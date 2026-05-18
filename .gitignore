@@ -14,6 +14,8 @@ venv/
 .DS_Store
 Thumbs.db
 
-# NOTE : data.js, data.json et .whoop_tokens.json SONT commités sur ce repo
-# (privé) car GitHub Actions a besoin de les régénérer/persister.
-# Le repo DOIT rester privé pour que ce soit safe.
+# NOTE : data.js, data.json, streams.js et .whoop_tokens.json SONT commités
+# sur ce repo (public) car GitHub Actions a besoin de les régénérer/persister
+# et GitHub Pages doit pouvoir les servir.
+# Les tokens Whoop sont publics — révocables via le portail dev Whoop si compromis.
+# Les clés API intervals.icu et Whoop client_secret restent dans les Secrets Actions.

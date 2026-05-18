@@ -1,10 +1,12 @@
 name: Update Coach IA data
 
-# Cron : toutes les 15 minutes + déclenchement manuel possible
+# Cron : toutes les 15 minutes + déclenchement manuel + push
 on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
+  push:
+    branches: [main]
 
 # Permissions pour committer data.js et tokens
 permissions:
@@ -45,39 +47,18 @@ jobs:
       - name: Run fetch_data.py
         run: python -X utf8 fetch_data.py
 
-      - name: Commit data & tokens to private repo
+      - name: Prepare index.html for GitHub Pages
+        run: cp dashboard.html index.html
+
+      - name: Commit data, tokens & dashboard
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f data.js data.json streams.js .whoop_tokens.json 2>/dev/null || true
+          git add -f data.js data.json streams.js .whoop_tokens.json index.html 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "Pas de changement, rien à committer."
           else
             git commit -m "Auto-update: $(date -u +'%Y-%m-%d %H:%M UTC')"
-            git push
-          fi
-
-      - name: Deploy dashboard to public repo
-        env:
-          DEPLOY_TOKEN: ${{ secrets.PAGES_DEPLOY_TOKEN }}
-        run: |
-          # Cloner le repo public dans un sous-dossier
-          git clone https://x-access-token:${DEPLOY_TOKEN}@github.com/Yanisjaber/coach-ia-dashboard.git public_repo
-
-          # Copier les fichiers du dashboard
-          cp dashboard.html public_repo/index.html
-          cp data.js public_repo/
-          cp data.json public_repo/
-          cp streams.js public_repo/ 2>/dev/null || true
-
-          cd public_repo
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          if git diff --staged --quiet; then
-            echo "Pas de changement à déployer."
-          else
-            git commit -m "Deploy: $(date -u +'%Y-%m-%d %H:%M UTC')"
             git push
           fi
 
