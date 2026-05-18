@@ -32,7 +32,7 @@ def _load_env():
 
 def _load_tokens():
     if not TOKEN_FILE.exists():
-        sys.exit("[X] .whoop_tokens.json absent - lance d'abord : python whoop_auth.py")
+        raise RuntimeError(".whoop_tokens.json absent - lance python whoop_auth.py.")
     return json.loads(TOKEN_FILE.read_text(encoding="utf-8"))
 
 
@@ -47,7 +47,7 @@ def _refresh_access(tokens):
     sec = env["WHOOP_CLIENT_SECRET"]
     refresh = tokens.get("refresh_token")
     if not refresh:
-        sys.exit("[X] Pas de refresh_token - relance python whoop_auth.py")
+        raise RuntimeError("Pas de refresh_token - relance python whoop_auth.py.")
     print("  -> Refresh du token Whoop...")
     resp = requests.post(TOKEN_URL, data={
         "grant_type": "refresh_token",
@@ -57,8 +57,11 @@ def _refresh_access(tokens):
         "scope": "offline",
     }, timeout=30)
     if resp.status_code != 200:
-        sys.exit(f"[X] Refresh failed {resp.status_code} : {resp.text[:300]}\n"
-                 "   Relance python whoop_auth.py pour reautoriser.")
+        # On lève une exception au lieu de sys.exit pour ne pas tuer fetch_data.py
+        raise RuntimeError(
+            f"Whoop refresh failed {resp.status_code} : {resp.text[:300]}. "
+            "Relance python whoop_auth.py localement puis push .whoop_tokens.json."
+        )
     new = resp.json()
     new["obtained_at"] = int(time.time())
     new["expires_at"] = int(time.time()) + new.get("expires_in", 3600) - 60

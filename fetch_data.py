@@ -428,11 +428,9 @@ def integrate_whoop(day_data, oldest, newest):
         # Compteur réel pour rapport ultérieur
         integrate_whoop.last_real_count = merged
         return True
-    except SystemExit:
-        raise
     except Exception as e:
-        print(f"  [!]Erreur Whoop : {e}", file=sys.stderr)
-        print("  ->Fallback sur données simulées")
+        print(f"  [!] Erreur Whoop : {e}", file=sys.stderr)
+        print("  -> Continue sans Whoop (data.js sera quand meme genere)")
         return False
 
 
