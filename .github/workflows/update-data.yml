@@ -1,0 +1,64 @@
+name: Update Coach IA data
+
+# Cron : toutes les 15 minutes + déclenchement manuel possible
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+# Permissions pour committer data.js et tokens
+permissions:
+  contents: write
+
+# Empêche deux jobs simultanés (évite conflits de commit)
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build .env from secrets
+        run: |
+          cat > .env <<EOF
+          INTERVALS_ATHLETE_ID=${{ secrets.INTERVALS_ATHLETE_ID }}
+          INTERVALS_API_KEY=${{ secrets.INTERVALS_API_KEY }}
+          WHOOP_CLIENT_ID=${{ secrets.WHOOP_CLIENT_ID }}
+          WHOOP_CLIENT_SECRET=${{ secrets.WHOOP_CLIENT_SECRET }}
+          WHOOP_REDIRECT_URI=http://localhost:8765/callback
+          EOF
+
+      - name: Run fetch_data.py
+        run: python -X utf8 fetch_data.py
+
+      - name: Commit and push data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Ajouter les fichiers générés (forcer car .gitignore peut les exclure en local)
+          git add -f data.js data.json .whoop_tokens.json 2>/dev/null || true
+          # Commit seulement si changements
+          if git diff --staged --quiet; then
+            echo "Pas de changement, rien à committer."
+          else
+            git commit -m "Auto-update: $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
+
+      - name: Cleanup .env
+        if: always()
+        run: rm -f .env

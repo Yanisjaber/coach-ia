@@ -1,0 +1,19 @@
+# Secrets locaux — JAMAIS commiter
+.env
+
+# Logs locaux
+update.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Système
+.DS_Store
+Thumbs.db
+
+# NOTE : data.js, data.json et .whoop_tokens.json SONT commités sur ce repo
+# (privé) car GitHub Actions a besoin de les régénérer/persister.
+# Le repo DOIT rester privé pour que ce soit safe.

@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coach IA — Dashboard Entraînement & Récupération</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="data.js" onerror="window._dataJsMissing=true"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0b0e14;
+    --bg-elev: #141821;
+    --bg-elev2: #1c2230;
+    --border: #232a3a;
+    --text: #e6e9ef;
+    --text-dim: #8b94a8;
+    --text-mute: #5a6378;
+    --accent: #4ade80;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --info: #60a5fa;
+    --purple: #a78bfa;
+    --pink: #f472b6;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--info));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 18px; color: #0b0e14;
+  }
+  .logo-text h1 { font-size: 20px; font-weight: 600; }
+  .logo-text p { font-size: 12px; color: var(--text-dim); }
+  .header-info { display: flex; gap: 20px; align-items: center; font-size: 13px; }
+  .header-info .date { color: var(--text-dim); }
+  .badge {
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: var(--warn);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  /* === HERO KPI === */
+  .hero {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .kpi-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .kpi-value { font-size: 36px; font-weight: 700; line-height: 1; }
+  .kpi-unit { font-size: 14px; color: var(--text-dim); margin-left: 4px; }
+  .kpi-trend { font-size: 12px; margin-top: 6px; color: var(--text-dim); }
+  .kpi-trend.up { color: var(--accent); }
+  .kpi-trend.down { color: var(--danger); }
+
+  .coach-card {
+    background: linear-gradient(135deg, rgba(74, 222, 128, 0.08), rgba(96, 165, 250, 0.08));
+    border-color: rgba(74, 222, 128, 0.3);
+  }
+  .coach-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .coach-pill {
+    background: rgba(74, 222, 128, 0.15);
+    color: var(--accent);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .coach-recommendation { font-size: 14px; line-height: 1.5; color: var(--text); }
+  .coach-recommendation strong { color: var(--accent); }
+
+  .ring-container { display: flex; align-items: center; gap: 16px; }
+  .ring {
+    width: 80px; height: 80px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .ring svg { transform: rotate(-90deg); }
+  .ring-text {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 22px; font-weight: 700;
+  }
+
+  /* === TABS === */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .tab {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    padding: 12px 18px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; animation: fadeIn 0.2s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  .section-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-subtitle { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
+
+  .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-1 { margin-bottom: 16px; }
+
+  .chart-wrap { position: relative; height: 320px; }
+  .chart-wrap.tall { height: 380px; }
+  .chart-wrap.small { height: 220px; }
+
+  /* === PLAN === */
+  .plan-list { display: flex; flex-direction: column; gap: 10px; }
+  .plan-item {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 60px 1fr auto;
+    gap: 14px;
+    align-items: center;
+  }
+  .plan-day {
+    text-align: center;
+    background: var(--bg);
+    padding: 8px;
+    border-radius: 8px;
+  }
+  .plan-day .dow { font-size: 10px; color: var(--text-dim); text-transform: uppercase; }
+  .plan-day .num { font-size: 18px; font-weight: 700; }
+  .plan-content .name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .plan-content .desc { font-size: 12px; color: var(--text-dim); }
+  .plan-adapt {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .plan-adapt.keep { background: rgba(74, 222, 128, 0.12); color: var(--accent); }
+  .plan-adapt.reduce { background: rgba(251, 191, 36, 0.12); color: var(--warn); }
+  .plan-adapt.swap { background: rgba(96, 165, 250, 0.12); color: var(--info); }
+  .plan-adapt.rest { background: rgba(248, 113, 113, 0.12); color: var(--danger); }
+
+  /* === SESSIONS TABLE === */
+  .session-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .session-table th {
+    text-align: left;
+    padding: 10px 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .session-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .session-table tr { cursor: pointer; transition: background 0.1s; }
+  .session-table tr:hover td { background: var(--bg-elev2); }
+  .session-table tr.selected td { background: rgba(74, 222, 128, 0.06); }
+
+  .pill {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .pill.endurance { background: rgba(96, 165, 250, 0.15); color: var(--info); }
+  .pill.tempo { background: rgba(167, 139, 250, 0.15); color: var(--purple); }
+  .pill.seuil { background: rgba(251, 191, 36, 0.15); color: var(--warn); }
+  .pill.vo2 { background: rgba(248, 113, 113, 0.15); color: var(--danger); }
+  .pill.recup { background: rgba(74, 222, 128, 0.15); color: var(--accent); }
+
+  .session-detail {
+    background: var(--bg-elev2);
+    border-radius: 10px;
+    padding: 18px;
+    margin-top: 14px;
+  }
+  .session-detail-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; }
+  .session-detail h3 { font-size: 16px; margin-bottom: 4px; }
+  .session-detail .meta { font-size: 12px; color: var(--text-dim); }
+  .metric-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .mini-metric { background: var(--bg); padding: 10px 12px; border-radius: 6px; }
+  .mini-metric .label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; }
+  .mini-metric .value { font-size: 18px; font-weight: 600; margin-top: 2px; }
+  .mini-metric .compare { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .mini-metric .compare.up { color: var(--accent); }
+  .mini-metric .compare.down { color: var(--danger); }
+
+  .zone-bar { display: flex; height: 24px; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+  .zone-seg { display: flex; align-items: center; justify-content: center; font-size: 10px; color: rgba(255,255,255,0.9); font-weight: 600; }
+  .legend { display: flex; gap: 14px; margin-top: 10px; flex-wrap: wrap; font-size: 11px; color: var(--text-dim); }
+  .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+
+  /* === ALERTS / INSIGHTS === */
+  .insight-list { display: flex; flex-direction: column; gap: 10px; }
+  .insight {
+    background: var(--bg-elev2);
+    border-left: 3px solid var(--info);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+  .insight.warn { border-left-color: var(--warn); }
+  .insight.danger { border-left-color: var(--danger); }
+  .insight.good { border-left-color: var(--accent); }
+  .insight .insight-title { font-weight: 600; margin-bottom: 3px; font-size: 13px; }
+  .insight .insight-body { color: var(--text-dim); font-size: 12px; }
+
+  footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-mute); font-size: 11px; text-align: center; }
+
+  /* === GLOSSAIRE === */
+  .glossary-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+    padding: 12px;
+    background: var(--bg-elev2);
+    border-radius: 8px;
+  }
+  .glossary-nav a {
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: var(--bg);
+    transition: all 0.15s;
+  }
+  .glossary-nav a:hover { color: var(--accent); background: rgba(74, 222, 128, 0.1); }
+  .glossary-section { margin-bottom: 28px; }
+  .glossary-section h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .term-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .term {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .term-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .term-abbr { font-size: 15px; font-weight: 700; color: var(--accent); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .term-name { font-size: 13px; color: var(--text-dim); font-style: italic; }
+  .term-def { font-size: 13px; line-height: 1.5; color: var(--text); }
+  .term-def .ex { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); font-size: 12px; color: var(--text-dim); }
+  .term-def .ex strong { color: var(--info); }
+
+  /* === SÉLECTEUR PÉRIODE === */
+  .period-selector {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+  .period-btn {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .period-btn:hover { color: var(--text); }
+  .period-btn.active {
+    background: rgba(74, 222, 128, 0.15);
+    border-color: rgba(74, 222, 128, 0.4);
+    color: var(--accent);
+  }
+  .date-range {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+  }
+  .date-range input[type="date"] {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 12px;
+    color-scheme: dark;
+    cursor: pointer;
+  }
+  .date-range input[type="date"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .date-range .preset {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .date-range .preset:hover { color: var(--text); }
+  .date-range .preset.active {
+    background: rgba(74, 222, 128, 0.15);
+    border-color: rgba(74, 222, 128, 0.4);
+    color: var(--accent);
+  }
+  .date-range .sep { color: var(--text-mute); }
+
+  .zone-summary {
+    margin-top: 10px;
+    padding: 10px;
+    background: var(--bg-elev2);
+    border-radius: 6px;
+    font-size: 11px;
+  }
+  .zone-summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+  }
+  .zone-summary-row .zname { color: var(--text-dim); }
+  .zone-summary-row .zpct { color: var(--text); font-weight: 600; }
+
+  @media (max-width: 900px) {
+    .term-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 900px) {
+    .hero, .grid-2, .grid-3, .metric-row { grid-template-columns: 1fr; }
+    .container { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">CI</div>
+    <div class="logo-text">
+      <h1>Coach IA</h1>
+      <p>Entraînement intelligent · intervals.icu × Whoop</p>
+    </div>
+  </div>
+  <div class="header-info">
+    <span class="date" id="today-date">—</span>
+    <span class="badge">Prototype · données simulées</span>
+  </div>
+</header>
+
+<!-- HERO KPIs -->
+<section class="hero">
+  <div class="card coach-card">
+    <div class="coach-header">
+      <span class="coach-pill">COACH IA</span>
+      <span style="font-size:11px;color:var(--text-dim);">Recommandation du jour</span>
+    </div>
+    <div class="coach-recommendation" id="coach-rec">—</div>
+  </div>
+
+  <div class="card">
+    <div class="kpi-label">Récupération Whoop</div>
+    <div class="ring-container">
+      <div class="ring">
+        <svg width="80" height="80"><circle cx="40" cy="40" r="34" fill="none" stroke="var(--border)" stroke-width="8"/><circle id="recovery-ring" cx="40" cy="40" r="34" fill="none" stroke="var(--accent)" stroke-width="8" stroke-dasharray="213.6" stroke-dashoffset="100" stroke-linecap="round"/></svg>
+        <div class="ring-text" id="recovery-val">—</div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--text-dim);">HRV</div>
+        <div style="font-size:18px;font-weight:600;" id="hrv-val">— ms</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Sommeil</div>
+        <div style="font-size:13px;" id="sleep-val">— h</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="kpi-label">Forme (TSB)</div>
+    <div><span class="kpi-value" id="tsb-val">—</span></div>
+    <div class="kpi-trend" id="tsb-state">—</div>
+    <div style="margin-top:10px;font-size:12px;color:var(--text-dim);">
+      Fitness CTL <span style="color:var(--text);" id="ctl-val">—</span><br>
+      Fatigue ATL <span style="color:var(--text);" id="atl-val">—</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="kpi-label">Charge 7 jours</div>
+    <div><span class="kpi-value" id="weekly-tss">—</span><span class="kpi-unit">TSS</span></div>
+    <div class="kpi-trend" id="weekly-trend">—</div>
+    <div style="margin-top:10px;font-size:12px;color:var(--text-dim);">
+      Séances : <span style="color:var(--text);" id="weekly-sessions">—</span><br>
+      Temps : <span style="color:var(--text);" id="weekly-hours">—</span>
+    </div>
+  </div>
+</section>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" data-panel="p1">Charge vs Récupération</button>
+  <button class="tab" data-panel="p2">Planification adaptative</button>
+  <button class="tab" data-panel="p3">Tendances long-terme</button>
+  <button class="tab" data-panel="p4">Détail séances</button>
+  <button class="tab" data-panel="p5">Termes</button>
+</div>
+
+<!-- PANEL 1: Charge vs Récupération -->
+<section class="panel active" id="p1">
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title">Forme & fatigue</div>
+      <div class="section-subtitle">Évolution CTL/ATL/TSB superposée au score de récupération Whoop</div>
+      <div class="date-range" id="load-range">
+        <button class="preset active" data-days="30">30j</button>
+        <button class="preset" data-days="90">90j</button>
+        <button class="preset" data-days="180">6 mois</button>
+        <button class="preset" data-days="365">1 an</button>
+        <span class="sep">·</span>
+        <span>du</span>
+        <input type="date" id="load-from">
+        <span>au</span>
+        <input type="date" id="load-to">
+      </div>
+      <div class="chart-wrap tall"><canvas id="chart-load"></canvas></div>
+      <div class="legend">
+        <span><span class="legend-dot" style="background:var(--info);"></span>CTL (forme)</span>
+        <span><span class="legend-dot" style="background:var(--warn);"></span>ATL (fatigue)</span>
+        <span><span class="legend-dot" style="background:var(--purple);"></span>TSB (fraîcheur)</span>
+        <span><span class="legend-dot" style="background:var(--accent);"></span>Recovery Whoop</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">Corrélations détectées</div>
+      <div class="section-subtitle">Calculées sur les 90 derniers jours</div>
+      <div class="insight-list" id="correl-list"></div>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="section-title">TSS vs Recovery (J+1)</div>
+      <div class="date-range" id="scatter-range">
+        <button class="preset active" data-days="30">30j</button>
+        <button class="preset" data-days="90">90j</button>
+        <button class="preset" data-days="365">1 an</button>
+        <span class="sep">·</span>
+        <input type="date" id="scatter-from">
+        <span>→</span>
+        <input type="date" id="scatter-to">
+      </div>
+      <div class="chart-wrap small"><canvas id="chart-scatter"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Charge hebdo</div>
+      <div class="chart-wrap small"><canvas id="chart-weekly"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Répartition par zones (%)</div>
+      <div class="period-selector" id="zones-period">
+        <button class="period-btn active" data-period="7">7 derniers jours</button>
+        <button class="period-btn" data-period="30">30 jours</button>
+        <button class="period-btn" data-period="90">90 jours</button>
+      </div>
+      <div class="chart-wrap small"><canvas id="chart-zones"></canvas></div>
+      <div class="zone-summary" id="zone-summary"></div>
+    </div>
+  </div>
+</section>
+
+<!-- PANEL 2: Planification adaptative -->
+<section class="panel" id="p2">
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title">7 jours à venir · adaptation automatique</div>
+      <div class="section-subtitle">L'agent ajuste chaque séance selon la récupération prévue et la charge accumulée</div>
+      <div class="plan-list" id="plan-list"></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Projection de forme</div>
+      <div class="section-subtitle">Évolution CTL / TSB si le plan adapté est suivi</div>
+      <div class="chart-wrap"><canvas id="chart-forecast"></canvas></div>
+      <div style="margin-top:14px;padding:12px;background:var(--bg-elev2);border-radius:8px;font-size:12px;">
+        <strong style="color:var(--accent);">Objectif :</strong> pic de forme prévu dans <span id="peak-days">—</span> jours (TSB +<span id="peak-tsb">—</span>) pour la sortie longue du week-end suivant.
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-1 card">
+    <div class="section-title">Logique d'adaptation du Coach IA</div>
+    <div class="section-subtitle">Règles appliquées par l'agent (transparentes et ajustables)</div>
+    <table class="session-table">
+      <thead><tr><th>Condition</th><th>Action proposée</th><th>Raison physiologique</th></tr></thead>
+      <tbody>
+        <tr><td>Recovery &lt; 33% (rouge)</td><td><span class="plan-adapt rest">Repos / récup active</span></td><td>HRV basse → SNP en stress, risque blessure ou surentraînement</td></tr>
+        <tr><td>Recovery 34-66% (jaune)</td><td><span class="plan-adapt reduce">−30% intensité</span></td><td>Adaptations possibles mais à puissance réduite, éviter le seuil</td></tr>
+        <tr><td>Recovery &gt; 66% + TSB &gt; 0</td><td><span class="plan-adapt keep">Séance prévue conservée</span></td><td>Capacité d'absorption optimale</td></tr>
+        <tr><td>TSB &lt; −30 sur 5j</td><td><span class="plan-adapt swap">Semaine de décharge</span></td><td>Risque de stagnation/régression, besoin de surcompensation</td></tr>
+        <tr><td>Sommeil &lt; 6h ET HRV ↓ 2j</td><td><span class="plan-adapt rest">Annulation séance dure</span></td><td>Récupération neuromusculaire insuffisante</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- PANEL 3: Tendances long-terme -->
+<section class="panel" id="p3">
+  <div class="grid-3">
+    <div class="card">
+      <div class="section-title">HRV (moyenne 7j)</div>
+      <div class="chart-wrap small"><canvas id="chart-hrv"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Sommeil</div>
+      <div class="chart-wrap small"><canvas id="chart-sleep"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Ratio aigu/chronique</div>
+      <div class="chart-wrap small"><canvas id="chart-ratio"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title">Évolution de la condition physique (CTL)</div>
+      <div class="section-subtitle">Progression sur 90 jours · zones de risque marquées</div>
+      <div class="chart-wrap"><canvas id="chart-ctl-trend"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Signaux d'alerte</div>
+      <div class="section-subtitle">Détection automatique de patterns à risque</div>
+      <div class="insight-list" id="alerts-list"></div>
+    </div>
+  </div>
+</section>
+
+<!-- PANEL 4: Détail séances -->
+<section class="panel" id="p4">
+  <div class="card">
+    <div class="section-title">Séances récentes</div>
+    <div class="section-subtitle">Cliquer sur une ligne pour voir le détail prévu vs réalisé</div>
+    <table class="session-table">
+      <thead><tr>
+        <th>Date</th><th>Séance</th><th>Type</th><th>Durée</th><th>TSS</th><th>NP / FTP%</th><th>FC moy</th><th>Conformité</th>
+      </tr></thead>
+      <tbody id="sessions-tbody"></tbody>
+    </table>
+    <div id="session-detail-wrap"></div>
+  </div>
+</section>
+
+<!-- PANEL 5: Termes -->
+<section class="panel" id="p5">
+  <div class="card">
+    <div class="section-title">Glossaire complet</div>
+    <div class="section-subtitle">Tous les termes techniques utilisés dans le dashboard, classés par catégorie. Cliquer sur une section pour y sauter.</div>
+
+    <nav class="glossary-nav">
+      <a href="#g-charge">Charge & forme</a>
+      <a href="#g-puissance">Puissance & intensité</a>
+      <a href="#g-zones">Zones d'entraînement</a>
+      <a href="#g-typeseances">Types de séances</a>
+      <a href="#g-recup">Récupération & physiologie</a>
+      <a href="#g-whoop">Whoop & sommeil</a>
+      <a href="#g-planification">Planification & adaptation</a>
+      <a href="#g-metriques">Métriques séance</a>
+    </nav>
+
+    <div class="glossary-section" id="g-charge">
+      <h2>Charge d'entraînement & forme</h2>
+      <div class="term-grid">
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">TSS</span><span class="term-name">Training Stress Score</span></div>
+          <div class="term-def">Score de stress d'entraînement. Quantifie la charge d'une séance en combinant intensité et durée. Une séance d'1h à 100% FTP = 100 TSS de référence.<span class="ex"><strong>Exemple :</strong> sortie longue de 3h en Z2 ≈ 180 TSS ; séance VO2max d'1h ≈ 120 TSS.</span></div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">CTL</span><span class="term-name">Chronic Training Load · Fitness</span></div>
+          <div class="term-def">Moyenne pondérée des TSS sur 42 jours. Représente ta condition physique acquise sur le long terme. Plus le CTL est haut, plus tu es "en forme".<span class="ex"><strong>Repère :</strong> cycliste amateur 40-60, compétiteur 70-100, pro 110+.</span></div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">ATL</span><span class="term-name">Acute Training Load · Fatigue</span></div>
+          <div class="term-def">Moyenne pondérée des TSS sur 7 jours. Représente la fatigue accumulée à court terme.<span class="ex"><strong>Repère :</strong> si ATL = CTL, charge équilibrée ; si ATL ≫ CTL, surcharge en cours.</span></div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">TSB</span><span class="term-name">Training Stress Balance · Forme/Fraîcheur</span></div>
+          <div class="term-def">Différence CTL − ATL. Mesure la "fraîcheur" : positif = reposé, négatif = fatigué.<span class="ex"><strong>Repères :</strong> > +5 frais (pic) · −10 à +5 optimal · −30 à −10 fatigué · < −30 surchargé.</span></div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Ratio ATL/CTL</span><span class="term-name">Acute/Chronic Workload Ratio</span></div>
+          <div class="term-def">Indicateur de risque de blessure. Ratio entre charge récente et chronique.<span class="ex"><strong>Sweet spot :</strong> 0.8-1.3. Au-dessus de 1.5, risque de blessure ×3-5.</span></div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Charge interne/externe</span></div>
+          <div class="term-def"><strong>Externe :</strong> ce que tu produis (puissance, vitesse, TSS). <strong>Interne :</strong> ce que ton corps subit (FC, HRV, recovery). Comparer les deux révèle l'efficience.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glossary-section" id="g-puissance">
+      <h2>Puissance & intensité</h2>
+      <div class="term-grid">
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">FTP</span><span class="term-name">Functional Threshold Power</span></div>
+          <div class="term-def">Puissance maximale soutenable pendant ~1h, exprimée en watts. C'est la référence qui définit toutes les zones d'entraînement. À retester tous les 6-8 semaines.<span class="ex"><strong>Exemple :</strong> FTP 250W → seuil ≈ 95-105% (238-263W).</span></div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">NP</span><span class="term-name">Normalized Power</span></div>
+          <div class="term-def">Puissance normalisée. Estime ce qu'aurait été la puissance moyenne si l'effort avait été parfaitement constant. Plus fidèle à la fatigue réelle que la puissance moyenne brute (surtout en intervalle ou terrain vallonné).</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">IF</span><span class="term-name">Intensity Factor</span></div>
+          <div class="term-def">Rapport NP / FTP. Mesure l'intensité globale d'une séance.<span class="ex"><strong>Repères :</strong> &lt; 0.75 endurance · 0.75-0.85 tempo · 0.85-0.95 seuil · > 0.95 course/PR.</span></div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">VI</span><span class="term-name">Variability Index</span></div>
+          <div class="term-def">Rapport NP / puissance moyenne. Mesure la régularité de l'effort.<span class="ex"><strong>Repères :</strong> 1.00-1.05 effort très régulier (contre-la-montre) · > 1.15 effort très irrégulier (criterium, intervalles).</span></div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">W/kg</span><span class="term-name">Watts par kilo</span></div>
+          <div class="term-def">Puissance rapportée au poids. Métrique clé en cyclisme dès qu'il y a du dénivelé.<span class="ex"><strong>Repères FTP :</strong> 2.5 débutant · 3.5 amateur entraîné · 4.5 compétiteur · 5.5+ élite.</span></div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Cadence</span></div>
+          <div class="term-def">Vitesse de pédalage en tours/minute (rpm).<span class="ex"><strong>Repères :</strong> 70-80 rpm en force/grosse vitesse · 85-95 rpm cadence "naturelle" · 100+ rpm vélocité/sprint.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glossary-section" id="g-zones">
+      <h2>Zones d'entraînement (modèle Coggan 5 zones)</h2>
+      <div class="term-grid">
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Z1</span><span class="term-name">Récupération active</span></div>
+          <div class="term-def">&lt; 55% FTP · &lt; 68% FC max. Effort très léger, conversation aisée. Utilisé pour la récupération entre intervalles ou le lendemain d'une séance dure.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Z2</span><span class="term-name">Endurance fondamentale</span></div>
+          <div class="term-def">55-75% FTP · 68-83% FC max. Pierre angulaire de l'entraînement d'endurance. Développe la base aérobie et la capacité à utiliser les graisses comme carburant. Doit représenter 70-80% du volume total.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Z3</span><span class="term-name">Tempo</span></div>
+          <div class="term-def">76-90% FTP · 84-94% FC max. Effort soutenu mais gérable longtemps. Améliore l'endurance musculaire et la résistance à l'accumulation de lactate.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Z4</span><span class="term-name">Seuil lactique</span></div>
+          <div class="term-def">91-105% FTP · 95-100% FC max. À cheval sur le FTP. Travaille la capacité à soutenir un effort intense longtemps. Format classique : 2-4 × 8-20 min.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Z5</span><span class="term-name">VO2max</span></div>
+          <div class="term-def">106-120% FTP · 100% FC max. Maximise la capacité aérobie. Très exigeant. Format classique : 4-6 × 3-5 min avec récup égale ou plus longue.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Z6 / Z7</span><span class="term-name">Anaérobie / Neuromusculaire</span></div>
+          <div class="term-def">&gt; 120% FTP. Au-delà du seuil aérobie. Sprints courts (10-30s) pour la puissance maximale et le système nerveux.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glossary-section" id="g-typeseances">
+      <h2>Types de séances</h2>
+      <div class="term-grid">
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Endurance Z2</span></div>
+          <div class="term-def">Sortie longue à intensité modérée (60-75% FTP). Construit la base aérobie sans fatigue excessive. Idéale 1-2× par semaine, durée 1h30-5h selon niveau.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Sweet Spot</span></div>
+          <div class="term-def">Effort à 88-94% FTP. "Point doux" entre tempo et seuil : grosse adaptation pour une fatigue contenue. Format typique : 3 × 12-15 min.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Seuil</span></div>
+          <div class="term-def">Intervalles à 95-105% FTP. Repousse le seuil lactique. Format : 2-4 × 8-20 min, récup 3-5 min.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">VO2max</span></div>
+          <div class="term-def">Intervalles courts et intenses à 106-120% FTP. Améliore le débit cardiaque maximal. Format : 4-6 × 3-5 min, récup égale.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Bloc / Intervalle</span></div>
+          <div class="term-def"><strong>Intervalle :</strong> période d'effort soutenue à intensité cible. <strong>Bloc :</strong> ensemble d'intervalles formant une série (ex : "bloc de 4 × 8 min").</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Récup active</span></div>
+          <div class="term-def">Sortie facile (Z1, &lt; 55% FTP) entre 30 et 60 min. Active la circulation sans ajouter de fatigue. Aide à éliminer les déchets métaboliques.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glossary-section" id="g-recup">
+      <h2>Récupération & physiologie</h2>
+      <div class="term-grid">
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">HRV</span><span class="term-name">Heart Rate Variability</span></div>
+          <div class="term-def">Variabilité de la fréquence cardiaque. Mesure de la variation entre deux battements (en ms). Reflète l'équilibre nerveux autonome.<span class="ex"><strong>Lecture :</strong> HRV haute = système parasympathique dominant = bien récupéré. HRV basse = stress, fatigue ou maladie naissante.</span></div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">SNP</span><span class="term-name">Système nerveux autonome</span></div>
+          <div class="term-def">Régule les fonctions involontaires. Deux branches : <strong>sympathique</strong> (action, stress, "fight or flight") et <strong>parasympathique</strong> (récup, digestion, "rest and digest"). L'HRV mesure leur équilibre.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">FC / bpm</span><span class="term-name">Fréquence cardiaque</span></div>
+          <div class="term-def">Battements par minute. FC max ≈ 220 − âge (formule indicative, à mesurer en vrai). FC repos = indicateur de fatigue (élevée = mauvaise récup).</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Lactate</span></div>
+          <div class="term-def">Sous-produit du métabolisme anaérobie. Souvent associé à tort à la fatigue : c'est en réalité un carburant. Son <strong>accumulation</strong> (production &gt; clairance) signale qu'on dépasse le seuil aérobie.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Surcompensation</span></div>
+          <div class="term-def">Principe d'entraînement : après une charge + repos, l'organisme reconstruit plus fort qu'avant. C'est ce mécanisme qui produit la progression.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Surentraînement</span></div>
+          <div class="term-def">État de fatigue chronique où l'organisme ne récupère plus. Symptômes : performance qui chute, HRV basse persistante, sommeil dégradé, irritabilité, infections fréquentes. Récup : semaines à mois.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glossary-section" id="g-whoop">
+      <h2>Whoop & sommeil</h2>
+      <div class="term-grid">
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Recovery Score</span><span class="term-name">Whoop</span></div>
+          <div class="term-def">Score 0-100% calculé chaque matin par Whoop à partir de HRV, FC repos, sommeil et fréquence respiratoire. Code couleur : <strong style="color:var(--danger);">rouge &lt; 33%</strong>, <strong style="color:var(--warn);">jaune 34-66%</strong>, <strong style="color:var(--accent);">vert &gt; 66%</strong>.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Strain</span><span class="term-name">Whoop</span></div>
+          <div class="term-def">Score 0-21 de l'effort cardiovasculaire total de la journée (échelle Borg modifiée, logarithmique). Combine FC sur 24h, pas seulement les séances. Strain &gt; 14 = journée très exigeante.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Sommeil profond</span></div>
+          <div class="term-def">Phase SWS (Slow Wave Sleep). Récupération physique maximale : sécrétion d'hormone de croissance, réparation tissulaire. Cible : 15-25% du temps de sommeil total.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">REM</span><span class="term-name">Rapid Eye Movement</span></div>
+          <div class="term-def">Phase de sommeil paradoxal. Consolidation mémoire et apprentissage moteur. Cible : 20-25% du temps de sommeil total.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Qualité de sommeil</span></div>
+          <div class="term-def">Score 0-100% combinant durée totale, efficience (temps endormi / temps au lit), perturbations et respect du besoin théorique. Indépendant de la durée brute en heures.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Sleep Debt</span><span class="term-name">Dette de sommeil</span></div>
+          <div class="term-def">Cumul du manque par rapport au besoin théorique. Une dette &gt; 5h sur 7 jours dégrade significativement performance et récup.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glossary-section" id="g-planification">
+      <h2>Planification & adaptation</h2>
+      <div class="term-grid">
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Bloc d'entraînement</span></div>
+          <div class="term-def">Période de 2-4 semaines avec un objectif d'adaptation spécifique (base, force, VO2max, affûtage). Le plan global enchaîne plusieurs blocs.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Semaine de décharge</span></div>
+          <div class="term-def">Semaine à charge réduite (−30 à −50%) après 2-3 semaines de build. Permet l'absorption des adaptations et la surcompensation. Sans elle, plateau ou régression.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Affûtage</span><span class="term-name">Tapering</span></div>
+          <div class="term-def">Réduction progressive de la charge sur 1-3 semaines avant un objectif. Le but : faire chuter l'ATL plus vite que le CTL pour faire monter le TSB et arriver frais.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Pic de forme</span></div>
+          <div class="term-def">Combinaison optimale CTL haut (capacité construite) + TSB positif (frais). Visé pour les compétitions ou objectifs majeurs. Difficile à maintenir &gt; 2-3 semaines.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Périodisation</span></div>
+          <div class="term-def">Structuration de la saison en phases (préparation générale → spécifique → compétition → transition). Chaque phase a son focus : volume, intensité, spécificité.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Conformité</span></div>
+          <div class="term-def">% de la séance prévue effectivement réalisée (TSS réalisé / TSS prévu). &gt; 95% conforme · 85-95% léger écart · &lt; 85% écart significatif (à analyser).</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glossary-section" id="g-metriques">
+      <h2>Métriques séance</h2>
+      <div class="term-grid">
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Puissance moyenne</span></div>
+          <div class="term-def">Moyenne arithmétique brute des watts. Sous-estime la difficulté des efforts variables. Toujours croiser avec NP.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">FC moyenne / max</span></div>
+          <div class="term-def">Moyenne et pic de fréquence cardiaque. Indique l'intensité physiologique perçue par le corps (vs intensité externe = watts).</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Decoupling cardiaque</span></div>
+          <div class="term-def">Dérive de la FC pendant un effort à puissance constante. &lt; 5% = bon état aérobie · &gt; 7% = fatigue, déshydratation ou base aérobie à travailler.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">EF</span><span class="term-name">Efficiency Factor</span></div>
+          <div class="term-def">NP / FC moyenne. Indicateur d'efficience aérobie : plus il monte au fil des semaines à FC égale, plus tu progresses en endurance de base.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Répartition par zones</span></div>
+          <div class="term-def">% de temps passé dans chaque zone (Z1-Z5) durant une séance. Indique si l'exécution colle au plan : une séance "endurance" doit être &gt; 80% en Z2.</div>
+        </div>
+        <div class="term">
+          <div class="term-head"><span class="term-abbr">Corrélation</span></div>
+          <div class="term-def">Coefficient entre −1 et +1 mesurant la force d'un lien entre 2 variables. Proche de +1 : lien fort positif. Proche de −1 : lien fort inverse. Proche de 0 : pas de lien.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Coach IA · prototype dashboard · données simulées sur 90 jours · construit pour valider l'UX avant intégration intervals.icu + Whoop
+</footer>
+
+</div>
+
+<script>
+// ========= UTILS =========
+const rand = (min, max) => Math.random() * (max - min) + min;
+const randInt = (min, max) => Math.floor(rand(min, max + 1));
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+const fmtDate = (d) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+
+// ========= DATA LOADER (data.js via window.DASHBOARD_DATA) =========
+async function loadData() {
+  try {
+    const json = window.DASHBOARD_DATA;
+    if (!json) throw new Error('window.DASHBOARD_DATA absent (data.js non chargé)');
+    if (!json.days || !json.days.length) throw new Error('data.js vide');
+
+    // Mise à jour de l'en-tête avec l'athlète réel
+    if (json.athlete) {
+      const a = json.athlete;
+      const sub = document.querySelector('.logo-text p');
+      const ftpStr = a.ftp ? `FTP ${a.ftp}W · ` : '';
+      const wStr = a.weight ? `${a.weight}kg · ` : '';
+      sub.textContent = `${a.name} · ${ftpStr}${wStr}intervals.icu`;
+    }
+    // Badge : nombre de jours réels Whoop disponibles
+    const badge = document.querySelector('header .badge');
+    if (badge) {
+      const realDays = (json.source && json.source.whoop_real_days) || 0;
+      if (realDays > 0) {
+        badge.textContent = `intervals.icu · Whoop : ${realDays}j réels`;
+        badge.style.background = 'rgba(74, 222, 128, 0.1)';
+        badge.style.borderColor = 'rgba(74, 222, 128, 0.3)';
+        badge.style.color = 'var(--accent)';
+      } else {
+        badge.textContent = 'intervals.icu uniquement · Whoop indisponible';
+      }
+    }
+
+    // Indicateur "dernière mise à jour"
+    if (json.generated_at) {
+      const gen = new Date(json.generated_at);
+      const now = new Date();
+      const minAgo = Math.round((now - gen) / 60000);
+      let fresh;
+      if (minAgo < 1) fresh = 'à l\'instant';
+      else if (minAgo < 60) fresh = `il y a ${minAgo} min`;
+      else if (minAgo < 1440) fresh = `il y a ${Math.round(minAgo/60)} h`;
+      else fresh = `il y a ${Math.round(minAgo/1440)} j`;
+      const dot = minAgo < 30 ? 'var(--accent)' : minAgo < 120 ? 'var(--warn)' : 'var(--danger)';
+      const existing = document.getElementById('last-update');
+      const html = `<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);">
+        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${dot};"></span>
+        Mis à jour ${fresh}
+      </span>`;
+      if (existing) {
+        existing.innerHTML = html;
+      } else {
+        const headerInfo = document.querySelector('.header-info');
+        const span = document.createElement('span');
+        span.id = 'last-update';
+        span.innerHTML = html;
+        headerInfo.insertBefore(span, headerInfo.firstChild);
+      }
+    }
+
+    // Convertir dates string → Date pour compatibilité avec le code existant
+    const days = json.days.map(d => ({ ...d, date: new Date(d.date + 'T12:00:00') }));
+    // Garder le plan réel pour usage ultérieur
+    window._planFromAPI = json.plan || [];
+    window._athleteMeta = json.athlete;
+    return days;
+  } catch (e) {
+    console.error('⚠️ Chargement data.json impossible :', e.message);
+    const badge = document.querySelector('header .badge');
+    if (badge) {
+      badge.textContent = '⚠ data.js absent — relancer fetch_data.py';
+      badge.style.background = 'rgba(248, 113, 113, 0.15)';
+      badge.style.borderColor = 'rgba(248, 113, 113, 0.4)';
+      badge.style.color = 'var(--danger)';
+    }
+    // Afficher message d'aide dans le corps
+    document.querySelector('.container').insertAdjacentHTML('beforeend',
+      `<div style="background:#1c2230;border:1px solid #f87171;border-radius:10px;padding:20px;margin-top:20px;">
+        <h3 style="color:#f87171;margin-bottom:8px;">data.js introuvable</h3>
+        <p style="color:#8b94a8;font-size:13px;">Le dashboard a besoin du fichier <code>data.js</code> dans le même dossier. Pour le générer :</p>
+        <pre style="background:#0b0e14;padding:12px;border-radius:6px;margin-top:10px;font-size:12px;overflow-x:auto;">cd "C:\\Users\\Cybertek\\Documents\\Claude\\Projects\\Coach IA"
+python fetch_data.py</pre>
+        <p style="color:#8b94a8;font-size:12px;margin-top:8px;">Puis rafraîchir cette page (F5).</p>
+       </div>`);
+    throw e;
+  }
+}
+
+// ========= MAIN (IIFE async) =========
+(async () => {
+const data = await loadData();
+const todayData = data[data.length - 1];
+const today = new Date(todayData.date);
+
+// ========= DATA GENERATION (fallback simulé) =========
+function generateData() {
+  const days = 90;
+  const data = [];
+  let ctl = 55, atl = 55;
+  let baseHRV = 62;
+
+  // Pattern d'entraînement : 2 semaines build, 1 semaine récup
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - i);
+    const dow = date.getDay();
+    const weekIndex = Math.floor((days - i) / 7);
+    const isRecoveryWeek = (weekIndex % 4 === 3);
+
+    // TSS du jour selon type de séance
+    let tss = 0, sessionType = null, sessionName = null, duration = 0;
+    if (dow === 1) { tss = 0; sessionName = "Repos"; } // lundi off
+    else if (dow === 2) {
+      tss = isRecoveryWeek ? rand(40, 55) : rand(70, 90);
+      sessionType = "tempo"; sessionName = "Tempo / sweet spot";
+      duration = randInt(60, 90);
+    }
+    else if (dow === 3) {
+      tss = isRecoveryWeek ? rand(30, 45) : rand(55, 75);
+      sessionType = "endurance"; sessionName = "Endurance Z2";
+      duration = randInt(75, 120);
+    }
+    else if (dow === 4) {
+      tss = isRecoveryWeek ? 0 : rand(85, 120);
+      sessionType = "seuil"; sessionName = "Intervalles seuil";
+      duration = randInt(70, 95);
+      if (isRecoveryWeek) sessionName = "Repos";
+    }
+    else if (dow === 5) {
+      tss = rand(25, 40);
+      sessionType = "recup"; sessionName = "Récup active";
+      duration = randInt(40, 60);
+    }
+    else if (dow === 6) {
+      tss = isRecoveryWeek ? rand(60, 80) : rand(110, 160);
+      sessionType = "vo2"; sessionName = "VO2max / blocs";
+      duration = randInt(90, 130);
+    }
+    else if (dow === 0) {
+      tss = isRecoveryWeek ? rand(80, 110) : rand(140, 200);
+      sessionType = "endurance"; sessionName = "Sortie longue";
+      duration = randInt(150, 240);
+    }
+    tss = Math.round(tss);
+
+    // CTL / ATL
+    ctl = ctl + (tss - ctl) / 42;
+    atl = atl + (tss - atl) / 7;
+    const tsb = ctl - atl;
+
+    // Whoop simulé : récupération corrélée négativement à ATL+TSS
+    const stressBase = (atl - 50) * 0.8 + tss * 0.15;
+    let recovery = clamp(85 - stressBase + rand(-12, 12), 15, 99);
+    recovery = Math.round(recovery);
+
+    // HRV corrélé à recovery
+    const hrv = Math.round(baseHRV + (recovery - 60) * 0.4 + rand(-4, 4));
+
+    // Sommeil
+    const sleepH = clamp(rand(6.5, 8.8) - (tss > 100 ? 0.3 : 0), 5, 9.5);
+    const sleepQ = clamp(recovery + rand(-10, 10), 30, 100);
+
+    data.push({
+      date, tss, ctl: +ctl.toFixed(1), atl: +atl.toFixed(1), tsb: +tsb.toFixed(1),
+      recovery, hrv, sleepH: +sleepH.toFixed(1), sleepQ: Math.round(sleepQ),
+      sessionType, sessionName, duration,
+      // Détails séance
+      np: sessionType ? randInt(180, 280) : 0,
+      hr: sessionType ? randInt(135, 168) : 0,
+      ftpPct: sessionType ? randInt(72, 95) : 0,
+      compliance: sessionType ? randInt(82, 102) : 0,
+      // Zones de FC (% temps)
+      zones: sessionType ? [
+        randInt(5, 20), randInt(20, 45), randInt(15, 30), randInt(8, 20), randInt(2, 12)
+      ] : null
+    });
+  }
+  // Normaliser zones à 100%
+  data.forEach(d => {
+    if (d.zones) {
+      const s = d.zones.reduce((a,b)=>a+b,0);
+      d.zones = d.zones.map(z => Math.round(z * 100 / s));
+    }
+  });
+  return data;
+}
+
+// ========= HERO KPI =========
+document.getElementById('today-date').textContent = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const hasRecovery = todayData.recovery != null;
+document.getElementById('recovery-val').textContent = hasRecovery ? todayData.recovery + '%' : '—';
+const ringDash = 213.6;
+if (hasRecovery) {
+  document.getElementById('recovery-ring').style.strokeDashoffset = ringDash * (1 - todayData.recovery / 100);
+  const recColor = todayData.recovery > 66 ? 'var(--accent)' : todayData.recovery > 33 ? 'var(--warn)' : 'var(--danger)';
+  document.getElementById('recovery-ring').style.stroke = recColor;
+} else {
+  document.getElementById('recovery-ring').style.strokeDashoffset = ringDash;
+  document.getElementById('recovery-ring').style.stroke = 'var(--text-mute)';
+}
+document.getElementById('hrv-val').textContent = todayData.hrv != null ? todayData.hrv + ' ms' : '— ms';
+document.getElementById('sleep-val').textContent = todayData.sleepH != null
+  ? todayData.sleepH + ' h' + (todayData.sleepQ != null ? ' (qualité ' + todayData.sleepQ + '%)' : '')
+  : '— h';
+
+document.getElementById('tsb-val').textContent = (todayData.tsb >= 0 ? '+' : '') + todayData.tsb.toFixed(0);
+const tsbState = todayData.tsb > 5 ? 'Frais · prêt à performer' : todayData.tsb > -10 ? 'Optimal · zone de progression' : todayData.tsb > -25 ? 'Fatigué · vigilance' : 'Surchargé · décharge recommandée';
+const tsbClass = todayData.tsb > 5 ? 'up' : todayData.tsb < -20 ? 'down' : '';
+const tsbEl = document.getElementById('tsb-state');
+tsbEl.textContent = tsbState;
+tsbEl.className = 'kpi-trend ' + tsbClass;
+document.getElementById('ctl-val').textContent = todayData.ctl.toFixed(0);
+document.getElementById('atl-val').textContent = todayData.atl.toFixed(0);
+
+const last7 = data.slice(-7);
+const weeklyTSS = last7.reduce((s,d)=>s+d.tss,0);
+const prev7 = data.slice(-14,-7);
+const prevTSS = prev7.reduce((s,d)=>s+d.tss,0);
+const trendPct = ((weeklyTSS - prevTSS) / prevTSS * 100).toFixed(0);
+document.getElementById('weekly-tss').textContent = weeklyTSS;
+const trendEl = document.getElementById('weekly-trend');
+trendEl.textContent = (trendPct > 0 ? '↑ +' : '↓ ') + trendPct + '% vs semaine précédente';
+trendEl.className = 'kpi-trend ' + (trendPct > 5 ? 'up' : trendPct < -5 ? 'down' : '');
+document.getElementById('weekly-sessions').textContent = last7.filter(d => d.tss > 0).length;
+document.getElementById('weekly-hours').textContent = (last7.reduce((s,d)=>s+(d.duration||0),0)/60).toFixed(1) + ' h';
+
+// Recommandation Coach IA — adaptée selon présence ou non de recovery Whoop
+let coachRec = '';
+if (todayData.recovery == null) {
+  // Pas de données Whoop → conseil basé uniquement sur TSB
+  if (todayData.tsb > 5) {
+    coachRec = `Pas de donnée Whoop aujourd'hui. <strong>TSB à +${todayData.tsb.toFixed(0)}</strong> → frais, bonne fenêtre pour pousser l'intensité.`;
+  } else if (todayData.tsb > -15) {
+    coachRec = `Pas de donnée Whoop aujourd'hui. <strong>TSB à ${todayData.tsb.toFixed(0)}</strong> → zone optimale, séance prévue OK.`;
+  } else if (todayData.tsb > -30) {
+    coachRec = `Pas de donnée Whoop aujourd'hui. <strong>TSB à ${todayData.tsb.toFixed(0)}</strong> (fatigué) → éviter les blocs VO2max, privilégier endurance Z2.`;
+  } else {
+    coachRec = `Pas de donnée Whoop aujourd'hui. <strong>TSB à ${todayData.tsb.toFixed(0)}</strong> (surcharge) → semaine de décharge recommandée.`;
+  }
+} else if (todayData.recovery < 34) {
+  coachRec = `Récupération <strong>basse (${todayData.recovery}%)</strong>${todayData.hrv != null ? ' + HRV à ' + todayData.hrv + ' ms' : ''}. <strong>Repos ou marche active recommandé</strong>. Ton corps signale un stress accumulé — forcer aujourd'hui dégraderait ta forme des prochaines semaines.`;
+} else if (todayData.recovery < 67) {
+  coachRec = `Récupération <strong>modérée (${todayData.recovery}%)</strong>. La séance prévue peut être faite à <strong>−30% d'intensité</strong>, sans efforts au-dessus du seuil. Privilégie l'endurance Z2 ou un tempo court.`;
+} else if (todayData.tsb < -15) {
+  coachRec = `Récupération bonne (${todayData.recovery}%) mais <strong>TSB à ${todayData.tsb.toFixed(0)}</strong> (fatigue accumulée). Tu peux t'entraîner mais évite les blocs VO2max — garde-les pour quand le TSB remontera au-dessus de −10.`;
+} else {
+  coachRec = `Tous les voyants sont au vert : recovery ${todayData.recovery}%, TSB ${todayData.tsb.toFixed(0)}${todayData.hrv != null ? ', HRV ' + todayData.hrv + ' ms' : ''}. <strong>Séance prévue conservée</strong> — c'est un bon jour pour pousser l'intensité.`;
+}
+document.getElementById('coach-rec').innerHTML = coachRec;
+
+// ========= CHART DEFAULTS =========
+Chart.defaults.color = '#8b94a8';
+Chart.defaults.borderColor = '#232a3a';
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+const labels = data.map(d => fmtDate(d.date));
+
+// ========= HELPERS DATE RANGE =========
+const toIsoDate = (d) => d.toISOString().slice(0, 10);
+function sliceByDate(arr, fromIso, toIso) {
+  return arr.filter(d => {
+    const iso = toIsoDate(d.date);
+    return iso >= fromIso && iso <= toIso;
+  });
+}
+function setInputDate(id, d) {
+  document.getElementById(id).value = toIsoDate(d);
+}
+function getInputDate(id) {
+  return document.getElementById(id).value;
+}
+
+// ========= CHART 1: CTL/ATL/TSB + Recovery (filtrable par dates) =========
+const loadChart = new Chart(document.getElementById('chart-load'), {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: 'CTL', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.1)', tension: 0.3, pointRadius: 0, fill: true, yAxisID: 'y' },
+      { label: 'ATL', data: [], borderColor: '#fbbf24', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, yAxisID: 'y' },
+      { label: 'TSB', data: [], borderColor: '#a78bfa', backgroundColor: 'transparent', borderDash: [4,4], tension: 0.3, pointRadius: 0, yAxisID: 'y' },
+      { label: 'Recovery', data: [], borderColor: '#4ade80', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, yAxisID: 'y1' }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { maxTicksLimit: 8 }, grid: { display: false } },
+      y: { position: 'left', title: { display: true, text: 'TSS / TSB' } },
+      y1: { position: 'right', min: 0, max: 100, title: { display: true, text: 'Recovery %' }, grid: { display: false } }
+    }
+  }
+});
+
+function renderLoadChart(fromIso, toIso) {
+  const subset = sliceByDate(data, fromIso, toIso);
+  loadChart.data.labels = subset.map(d => fmtDate(d.date));
+  loadChart.data.datasets[0].data = subset.map(d => d.ctl);
+  loadChart.data.datasets[1].data = subset.map(d => d.atl);
+  loadChart.data.datasets[2].data = subset.map(d => d.tsb);
+  loadChart.data.datasets[3].data = subset.map(d => d.recovery);
+  loadChart.update();
+}
+
+// Init : 30 derniers jours par défaut
+{
+  const end = new Date(today);
+  const start = new Date(today);
+  start.setDate(end.getDate() - 29);
+  setInputDate('load-from', start);
+  setInputDate('load-to', end);
+  // bornes min/max sur les inputs
+  document.getElementById('load-from').min = toIsoDate(data[0].date);
+  document.getElementById('load-from').max = toIsoDate(data[data.length-1].date);
+  document.getElementById('load-to').min = toIsoDate(data[0].date);
+  document.getElementById('load-to').max = toIsoDate(data[data.length-1].date);
+  renderLoadChart(toIsoDate(start), toIsoDate(end));
+}
+
+// Event handlers
+document.querySelectorAll('#load-range .preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#load-range .preset').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const days = +btn.dataset.days;
+    const end = new Date(today);
+    const start = new Date(today);
+    start.setDate(end.getDate() - (days - 1));
+    setInputDate('load-from', start);
+    setInputDate('load-to', end);
+    renderLoadChart(toIsoDate(start), toIsoDate(end));
+  });
+});
+['load-from', 'load-to'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    // Désactiver les boutons preset si la sélection est manuelle
+    document.querySelectorAll('#load-range .preset').forEach(b => b.classList.remove('active'));
+    renderLoadChart(getInputDate('load-from'), getInputDate('load-to'));
+  });
+});
+
+// ========= STATS & CORRÉLATIONS (uniquement données Whoop réelles) =========
+function pearson(xs, ys) {
+  const n = xs.length;
+  if (n < 3) return null;
+  const mx = xs.reduce((a,b)=>a+b,0)/n;
+  const my = ys.reduce((a,b)=>a+b,0)/n;
+  let num = 0, dx2 = 0, dy2 = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xs[i] - mx, dy = ys[i] - my;
+    num += dx * dy;
+    dx2 += dx * dx;
+    dy2 += dy * dy;
+  }
+  const den = Math.sqrt(dx2 * dy2);
+  return den === 0 ? null : num / den;
+}
+
+const realWhoop = data.filter(d => d.whoopSource === 'real' && d.recovery != null);
+const realCount = realWhoop.length;
+const insights = [];
+
+if (realCount >= 3) {
+  // Moyennes
+  const avgRec = Math.round(realWhoop.reduce((s,d)=>s+d.recovery,0) / realCount);
+  const hrvDays = realWhoop.filter(d => d.hrv != null);
+  const avgHrv = hrvDays.length ? Math.round(hrvDays.reduce((s,d)=>s+d.hrv,0) / hrvDays.length) : null;
+  const sleepDays = realWhoop.filter(d => d.sleepH != null);
+  const avgSleep = sleepDays.length ? +(sleepDays.reduce((s,d)=>s+d.sleepH,0) / sleepDays.length).toFixed(1) : null;
+
+  insights.push({
+    class: avgRec > 60 ? 'good' : 'warn',
+    title: 'Récupération moyenne',
+    val: avgRec + '%',
+    body: `Moyenne sur ${realCount} jour${realCount>1?'s':''} de Whoop actifs.`
+  });
+  if (avgHrv != null) insights.push({
+    class: 'good',
+    title: 'HRV moyenne',
+    val: avgHrv + ' ms',
+    body: 'Calculée sur tes mesures Whoop réelles.'
+  });
+  if (avgSleep != null) insights.push({
+    class: avgSleep >= 7.5 ? 'good' : 'warn',
+    title: 'Sommeil moyen',
+    val: avgSleep + ' h',
+    body: avgSleep >= 7.5 ? 'Volume de sommeil correct.' : 'Volume sous le seuil 7h30 recommandé pour récupération optimale.'
+  });
+
+  // Corrélation Recovery ↔ ATL si on a assez de points
+  if (realCount >= 5) {
+    const xs = realWhoop.map(d => d.atl);
+    const ys = realWhoop.map(d => d.recovery);
+    const r = pearson(xs, ys);
+    if (r != null) {
+      insights.push({
+        class: r < -0.3 ? 'good' : 'warn',
+        title: 'Corrélation ATL ↔ Recovery',
+        val: (r >= 0 ? '+' : '') + r.toFixed(2),
+        body: r < -0.3
+          ? 'Corrélation négative attendue : plus de fatigue → moins de récup. Cohérent.'
+          : Math.abs(r) < 0.3
+            ? 'Faible corrélation pour l\'instant — besoin de plus de jours pour stabiliser.'
+            : 'Corrélation inattendue (positive). À surveiller avec plus de données.'
+      });
+    }
+  }
+} else if (realCount > 0) {
+  insights.push({
+    class: 'warn',
+    title: 'Données insuffisantes',
+    val: realCount + 'j',
+    body: 'Seulement ' + realCount + ' jour' + (realCount>1?'s':'') + ' de Whoop. Les corrélations charge ↔ récupération deviennent fiables à partir de 30 jours.'
+  });
+} else {
+  insights.push({
+    class: 'warn',
+    title: 'Aucune donnée Whoop',
+    val: '—',
+    body: 'Aucun score de récupération disponible. Lance python whoop_auth.py puis python fetch_data.py.'
+  });
+}
+document.getElementById('correl-list').innerHTML = insights.map(c => `
+  <div class="insight ${c.class}">
+    <div class="insight-title">${c.title} <span style="float:right;color:var(--text);">${c.val}</span></div>
+    <div class="insight-body">${c.body}</div>
+  </div>`).join('');
+
+// ========= CHART SCATTER (filtrable par dates) =========
+const scatterChart = new Chart(document.getElementById('chart-scatter'), {
+  type: 'scatter',
+  data: {
+    datasets: [{
+      label: 'Jour',
+      data: [],
+      backgroundColor: 'rgba(96,165,250,0.5)',
+      pointRadius: 4
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (ctx) => `TSS ${ctx.parsed.x} → Recovery ${ctx.parsed.y}%` } }
+    },
+    scales: {
+      x: { title: { display: true, text: 'TSS du jour' } },
+      y: { title: { display: true, text: 'Recovery J+1 (%)' }, min: 0, max: 100 }
+    }
+  }
+});
+
+function renderScatterChart(fromIso, toIso) {
+  // Construire les paires (TSS jour, Recovery J+1) à partir de toute la série
+  // puis filtrer par date du "jour" (et seulement si TSS > 0)
+  const pairs = [];
+  for (let i = 0; i < data.length - 1; i++) {
+    const iso = toIsoDate(data[i].date);
+    if (iso < fromIso || iso > toIso) continue;
+    if ((data[i].tss || 0) === 0) continue;
+    if (data[i+1].recovery == null) continue;
+    pairs.push({ x: data[i].tss, y: data[i+1].recovery });
+  }
+  scatterChart.data.datasets[0].data = pairs;
+  scatterChart.update();
+}
+
+// Init : 30 derniers jours
+{
+  const end = new Date(today);
+  const start = new Date(today);
+  start.setDate(end.getDate() - 29);
+  setInputDate('scatter-from', start);
+  setInputDate('scatter-to', end);
+  document.getElementById('scatter-from').min = toIsoDate(data[0].date);
+  document.getElementById('scatter-from').max = toIsoDate(data[data.length-1].date);
+  document.getElementById('scatter-to').min = toIsoDate(data[0].date);
+  document.getElementById('scatter-to').max = toIsoDate(data[data.length-1].date);
+  renderScatterChart(toIsoDate(start), toIsoDate(end));
+}
+
+document.querySelectorAll('#scatter-range .preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#scatter-range .preset').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const days = +btn.dataset.days;
+    const end = new Date(today);
+    const start = new Date(today);
+    start.setDate(end.getDate() - (days - 1));
+    setInputDate('scatter-from', start);
+    setInputDate('scatter-to', end);
+    renderScatterChart(toIsoDate(start), toIsoDate(end));
+  });
+});
+['scatter-from', 'scatter-to'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    document.querySelectorAll('#scatter-range .preset').forEach(b => b.classList.remove('active'));
+    renderScatterChart(getInputDate('scatter-from'), getInputDate('scatter-to'));
+  });
+});
+
+// ========= CHART WEEKLY (labels = vraies dates de semaine) =========
+const fmtShortDate = (d) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }).replace('.', '');
+const weeks = [];
+for (let i = 12; i >= 0; i--) {
+  const sliceEnd = data.length - i*7;
+  const sliceStart = Math.max(0, sliceEnd - 7);
+  const slice = data.slice(sliceStart, sliceEnd);
+  if (slice.length === 0) continue;
+  const tss = slice.reduce((s,d)=>s+d.tss,0);
+  const firstD = slice[0].date;
+  const lastD = slice[slice.length - 1].date;
+  // Label "15 avr - 22 avr"
+  const label = `${fmtShortDate(firstD)} - ${fmtShortDate(lastD)}`;
+  weeks.push({ label, tss });
+}
+new Chart(document.getElementById('chart-weekly'), {
+  type: 'bar',
+  data: {
+    labels: weeks.map(w=>w.label),
+    datasets: [{ data: weeks.map(w=>w.tss), backgroundColor: weeks.map(w => w.tss > 500 ? '#f87171' : w.tss > 380 ? '#fbbf24' : '#4ade80'), borderRadius: 4 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { title: (items) => 'Semaine ' + items[0].label, label: (ctx) => ctx.parsed.y + ' TSS' } }
+    },
+    scales: {
+      y: { title: { display: true, text: 'TSS hebdo' } },
+      x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45 } }
+    }
+  }
+});
+
+// ========= CHART ZONES (avec sélecteur de période) =========
+const zoneLabels = ['Z1 récup', 'Z2 endurance', 'Z3 tempo', 'Z4 seuil', 'Z5 VO2max'];
+const zoneColors = ['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f87171'];
+
+function computeZones(periodDays) {
+  // Pondérer par la durée de chaque séance pour avoir un % réel du temps total
+  const slice = data.slice(-periodDays).filter(d => d.zones && d.duration);
+  const totals = [0,0,0,0,0];
+  let totalTime = 0;
+  slice.forEach(d => {
+    d.zones.forEach((pct, i) => {
+      const minutes = (pct / 100) * d.duration;
+      totals[i] += minutes;
+      totalTime += minutes;
+    });
+  });
+  if (totalTime === 0) return { pct: [0,0,0,0,0], totalMin: 0, sessions: 0 };
+  return {
+    pct: totals.map(m => +(m * 100 / totalTime).toFixed(1)),
+    totalMin: Math.round(totalTime),
+    sessions: slice.length
+  };
+}
+
+const zonesChart = new Chart(document.getElementById('chart-zones'), {
+  type: 'doughnut',
+  data: {
+    labels: zoneLabels,
+    datasets: [{ data: [0,0,0,0,0], backgroundColor: zoneColors, borderWidth: 0 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 } } },
+      tooltip: { callbacks: { label: (ctx) => ctx.label + ' : ' + ctx.parsed + '%' } }
+    }
+  }
+});
+
+function renderZones(periodDays) {
+  const { pct, totalMin, sessions } = computeZones(periodDays);
+  zonesChart.data.datasets[0].data = pct;
+  zonesChart.update();
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  const rows = zoneLabels.map((label, i) =>
+    `<div class="zone-summary-row"><span class="zname"><span class="legend-dot" style="background:${zoneColors[i]};"></span>${label}</span><span class="zpct">${pct[i]}%</span></div>`
+  ).join('');
+  document.getElementById('zone-summary').innerHTML = `
+    <div style="margin-bottom:8px;color:var(--text-dim);">
+      <strong style="color:var(--text);">${sessions}</strong> séance${sessions>1?'s':''} · <strong style="color:var(--text);">${hours}h${mins.toString().padStart(2,'0')}</strong> de pratique
+    </div>
+    ${rows}
+  `;
+}
+
+// Init avec 7 jours par défaut
+renderZones(7);
+
+document.querySelectorAll('#zones-period .period-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#zones-period .period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderZones(+btn.dataset.period);
+  });
+});
+
+// ========= PANEL 2: PLAN ADAPTATIF =========
+const dowFr = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+const apiPlan = window._planFromAPI || [];
+
+function adaptPlan(p, dayRecovery, dayTSB) {
+  // Logique d'adaptation simple
+  if (!p.plannedTSS || p.plannedTSS < 30) return { class: 'keep', label: 'OK' };
+  if (dayRecovery !== null && dayRecovery < 34) return { class: 'rest', label: 'Repos recommandé' };
+  if (dayRecovery !== null && dayRecovery < 67) return { class: 'reduce', label: '−30% intensité' };
+  if (dayTSB !== null && dayTSB < -25) return { class: 'swap', label: 'Décharge conseillée' };
+  return { class: 'keep', label: 'Maintenu' };
+}
+
+let planHTML = '';
+if (apiPlan.length > 0) {
+  // Utiliser les events réels d'intervals.icu
+  planHTML = apiPlan.slice(0, 7).map(p => {
+    const d = new Date(p.date + 'T12:00:00');
+    const adapt = adaptPlan(p, todayData.recovery, todayData.tsb);
+    return `<div class="plan-item">
+      <div class="plan-day"><div class="dow">${dowFr[d.getDay()]}</div><div class="num">${d.getDate()}</div></div>
+      <div class="plan-content"><div class="name">${p.name}</div><div class="desc">${p.desc || (p.plannedTSS ? p.plannedTSS + ' TSS prévus' : '')}</div></div>
+      <div><span class="plan-adapt ${adapt.class}">${adapt.label}</span></div>
+    </div>`;
+  }).join('');
+} else {
+  // Pas d'events sur intervals.icu : afficher un placeholder + suggestion de plan-type
+  planHTML = `<div style="background:var(--bg-elev2);border:1px dashed var(--border);border-radius:10px;padding:18px;text-align:center;color:var(--text-dim);font-size:13px;line-height:1.6;">
+    <strong style="color:var(--text);display:block;margin-bottom:6px;">Aucune séance planifiée sur intervals.icu</strong>
+    Pour activer la planification adaptative, ajoute tes séances futures dans le calendrier intervals.icu (onglet Plan).<br>
+    Le Coach IA pourra alors adapter chaque séance en fonction de ta récupération.
+  </div>`;
+}
+document.getElementById('plan-list').innerHTML = planHTML;
+
+// ========= FORECAST =========
+const fcLabels = [], fcCTL = [], fcTSB = [];
+let fCTL = todayData.ctl, fATL = todayData.atl;
+const futureTSS = [0, 70, 55, 60, 30, 80, 175]; // semaine type adaptée
+for (let i = 0; i < 21; i++) {
+  const d = new Date(today); d.setDate(today.getDate() + i);
+  const t = futureTSS[i % 7];
+  fCTL = fCTL + (t - fCTL) / 42;
+  fATL = fATL + (t - fATL) / 7;
+  fcLabels.push(fmtDate(d));
+  fcCTL.push(+fCTL.toFixed(1));
+  fcTSB.push(+(fCTL - fATL).toFixed(1));
+}
+const peakIdx = fcTSB.indexOf(Math.max(...fcTSB));
+document.getElementById('peak-days').textContent = peakIdx;
+document.getElementById('peak-tsb').textContent = fcTSB[peakIdx].toFixed(0);
+
+new Chart(document.getElementById('chart-forecast'), {
+  type: 'line',
+  data: {
+    labels: fcLabels,
+    datasets: [
+      { label: 'CTL projeté', data: fcCTL, borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.15)', tension: 0.3, pointRadius: 0, fill: true },
+      { label: 'TSB projeté', data: fcTSB, borderColor: '#a78bfa', borderDash: [4,4], tension: 0.3, pointRadius: 0 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { boxWidth: 10 } } },
+    scales: { x: { ticks: { maxTicksLimit: 7 }, grid: { display: false } } }
+  }
+});
+
+// ========= PANEL 3: LONG TERME (robuste aux nulls Whoop) =========
+// Rolling average qui ignore les nulls (renvoie null si aucun point dans la fenêtre)
+const rolling = (arr, n) => arr.map((_, i, a) => {
+  const s = a.slice(Math.max(0, i-n+1), i+1).filter(v => v != null);
+  if (s.length === 0) return null;
+  return +(s.reduce((x,y)=>x+y,0)/s.length).toFixed(1);
+});
+const hrv7 = rolling(data.map(d=>d.hrv), 7);
+
+new Chart(document.getElementById('chart-hrv'), {
+  type: 'line',
+  data: { labels, datasets: [{ data: hrv7, borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.15)', tension: 0.3, pointRadius: 0, fill: true, spanGaps: false }] },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } }, y: { title: { display: true, text: 'ms' } } } }
+});
+
+// Sommeil : 30 derniers jours, nulls → barre vide
+const sleepSlice = data.slice(-30);
+new Chart(document.getElementById('chart-sleep'), {
+  type: 'bar',
+  data: {
+    labels: sleepSlice.map(d => fmtDate(d.date)),
+    datasets: [{
+      data: sleepSlice.map(d => d.sleepH),
+      backgroundColor: sleepSlice.map(d => d.sleepH == null ? '#2a3142' : d.sleepH < 6.5 ? '#f87171' : d.sleepH < 7 ? '#fbbf24' : '#4ade80'),
+      borderRadius: 2
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (ctx) => ctx.parsed.y == null ? 'Pas de donnée Whoop' : ctx.parsed.y + ' h' } }
+    },
+    scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } }, y: { title: { display: true, text: 'heures' }, min: 0 } }
+  }
+});
+
+const ratio = data.map(d => d.ctl > 0 ? +(d.atl / d.ctl).toFixed(2) : 1);
+new Chart(document.getElementById('chart-ratio'), {
+  type: 'line',
+  data: { labels, datasets: [
+    { data: ratio, borderColor: '#fbbf24', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0 },
+    { data: data.map(()=>1.3), borderColor: 'rgba(248,113,113,0.5)', borderDash: [3,3], pointRadius: 0 },
+    { data: data.map(()=>0.8), borderColor: 'rgba(74,222,128,0.5)', borderDash: [3,3], pointRadius: 0 }
+  ] },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } }, y: { title: { display: true, text: 'ATL/CTL' }, min: 0.5, max: 1.6 } } }
+});
+
+new Chart(document.getElementById('chart-ctl-trend'), {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [{ label: 'CTL', data: data.map(d=>d.ctl), borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.2)', tension: 0.3, pointRadius: 0, fill: true }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { ticks: { maxTicksLimit: 10 }, grid: { display: false } }, y: { title: { display: true, text: 'CTL (fitness)' } } }
+  }
+});
+
+// Alertes long-terme — calculées sur les vraies données
+const alerts = [];
+
+// 1. Évolution CTL sur 90j
+const last90 = data.slice(-90);
+if (last90.length >= 30) {
+  const ctlStart = last90[0].ctl;
+  const ctlEnd = last90[last90.length - 1].ctl;
+  const ctlPct = ctlStart > 0 ? Math.round((ctlEnd - ctlStart) / ctlStart * 100) : 0;
+  alerts.push({
+    class: ctlPct > 5 ? 'good' : ctlPct < -10 ? 'danger' : 'warn',
+    title: `Évolution de la forme : ${ctlPct >= 0 ? '+' : ''}${ctlPct}% sur 90 jours`,
+    body: `CTL passé de ${ctlStart.toFixed(0)} à ${ctlEnd.toFixed(0)}. ${ctlPct > 10 ? 'Progression saine.' : ctlPct < -10 ? 'Régression — vérifier la cause (blessure, pause, démotivation).' : ctlPct > 0 ? 'Progression légère.' : 'Forme stable.'}`
+  });
+}
+
+// 2. Ratio ATL/CTL : périodes à risque
+const riskDays = data.filter(d => d.ctl > 10 && d.atl / d.ctl > 1.3).length;
+if (riskDays > 0) {
+  alerts.push({
+    class: riskDays > 14 ? 'danger' : 'warn',
+    title: `Ratio ATL/CTL > 1.3 sur ${riskDays} jour${riskDays>1?'s':''}`,
+    body: riskDays > 14 ? 'Plusieurs périodes de surcharge — risque de blessure majoré. Bien intercaler des semaines de décharge.' : 'Période ponctuelle de surcharge bien gérée.'
+  });
+} else if (data.length > 30) {
+  alerts.push({
+    class: 'good',
+    title: 'Aucune surcharge aiguë détectée',
+    body: 'Ratio ATL/CTL toujours sous 1.3 → tu absorbes ta charge sans pic de risque.'
+  });
+}
+
+// 3. HRV — seulement si données réelles
+const realHrv = data.filter(d => d.whoopSource === 'real' && d.hrv != null);
+if (realHrv.length >= 3) {
+  const avgHrv = realHrv.reduce((s,d)=>s+d.hrv,0) / realHrv.length;
+  const stdHrv = Math.sqrt(realHrv.reduce((s,d)=>s+Math.pow(d.hrv-avgHrv,2),0) / realHrv.length);
+  alerts.push({
+    class: stdHrv < 8 ? 'good' : 'warn',
+    title: `HRV moyenne ${avgHrv.toFixed(0)} ms (σ ${stdHrv.toFixed(1)})`,
+    body: stdHrv < 8 ? 'Variabilité faible → état de récup stable.' : 'Variabilité élevée → état fluctuant. Surveiller les soirs avant séance dure.'
+  });
+} else {
+  alerts.push({
+    class: 'warn',
+    title: 'HRV : pas assez de données Whoop',
+    body: `Seulement ${realHrv.length} jour${realHrv.length>1?'s':''} de mesures HRV réelles. Les analyses long-terme demandent 14j+.`
+  });
+}
+
+// 4. Sommeil — seulement si données réelles
+const realSleep = data.filter(d => d.whoopSource === 'real' && d.sleepH != null);
+if (realSleep.length >= 3) {
+  const avgSleep = realSleep.reduce((s,d)=>s+d.sleepH,0) / realSleep.length;
+  const shortNights = realSleep.filter(d => d.sleepH < 7).length;
+  alerts.push({
+    class: avgSleep >= 7.5 && shortNights < realSleep.length * 0.3 ? 'good' : 'warn',
+    title: `Sommeil moyen ${avgSleep.toFixed(1)}h · ${shortNights}/${realSleep.length} nuit${realSleep.length>1?'s':''} < 7h`,
+    body: avgSleep >= 7.5 ? 'Volume correct. Les jours après une nuit courte sont à modérer en intensité.' : 'Volume insuffisant — priorité au sommeil pour récupérer.'
+  });
+}
+
+document.getElementById('alerts-list').innerHTML = alerts.map(a => `
+  <div class="insight ${a.class}">
+    <div class="insight-title">${a.title}</div>
+    <div class="insight-body">${a.body}</div>
+  </div>`).join('');
+
+// ========= PANEL 4: SESSIONS =========
+const sessions = data.filter(d => d.sessionType).slice(-12).reverse();
+const tbody = document.getElementById('sessions-tbody');
+tbody.innerHTML = sessions.map((s, i) => `
+  <tr data-idx="${i}">
+    <td>${fmtDate(s.date)}</td>
+    <td>${s.sessionName}</td>
+    <td><span class="pill ${s.sessionType}">${s.sessionType}</span></td>
+    <td>${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')}</td>
+    <td>${s.tss}</td>
+    <td>${s.np}W (${s.ftpPct}%)</td>
+    <td>${s.hr} bpm</td>
+    <td><span style="color:${s.compliance>=95?'var(--accent)':s.compliance>=85?'var(--warn)':'var(--danger)'};">${s.compliance}%</span></td>
+  </tr>
+`).join('');
+
+function renderSessionDetail(s) {
+  const zoneColors = ['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f87171'];
+  const zonesHTML = s.zones.map((z, i) => `<div class="zone-seg" style="width:${z}%;background:${zoneColors[i]};">${z>8?z+'%':''}</div>`).join('');
+  const html = `
+  <div class="session-detail">
+    <div class="session-detail-header">
+      <div>
+        <h3>${s.sessionName} <span class="pill ${s.sessionType}" style="margin-left:8px;">${s.sessionType}</span></h3>
+        <div class="meta">${s.date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · ${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')} · ${s.tss} TSS</div>
+      </div>
+      <div style="text-align:right;font-size:12px;color:var(--text-dim);">Recovery avant : <strong style="color:var(--text);">${s.recovery != null ? s.recovery + '%' : '—'}</strong></div>
+    </div>
+    <div class="metric-row">
+      <div class="mini-metric"><div class="label">NP / Puissance norm.</div><div class="value">${s.np} W</div><div class="compare">${s.ftpPct}% FTP</div></div>
+      <div class="mini-metric"><div class="label">FC moyenne</div><div class="value">${s.hr} bpm</div><div class="compare">Max ${s.hr + randInt(15,30)} bpm</div></div>
+      <div class="mini-metric"><div class="label">TSS réalisé</div><div class="value">${s.tss}</div><div class="compare ${s.compliance>=95?'up':'down'}">${s.compliance}% du prévu</div></div>
+      <div class="mini-metric"><div class="label">Variabilité</div><div class="value">${(rand(1.02,1.18)).toFixed(2)}</div><div class="compare">IF ${(s.ftpPct/100).toFixed(2)}</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">Répartition du temps par zone de FC</div>
+    <div class="zone-bar">${zonesHTML}</div>
+    <div class="legend">
+      <span><span class="legend-dot" style="background:#4ade80;"></span>Z1 récup</span>
+      <span><span class="legend-dot" style="background:#60a5fa;"></span>Z2 endurance</span>
+      <span><span class="legend-dot" style="background:#a78bfa;"></span>Z3 tempo</span>
+      <span><span class="legend-dot" style="background:#fbbf24;"></span>Z4 seuil</span>
+      <span><span class="legend-dot" style="background:#f87171;"></span>Z5 VO2max</span>
+    </div>
+    <div style="margin-top:14px;padding:12px;background:var(--bg);border-radius:6px;font-size:13px;">
+      <strong style="color:var(--info);">Analyse Coach IA :</strong>
+      ${(() => {
+        const c = s.compliance;
+        const recTxt = s.recovery != null ? s.recovery + '%' : 'inconnue';
+        if (c == null) return `Pas de TSS planifié pour cette séance (mode libre). NP ${s.np}W sur ${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')}.`;
+        if (c >= 95) return `Séance conforme au plan. Exécution propre, ${s.ftpPct}% FTP atteint comme prévu.`;
+        if (c >= 85) return `Léger écart (${c}% du prévu). Probablement lié à la récupération de départ (${recTxt}). Pas d'inquiétude — adapter la prochaine séance similaire.`;
+        return `Écart significatif (${c}%). Possible signe de fatigue accumulée ou objectif trop ambitieux. Suggérer une décharge.`;
+      })()}
+    </div>
+  </div>`;
+  document.getElementById('session-detail-wrap').innerHTML = html;
+}
+
+tbody.addEventListener('click', (e) => {
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+  tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+  tr.classList.add('selected');
+  renderSessionDetail(sessions[+tr.dataset.idx]);
+});
+// auto-render première séance
+if (sessions.length) {
+  tbody.querySelector('tr').classList.add('selected');
+  renderSessionDetail(sessions[0]);
+}
+
+// ========= TABS =========
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.panel).classList.add('active');
+  });
+});
+
+})(); // fin IIFE async
+</script>
+</body>
+</html>

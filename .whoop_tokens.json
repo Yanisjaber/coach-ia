@@ -1,0 +1,9 @@
+{
+  "access_token": "RWLkQQxp_PBMPDhfQ_UuxpR7KIpwCk_PQan_06oB0nM.6kHB8t4BG9ggLkGthEqL1UvZaCwR8Obyt7txHbIrdOI",
+  "expires_in": 3599,
+  "refresh_token": "bljd9MBVBai3Cg9DGtjAWIyFX3P-kLIAT8GJ15FnbBA.YtJI15v3VUvDRIN-tdVriGG4ASrnme6WxUI-Wiyj1dA",
+  "scope": "offline read:recovery read:cycles read:sleep read:profile read:body_measurement read:workout",
+  "token_type": "bearer",
+  "obtained_at": 1779092296,
+  "expires_at": 1779095835
+}
