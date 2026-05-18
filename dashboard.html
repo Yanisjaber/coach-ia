@@ -2938,12 +2938,15 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
 
   const counter = hasMulti ? `<div class="day-card-counter">${idx + 1}/${total}</div>` : '';
 
+  // Fallbacks robustes pour data.js ancien format (champs day-level)
+  const aType = act.type || act.sessionType || '';
+  const aName = act.name || act.sessionName || 'Séance';
   return `
     <div class="day-card past${isToday ? ' today' : ''}" data-iso="${iso}" data-source="realise">
       <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
       ${dateRow}
-      <span class="day-card-type pill ${act.type || ''}">${act.type || ''}</span>
-      <div class="day-card-name">${act.name || 'Séance'}</div>
+      ${aType ? `<span class="day-card-type pill ${aType}">${aType}</span>` : ''}
+      <div class="day-card-name">${aName}</div>
       <div class="day-card-meta">${dur ? `${h}h${m} · ` : ''}${act.tss || 0} TSS</div>
       <div class="day-card-why">${act.np ? `NP ${act.np}W` : ''}${act.hr ? (act.np ? ' · ' : '') + `FC ${act.hr}` : ''}${(!act.np && !act.hr) ? 'Réalisé' : ''}</div>
       ${counter}
@@ -3567,12 +3570,13 @@ function openSessionModal(iso, source) {
         if (act.variability_index) metrics.push(`<div class="modal-metric"><div class="m-label">VI</div><div class="m-value">${act.variability_index}</div><div class="m-sub">Variabilité</div></div>`);
         if (act.sport) metrics.push(`<div class="modal-metric"><div class="m-label">Sport</div><div class="m-value" style="font-size:15px;text-transform:capitalize;">${act.sport}</div>${act.raw_type ? `<div class="m-sub">${act.raw_type}</div>` : ''}</div>`);
 
-        // Lien vers intervals.icu si on a l'ID
-        const intervalsLink = act.id ? `
-          <a href="https://intervals.icu/activities/${act.id}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:rgba(96,165,250,0.12);border:1px solid rgba(96,165,250,0.3);color:var(--info);padding:8px 14px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500;">
+        // Lien vers intervals.icu si on a l'ID (fallback sur activityId pour ancien format)
+        const aId = act.id || act.activityId || day.activityId;
+        const intervalsLink = aId ? `
+          <a href="https://intervals.icu/activities/${aId}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:rgba(96,165,250,0.12);border:1px solid rgba(96,165,250,0.3);color:var(--info);padding:8px 14px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500;">
             Voir le détail complet sur intervals.icu ↗
           </a>
-          <div style="font-size:11px;color:var(--text-mute);margin-top:6px;">ID activité : <code>${act.id}</code></div>
+          <div style="font-size:11px;color:var(--text-mute);margin-top:6px;">ID activité : <code>${aId}</code></div>
         ` : '';
 
         bodyEl.innerHTML = `
@@ -3593,8 +3597,9 @@ function openSessionModal(iso, source) {
           btn.addEventListener('click', () => renderModalActivity(+btn.dataset.i));
         });
         // Lancer le chargement des streams en async (la modal est déjà visible)
-        if (act.id) {
-          renderStreamsSection(document.getElementById('streams-section'), act.id);
+        const streamId = act.id || act.activityId || day.activityId;
+        if (streamId) {
+          renderStreamsSection(document.getElementById('streams-section'), streamId);
         } else {
           document.getElementById('streams-section').innerHTML = '<div class="modal-placeholder">Pas d\'ID activité disponible pour cette séance.</div>';
         }
