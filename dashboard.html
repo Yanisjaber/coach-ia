@@ -4,8 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Coach IA — Dashboard Entraînement & Récupération</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%234ade80'/><stop offset='1' stop-color='%2360a5fa'/></linearGradient></defs><rect width='100' height='100' rx='22' fill='url(%23g)'/><text x='50' y='71' font-size='55' font-weight='800' fill='%230b0e14' text-anchor='middle' font-family='Arial,sans-serif'>CI</text></svg>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <script src="data.js" onerror="window._dataJsMissing=true"></script>
+<script src="streams.js" onerror="window._streamsJsMissing=true"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -32,12 +35,21 @@
   }
   .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
   header {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 0;
     padding-bottom: 20px;
     border-bottom: 1px solid var(--border);
+  }
+  header .logo { justify-self: start; }
+  header .sport-filter { justify-self: center; margin: 0; }
+  header .header-info { justify-self: end; }
+  .badge-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
   }
   .logo { display: flex; align-items: center; gap: 12px; }
   .logo-icon {
@@ -49,7 +61,36 @@
   }
   .logo-text h1 { font-size: 20px; font-weight: 600; }
   .logo-text p { font-size: 12px; color: var(--text-dim); }
-  .header-info { display: flex; gap: 20px; align-items: center; font-size: 13px; }
+  .sport-filter {
+    display: flex;
+    gap: 4px;
+    margin: 0 auto;
+    padding: 4px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .sport-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .sport-btn:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .sport-btn.active {
+    background: rgba(74, 222, 128, 0.15);
+    border-color: rgba(74, 222, 128, 0.35);
+    color: var(--accent);
+  }
+  .header-info { display: flex; gap: 20px; align-items: center; font-size: 13px; line-height: 1; }
+  .header-info > span { display: inline-flex; align-items: center; gap: 6px; }
   .header-info .date { color: var(--text-dim); }
   .badge {
     background: rgba(251, 191, 36, 0.1);
@@ -64,10 +105,22 @@
   /* === HERO KPI === */
   .hero {
     display: grid;
-    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    grid-template-columns: repeat(4, 1fr);
     gap: 16px;
     margin-bottom: 24px;
   }
+  .hero .card {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .hero .ring-container { justify-content: center; }
+  .hero .coach-header { justify-content: center; }
+  .hero .kpi-label { text-align: center; }
+  .hero .kpi-trend { text-align: center; }
+  .hero .ls-metric { align-items: center; }
+  #last-session-metrics { justify-content: center; }
   .card {
     background: var(--bg-elev);
     border: 1px solid var(--border);
@@ -82,8 +135,8 @@
   .kpi-trend.down { color: var(--danger); }
 
   .coach-card {
-    background: linear-gradient(135deg, rgba(74, 222, 128, 0.08), rgba(96, 165, 250, 0.08));
-    border-color: rgba(74, 222, 128, 0.3);
+    background: var(--bg-elev);
+    border-color: var(--border);
   }
   .coach-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   .coach-pill {
@@ -96,6 +149,10 @@
   }
   .coach-recommendation { font-size: 14px; line-height: 1.5; color: var(--text); }
   .coach-recommendation strong { color: var(--accent); }
+  .ls-metric { display: flex; flex-direction: column; }
+  .ls-val { font-size: 20px; font-weight: 700; line-height: 1.1; }
+  .ls-lbl { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+  .ls-empty { font-size: 13px; color: var(--text-dim); font-style: italic; }
 
   .ring-container { display: flex; align-items: center; gap: 16px; }
   .ring {
@@ -114,9 +171,12 @@
   /* === TABS === */
   .tabs {
     display: flex;
+    justify-content: center;
+    align-items: center;
     gap: 4px;
     border-bottom: 1px solid var(--border);
     margin-bottom: 24px;
+    padding: 8px 0 6px;
   }
   .tab {
     background: none;
@@ -148,6 +208,31 @@
     align-items: center;
     gap: 8px;
   }
+  .zones-toggle {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--bg-elev2);
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    margin-left: auto;
+  }
+  .ztoggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+  }
+  .ztoggle-btn:hover { color: var(--text); }
+  .ztoggle-btn.active {
+    background: rgba(74, 222, 128, 0.15);
+    color: var(--accent);
+  }
   .section-subtitle { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
 
   .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
@@ -157,6 +242,471 @@
   .chart-wrap { position: relative; height: 320px; }
   .chart-wrap.tall { height: 380px; }
   .chart-wrap.small { height: 220px; }
+  .chart-wrap.tiny { height: 130px; }
+
+  /* === COMPETITIONS === */
+  .comp-form {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .comp-form input, .comp-form select {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    color-scheme: dark;
+  }
+  .comp-form input[type="text"] { flex: 1; min-width: 220px; }
+  .comp-form button {
+    background: rgba(74, 222, 128, 0.15);
+    border: 1px solid rgba(74, 222, 128, 0.35);
+    color: var(--accent);
+    padding: 7px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .comp-form button:hover { background: rgba(74, 222, 128, 0.25); }
+
+  .comp-list { display: flex; flex-direction: column; gap: 8px; }
+  .comp-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .comp-prio {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .comp-prio.A { background: rgba(248, 113, 113, 0.18); color: var(--danger); }
+  .comp-prio.B { background: rgba(251, 191, 36, 0.18); color: var(--warn); }
+  .comp-prio.C { background: rgba(96, 165, 250, 0.18); color: var(--info); }
+  .comp-name { flex: 1; font-weight: 500; }
+  .comp-date { color: var(--text-dim); font-size: 12px; }
+  .comp-countdown { color: var(--accent); font-size: 12px; font-weight: 600; min-width: 90px; text-align: right; }
+  .comp-del {
+    background: transparent;
+    border: none;
+    color: var(--text-mute);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 16px;
+    line-height: 1;
+  }
+  .comp-del:hover { color: var(--danger); }
+  .comp-empty { color: var(--text-dim); font-size: 13px; font-style: italic; text-align: center; padding: 16px; }
+
+  /* === CHAT COACH IA === */
+  .chat-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-height: 450px;
+    overflow-y: auto;
+    padding: 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    min-height: 200px;
+  }
+  .chat-empty {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-style: italic;
+    padding: 30px 20px;
+    line-height: 1.6;
+  }
+  .chat-message {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .chat-message.user { flex-direction: row-reverse; }
+  .chat-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+  .chat-avatar.user { background: rgba(96, 165, 250, 0.2); color: var(--info); }
+  .chat-avatar.coach { background: rgba(74, 222, 128, 0.2); color: var(--accent); }
+  .chat-bubble-wrap { max-width: 75%; }
+  .chat-bubble {
+    background: var(--bg-elev2);
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.55;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .chat-message.user .chat-bubble {
+    background: rgba(96, 165, 250, 0.12);
+    border: 1px solid rgba(96, 165, 250, 0.25);
+  }
+  .chat-message.coach .chat-bubble {
+    background: rgba(74, 222, 128, 0.08);
+    border: 1px solid rgba(74, 222, 128, 0.2);
+  }
+  .chat-time {
+    font-size: 10px;
+    color: var(--text-mute);
+    margin-top: 4px;
+    padding: 0 6px;
+  }
+  .chat-message.user .chat-time { text-align: right; }
+  .chat-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .chat-input-row textarea {
+    flex: 1;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    resize: none;
+    min-height: 44px;
+    max-height: 120px;
+    line-height: 1.5;
+  }
+  .chat-input-row textarea:focus { outline: none; border-color: var(--accent); }
+  .chat-input-row button {
+    background: rgba(74, 222, 128, 0.15);
+    border: 1px solid rgba(74, 222, 128, 0.35);
+    color: var(--accent);
+    padding: 10px 22px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .chat-input-row button:hover { background: rgba(74, 222, 128, 0.25); }
+  .chat-clear {
+    background: none;
+    border: none;
+    color: var(--text-mute);
+    cursor: pointer;
+    font-size: 11px;
+    margin-left: auto;
+    padding: 4px 8px;
+  }
+  .chat-clear:hover { color: var(--danger); }
+  .chat-prefs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 11px;
+  }
+  .chat-pref-tag {
+    background: rgba(74, 222, 128, 0.1);
+    border: 1px solid rgba(74, 222, 128, 0.25);
+    color: var(--accent);
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+
+  /* === SOUS-ONGLETS CALENDRIER === */
+  .subtabs {
+    display: flex;
+    gap: 4px;
+    margin: 0 auto 14px;
+    padding: 4px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: fit-content;
+  }
+  .subtab {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+  }
+  .subtab:hover { color: var(--text); }
+  .subtab.active {
+    background: rgba(74, 222, 128, 0.15);
+    border-color: rgba(74, 222, 128, 0.35);
+    color: var(--accent);
+  }
+  .month-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .month-filter input[type="month"] {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    color-scheme: dark;
+  }
+  .month-filter button {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .month-filter button:hover { color: var(--text); }
+  .month-filter .reset {
+    color: var(--accent);
+    border-color: rgba(74, 222, 128, 0.35);
+  }
+
+  /* === CALENDRIER 4 SEMAINES === */
+  .month-plan {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .week-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .week-row-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .week-row-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr) 110px;
+    gap: 10px;
+  }
+  .week-totals {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .wt-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+  }
+  .wt-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .wt-val {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .wt-lbl {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .week-calendar {
+    display: block;
+    width: 100%;
+  }
+  .day-card {
+    position: relative;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    height: 220px;
+    overflow: hidden;
+  }
+  .day-card-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+  }
+  .day-card-why {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .day-card-date-row {
+    display: flex;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .day-card-date-row .day-card-date { margin-bottom: 0; }
+  .day-card-arrows-wrapper {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+  }
+  .day-card-arrow-inline {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 2px 4px;
+    font-family: inherit;
+    transition: color 0.12s;
+  }
+  .day-card-arrow-inline:hover { color: var(--text); }
+  .day-card-arrow-inline:active { transform: scale(0.9); }
+  .day-card-counter {
+    position: absolute;
+    bottom: 4px;
+    right: 6px;
+    font-size: 9px;
+    color: var(--accent);
+    background: rgba(74, 222, 128, 0.15);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .day-card.rest { background: var(--bg); border-style: dashed; }
+  .day-card.past { opacity: 0.7; background: var(--bg); }
+  .day-card.today {
+    border-color: rgba(74, 222, 128, 0.5);
+    box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.3);
+  }
+  .day-card.empty-past {
+    opacity: 0.5;
+    background: transparent;
+    border-style: dashed;
+  }
+  .day-card-dow {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .day-card-date {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .day-card-type {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    align-self: flex-start;
+  }
+  .day-card-name { font-size: 12px; font-weight: 600; margin-bottom: 6px; line-height: 1.3; }
+  .day-card-meta { font-size: 11px; color: var(--text-dim); margin-bottom: auto; }
+  .day-card-why {
+    font-size: 10px;
+    color: var(--text-mute);
+    border-top: 1px dashed var(--border);
+    padding-top: 8px;
+    margin-top: 10px;
+    line-height: 1.4;
+  }
+  .day-card-arrows {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 4px 0;
+    background: rgba(74, 222, 128, 0.08);
+    border-radius: 6px;
+    font-size: 11px;
+  }
+  .day-card-arrows button {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: inherit;
+  }
+  .day-card-arrows button:hover { background: rgba(74, 222, 128, 0.18); }
+  .day-card-arrows .idx { color: var(--text-dim); font-weight: 600; }
+  .phase-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-left: 8px;
+  }
+  .phase-pill.build { background: rgba(96, 165, 250, 0.15); color: var(--info); }
+  .phase-pill.peak { background: rgba(251, 191, 36, 0.15); color: var(--warn); }
+  .phase-pill.taper { background: rgba(167, 139, 250, 0.15); color: var(--purple); }
+  .phase-pill.race { background: rgba(248, 113, 113, 0.15); color: var(--danger); }
+  .phase-pill.recovery { background: rgba(74, 222, 128, 0.15); color: var(--accent); }
+
+  @media (max-width: 900px) {
+    .week-calendar { grid-template-columns: repeat(2, 1fr); }
+  }
 
   /* === PLAN === */
   .plan-list { display: flex; flex-direction: column; gap: 10px; }
@@ -262,6 +812,133 @@
   .insight .insight-body { color: var(--text-dim); font-size: 12px; }
 
   footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-mute); font-size: 11px; text-align: center; }
+
+  /* === MODAL DÉTAIL SÉANCE === */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 1000;
+    padding: 40px 20px;
+    overflow-y: auto;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    max-width: 900px;
+    width: 100%;
+    padding: 24px 28px;
+    margin: auto 0;
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    gap: 16px;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-title { flex: 1; }
+  .modal-title h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .modal-meta { font-size: 13px; color: var(--text-dim); }
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-mute);
+    cursor: pointer;
+    font-size: 26px;
+    line-height: 1;
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+  .modal-close:hover { color: var(--danger); background: var(--bg-elev2); }
+  .modal-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .modal-metric {
+    background: var(--bg-elev2);
+    padding: 12px 14px;
+    border-radius: 8px;
+  }
+  .modal-metric .m-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .modal-metric .m-value {
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 4px;
+    line-height: 1.1;
+  }
+  .modal-metric .m-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+  .modal-section { margin-bottom: 18px; }
+  .modal-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+  .modal-placeholder {
+    background: var(--bg-elev2);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 18px;
+    text-align: center;
+    color: var(--text-mute);
+    font-size: 12px;
+    line-height: 1.6;
+    font-style: italic;
+  }
+  .modal-activity-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 16px;
+    padding: 4px;
+    background: var(--bg-elev2);
+    border-radius: 6px;
+    width: fit-content;
+  }
+  .modal-activity-switch button {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .modal-activity-switch button.active {
+    background: rgba(74, 222, 128, 0.15);
+    color: var(--accent);
+  }
+  .day-card { cursor: pointer; }
+  .day-card.empty-past { cursor: default; }
 
   /* === GLOSSAIRE === */
   .glossary-nav {
@@ -415,63 +1092,22 @@
       <p>Entraînement intelligent · intervals.icu × Whoop</p>
     </div>
   </div>
+  <div class="sport-filter" id="sport-filter">
+    <button class="sport-btn active" data-sport="tout">Tout</button>
+    <button class="sport-btn" data-sport="cyclisme">Cyclisme</button>
+    <button class="sport-btn" data-sport="course">Course à pied</button>
+    <button class="sport-btn" data-sport="musculation">Musculation</button>
+  </div>
   <div class="header-info">
+    <span id="last-update"></span>
     <span class="date" id="today-date">—</span>
-    <span class="badge">Prototype · données simulées</span>
   </div>
 </header>
 
-<!-- HERO KPIs -->
-<section class="hero">
-  <div class="card coach-card">
-    <div class="coach-header">
-      <span class="coach-pill">COACH IA</span>
-      <span style="font-size:11px;color:var(--text-dim);">Recommandation du jour</span>
-    </div>
-    <div class="coach-recommendation" id="coach-rec">—</div>
-  </div>
-
-  <div class="card">
-    <div class="kpi-label">Récupération Whoop</div>
-    <div class="ring-container">
-      <div class="ring">
-        <svg width="80" height="80"><circle cx="40" cy="40" r="34" fill="none" stroke="var(--border)" stroke-width="8"/><circle id="recovery-ring" cx="40" cy="40" r="34" fill="none" stroke="var(--accent)" stroke-width="8" stroke-dasharray="213.6" stroke-dashoffset="100" stroke-linecap="round"/></svg>
-        <div class="ring-text" id="recovery-val">—</div>
-      </div>
-      <div>
-        <div style="font-size:12px;color:var(--text-dim);">HRV</div>
-        <div style="font-size:18px;font-weight:600;" id="hrv-val">— ms</div>
-        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Sommeil</div>
-        <div style="font-size:13px;" id="sleep-val">— h</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="kpi-label">Forme (TSB)</div>
-    <div><span class="kpi-value" id="tsb-val">—</span></div>
-    <div class="kpi-trend" id="tsb-state">—</div>
-    <div style="margin-top:10px;font-size:12px;color:var(--text-dim);">
-      Fitness CTL <span style="color:var(--text);" id="ctl-val">—</span><br>
-      Fatigue ATL <span style="color:var(--text);" id="atl-val">—</span>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="kpi-label">Charge 7 jours</div>
-    <div><span class="kpi-value" id="weekly-tss">—</span><span class="kpi-unit">TSS</span></div>
-    <div class="kpi-trend" id="weekly-trend">—</div>
-    <div style="margin-top:10px;font-size:12px;color:var(--text-dim);">
-      Séances : <span style="color:var(--text);" id="weekly-sessions">—</span><br>
-      Temps : <span style="color:var(--text);" id="weekly-hours">—</span>
-    </div>
-  </div>
-</section>
-
 <!-- TABS -->
 <div class="tabs">
-  <button class="tab active" data-panel="p1">Charge vs Récupération</button>
-  <button class="tab" data-panel="p2">Planification adaptative</button>
+  <button class="tab active" data-panel="p1">Tableau de bord</button>
+  <button class="tab" data-panel="p2">Entraîneur</button>
   <button class="tab" data-panel="p3">Tendances long-terme</button>
   <button class="tab" data-panel="p4">Détail séances</button>
   <button class="tab" data-panel="p5">Termes</button>
@@ -479,60 +1115,130 @@
 
 <!-- PANEL 1: Charge vs Récupération -->
 <section class="panel active" id="p1">
-  <div class="grid-2">
-    <div class="card">
-      <div class="section-title">Forme & fatigue</div>
-      <div class="section-subtitle">Évolution CTL/ATL/TSB superposée au score de récupération Whoop</div>
-      <div class="date-range" id="load-range">
-        <button class="preset active" data-days="30">30j</button>
-        <button class="preset" data-days="90">90j</button>
-        <button class="preset" data-days="180">6 mois</button>
-        <button class="preset" data-days="365">1 an</button>
-        <span class="sep">·</span>
-        <span>du</span>
-        <input type="date" id="load-from">
-        <span>au</span>
-        <input type="date" id="load-to">
+  <!-- HERO KPIs (intégrés à l'onglet Charge vs Récupération) -->
+  <section class="hero">
+    <div class="card coach-card">
+      <div class="coach-header">
+        <span class="coach-pill">DERNIÈRE SÉANCE</span>
+        <span style="font-size:11px;color:var(--text-dim);" id="last-session-date">—</span>
       </div>
-      <div class="chart-wrap tall"><canvas id="chart-load"></canvas></div>
-      <div class="legend">
-        <span><span class="legend-dot" style="background:var(--info);"></span>CTL (forme)</span>
-        <span><span class="legend-dot" style="background:var(--warn);"></span>ATL (fatigue)</span>
-        <span><span class="legend-dot" style="background:var(--purple);"></span>TSB (fraîcheur)</span>
-        <span><span class="legend-dot" style="background:var(--accent);"></span>Recovery Whoop</span>
+      <div id="last-session-name" style="font-size:15px;font-weight:600;margin-bottom:12px;">—</div>
+      <div id="last-session-metrics" style="display:flex;gap:18px;flex-wrap:wrap;"></div>
+    </div>
+
+    <div class="card">
+      <div class="kpi-label">Récupération Whoop</div>
+      <div class="ring-container">
+        <div class="ring">
+          <svg width="80" height="80"><circle cx="40" cy="40" r="34" fill="none" stroke="var(--border)" stroke-width="8"/><circle id="recovery-ring" cx="40" cy="40" r="34" fill="none" stroke="var(--accent)" stroke-width="8" stroke-dasharray="213.6" stroke-dashoffset="100" stroke-linecap="round"/></svg>
+          <div class="ring-text" id="recovery-val">—</div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--text-dim);">HRV</div>
+          <div style="font-size:18px;font-weight:600;" id="hrv-val">— ms</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Sommeil</div>
+          <div style="font-size:13px;" id="sleep-val">— h</div>
+        </div>
       </div>
     </div>
+
     <div class="card">
-      <div class="section-title">Corrélations détectées</div>
-      <div class="section-subtitle">Calculées sur les 90 derniers jours</div>
-      <div class="insight-list" id="correl-list"></div>
+      <div class="kpi-label">Forme (TSB)</div>
+      <div><span class="kpi-value" id="tsb-val">—</span></div>
+      <div class="kpi-trend" id="tsb-state">—</div>
+      <div style="margin-top:10px;font-size:12px;color:var(--text-dim);">
+        Fitness CTL <span style="color:var(--text);" id="ctl-val">—</span><br>
+        Fatigue ATL <span style="color:var(--text);" id="atl-val">—</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="kpi-label">Charge 7 jours</div>
+      <div><span class="kpi-value" id="weekly-tss">—</span><span class="kpi-unit">TSS</span></div>
+      <div class="kpi-trend" id="weekly-trend">—</div>
+      <div style="margin-top:10px;font-size:12px;color:var(--text-dim);">
+        Séances : <span style="color:var(--text);" id="weekly-sessions">—</span><br>
+        Temps : <span style="color:var(--text);" id="weekly-hours">—</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid-1 card">
+    <div class="section-title">Forme & fatigue</div>
+    <div class="date-range" id="load-range">
+      <button class="preset active" data-days="30">30j</button>
+      <button class="preset" data-days="90">90j</button>
+      <button class="preset" data-days="180">6 mois</button>
+      <button class="preset" data-days="365">1 an</button>
+      <span class="sep">·</span>
+      <span>du</span>
+      <input type="date" id="load-from">
+      <span>au</span>
+      <input type="date" id="load-to">
+    </div>
+    <div class="chart-wrap tall"><canvas id="chart-load"></canvas></div>
+    <div class="legend">
+      <span><span class="legend-dot" style="background:var(--info);"></span>CTL (forme)</span>
+      <span><span class="legend-dot" style="background:var(--warn);"></span>ATL (fatigue)</span>
+      <span><span class="legend-dot" style="background:var(--purple);"></span>TSB (fraîcheur)</span>
     </div>
   </div>
 
   <div class="grid-3">
     <div class="card">
-      <div class="section-title">TSS vs Recovery (J+1)</div>
-      <div class="date-range" id="scatter-range">
-        <button class="preset active" data-days="30">30j</button>
-        <button class="preset" data-days="90">90j</button>
-        <button class="preset" data-days="365">1 an</button>
+      <div class="section-title">Heures hebdomadaires</div>
+      <div class="date-range" id="hours-range">
+        <button class="preset" data-weeks="4">4 sem</button>
+        <button class="preset active" data-weeks="12">12 sem</button>
         <span class="sep">·</span>
-        <input type="date" id="scatter-from">
+        <input type="date" id="hours-from">
         <span>→</span>
-        <input type="date" id="scatter-to">
+        <input type="date" id="hours-to">
       </div>
-      <div class="chart-wrap small"><canvas id="chart-scatter"></canvas></div>
+      <div class="chart-wrap small"><canvas id="chart-hours"></canvas></div>
+      <div id="hours-detail" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <div style="font-size:11px; color:var(--text-dim);" id="hours-detail-title">Détail jour par jour</div>
+          <button id="hours-detail-close" style="background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:18px; line-height:1; padding:0 6px;">×</button>
+        </div>
+        <div class="chart-wrap" style="height:110px;"><canvas id="chart-hours-daily"></canvas></div>
+      </div>
     </div>
     <div class="card">
-      <div class="section-title">Charge hebdo</div>
+      <div class="section-title">Charge hebdomadaire</div>
+      <div class="date-range" id="weekly-range">
+        <button class="preset" data-weeks="4">4 sem</button>
+        <button class="preset active" data-weeks="12">12 sem</button>
+        <span class="sep">·</span>
+        <input type="date" id="weekly-from">
+        <span>→</span>
+        <input type="date" id="weekly-to">
+      </div>
       <div class="chart-wrap small"><canvas id="chart-weekly"></canvas></div>
+      <div id="weekly-detail" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <div style="font-size:11px; color:var(--text-dim);" id="weekly-detail-title">Détail jour par jour</div>
+          <button id="weekly-detail-close" style="background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:18px; line-height:1; padding:0 6px;">×</button>
+        </div>
+        <div class="chart-wrap" style="height:110px;"><canvas id="chart-weekly-daily"></canvas></div>
+      </div>
     </div>
     <div class="card">
-      <div class="section-title">Répartition par zones (%)</div>
-      <div class="period-selector" id="zones-period">
-        <button class="period-btn active" data-period="7">7 derniers jours</button>
-        <button class="period-btn" data-period="30">30 jours</button>
-        <button class="period-btn" data-period="90">90 jours</button>
+      <div class="section-title">
+        <span>Répartition par zones (%)</span>
+        <div class="zones-toggle" id="zones-type-toggle">
+          <button class="ztoggle-btn active" data-type="hr">FC</button>
+          <button class="ztoggle-btn" data-type="power">Puissance</button>
+        </div>
+      </div>
+      <div class="date-range" id="zones-range">
+        <button class="preset active" data-days="7">7j</button>
+        <button class="preset" data-days="30">30j</button>
+        <button class="preset" data-days="90">90j</button>
+        <span class="sep">·</span>
+        <input type="date" id="zones-from">
+        <span>→</span>
+        <input type="date" id="zones-to">
       </div>
       <div class="chart-wrap small"><canvas id="chart-zones"></canvas></div>
       <div class="zone-summary" id="zone-summary"></div>
@@ -540,37 +1246,55 @@
   </div>
 </section>
 
-<!-- PANEL 2: Planification adaptative -->
+<!-- PANEL 2: Entraîneur -->
 <section class="panel" id="p2">
-  <div class="grid-2">
-    <div class="card">
-      <div class="section-title">7 jours à venir · adaptation automatique</div>
-      <div class="section-subtitle">L'agent ajuste chaque séance selon la récupération prévue et la charge accumulée</div>
-      <div class="plan-list" id="plan-list"></div>
+  <!-- Compétitions -->
+  <div class="grid-1 card">
+    <div class="section-title">Compétitions à venir</div>
+    <div class="section-subtitle">Ajoute tes objectifs pour que le Coach IA structure ton plan (build → peak → taper → race)</div>
+    <div class="comp-form">
+      <input type="text" id="comp-name" placeholder="Nom de la compétition (ex : Course de Cambrils)">
+      <input type="date" id="comp-date">
+      <select id="comp-priority" title="Priorité">
+        <option value="A">A (objectif principal)</option>
+        <option value="B">B (intermédiaire)</option>
+        <option value="C">C (préparation)</option>
+      </select>
+      <button id="comp-add">Ajouter</button>
     </div>
-    <div class="card">
-      <div class="section-title">Projection de forme</div>
-      <div class="section-subtitle">Évolution CTL / TSB si le plan adapté est suivi</div>
-      <div class="chart-wrap"><canvas id="chart-forecast"></canvas></div>
-      <div style="margin-top:14px;padding:12px;background:var(--bg-elev2);border-radius:8px;font-size:12px;">
-        <strong style="color:var(--accent);">Objectif :</strong> pic de forme prévu dans <span id="peak-days">—</span> jours (TSB +<span id="peak-tsb">—</span>) pour la sortie longue du week-end suivant.
-      </div>
-    </div>
+    <div class="comp-list" id="comp-list"></div>
   </div>
 
+  <!-- Plan / Calendrier -->
   <div class="grid-1 card">
-    <div class="section-title">Logique d'adaptation du Coach IA</div>
-    <div class="section-subtitle">Règles appliquées par l'agent (transparentes et ajustables)</div>
-    <table class="session-table">
-      <thead><tr><th>Condition</th><th>Action proposée</th><th>Raison physiologique</th></tr></thead>
-      <tbody>
-        <tr><td>Recovery &lt; 33% (rouge)</td><td><span class="plan-adapt rest">Repos / récup active</span></td><td>HRV basse → SNP en stress, risque blessure ou surentraînement</td></tr>
-        <tr><td>Recovery 34-66% (jaune)</td><td><span class="plan-adapt reduce">−30% intensité</span></td><td>Adaptations possibles mais à puissance réduite, éviter le seuil</td></tr>
-        <tr><td>Recovery &gt; 66% + TSB &gt; 0</td><td><span class="plan-adapt keep">Séance prévue conservée</span></td><td>Capacité d'absorption optimale</td></tr>
-        <tr><td>TSB &lt; −30 sur 5j</td><td><span class="plan-adapt swap">Semaine de décharge</span></td><td>Risque de stagnation/régression, besoin de surcompensation</td></tr>
-        <tr><td>Sommeil &lt; 6h ET HRV ↓ 2j</td><td><span class="plan-adapt rest">Annulation séance dure</span></td><td>Récupération neuromusculaire insuffisante</td></tr>
-      </tbody>
-    </table>
+    <div class="subtabs" id="calendar-subtabs">
+      <button class="subtab active" data-mode="prevu">Prévu</button>
+      <button class="subtab" data-mode="realise">Réalisé</button>
+    </div>
+
+    <div class="month-filter" id="month-filter" style="display:none;">
+      <button id="month-prev" title="Mois précédent">←</button>
+      <input type="month" id="month-input">
+      <button id="month-next" title="Mois suivant">→</button>
+      <button id="month-reset" class="reset">4 dernières semaines</button>
+    </div>
+
+    <div class="week-calendar" id="week-calendar"></div>
+  </div>
+
+  <!-- Chat Coach IA -->
+  <div class="grid-1 card">
+    <div class="section-title">
+      <span>Coach IA · Chat</span>
+      <button class="chat-clear" id="chat-clear" title="Effacer la conversation">Effacer</button>
+    </div>
+    <div class="section-subtitle">Décris tes sensations, ce que tu veux travailler, tes douleurs — le coach adapte ton plan en conséquence</div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-input-row">
+      <textarea id="chat-input" placeholder="Ex : Je me sens fatigué cette semaine · Je veux travailler mon seuil · J'ai mal au genou · Bien dormi, en forme..." rows="2"></textarea>
+      <button id="chat-send">Envoyer</button>
+    </div>
+    <div class="chat-prefs" id="chat-prefs"></div>
   </div>
 </section>
 
@@ -883,6 +1607,20 @@
   Coach IA · prototype dashboard · données simulées sur 90 jours · construit pour valider l'UX avant intégration intervals.icu + Whoop
 </footer>
 
+<!-- Modal détail séance -->
+<div class="modal-overlay" id="session-modal">
+  <div class="modal" id="session-modal-content">
+    <div class="modal-header">
+      <div class="modal-title">
+        <h2 id="modal-title">—</h2>
+        <div class="modal-meta" id="modal-meta">—</div>
+      </div>
+      <button class="modal-close" id="modal-close" title="Fermer (Échap)">×</button>
+    </div>
+    <div id="modal-body">—</div>
+  </div>
+</div>
+
 </div>
 
 <script>
@@ -903,9 +1641,8 @@ async function loadData() {
     if (json.athlete) {
       const a = json.athlete;
       const sub = document.querySelector('.logo-text p');
-      const ftpStr = a.ftp ? `FTP ${a.ftp}W · ` : '';
-      const wStr = a.weight ? `${a.weight}kg · ` : '';
-      sub.textContent = `${a.name} · ${ftpStr}${wStr}intervals.icu`;
+      const ftpStr = a.ftp ? ` · FTP ${a.ftp}W` : '';
+      sub.textContent = `${a.name}${ftpStr}`;
     }
     // Badge : nombre de jours réels Whoop disponibles
     const badge = document.querySelector('header .badge');
@@ -921,7 +1658,7 @@ async function loadData() {
       }
     }
 
-    // Indicateur "dernière mise à jour"
+    // Indicateur "dernière mise à jour" — placé dans .badge-stack (sous le badge)
     if (json.generated_at) {
       const gen = new Date(json.generated_at);
       const now = new Date();
@@ -932,19 +1669,10 @@ async function loadData() {
       else if (minAgo < 1440) fresh = `il y a ${Math.round(minAgo/60)} h`;
       else fresh = `il y a ${Math.round(minAgo/1440)} j`;
       const dot = minAgo < 30 ? 'var(--accent)' : minAgo < 120 ? 'var(--warn)' : 'var(--danger)';
-      const existing = document.getElementById('last-update');
-      const html = `<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);">
-        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${dot};"></span>
-        Mis à jour ${fresh}
-      </span>`;
-      if (existing) {
-        existing.innerHTML = html;
-      } else {
-        const headerInfo = document.querySelector('.header-info');
-        const span = document.createElement('span');
-        span.id = 'last-update';
-        span.innerHTML = html;
-        headerInfo.insertBefore(span, headerInfo.firstChild);
+      const updateEl = document.getElementById('last-update');
+      if (updateEl) {
+        updateEl.style.color = 'var(--text-dim)';
+        updateEl.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:${dot};display:inline-block;"></span><span>Mis à jour ${fresh}</span>`;
       }
     }
 
@@ -978,9 +1706,12 @@ python fetch_data.py</pre>
 
 // ========= MAIN (IIFE async) =========
 (async () => {
-const data = await loadData();
-const todayData = data[data.length - 1];
+const _allData = await loadData();
+let data = _allData;
+let todayData = _allData[_allData.length - 1];
 const today = new Date(todayData.date);
+// Filtre sports actif (Set : 'tout' OU sous-ensemble de cyclisme/course/musculation)
+const activeSports = new Set(['tout']);
 
 // ========= DATA GENERATION (fallback simulé) =========
 function generateData() {
@@ -1077,6 +1808,8 @@ function generateData() {
 
 // ========= HERO KPI =========
 document.getElementById('today-date').textContent = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+function renderHeroKpi() {
 const hasRecovery = todayData.recovery != null;
 document.getElementById('recovery-val').textContent = hasRecovery ? todayData.recovery + '%' : '—';
 const ringDash = 213.6;
@@ -1114,39 +1847,199 @@ trendEl.className = 'kpi-trend ' + (trendPct > 5 ? 'up' : trendPct < -5 ? 'down'
 document.getElementById('weekly-sessions').textContent = last7.filter(d => d.tss > 0).length;
 document.getElementById('weekly-hours').textContent = (last7.reduce((s,d)=>s+(d.duration||0),0)/60).toFixed(1) + ' h';
 
-// Recommandation Coach IA — adaptée selon présence ou non de recovery Whoop
-let coachRec = '';
-if (todayData.recovery == null) {
-  // Pas de données Whoop → conseil basé uniquement sur TSB
-  if (todayData.tsb > 5) {
-    coachRec = `Pas de donnée Whoop aujourd'hui. <strong>TSB à +${todayData.tsb.toFixed(0)}</strong> → frais, bonne fenêtre pour pousser l'intensité.`;
-  } else if (todayData.tsb > -15) {
-    coachRec = `Pas de donnée Whoop aujourd'hui. <strong>TSB à ${todayData.tsb.toFixed(0)}</strong> → zone optimale, séance prévue OK.`;
-  } else if (todayData.tsb > -30) {
-    coachRec = `Pas de donnée Whoop aujourd'hui. <strong>TSB à ${todayData.tsb.toFixed(0)}</strong> (fatigué) → éviter les blocs VO2max, privilégier endurance Z2.`;
-  } else {
-    coachRec = `Pas de donnée Whoop aujourd'hui. <strong>TSB à ${todayData.tsb.toFixed(0)}</strong> (surcharge) → semaine de décharge recommandée.`;
-  }
-} else if (todayData.recovery < 34) {
-  coachRec = `Récupération <strong>basse (${todayData.recovery}%)</strong>${todayData.hrv != null ? ' + HRV à ' + todayData.hrv + ' ms' : ''}. <strong>Repos ou marche active recommandé</strong>. Ton corps signale un stress accumulé — forcer aujourd'hui dégraderait ta forme des prochaines semaines.`;
-} else if (todayData.recovery < 67) {
-  coachRec = `Récupération <strong>modérée (${todayData.recovery}%)</strong>. La séance prévue peut être faite à <strong>−30% d'intensité</strong>, sans efforts au-dessus du seuil. Privilégie l'endurance Z2 ou un tempo court.`;
-} else if (todayData.tsb < -15) {
-  coachRec = `Récupération bonne (${todayData.recovery}%) mais <strong>TSB à ${todayData.tsb.toFixed(0)}</strong> (fatigue accumulée). Tu peux t'entraîner mais évite les blocs VO2max — garde-les pour quand le TSB remontera au-dessus de −10.`;
+// Dernière séance — bloc en haut à gauche du hero
+const lastSession = [...data].reverse().find(d => d.sessionType);
+const dateEl = document.getElementById('last-session-date');
+const nameEl = document.getElementById('last-session-name');
+const metricsEl = document.getElementById('last-session-metrics');
+if (!lastSession) {
+  dateEl.textContent = '';
+  nameEl.innerHTML = '<span class="ls-empty">Aucune séance dans la période</span>';
+  metricsEl.innerHTML = '';
 } else {
-  coachRec = `Tous les voyants sont au vert : recovery ${todayData.recovery}%, TSB ${todayData.tsb.toFixed(0)}${todayData.hrv != null ? ', HRV ' + todayData.hrv + ' ms' : ''}. <strong>Séance prévue conservée</strong> — c'est un bon jour pour pousser l'intensité.`;
+  const daysSince = Math.round((today - lastSession.date) / 86400000);
+  const dateStr = daysSince === 0 ? "Aujourd'hui"
+                : daysSince === 1 ? "Hier"
+                : `Il y a ${daysSince} jours`;
+  dateEl.textContent = `${dateStr} · ${lastSession.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}`;
+  nameEl.textContent = lastSession.sessionName || 'Séance';
+
+  const dur = lastSession.duration || 0;
+  const h = Math.floor(dur / 60);
+  const m = (dur % 60).toString().padStart(2, '0');
+  const metrics = [];
+  if (lastSession.tss) metrics.push(`<div class="ls-metric"><div class="ls-val">${lastSession.tss}</div><div class="ls-lbl">TSS</div></div>`);
+  if (dur) metrics.push(`<div class="ls-metric"><div class="ls-val">${h}h${m}</div><div class="ls-lbl">Durée</div></div>`);
+  if (lastSession.np) metrics.push(`<div class="ls-metric"><div class="ls-val">${lastSession.np}<span style="font-size:13px;font-weight:500;">W</span></div><div class="ls-lbl">NP</div></div>`);
+  if (lastSession.hr) metrics.push(`<div class="ls-metric"><div class="ls-val">${lastSession.hr}<span style="font-size:13px;font-weight:500;">bpm</span></div><div class="ls-lbl">FC moy</div></div>`);
+  metricsEl.innerHTML = metrics.join('');
 }
-document.getElementById('coach-rec').innerHTML = coachRec;
+}
+renderHeroKpi();
 
 // ========= CHART DEFAULTS =========
 Chart.defaults.color = '#8b94a8';
 Chart.defaults.borderColor = '#232a3a';
 Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+// Tooltips : ronds pleins au lieu de carrés pour les indicateurs de série
+Chart.defaults.plugins.tooltip.usePointStyle = true;
+Chart.defaults.plugins.tooltip.boxPadding = 6;
+
+// ========= PLUGIN : LIGNE VERTICALE AU HOVER =========
+Chart.register({
+  id: 'verticalHoverLine',
+  afterDraw: (chart) => {
+    if (chart.config.options?.plugins?.verticalHoverLine === false) return;
+    if (!chart.tooltip || !chart.tooltip._active || chart.tooltip._active.length === 0) return;
+    const ctx = chart.ctx;
+    const x = chart.tooltip._active[0].element.x;
+    const topY = chart.chartArea.top;
+    const bottomY = chart.chartArea.bottom;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x, topY);
+    ctx.lineTo(x, bottomY);
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(139, 148, 168, 0.5)';
+    ctx.stroke();
+    ctx.restore();
+  }
+});
+// Forcer le remplissage avec la couleur de la courbe / barre (sinon intérieur transparent / "blanc")
+Chart.defaults.plugins.tooltip.callbacks = Chart.defaults.plugins.tooltip.callbacks || {};
+Chart.defaults.plugins.tooltip.callbacks.labelColor = function(context) {
+  // Priorité : couleur spécifique de la barre survolée si backgroundColor est un array,
+  // sinon borderColor de la courbe, sinon backgroundColor unique.
+  const ds = context.dataset;
+  let color;
+  if (Array.isArray(ds.backgroundColor)) {
+    color = ds.backgroundColor[context.dataIndex];
+  } else {
+    color = ds.borderColor || ds.backgroundColor || '#888';
+  }
+  return {
+    borderColor: color,
+    backgroundColor: color,
+    borderWidth: 0,
+    borderRadius: 0
+  };
+};
 
 const labels = data.map(d => fmtDate(d.date));
 
+// ========= FILTRE SPORTS =========
+function getSportFromDay(d) {
+  // Prefer d.sport (nouveau format), fallback sur d.sessionType (ancien data.js)
+  if (d.sport) return d.sport;
+  if (!d.sessionType) return null;
+  if (d.sessionType === 'force') return 'musculation';
+  if (d.sessionType === 'mobilite') return 'mobilite';
+  if (d.sessionType === 'natation') return 'natation';
+  return 'cyclisme'; // par défaut, sessions cycling-like
+}
+
+function applySportFilter() {
+  // Reset des index activité par jour (les arrays changent selon le filtre)
+  Object.keys(dayActivityIndex).forEach(k => delete dayActivityIndex[k]);
+
+  if (activeSports.has('tout') || activeSports.size === 0) {
+    data = _allData;
+  } else {
+    // 1. Construire la vue filtrée : filtre par ACTIVITÉ (granularité fine)
+    const filtered = _allData.map(d => {
+      // Pas d'activités du tout → jour de repos, on garde
+      if (!d.activities || d.activities.length === 0) {
+        // Fallback : si pas d'array activities mais sessionType présent, utiliser sport racine
+        if (d.sessionType) {
+          const sport = getSportFromDay(d);
+          if (sport && !activeSports.has(sport)) {
+            return {
+              ...d,
+              tss: 0, duration: 0, zones: null, zones_hr: null, zones_power: null,
+              sessionType: null, sessionName: null,
+              np: 0, avgW: 0, hr: 0, ftpPct: 0, compliance: null, intensity: 0,
+              activities: []
+            };
+          }
+        }
+        return { ...d };
+      }
+
+      // Filtrer les activités qui matchent les sports actifs
+      const matchingActs = d.activities.filter(a => activeSports.has(a.sport));
+
+      if (matchingActs.length === 0) {
+        // Aucune activité ne correspond → jour vidé
+        return {
+          ...d,
+          tss: 0, duration: 0, zones: null, zones_hr: null, zones_power: null,
+          sessionType: null, sessionName: null,
+          np: 0, avgW: 0, hr: 0, ftpPct: 0, compliance: null, intensity: 0,
+          activities: []
+        };
+      }
+
+      // Au moins une activité matche : recomposer le jour avec les activités filtrées
+      const main = matchingActs[0]; // déjà triées par TSS desc côté Python
+      const totalTss = matchingActs.reduce((s, a) => s + (a.tss || 0), 0);
+      const totalDur = matchingActs.reduce((s, a) => s + (a.duration || 0), 0);
+
+      return {
+        ...d,
+        tss: totalTss,
+        duration: totalDur,
+        sessionName: main.name,
+        sessionType: main.type,
+        sport: main.sport,
+        np: main.np || 0,
+        hr: main.hr || 0,
+        ftpPct: main.ftpPct || 0,
+        zones: main.zones_hr || main.zones_power || null,
+        zones_hr: main.zones_hr || null,
+        zones_power: main.zones_power || null,
+        activities: matchingActs
+      };
+    });
+
+    // 2. Recalculer CTL/ATL/TSB sur les TSS filtrés (EWMA : 42j pour CTL, 7j pour ATL)
+    let ctl = 0, atl = 0;
+    filtered.forEach(d => {
+      const t = d.tss || 0;
+      ctl = ctl + (t - ctl) / 42;
+      atl = atl + (t - atl) / 7;
+      d.ctl = +ctl.toFixed(1);
+      d.atl = +atl.toFixed(1);
+      d.tsb = +(ctl - atl).toFixed(1);
+    });
+
+    data = filtered;
+  }
+  // Mettre à jour todayData (pointe sur le dernier jour de la vue filtrée)
+  todayData = data[data.length - 1];
+  rerenderFilteredCharts();
+}
+
+function rerenderFilteredCharts() {
+  if (typeof renderHeroKpi === 'function') renderHeroKpi();
+  if (typeof renderLoadChart === 'function') renderLoadChart(getInputDate('load-from'), getInputDate('load-to'));
+  if (typeof renderHoursChart === 'function') renderHoursChart(getInputDate('hours-from'), getInputDate('hours-to'));
+  if (typeof renderWeeklyChart === 'function') renderWeeklyChart(getInputDate('weekly-from'), getInputDate('weekly-to'));
+  if (typeof renderZones === 'function') renderZones(getInputDate('zones-from'), getInputDate('zones-to'));
+  if (typeof renderSessionsTable === 'function') renderSessionsTable();
+  if (typeof renderCalendar === 'function') renderCalendar();
+}
+
 // ========= HELPERS DATE RANGE =========
-const toIsoDate = (d) => d.toISOString().slice(0, 10);
+// Important : utiliser les composantes LOCALES (pas UTC) pour éviter
+// le décalage de fuseau horaire (ex: minuit local CEST → veille UTC).
+const toIsoDate = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+const fmtShortDate = (d) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }).replace('.', '');
 function sliceByDate(arr, fromIso, toIso) {
   return arr.filter(d => {
     const iso = toIsoDate(d.date);
@@ -1166,10 +2059,9 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
   data: {
     labels: [],
     datasets: [
-      { label: 'CTL', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.1)', tension: 0.3, pointRadius: 0, fill: true, yAxisID: 'y' },
-      { label: 'ATL', data: [], borderColor: '#fbbf24', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, yAxisID: 'y' },
-      { label: 'TSB', data: [], borderColor: '#a78bfa', backgroundColor: 'transparent', borderDash: [4,4], tension: 0.3, pointRadius: 0, yAxisID: 'y' },
-      { label: 'Recovery', data: [], borderColor: '#4ade80', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, yAxisID: 'y1' }
+      { label: 'CTL', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.1)', cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#60a5fa', fill: true, yAxisID: 'y' },
+      { label: 'ATL', data: [], borderColor: '#fbbf24', backgroundColor: 'transparent', cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#fbbf24', yAxisID: 'y' },
+      { label: 'TSB', data: [], borderColor: '#a78bfa', backgroundColor: 'transparent', borderDash: [4,4], cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#a78bfa', yAxisID: 'y' }
     ]
   },
   options: {
@@ -1178,8 +2070,7 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
     plugins: { legend: { display: false } },
     scales: {
       x: { ticks: { maxTicksLimit: 8 }, grid: { display: false } },
-      y: { position: 'left', title: { display: true, text: 'TSS / TSB' } },
-      y1: { position: 'right', min: 0, max: 100, title: { display: true, text: 'Recovery %' }, grid: { display: false } }
+      y: { position: 'left', title: { display: true, text: 'TSS / TSB' } }
     }
   }
 });
@@ -1190,7 +2081,6 @@ function renderLoadChart(fromIso, toIso) {
   loadChart.data.datasets[0].data = subset.map(d => d.ctl);
   loadChart.data.datasets[1].data = subset.map(d => d.atl);
   loadChart.data.datasets[2].data = subset.map(d => d.tsb);
-  loadChart.data.datasets[3].data = subset.map(d => d.recovery);
   loadChart.update();
 }
 
@@ -1231,211 +2121,395 @@ document.querySelectorAll('#load-range .preset').forEach(btn => {
   });
 });
 
-// ========= STATS & CORRÉLATIONS (uniquement données Whoop réelles) =========
-function pearson(xs, ys) {
-  const n = xs.length;
-  if (n < 3) return null;
-  const mx = xs.reduce((a,b)=>a+b,0)/n;
-  const my = ys.reduce((a,b)=>a+b,0)/n;
-  let num = 0, dx2 = 0, dy2 = 0;
-  for (let i = 0; i < n; i++) {
-    const dx = xs[i] - mx, dy = ys[i] - my;
-    num += dx * dy;
-    dx2 += dx * dx;
-    dy2 += dy * dy;
-  }
-  const den = Math.sqrt(dx2 * dy2);
-  return den === 0 ? null : num / den;
-}
+// (Corrélations supprimées du dashboard — bloc retiré sur demande)
 
-const realWhoop = data.filter(d => d.whoopSource === 'real' && d.recovery != null);
-const realCount = realWhoop.length;
-const insights = [];
+// ========= CHART HOURS (heures hebdomadaires, semaines calendaires, drill-down jour) =========
+let currentHoursWeeks = [];
+let selectedHoursIndex = null;
+let hoursDailyChart = null;
 
-if (realCount >= 3) {
-  // Moyennes
-  const avgRec = Math.round(realWhoop.reduce((s,d)=>s+d.recovery,0) / realCount);
-  const hrvDays = realWhoop.filter(d => d.hrv != null);
-  const avgHrv = hrvDays.length ? Math.round(hrvDays.reduce((s,d)=>s+d.hrv,0) / hrvDays.length) : null;
-  const sleepDays = realWhoop.filter(d => d.sleepH != null);
-  const avgSleep = sleepDays.length ? +(sleepDays.reduce((s,d)=>s+d.sleepH,0) / sleepDays.length).toFixed(1) : null;
-
-  insights.push({
-    class: avgRec > 60 ? 'good' : 'warn',
-    title: 'Récupération moyenne',
-    val: avgRec + '%',
-    body: `Moyenne sur ${realCount} jour${realCount>1?'s':''} de Whoop actifs.`
-  });
-  if (avgHrv != null) insights.push({
-    class: 'good',
-    title: 'HRV moyenne',
-    val: avgHrv + ' ms',
-    body: 'Calculée sur tes mesures Whoop réelles.'
-  });
-  if (avgSleep != null) insights.push({
-    class: avgSleep >= 7.5 ? 'good' : 'warn',
-    title: 'Sommeil moyen',
-    val: avgSleep + ' h',
-    body: avgSleep >= 7.5 ? 'Volume de sommeil correct.' : 'Volume sous le seuil 7h30 recommandé pour récupération optimale.'
-  });
-
-  // Corrélation Recovery ↔ ATL si on a assez de points
-  if (realCount >= 5) {
-    const xs = realWhoop.map(d => d.atl);
-    const ys = realWhoop.map(d => d.recovery);
-    const r = pearson(xs, ys);
-    if (r != null) {
-      insights.push({
-        class: r < -0.3 ? 'good' : 'warn',
-        title: 'Corrélation ATL ↔ Recovery',
-        val: (r >= 0 ? '+' : '') + r.toFixed(2),
-        body: r < -0.3
-          ? 'Corrélation négative attendue : plus de fatigue → moins de récup. Cohérent.'
-          : Math.abs(r) < 0.3
-            ? 'Faible corrélation pour l\'instant — besoin de plus de jours pour stabiliser.'
-            : 'Corrélation inattendue (positive). À surveiller avec plus de données.'
-      });
-    }
-  }
-} else if (realCount > 0) {
-  insights.push({
-    class: 'warn',
-    title: 'Données insuffisantes',
-    val: realCount + 'j',
-    body: 'Seulement ' + realCount + ' jour' + (realCount>1?'s':'') + ' de Whoop. Les corrélations charge ↔ récupération deviennent fiables à partir de 30 jours.'
-  });
-} else {
-  insights.push({
-    class: 'warn',
-    title: 'Aucune donnée Whoop',
-    val: '—',
-    body: 'Aucun score de récupération disponible. Lance python whoop_auth.py puis python fetch_data.py.'
-  });
-}
-document.getElementById('correl-list').innerHTML = insights.map(c => `
-  <div class="insight ${c.class}">
-    <div class="insight-title">${c.title} <span style="float:right;color:var(--text);">${c.val}</span></div>
-    <div class="insight-body">${c.body}</div>
-  </div>`).join('');
-
-// ========= CHART SCATTER (filtrable par dates) =========
-const scatterChart = new Chart(document.getElementById('chart-scatter'), {
-  type: 'scatter',
-  data: {
-    datasets: [{
-      label: 'Jour',
-      data: [],
-      backgroundColor: 'rgba(96,165,250,0.5)',
-      pointRadius: 4
-    }]
-  },
+const hoursChart = new Chart(document.getElementById('chart-hours'), {
+  type: 'bar',
+  data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 4 }] },
   options: {
     responsive: true, maintainAspectRatio: false,
+    onClick: (event, elements) => {
+      if (elements.length === 0) return;
+      const idx = elements[0].index;
+      if (selectedHoursIndex === idx) {
+        hideHoursDetail();
+      } else {
+        selectedHoursIndex = idx;
+        showHoursDetail(currentHoursWeeks[idx]);
+      }
+    },
+    onHover: (event, elements) => {
+      event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+    },
     plugins: {
       legend: { display: false },
-      tooltip: { callbacks: { label: (ctx) => `TSS ${ctx.parsed.x} → Recovery ${ctx.parsed.y}%` } }
+      tooltip: {
+        callbacks: {
+          title: (items) => 'Semaine ' + items[0].label,
+          label: (ctx) => ctx.parsed.y + ' h (clique pour détail)'
+        }
+      }
     },
     scales: {
-      x: { title: { display: true, text: 'TSS du jour' } },
-      y: { title: { display: true, text: 'Recovery J+1 (%)' }, min: 0, max: 100 }
+      y: { title: { display: true, text: 'Heures' }, beginAtZero: true },
+      x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 14 } }
     }
   }
 });
 
-function renderScatterChart(fromIso, toIso) {
-  // Construire les paires (TSS jour, Recovery J+1) à partir de toute la série
-  // puis filtrer par date du "jour" (et seulement si TSS > 0)
-  const pairs = [];
-  for (let i = 0; i < data.length - 1; i++) {
-    const iso = toIsoDate(data[i].date);
-    if (iso < fromIso || iso > toIso) continue;
-    if ((data[i].tss || 0) === 0) continue;
-    if (data[i+1].recovery == null) continue;
-    pairs.push({ x: data[i].tss, y: data[i+1].recovery });
+function renderHoursChart(fromIso, toIso) {
+  currentHoursWeeks = computeWeeksByDate(fromIso, toIso);
+  const labels = currentHoursWeeks.map(w => w.label);
+  const hoursArr = currentHoursWeeks.map(w => +(w.days.reduce((s, d) => s + (d.duration || 0), 0) / 60).toFixed(1));
+  const colors = hoursArr.map(h => {
+    if (h === 0) return '#2a3142';
+    if (h > 12) return '#f87171';
+    if (h > 8) return '#fbbf24';
+    return '#4ade80';
+  });
+  hoursChart.data.labels = labels;
+  hoursChart.data.datasets[0].data = hoursArr;
+  hoursChart.data.datasets[0].backgroundColor = colors;
+  hoursChart.update();
+  hideHoursDetail();
+}
+
+function showHoursDetail(week) {
+  if (!week) return;
+  document.getElementById('hours-detail').style.display = 'block';
+  document.getElementById('hours-detail-title').textContent =
+    `Détail jour par jour · semaine du ${week.label}`;
+
+  const dowFr = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+  const dayLabels = week.days.map(d => `${dowFr[d.date.getDay()]} ${d.date.getDate()}`);
+  const dayHours = week.days.map(d => +((d.duration || 0) / 60).toFixed(1));
+  const dayColors = dayHours.map(h => {
+    if (h === 0) return '#2a3142';
+    if (h > 3) return '#f87171';
+    if (h > 1.5) return '#fbbf24';
+    return '#4ade80';
+  });
+  const daySessionNames = week.days.map(d => d.sessionName || 'Repos');
+
+  if (hoursDailyChart) {
+    hoursDailyChart.data.labels = dayLabels;
+    hoursDailyChart.data.datasets[0].data = dayHours;
+    hoursDailyChart.data.datasets[0].backgroundColor = dayColors;
+    hoursDailyChart.$daySessionNames = daySessionNames;
+    hoursDailyChart.update();
+  } else {
+    const canvas = document.getElementById('chart-hours-daily');
+    hoursDailyChart = new Chart(canvas, {
+      type: 'bar',
+      data: { labels: dayLabels, datasets: [{ data: dayHours, backgroundColor: dayColors, borderRadius: 4 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => items[0].label,
+              label: (ctx) => {
+                const name = ctx.chart.$daySessionNames?.[ctx.dataIndex] || '';
+                return name ? `${name} · ${ctx.parsed.y} h` : `${ctx.parsed.y} h`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: { title: { display: true, text: 'Heures' }, beginAtZero: true },
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+    hoursDailyChart.$daySessionNames = daySessionNames;
   }
-  scatterChart.data.datasets[0].data = pairs;
-  scatterChart.update();
 }
 
-// Init : 30 derniers jours
-{
+function hideHoursDetail() {
+  document.getElementById('hours-detail').style.display = 'none';
+  selectedHoursIndex = null;
+}
+
+document.getElementById('hours-detail-close').addEventListener('click', hideHoursDetail);
+
+function applyHoursPreset(numWeeks) {
   const end = new Date(today);
-  const start = new Date(today);
-  start.setDate(end.getDate() - 29);
-  setInputDate('scatter-from', start);
-  setInputDate('scatter-to', end);
-  document.getElementById('scatter-from').min = toIsoDate(data[0].date);
-  document.getElementById('scatter-from').max = toIsoDate(data[data.length-1].date);
-  document.getElementById('scatter-to').min = toIsoDate(data[0].date);
-  document.getElementById('scatter-to').max = toIsoDate(data[data.length-1].date);
-  renderScatterChart(toIsoDate(start), toIsoDate(end));
+  const currentMonday = getMondayOfWeek(end);
+  const start = new Date(currentMonday);
+  start.setDate(currentMonday.getDate() - (numWeeks - 1) * 7);
+  setInputDate('hours-from', start);
+  setInputDate('hours-to', end);
+  renderHoursChart(toIsoDate(start), toIsoDate(end));
 }
 
-document.querySelectorAll('#scatter-range .preset').forEach(btn => {
+// Init avec 12 semaines calendaires par défaut
+document.getElementById('hours-from').min = toIsoDate(data[0].date);
+document.getElementById('hours-from').max = toIsoDate(data[data.length-1].date);
+document.getElementById('hours-to').min = toIsoDate(data[0].date);
+document.getElementById('hours-to').max = toIsoDate(data[data.length-1].date);
+applyHoursPreset(12);
+
+document.querySelectorAll('#hours-range .preset').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('#scatter-range .preset').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#hours-range .preset').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    const days = +btn.dataset.days;
-    const end = new Date(today);
-    const start = new Date(today);
-    start.setDate(end.getDate() - (days - 1));
-    setInputDate('scatter-from', start);
-    setInputDate('scatter-to', end);
-    renderScatterChart(toIsoDate(start), toIsoDate(end));
-  });
-});
-['scatter-from', 'scatter-to'].forEach(id => {
-  document.getElementById(id).addEventListener('change', () => {
-    document.querySelectorAll('#scatter-range .preset').forEach(b => b.classList.remove('active'));
-    renderScatterChart(getInputDate('scatter-from'), getInputDate('scatter-to'));
+    applyHoursPreset(+btn.dataset.weeks);
   });
 });
 
-// ========= CHART WEEKLY (labels = vraies dates de semaine) =========
-const fmtShortDate = (d) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }).replace('.', '');
-const weeks = [];
-for (let i = 12; i >= 0; i--) {
-  const sliceEnd = data.length - i*7;
-  const sliceStart = Math.max(0, sliceEnd - 7);
-  const slice = data.slice(sliceStart, sliceEnd);
-  if (slice.length === 0) continue;
-  const tss = slice.reduce((s,d)=>s+d.tss,0);
-  const firstD = slice[0].date;
-  const lastD = slice[slice.length - 1].date;
-  // Label "15 avr - 22 avr"
-  const label = `${fmtShortDate(firstD)} - ${fmtShortDate(lastD)}`;
-  weeks.push({ label, tss });
+['hours-from', 'hours-to'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    document.querySelectorAll('#hours-range .preset').forEach(b => b.classList.remove('active'));
+    renderHoursChart(getInputDate('hours-from'), getInputDate('hours-to'));
+  });
+});
+
+// ========= CHART WEEKLY (filtrable par nombre de semaines + drill-down jour) =========
+
+let currentWeeks = [];        // semaines actuellement affichées
+let selectedWeekIndex = null; // index de la semaine cliquée (null si aucune)
+let dailyChart = null;         // chart du détail journalier, créé à la 1ère ouverture
+
+// Lundi de la semaine d'une date donnée (semaine ISO calendaire Mon-Sun)
+function getMondayOfWeek(date) {
+  const d = new Date(date);
+  const day = d.getDay();         // 0=Dim, 1=Lun, ..., 6=Sam
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
-new Chart(document.getElementById('chart-weekly'), {
+
+function computeWeeksByDate(fromIso, toIso) {
+  // Regrouper par VRAIES semaines calendaires (Lundi -> Dimanche).
+  // La semaine en cours est affichée même incomplète (les jours futurs valent 0).
+  const fromDate = new Date(fromIso + 'T12:00:00');
+  const toDate = new Date(toIso + 'T12:00:00');
+  const firstMonday = getMondayOfWeek(fromDate);
+  // Aller jusqu'au dimanche de la semaine de toDate
+  const lastSunday = getMondayOfWeek(toDate);
+  lastSunday.setDate(lastSunday.getDate() + 6);
+
+  // Index data par date ISO pour lookup O(1)
+  const dataByIso = {};
+  data.forEach(d => { dataByIso[toIsoDate(d.date)] = d; });
+
+  const weeks = [];
+  let weekStart = new Date(firstMonday);
+
+  while (weekStart <= lastSunday) {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    const weekDays = [];
+    let weekHasAny = false;
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(weekStart);
+      day.setDate(weekStart.getDate() + i);
+      const iso = toIsoDate(day);
+      if (dataByIso[iso]) {
+        weekDays.push(dataByIso[iso]);
+        weekHasAny = true;
+      } else {
+        // Jour futur ou absent : barre vide / grise
+        weekDays.push({
+          date: day,
+          tss: 0,
+          sessionName: null,
+          duration: 0
+        });
+      }
+    }
+
+    // Si la semaine entière est en dehors de l'historique (très ancien), on skip
+    if (weekHasAny) {
+      const tss = weekDays.reduce((s, d) => s + (d.tss || 0), 0);
+      weeks.push({
+        label: `${fmtShortDate(weekStart)} - ${fmtShortDate(weekEnd)}`,
+        tss,
+        days: weekDays
+      });
+    }
+
+    // Avancer d'une semaine
+    weekStart = new Date(weekStart);
+    weekStart.setDate(weekStart.getDate() + 7);
+  }
+
+  return weeks;
+}
+
+const weeklyChart = new Chart(document.getElementById('chart-weekly'), {
   type: 'bar',
   data: {
-    labels: weeks.map(w=>w.label),
-    datasets: [{ data: weeks.map(w=>w.tss), backgroundColor: weeks.map(w => w.tss > 500 ? '#f87171' : w.tss > 380 ? '#fbbf24' : '#4ade80'), borderRadius: 4 }]
+    labels: [],
+    datasets: [{ data: [], backgroundColor: [], borderRadius: 4 }]
   },
   options: {
     responsive: true, maintainAspectRatio: false,
+    onClick: (event, elements) => {
+      if (elements.length === 0) return;
+      const idx = elements[0].index;
+      if (selectedWeekIndex === idx) {
+        // Re-clic sur la même barre → on ferme
+        hideWeekDetail();
+      } else {
+        selectedWeekIndex = idx;
+        showWeekDetail(currentWeeks[idx]);
+      }
+    },
+    onHover: (event, elements) => {
+      event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+    },
     plugins: {
       legend: { display: false },
-      tooltip: { callbacks: { title: (items) => 'Semaine ' + items[0].label, label: (ctx) => ctx.parsed.y + ' TSS' } }
+      tooltip: { callbacks: { title: (items) => 'Semaine ' + items[0].label, label: (ctx) => ctx.parsed.y + ' TSS (clique pour détail)' } }
     },
     scales: {
       y: { title: { display: true, text: 'TSS hebdo' } },
-      x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45 } }
+      x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 14 } }
     }
   }
+});
+
+function renderWeeklyChart(fromIso, toIso) {
+  currentWeeks = computeWeeksByDate(fromIso, toIso);
+  weeklyChart.data.labels = currentWeeks.map(w => w.label);
+  weeklyChart.data.datasets[0].data = currentWeeks.map(w => w.tss);
+  weeklyChart.data.datasets[0].backgroundColor = currentWeeks.map(w =>
+    w.tss > 500 ? '#f87171' : w.tss > 380 ? '#fbbf24' : '#4ade80'
+  );
+  weeklyChart.update();
+  hideWeekDetail();
+}
+
+function showWeekDetail(week) {
+  const detailDiv = document.getElementById('weekly-detail');
+  detailDiv.style.display = 'block';
+  document.getElementById('weekly-detail-title').textContent =
+    `Détail jour par jour · semaine du ${week.label}`;
+
+  const dowFr = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+  const dayLabels = week.days.map(d => `${dowFr[d.date.getDay()]} ${d.date.getDate()}`);
+  const dayTss = week.days.map(d => d.tss);
+  const dayColors = week.days.map(d => {
+    if (!d.tss) return '#2a3142';      // jour de repos / pas de séance
+    if (d.tss > 150) return '#f87171'; // grosse séance
+    if (d.tss > 80) return '#fbbf24';  // séance moyenne
+    return '#4ade80';                   // séance légère
+  });
+  const daySessionNames = week.days.map(d => d.sessionName || 'Repos');
+
+  if (dailyChart) {
+    dailyChart.data.labels = dayLabels;
+    dailyChart.data.datasets[0].data = dayTss;
+    dailyChart.data.datasets[0].backgroundColor = dayColors;
+    dailyChart.$daySessionNames = daySessionNames;
+    dailyChart.update();
+  } else {
+    const canvas = document.getElementById('chart-weekly-daily');
+    dailyChart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: dayLabels,
+        datasets: [{ data: dayTss, backgroundColor: dayColors, borderRadius: 4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => items[0].label,
+              label: (ctx) => {
+                const name = ctx.chart.$daySessionNames?.[ctx.dataIndex] || '';
+                return name ? `${name} · ${ctx.parsed.y} TSS` : `${ctx.parsed.y} TSS`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: { title: { display: true, text: 'TSS' }, beginAtZero: true },
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+    dailyChart.$daySessionNames = daySessionNames;
+  }
+}
+
+function hideWeekDetail() {
+  document.getElementById('weekly-detail').style.display = 'none';
+  selectedWeekIndex = null;
+}
+
+document.getElementById('weekly-detail-close').addEventListener('click', hideWeekDetail);
+
+// Helper preset : N semaines calendaires (semaine courante + N-1 semaines passées)
+function applyWeeklyPreset(numWeeks) {
+  const end = new Date(today);
+  const currentMonday = getMondayOfWeek(end);
+  const start = new Date(currentMonday);
+  start.setDate(currentMonday.getDate() - (numWeeks - 1) * 7);
+  setInputDate('weekly-from', start);
+  setInputDate('weekly-to', end);
+  renderWeeklyChart(toIsoDate(start), toIsoDate(end));
+}
+
+// Init : 12 semaines calendaires (semaine courante + 11 précédentes)
+document.getElementById('weekly-from').min = toIsoDate(data[0].date);
+document.getElementById('weekly-from').max = toIsoDate(data[data.length-1].date);
+document.getElementById('weekly-to').min = toIsoDate(data[0].date);
+document.getElementById('weekly-to').max = toIsoDate(data[data.length-1].date);
+applyWeeklyPreset(12);
+
+// Presets : 4 sem / 12 sem
+document.querySelectorAll('#weekly-range .preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#weekly-range .preset').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyWeeklyPreset(+btn.dataset.weeks);
+  });
+});
+
+// Date inputs manuels : déselectionne les presets
+['weekly-from', 'weekly-to'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    document.querySelectorAll('#weekly-range .preset').forEach(b => b.classList.remove('active'));
+    renderWeeklyChart(getInputDate('weekly-from'), getInputDate('weekly-to'));
+  });
 });
 
 // ========= CHART ZONES (avec sélecteur de période) =========
 const zoneLabels = ['Z1 récup', 'Z2 endurance', 'Z3 tempo', 'Z4 seuil', 'Z5 VO2max'];
 const zoneColors = ['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f87171'];
 
-function computeZones(periodDays) {
+// État : 'hr' (FC) ou 'power' (Watts)
+let currentZoneType = 'hr';
+
+function getZonesForDay(d) {
+  // Renvoie le tableau de zones approprié selon le toggle, avec fallback
+  if (currentZoneType === 'power') return d.zones_power || null;
+  return d.zones_hr || d.zones || null;
+}
+
+function computeZonesByDate(fromIso, toIso) {
   // Pondérer par la durée de chaque séance pour avoir un % réel du temps total
-  const slice = data.slice(-periodDays).filter(d => d.zones && d.duration);
+  const slice = data.filter(d => {
+    const iso = toIsoDate(d.date);
+    return iso >= fromIso && iso <= toIso && getZonesForDay(d) && d.duration;
+  });
   const totals = [0,0,0,0,0];
   let totalTime = 0;
   slice.forEach(d => {
-    d.zones.forEach((pct, i) => {
+    const zones = getZonesForDay(d);
+    zones.forEach((pct, i) => {
       const minutes = (pct / 100) * d.duration;
       totals[i] += minutes;
       totalTime += minutes;
@@ -1464,8 +2538,8 @@ const zonesChart = new Chart(document.getElementById('chart-zones'), {
   }
 });
 
-function renderZones(periodDays) {
-  const { pct, totalMin, sessions } = computeZones(periodDays);
+function renderZones(fromIso, toIso) {
+  const { pct, totalMin, sessions } = computeZonesByDate(fromIso, toIso);
   zonesChart.data.datasets[0].data = pct;
   zonesChart.update();
   const hours = Math.floor(totalMin / 60);
@@ -1481,84 +2555,1378 @@ function renderZones(periodDays) {
   `;
 }
 
-// Init avec 7 jours par défaut
-renderZones(7);
+// Init avec 7 derniers jours par défaut
+{
+  const end = new Date(today);
+  const start = new Date(today);
+  start.setDate(end.getDate() - 6);
+  setInputDate('zones-from', start);
+  setInputDate('zones-to', end);
+  document.getElementById('zones-from').min = toIsoDate(data[0].date);
+  document.getElementById('zones-from').max = toIsoDate(data[data.length-1].date);
+  document.getElementById('zones-to').min = toIsoDate(data[0].date);
+  document.getElementById('zones-to').max = toIsoDate(data[data.length-1].date);
+  renderZones(toIsoDate(start), toIsoDate(end));
+}
 
-document.querySelectorAll('#zones-period .period-btn').forEach(btn => {
+// Presets
+document.querySelectorAll('#zones-range .preset').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('#zones-period .period-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#zones-range .preset').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    renderZones(+btn.dataset.period);
+    const days = +btn.dataset.days;
+    const end = new Date(today);
+    const start = new Date(today);
+    start.setDate(end.getDate() - (days - 1));
+    setInputDate('zones-from', start);
+    setInputDate('zones-to', end);
+    renderZones(toIsoDate(start), toIsoDate(end));
   });
 });
 
-// ========= PANEL 2: PLAN ADAPTATIF =========
-const dowFr = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
-const apiPlan = window._planFromAPI || [];
+// Date inputs manuels
+['zones-from', 'zones-to'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    document.querySelectorAll('#zones-range .preset').forEach(b => b.classList.remove('active'));
+    renderZones(getInputDate('zones-from'), getInputDate('zones-to'));
+  });
+});
 
-function adaptPlan(p, dayRecovery, dayTSB) {
-  // Logique d'adaptation simple
-  if (!p.plannedTSS || p.plannedTSS < 30) return { class: 'keep', label: 'OK' };
-  if (dayRecovery !== null && dayRecovery < 34) return { class: 'rest', label: 'Repos recommandé' };
-  if (dayRecovery !== null && dayRecovery < 67) return { class: 'reduce', label: '−30% intensité' };
-  if (dayTSB !== null && dayTSB < -25) return { class: 'swap', label: 'Décharge conseillée' };
-  return { class: 'keep', label: 'Maintenu' };
+// Toggle FC / Watts
+document.querySelectorAll('#zones-type-toggle .ztoggle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#zones-type-toggle .ztoggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentZoneType = btn.dataset.type;
+    renderZones(getInputDate('zones-from'), getInputDate('zones-to'));
+  });
+});
+
+// ========= PANEL 2: ENTRAÎNEUR (compétitions + plan 7j) =========
+const dowFr = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+const COMP_KEY = 'coach_ia_competitions_v1';
+
+function loadCompetitions() {
+  try {
+    const raw = localStorage.getItem(COMP_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw).filter(c => c.date && c.name);
+  } catch (e) { return []; }
 }
 
-let planHTML = '';
-if (apiPlan.length > 0) {
-  // Utiliser les events réels d'intervals.icu
-  planHTML = apiPlan.slice(0, 7).map(p => {
-    const d = new Date(p.date + 'T12:00:00');
-    const adapt = adaptPlan(p, todayData.recovery, todayData.tsb);
-    return `<div class="plan-item">
-      <div class="plan-day"><div class="dow">${dowFr[d.getDay()]}</div><div class="num">${d.getDate()}</div></div>
-      <div class="plan-content"><div class="name">${p.name}</div><div class="desc">${p.desc || (p.plannedTSS ? p.plannedTSS + ' TSS prévus' : '')}</div></div>
-      <div><span class="plan-adapt ${adapt.class}">${adapt.label}</span></div>
+function saveCompetitions(comps) {
+  localStorage.setItem(COMP_KEY, JSON.stringify(comps));
+}
+
+function renderCompList() {
+  const comps = loadCompetitions()
+    .map(c => ({ ...c, dateObj: new Date(c.date + 'T12:00:00') }))
+    .filter(c => c.dateObj >= today)
+    .sort((a, b) => a.dateObj - b.dateObj);
+
+  const list = document.getElementById('comp-list');
+  if (comps.length === 0) {
+    list.innerHTML = `<div class="comp-empty">Aucune compétition enregistrée. Ajoute ton prochain objectif pour structurer ton plan.</div>`;
+    return;
+  }
+  list.innerHTML = comps.map(c => {
+    const daysUntil = Math.ceil((c.dateObj - today) / 86400000);
+    const dateStr = c.dateObj.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+    return `<div class="comp-item">
+      <span class="comp-prio ${c.priority}">${c.priority}</span>
+      <span class="comp-name">${c.name}</span>
+      <span class="comp-date">${dateStr}</span>
+      <span class="comp-countdown">dans ${daysUntil} j</span>
+      <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
     </div>`;
   }).join('');
-} else {
-  // Pas d'events sur intervals.icu : afficher un placeholder + suggestion de plan-type
-  planHTML = `<div style="background:var(--bg-elev2);border:1px dashed var(--border);border-radius:10px;padding:18px;text-align:center;color:var(--text-dim);font-size:13px;line-height:1.6;">
-    <strong style="color:var(--text);display:block;margin-bottom:6px;">Aucune séance planifiée sur intervals.icu</strong>
-    Pour activer la planification adaptative, ajoute tes séances futures dans le calendrier intervals.icu (onglet Plan).<br>
-    Le Coach IA pourra alors adapter chaque séance en fonction de ta récupération.
-  </div>`;
 }
-document.getElementById('plan-list').innerHTML = planHTML;
 
-// ========= FORECAST =========
-const fcLabels = [], fcCTL = [], fcTSB = [];
-let fCTL = todayData.ctl, fATL = todayData.atl;
-const futureTSS = [0, 70, 55, 60, 30, 80, 175]; // semaine type adaptée
-for (let i = 0; i < 21; i++) {
-  const d = new Date(today); d.setDate(today.getDate() + i);
-  const t = futureTSS[i % 7];
-  fCTL = fCTL + (t - fCTL) / 42;
-  fATL = fATL + (t - fATL) / 7;
-  fcLabels.push(fmtDate(d));
-  fcCTL.push(+fCTL.toFixed(1));
-  fcTSB.push(+(fCTL - fATL).toFixed(1));
+document.getElementById('comp-add').addEventListener('click', () => {
+  const name = document.getElementById('comp-name').value.trim();
+  const date = document.getElementById('comp-date').value;
+  const priority = document.getElementById('comp-priority').value;
+  if (!name || !date) {
+    alert('Renseigne au moins le nom et la date.');
+    return;
+  }
+  const comps = loadCompetitions();
+  comps.push({ id: Date.now().toString(), name, date, priority });
+  saveCompetitions(comps);
+  document.getElementById('comp-name').value = '';
+  document.getElementById('comp-date').value = '';
+  renderCompList();
+  renderCalendar();
+});
+
+document.getElementById('comp-list').addEventListener('click', (e) => {
+  if (!e.target.classList.contains('comp-del')) return;
+  const id = e.target.dataset.id;
+  const comps = loadCompetitions().filter(c => c.id !== id);
+  saveCompetitions(comps);
+  renderCompList();
+  renderCalendar();
+});
+
+// ========= GÉNÉRATION DU PLAN 7 JOURS =========
+function determinePhase(comps, currentTSB) {
+  // TSB très bas → forcer décharge avant tout objectif
+  if (currentTSB < -30) return { phase: 'recovery', daysUntil: null, comp: null };
+  const futureComps = comps.filter(c => c.dateObj >= today).sort((a,b) => a.dateObj - b.dateObj);
+  if (futureComps.length === 0) return { phase: 'build', daysUntil: null, comp: null };
+  const next = futureComps[0];
+  const daysUntil = Math.ceil((next.dateObj - today) / 86400000);
+  let phase;
+  if (daysUntil <= 7) phase = 'race';
+  else if (daysUntil <= 28) phase = 'taper';
+  else if (daysUntil <= 56) phase = 'peak';
+  else phase = 'build';
+  return { phase, daysUntil, comp: next };
 }
-const peakIdx = fcTSB.indexOf(Math.max(...fcTSB));
-document.getElementById('peak-days').textContent = peakIdx;
-document.getElementById('peak-tsb').textContent = fcTSB[peakIdx].toFixed(0);
 
-new Chart(document.getElementById('chart-forecast'), {
-  type: 'line',
-  data: {
-    labels: fcLabels,
-    datasets: [
-      { label: 'CTL projeté', data: fcCTL, borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.15)', tension: 0.3, pointRadius: 0, fill: true },
-      { label: 'TSB projeté', data: fcTSB, borderColor: '#a78bfa', borderDash: [4,4], tension: 0.3, pointRadius: 0 }
-    ]
+// Templates par phase × jour de semaine (dow : 1=Lun, 0=Dim)
+const PLAN_TEMPLATES = {
+  build: {
+    1: { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Récup post-week-end, repos complet recommandé' },
+    2: { type: 'tempo', name: 'Tempo / Sweet Spot', dur: 75, tss: 80, why: 'Volume d\'intensité modérée pour densifier le CTL' },
+    3: { type: 'endurance', name: 'Endurance Z2', dur: 90, tss: 60, why: 'Base aérobie, fait grimper le CTL sans coût en fatigue' },
+    4: { type: 'seuil', name: 'Seuil 4×8min', dur: 80, tss: 95, why: 'Bloc de seuil pour repousser le FTP' },
+    5: { type: 'recup', name: 'Récup active', dur: 45, tss: 25, why: 'Évacuer la fatigue avant le week-end' },
+    6: { type: 'vo2', name: 'VO2max 5×4min', dur: 90, tss: 110, why: 'Travail capacité aérobie maximale' },
+    0: { type: 'endurance', name: 'Sortie longue Z2', dur: 180, tss: 160, why: 'Construire l\'endurance et la résistance, brique principale du build' }
   },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { labels: { boxWidth: 10 } } },
-    scales: { x: { ticks: { maxTicksLimit: 7 }, grid: { display: false } } }
+  peak: {
+    1: { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Récup totale' },
+    2: { type: 'seuil', name: 'Seuil 3×12min', dur: 85, tss: 110, why: 'Renforcer le FTP en phase peak' },
+    3: { type: 'endurance', name: 'Endurance Z2', dur: 75, tss: 55, why: 'Récupération active entre les blocs intensifs' },
+    4: { type: 'vo2', name: 'VO2max 6×3min', dur: 80, tss: 115, why: 'Pic d\'intensité, le bloc clé du peak' },
+    5: { type: 'recup', name: 'Récup active', dur: 40, tss: 20, why: 'Vidange complète avant le simulateur du week-end' },
+    6: { type: 'tempo', name: 'Simulation course (sweet spot + sprints)', dur: 100, tss: 120, why: 'Reproduire les efforts de course pour préparer le corps' },
+    0: { type: 'endurance', name: 'Sortie longue + 3×8min seuil', dur: 180, tss: 170, why: 'Maintenir l\'endurance avec un peu d\'intensité' }
+  },
+  taper: {
+    1: { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Affûtage' },
+    2: { type: 'tempo', name: 'Tempo court 2×10min', dur: 50, tss: 50, why: 'Maintenir le tonus sans creuser la fatigue' },
+    3: { type: 'endurance', name: 'Endurance Z2 courte', dur: 60, tss: 40, why: 'Volume réduit, faire chuter l\'ATL' },
+    4: { type: 'vo2', name: 'VO2max 4×3min', dur: 60, tss: 70, why: 'Petite dose d\'intensité pour rester réactif' },
+    5: { type: 'recup', name: 'Récup active', dur: 30, tss: 15, why: 'Décrassage' },
+    6: { type: 'tempo', name: 'Openers : 3×30sec sprint', dur: 45, tss: 35, why: 'Activer le système neuromusculaire' },
+    0: { type: 'endurance', name: 'Endurance Z2', dur: 90, tss: 60, why: 'Sortie de plaisir, sentir la forme arriver' }
+  },
+  race: {
+    1: { type: 'rest', name: 'Repos complet', dur: 0, tss: 0, why: 'Semaine de course : zéro charge' },
+    2: { type: 'recup', name: 'Récup active 30min', dur: 30, tss: 15, why: 'Décrasser sans fatiguer' },
+    3: { type: 'tempo', name: 'Openers : 5×30sec sprint', dur: 40, tss: 30, why: 'Réveiller le corps' },
+    4: { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Veille de veille de course' },
+    5: { type: 'tempo', name: 'Openers courts', dur: 30, tss: 25, why: 'Activation neuromusculaire' },
+    6: { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Repos avant course' },
+    0: { type: 'vo2', name: 'COURSE 🏁', dur: 120, tss: 200, why: 'Jour J — donne tout' }
+  },
+  recovery: {
+    1: { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Décharge : récupération maximale' },
+    2: { type: 'recup', name: 'Récup active', dur: 45, tss: 25, why: 'Décharge active douce' },
+    3: { type: 'endurance', name: 'Endurance Z2 courte', dur: 60, tss: 40, why: 'Volume très bas, juste pour bouger' },
+    4: { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Récupération continue' },
+    5: { type: 'recup', name: 'Récup active', dur: 40, tss: 20, why: 'Maintenir l\'élan sans charger' },
+    6: { type: 'endurance', name: 'Endurance courte', dur: 75, tss: 55, why: 'Reprise progressive' },
+    0: { type: 'endurance', name: 'Endurance Z2', dur: 90, tss: 60, why: 'Sortie facile pour finir la décharge' }
+  }
+};
+
+const PHASE_LABELS = {
+  build: 'Build',
+  peak: 'Peak',
+  taper: 'Taper',
+  race: 'Race week',
+  recovery: 'Décharge'
+};
+
+function adjustForRecovery(proposal, recovery) {
+  // Récup basse → on adoucit
+  if (recovery == null) return proposal;
+  if (recovery < 34 && proposal.type !== 'rest') {
+    return { ...proposal, type: 'recup', name: 'Récup active (recovery basse)', dur: Math.min(45, proposal.dur), tss: 20, why: `Recovery ${recovery}% : remplacement par récup active pour préserver l'équilibre` };
+  }
+  if (recovery < 50 && (proposal.type === 'vo2' || proposal.type === 'seuil')) {
+    return { ...proposal, name: proposal.name + ' (allégé)', dur: Math.round(proposal.dur * 0.7), tss: Math.round(proposal.tss * 0.7), why: `Recovery ${recovery}% : intensité réduite -30%` };
+  }
+  return proposal;
+}
+
+function determinePhaseForDate(comps, fromDate, currentTSB) {
+  if (currentTSB < -30) return 'recovery';
+  const futureComps = comps.filter(c => c.dateObj >= fromDate).sort((a,b) => a.dateObj - b.dateObj);
+  if (futureComps.length === 0) return 'build';
+  const daysUntil = Math.ceil((futureComps[0].dateObj - fromDate) / 86400000);
+  if (daysUntil <= 7) return 'race';
+  if (daysUntil <= 28) return 'taper';
+  if (daysUntil <= 56) return 'peak';
+  return 'build';
+}
+
+function renderWeekPlan() {
+  const comps = loadCompetitions().map(c => ({ ...c, dateObj: new Date(c.date + 'T12:00:00') }));
+  const { phase, daysUntil, comp } = determinePhase(comps, todayData.tsb);
+
+  // Pill de phase supprimée — l'info est dans le sous-titre
+
+  // Sous-titre supprimé
+  const subEl = { textContent: '' };
+  if (comp) {
+    subEl.textContent = `Prochain objectif : ${comp.name} (priorité ${comp.priority}) dans ${daysUntil} jours · phase actuelle ${PHASE_LABELS[phase]}`;
+  } else if (phase === 'recovery') {
+    subEl.textContent = `TSB actuel ${todayData.tsb.toFixed(0)} : décharge prioritaire avant tout objectif`;
+  } else {
+    subEl.textContent = `Aucune compétition planifiée · phase ${PHASE_LABELS[phase]} (entretien général)`;
+  }
+
+  // Lundi de la semaine courante = première semaine affichée
+  const thisMonday = getMondayOfWeek(today);
+  const todayIso = toIsoDate(today);
+
+  // Index data par date ISO pour les jours passés
+  const dataByIso = {};
+  data.forEach(d => { dataByIso[toIsoDate(d.date)] = d; });
+
+  // Mode Prévu : TOUJOURS 4 semaines glissantes.
+  // Sans selectedMonth → depuis la semaine courante.
+  // Avec selectedMonth → 4 semaines à partir du 1er lundi du mois sélectionné.
+  let weeksStarts = [];
+  const startMonday = selectedMonth
+    ? getMondayOfWeek(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1))
+    : thisMonday;
+  for (let w = 0; w < 4; w++) {
+    const ws = new Date(startMonday);
+    ws.setDate(startMonday.getDate() + w * 7);
+    weeksStarts.push(ws);
+  }
+
+  const weeksHtml = [];
+  for (let w = 0; w < weeksStarts.length; w++) {
+    const weekStart = weeksStarts[w];
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const weekLabel = `Semaine du ${fmtShortDate(weekStart)} au ${fmtShortDate(weekEnd)}`;
+
+    const dayCards = [];
+    let weekTotalDur = 0;
+    let weekTotalTss = 0;
+    let weekTotalSessions = 0;
+    let weekKind = 'past'; // 'past' = entièrement passée, 'current' = en cours, 'future' = à venir
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      const iso = toIsoDate(d);
+      const dow = d.getDay();
+      const isPast = iso < todayIso;
+      const isToday = iso === todayIso;
+
+      let cardHTML;
+      if (isPast) {
+        // Mode Prévu : jours passés laissés vierges (historique du plan non disponible).
+        // Au fil du temps, ces jours seront alimentés par les "prévus du passé".
+        cardHTML = `
+          <div class="day-card empty-past">
+            <div class="day-card-dow">${dowFr[dow]}</div>
+            <div class="day-card-date">${d.getDate()}</div>
+          </div>
+        `;
+      } else {
+        // Aujourd'hui ou futur : proposition IA
+        const dayPhase = determinePhaseForDate(comps, d, todayData.tsb);
+        const tmpl = PLAN_TEMPLATES[dayPhase][dow];
+        let proposal = { ...tmpl };
+
+        // Override si c'est le jour de compétition
+        if (comp && toIsoDate(comp.dateObj) === iso) {
+          proposal = { type: 'vo2', name: `🏁 ${comp.name}`, dur: 120, tss: 200, why: `Jour de compétition · priorité ${comp.priority}` };
+        } else if (isToday) {
+          // Ajuster selon recovery du jour pour aujourd'hui
+          proposal = adjustForRecovery(proposal, todayData.recovery);
+        }
+
+        const isRest = !proposal.tss || proposal.type === 'rest';
+        const todayClass = isToday ? ' today' : '';
+        if (proposal.tss) {
+          weekTotalDur += proposal.dur || 0;
+          weekTotalTss += proposal.tss || 0;
+          weekTotalSessions += 1;
+        }
+        cardHTML = `
+          <div class="day-card${isRest ? ' rest' : ''}${todayClass}" data-iso="${iso}" data-source="prevu">
+            <div class="day-card-dow">${dowFr[dow]}${isToday ? " · aujourd'hui" : ''}</div>
+            <div class="day-card-date">${d.getDate()}</div>
+            ${proposal.type ? `<span class="day-card-type pill ${proposal.type}">${proposal.type}</span>` : ''}
+            <div class="day-card-name">${proposal.name}</div>
+            <div class="day-card-meta">
+              ${proposal.dur ? `${Math.floor(proposal.dur/60)}h${(proposal.dur%60).toString().padStart(2,'0')} · ` : ''}${proposal.tss || 0} TSS
+            </div>
+            <div class="day-card-why">${proposal.why}</div>
+          </div>
+        `;
+      }
+      dayCards.push(cardHTML);
+
+      // Détermine si la semaine est passée, en cours ou future
+      if (isToday) weekKind = 'current';
+      else if (!isPast && weekKind === 'past') weekKind = 'current';
+    }
+    if (weekStart > today) weekKind = 'future';
+
+    // Carte des totaux (réalisé pour passé/courant, prévu pour future)
+    const totalHours = (weekTotalDur / 60).toFixed(1);
+    const totalsLabel = weekKind === 'future' ? 'Prévu' : (weekKind === 'current' ? 'En cours' : 'Bilan');
+    const totalsCard = `
+      <div class="week-totals">
+        <div class="wt-label">${totalsLabel}</div>
+        <div class="wt-row"><span class="wt-val">${totalHours}<span style="font-size:13px;font-weight:500;">h</span></span><span class="wt-lbl">Volume</span></div>
+        <div class="wt-row"><span class="wt-val">${weekTotalTss}</span><span class="wt-lbl">TSS</span></div>
+        <div class="wt-row"><span class="wt-val">${weekTotalSessions}</span><span class="wt-lbl">Séances</span></div>
+      </div>
+    `;
+    dayCards.push(totalsCard);
+
+    weeksHtml.push(`
+      <div class="week-row">
+        <div class="week-row-label">${weekLabel}</div>
+        <div class="week-row-days">${dayCards.join('')}</div>
+      </div>
+    `);
+  }
+
+  document.getElementById('week-calendar').innerHTML = `<div class="month-plan">${weeksHtml.join('')}</div>`;
+}
+
+// ========= MODE PRÉVU vs RÉALISÉ =========
+let calendarMode = 'prevu';
+let selectedMonth = null; // null = 4 dernières semaines, sinon Date 1er du mois sélectionné
+// Index de l'activité affichée par jour (pour les jours multi-activités). Clé = ISO date.
+const dayActivityIndex = {};
+
+function getDisplayedActivity(realDay) {
+  // Renvoie l'activité actuellement à afficher pour ce jour (selon dayActivityIndex)
+  const iso = toIsoDate(realDay.date);
+  const acts = realDay.activities;
+  if (!acts || acts.length === 0) return null;
+  const idx = dayActivityIndex[iso] || 0;
+  return { activity: acts[Math.min(idx, acts.length - 1)], idx: Math.min(idx, acts.length - 1), total: acts.length, iso };
+}
+
+function renderRealisedDayCard(d, dow, realDay, isToday) {
+  const dispo = getDisplayedActivity(realDay);
+  // Si pas de tableau activities (ancien data.js), fallback sur les champs racine du day
+  const act = dispo ? dispo.activity : realDay;
+  const total = dispo ? dispo.total : 1;
+  const idx = dispo ? dispo.idx : 0;
+  const iso = toIsoDate(d);
+
+  const dur = act.duration || 0;
+  const h = Math.floor(dur / 60);
+  const m = (dur % 60).toString().padStart(2, '0');
+
+  const hasMulti = total > 1;
+  const dateRow = hasMulti ? `
+    <div class="day-card-date-row">
+      <div class="day-card-date">${d.getDate()}</div>
+      <div class="day-card-arrows-wrapper">
+        <button class="day-card-arrow-inline arrow-prev" data-iso="${iso}" title="Activité précédente">‹</button>
+        <button class="day-card-arrow-inline arrow-next" data-iso="${iso}" title="Activité suivante">›</button>
+      </div>
+    </div>
+  ` : `<div class="day-card-date">${d.getDate()}</div>`;
+
+  const counter = hasMulti ? `<div class="day-card-counter">${idx + 1}/${total}</div>` : '';
+
+  return `
+    <div class="day-card past${isToday ? ' today' : ''}" data-iso="${iso}" data-source="realise">
+      <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
+      ${dateRow}
+      <span class="day-card-type pill ${act.type || ''}">${act.type || ''}</span>
+      <div class="day-card-name">${act.name || 'Séance'}</div>
+      <div class="day-card-meta">${dur ? `${h}h${m} · ` : ''}${act.tss || 0} TSS</div>
+      <div class="day-card-why">${act.np ? `NP ${act.np}W` : ''}${act.hr ? (act.np ? ' · ' : '') + `FC ${act.hr}` : ''}${(!act.np && !act.hr) ? 'Réalisé' : ''}</div>
+      ${counter}
+    </div>
+  `;
+}
+
+function renderCalendar() {
+  // Filtre mois visible dans les deux modes
+  document.getElementById('month-filter').style.display = 'flex';
+  // Reset button label selon le mode
+  const resetBtn = document.getElementById('month-reset');
+  if (resetBtn) {
+    resetBtn.textContent = calendarMode === 'prevu' ? '4 sem. à venir' : '4 dernières semaines';
+  }
+  if (calendarMode === 'prevu') {
+    renderWeekPlan();
+  } else {
+    renderRealiseCalendar();
+  }
+}
+
+function renderRealiseCalendar() {
+  // Sous-titre supprimé
+  const subEl = { textContent: '' };
+
+  // Index data par ISO
+  const dataByIso = {};
+  data.forEach(d => { dataByIso[toIsoDate(d.date)] = d; });
+
+  // Déterminer les semaines à afficher
+  let weeksStarts = [];
+  if (selectedMonth) {
+    // Mois sélectionné : afficher toutes les semaines qui contiennent au moins un jour de ce mois
+    const firstDay = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
+    const lastDay = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
+    const firstMonday = getMondayOfWeek(firstDay);
+    let cursor = new Date(firstMonday);
+    while (cursor <= lastDay) {
+      weeksStarts.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 7);
+    }
+    const monthLabel = selectedMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    subEl.textContent = `Réalisé · ${monthLabel}`;
+  } else {
+    // Default : 4 dernières semaines incluant la semaine en cours
+    const thisMonday = getMondayOfWeek(today);
+    for (let i = 3; i >= 0; i--) {
+      const w = new Date(thisMonday);
+      w.setDate(thisMonday.getDate() - i * 7);
+      weeksStarts.push(w);
+    }
+    subEl.textContent = `Réalisé · 4 dernières semaines`;
+  }
+  // Inverser pour afficher la semaine la plus récente en haut
+  weeksStarts.reverse();
+
+  const todayIso = toIsoDate(today);
+  const weeksHtml = [];
+  for (const weekStart of weeksStarts) {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const weekLabel = `Semaine du ${fmtShortDate(weekStart)} au ${fmtShortDate(weekEnd)}`;
+
+    const dayCards = [];
+    let weekTotalDur = 0;
+    let weekTotalTss = 0;
+    let weekTotalSessions = 0;
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      const iso = toIsoDate(d);
+      const dow = d.getDay();
+      const isFuture = iso > todayIso;
+      const isToday = iso === todayIso;
+
+      let cardHTML;
+      if (isFuture) {
+        // Jour futur : on n'affiche rien (mode réalisé)
+        cardHTML = `
+          <div class="day-card empty-past" style="opacity:0.3;">
+            <div class="day-card-dow">${dowFr[dow]}</div>
+            <div class="day-card-date">${d.getDate()}</div>
+            <div class="day-card-name" style="color:var(--text-mute);font-weight:500;">À venir</div>
+          </div>
+        `;
+      } else {
+        const realDay = dataByIso[iso];
+        if (realDay && realDay.sessionType) {
+          const dur = realDay.duration || 0;
+          weekTotalDur += dur;
+          weekTotalTss += realDay.tss || 0;
+          weekTotalSessions += 1;
+          cardHTML = renderRealisedDayCard(d, dow, realDay, isToday);
+        } else {
+          cardHTML = `
+            <div class="day-card empty-past">
+              <div class="day-card-dow">${dowFr[dow]}${isToday ? " · auj." : ''}</div>
+              <div class="day-card-date">${d.getDate()}</div>
+              <div class="day-card-name" style="color:var(--text-mute);font-weight:500;">Repos</div>
+            </div>
+          `;
+        }
+      }
+      dayCards.push(cardHTML);
+    }
+
+    const totalHours = (weekTotalDur / 60).toFixed(1);
+    const totalsCard = `
+      <div class="week-totals">
+        <div class="wt-label">Bilan</div>
+        <div class="wt-row"><span class="wt-val">${totalHours}<span style="font-size:13px;font-weight:500;">h</span></span><span class="wt-lbl">Volume</span></div>
+        <div class="wt-row"><span class="wt-val">${weekTotalTss}</span><span class="wt-lbl">TSS</span></div>
+        <div class="wt-row"><span class="wt-val">${weekTotalSessions}</span><span class="wt-lbl">Séances</span></div>
+      </div>
+    `;
+    dayCards.push(totalsCard);
+
+    weeksHtml.push(`
+      <div class="week-row">
+        <div class="week-row-label">${weekLabel}</div>
+        <div class="week-row-days">${dayCards.join('')}</div>
+      </div>
+    `);
+  }
+
+  document.getElementById('week-calendar').innerHTML = `<div class="month-plan">${weeksHtml.join('')}</div>`;
+}
+
+// Handler flèches + clic carte (event delegation sur le calendrier)
+document.getElementById('week-calendar').addEventListener('click', (e) => {
+  const isPrev = e.target.classList.contains('arrow-prev');
+  const isNext = e.target.classList.contains('arrow-next');
+  if (isPrev || isNext) {
+    e.stopPropagation();
+    const iso = e.target.dataset.iso;
+    const day = data.find(d => toIsoDate(d.date) === iso);
+    if (!day || !day.activities || day.activities.length < 2) return;
+    const dir = isNext ? 1 : -1;
+    const current = dayActivityIndex[iso] || 0;
+    let next = current + dir;
+    if (next < 0) next = day.activities.length - 1;
+    if (next >= day.activities.length) next = 0;
+    dayActivityIndex[iso] = next;
+    renderCalendar();
+    return;
+  }
+  // Clic sur la carte → ouvrir la modal
+  const card = e.target.closest('.day-card');
+  if (!card || card.classList.contains('empty-past')) return;
+  const iso = card.dataset.iso;
+  const source = card.dataset.source;
+  if (!iso) return;
+  openSessionModal(iso, source);
+});
+
+// ========= API CLIENT INTERVALS.ICU (via Cloudflare Worker proxy) =========
+const streamsCache = {};
+const activityCache = {};
+const STREAMS_LS_KEY = 'coach_ia_streams_cache_v1';
+const STREAMS_LS_MAX = 30; // garder les 30 derniers streams en localStorage
+
+async function apiFetch(path) {
+  const resp = await fetch(`/api/intervals${path}`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return await resp.json();
+}
+
+function _lsGet() {
+  try { return JSON.parse(localStorage.getItem(STREAMS_LS_KEY) || '{}'); }
+  catch { return {}; }
+}
+function _lsSet(cache) {
+  try { localStorage.setItem(STREAMS_LS_KEY, JSON.stringify(cache)); }
+  catch (e) {
+    console.warn('LS streams cache plein, on vide');
+    try { localStorage.removeItem(STREAMS_LS_KEY); } catch {}
+  }
+}
+function loadStreamsFromLS(activityId) {
+  const cache = _lsGet();
+  return cache[activityId] ? cache[activityId].data : null;
+}
+function saveStreamsToLS(activityId, data) {
+  let cache = _lsGet();
+  cache[activityId] = { data, ts: Date.now() };
+  const entries = Object.entries(cache);
+  if (entries.length > STREAMS_LS_MAX) {
+    entries.sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0));
+    cache = Object.fromEntries(entries.slice(0, STREAMS_LS_MAX));
+  }
+  _lsSet(cache);
+}
+
+async function loadStreams(activityId) {
+  if (!activityId) return null;
+  const idKey = String(activityId);
+  // 0. Pre-fetched côté serveur (streams.js, dispo dès le chargement)
+  if (window.STREAMS_CACHE && window.STREAMS_CACHE[idKey]) {
+    return window.STREAMS_CACHE[idKey];
+  }
+  // 1. Cache mémoire de la session courante
+  if (streamsCache[activityId] !== undefined) return streamsCache[activityId];
+  // 2. Cache localStorage (persiste entre sessions)
+  const cached = loadStreamsFromLS(activityId);
+  if (cached) {
+    streamsCache[activityId] = cached;
+    return cached;
+  }
+  // 3. Fetch live via le proxy
+  try {
+    const data = await apiFetch(`/activity/${activityId}/streams?types=watts,heartrate,cadence,distance,altitude`);
+    streamsCache[activityId] = data;
+    saveStreamsToLS(activityId, data);
+    return data;
+  } catch (e) {
+    console.error('loadStreams:', e);
+    streamsCache[activityId] = null;
+    return null;
+  }
+}
+
+async function loadActivityFull(activityId) {
+  if (!activityId) return null;
+  if (activityCache[activityId] !== undefined) return activityCache[activityId];
+  try {
+    const data = await apiFetch(`/activity/${activityId}`);
+    activityCache[activityId] = data;
+    return data;
+  } catch (e) {
+    console.error('loadActivityFull:', e);
+    activityCache[activityId] = null;
+    return null;
+  }
+}
+
+// Downsample un tableau pour rendre Chart.js fluide (séances de 3h+ = 10000+ points)
+function downsample(arr, targetSize = 600) {
+  if (!arr || arr.length <= targetSize) return arr ? [...arr] : [];
+  const step = arr.length / targetSize;
+  const out = new Array(targetSize);
+  for (let i = 0; i < targetSize; i++) {
+    const s = Math.floor(i * step);
+    const e = Math.min(arr.length, Math.floor((i + 1) * step));
+    let sum = 0, count = 0;
+    for (let j = s; j < e; j++) {
+      const v = arr[j];
+      if (v != null && !isNaN(v)) { sum += v; count++; }
+    }
+    out[i] = count > 0 ? sum / count : null;
+  }
+  return out;
+}
+
+function formatHMS(seconds) {
+  if (seconds == null || isNaN(seconds)) return '';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}h${m.toString().padStart(2,'0')}`;
+  if (m > 0) return `${m}m${s.toString().padStart(2,'0')}`;
+  return `${s}s`;
+}
+
+// Tracker des charts modal pour les détruire à la prochaine ouverture
+let _modalCharts = [];
+function destroyModalCharts() {
+  _modalCharts.forEach(c => { try { c.destroy(); } catch (e) {} });
+  _modalCharts = [];
+}
+
+async function renderStreamsSection(container, activityId) {
+  destroyModalCharts();
+  const cached = streamsCache[activityId] !== undefined || loadStreamsFromLS(activityId);
+  container.innerHTML = `<div class="modal-placeholder">${cached ? '📊 Rendu depuis le cache local...' : '⏳ Téléchargement des streams depuis intervals.icu...'}</div>`;
+
+  const streams = await loadStreams(activityId);
+  if (!streams) {
+    container.innerHTML = '<div class="modal-placeholder">Pas de streams disponibles pour cette activité (ou erreur de chargement).</div>';
+    return;
+  }
+  // Yield to browser pour afficher le message "Rendu..." avant de bloquer sur le render
+  container.innerHTML = '<div class="modal-placeholder">📊 Rendu des graphiques...</div>';
+  await new Promise(r => requestAnimationFrame(r));
+
+  // intervals.icu peut renvoyer les streams sous 2 formats : array de {type,data} ou objet {watts:[], ...}
+  const findStream = (type) => {
+    if (Array.isArray(streams)) {
+      const s = streams.find(x => x && x.type === type);
+      return s ? s.data : null;
+    }
+    return streams[type] || null;
+  };
+
+  const watts = findStream('watts');
+  const hr = findStream('heartrate');
+  const cadence = findStream('cadence');
+  const altitude = findStream('altitude');
+  const distance = findStream('distance');
+
+  const length = (watts && watts.length) || (hr && hr.length) || (cadence && cadence.length) || 0;
+  if (length === 0) {
+    container.innerHTML = '<div class="modal-placeholder">Aucun stream haute résolution n\'est disponible pour cette activité (séance peut-être sans capteur).</div>';
+    return;
+  }
+
+  // Choix de l'axe X : distance (km) si dispo, sinon temps (h/m/s).
+  const useDistance = distance && distance.length === length && distance[distance.length - 1] > 0;
+  const fullTime = Array.from({ length }, (_, i) => i);
+  const fullX = useDistance ? distance : fullTime;
+
+  // PAS de downsampling manuel : on garde la résolution complète seconde par seconde.
+  // Chart.js avec le plugin decimation (LTTB) gérera l'affichage : décime à ~1500 points
+  // pour la performance, mais redécime à la résolution réelle au zoom in.
+
+  // Formatter de l'axe X selon le mode (entier pour les ticks, 2 décimales pour le tooltip)
+  const fmtXTick = useDistance
+    ? (val) => Math.round(val / 1000) + ' km'
+    : (val) => formatHMS(val);
+  const fmtXTooltip = useDistance
+    ? (val) => (val / 1000).toFixed(2) + ' km'
+    : (val) => formatHMS(val);
+  const fmtX = fmtXTick;
+
+  // Pairs {x,y} pour Chart.js (à connaître avant le template innerHTML)
+  const pairs = (yArr) => {
+    if (!yArr) return [];
+    const out = [];
+    for (let i = 0; i < fullX.length; i++) {
+      if (yArr[i] != null && !isNaN(yArr[i])) out.push({ x: fullX[i], y: yArr[i] });
+    }
+    return out;
+  };
+  const wattsPts = pairs(watts);
+  const hrPts = pairs(hr);
+  const cadencePts = pairs(cadence);
+  const altPts = pairs(altitude);
+
+  container.innerHTML = `
+    <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;margin-bottom:14px;font-size:12px;color:var(--text-dim);">
+      <div>Temps : <strong id="stat-temps" style="color:var(--text);font-size:14px;">—</strong></div>
+      <div>Distance : <strong id="stat-dist" style="color:var(--text);font-size:14px;">—</strong></div>
+      <div>FC moy : <strong id="stat-fc" style="color:var(--text);font-size:14px;">—</strong></div>
+      <div>Puissance moy : <strong id="stat-watts" style="color:var(--text);font-size:14px;">—</strong></div>
+      <button id="streams-zoom-reset" style="margin-left:auto;background:var(--bg-elev2);border:1px solid var(--border);color:var(--text-dim);padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;">Réinitialiser le zoom</button>
+    </div>
+    ${(wattsPts.length || hrPts.length) ? `<div class="chart-wrap" style="height:260px;margin-bottom:14px;"><canvas id="streams-power-hr"></canvas></div>` : ''}
+    ${cadencePts.length ? `<div class="chart-wrap" style="height:140px;margin-bottom:14px;"><canvas id="streams-cadence"></canvas></div>` : ''}
+    ${altPts.length ? `<div class="chart-wrap" style="height:140px;"><canvas id="streams-alt"></canvas></div>` : ''}
+  `;
+
+  // Compute stats sur la plage [minX, maxX] (en m si distance, en s si temps)
+  // Utilise les FULL streams (pas downsampled) pour la précision.
+  function computeStats(minX, maxX) {
+    // Trouver les indices borne
+    let firstIdx = -1, lastIdx = -1;
+    for (let i = 0; i < fullX.length; i++) {
+      if (firstIdx === -1 && fullX[i] >= minX) firstIdx = i;
+      if (fullX[i] <= maxX) lastIdx = i;
+    }
+    if (firstIdx === -1 || lastIdx < firstIdx) return null;
+
+    // Temps écoulé = durée entre les deux indices (1 sample/s en général)
+    const timeElapsed = lastIdx - firstIdx;
+
+    // Distance parcourue
+    let distCov = null;
+    if (distance && distance.length === length) {
+      distCov = (distance[lastIdx] - distance[firstIdx]) / 1000;
+    }
+
+    // Avg watts
+    let wSum = 0, wCount = 0;
+    if (watts) {
+      for (let i = firstIdx; i <= lastIdx; i++) {
+        const v = watts[i];
+        if (v != null && !isNaN(v)) { wSum += v; wCount++; }
+      }
+    }
+    const avgW = wCount > 0 ? Math.round(wSum / wCount) : null;
+
+    // Avg HR
+    let hSum = 0, hCount = 0;
+    if (hr) {
+      for (let i = firstIdx; i <= lastIdx; i++) {
+        const v = hr[i];
+        if (v != null && !isNaN(v)) { hSum += v; hCount++; }
+      }
+    }
+    const avgH = hCount > 0 ? Math.round(hSum / hCount) : null;
+
+    return { timeElapsed, distCov, avgW, avgH };
+  }
+
+  function renderStats(stats) {
+    document.getElementById('stat-temps').textContent = stats && stats.timeElapsed != null ? formatHMS(stats.timeElapsed) : '—';
+    document.getElementById('stat-dist').textContent = stats && stats.distCov != null ? stats.distCov.toFixed(2) + ' km' : '—';
+    document.getElementById('stat-fc').textContent = stats && stats.avgH != null ? stats.avgH + ' bpm' : '—';
+    document.getElementById('stat-watts').textContent = stats && stats.avgW != null ? stats.avgW + ' W' : '—';
+  }
+
+  // Stats initiales : toute la plage
+  setTimeout(() => {
+    renderStats(computeStats(fullX[0], fullX[fullX.length - 1]));
+  }, 0);
+
+  // Expose pour syncZoomToOthers
+  window._streamsComputeStats = computeStats;
+  window._streamsRenderStats = renderStats;
+
+  // Axe X linéaire : positions proportionnelles à la distance (ou au temps)
+  const sharedX = {
+    type: 'linear',
+    ticks: {
+      maxTicksLimit: 8,
+      callback: (val) => fmtXTick(val),
+      font: { size: 10 }
+    },
+    grid: { display: false }
+  };
+  // Tooltip : affiche la valeur réelle de X (km ou temps), pas l'index
+  const tooltipTitle = (items) => fmtXTooltip(items[0].parsed.x);
+
+  // Plugin decimation : redécime intelligemment selon la zone visible (LTTB préserve les pics)
+  const decimationConfig = {
+    enabled: true,
+    algorithm: 'lttb',
+    samples: 1500,
+    threshold: 1500
+  };
+
+  // Y axis ticks : valeurs entières (pas de décimales)
+  const intY = { ticks: { callback: (v) => Math.round(v) } };
+  // Tooltip label : arrondi à l'entier
+  const labelInt = (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)}`;
+
+  // Config zoom : drag pour zoomer, double-clic pour reset, sync entre les 3 charts
+  const syncZoomToOthers = (sourceChart) => {
+    const { min, max } = sourceChart.scales.x;
+    _modalCharts.forEach(c => {
+      if (c === sourceChart || !c.scales.x) return;
+      c.options.scales.x.min = min;
+      c.options.scales.x.max = max;
+      c.update('none');
+    });
+    // Recalculer les stats sur la nouvelle plage visible
+    if (window._streamsComputeStats && window._streamsRenderStats) {
+      window._streamsRenderStats(window._streamsComputeStats(min, max));
+    }
+  };
+  const zoomConfig = {
+    zoom: {
+      drag: {
+        enabled: true,
+        backgroundColor: 'rgba(74, 222, 128, 0.15)',
+        borderColor: 'rgba(74, 222, 128, 0.5)',
+        borderWidth: 1
+      },
+      mode: 'x',
+      onZoomComplete: ({ chart }) => syncZoomToOthers(chart)
+    },
+    pan: {
+      enabled: true,
+      mode: 'x',
+      modifierKey: 'shift', // pan avec Shift+drag (sinon le drag normal zoome)
+      onPanComplete: ({ chart }) => syncZoomToOthers(chart)
+    },
+    limits: { x: { min: 'original', max: 'original' } }
+  };
+
+  // Double-clic sur n'importe quel chart → reset zoom partout + stats sur plage complète
+  setTimeout(() => {
+    const resetAll = () => {
+      _modalCharts.forEach(c => { try { c.resetZoom(); } catch (e) {} });
+      // Recalculer stats sur la plage complète après reset
+      if (window._streamsComputeStats && window._streamsRenderStats) {
+        window._streamsRenderStats(window._streamsComputeStats(fullX[0], fullX[fullX.length - 1]));
+      }
+    };
+    ['streams-power-hr', 'streams-cadence', 'streams-alt'].forEach(id => {
+      const cv = document.getElementById(id);
+      if (cv) cv.addEventListener('dblclick', resetAll);
+    });
+    const btn = document.getElementById('streams-zoom-reset');
+    if (btn) btn.addEventListener('click', resetAll);
+  }, 0);
+
+  // Chart 1 : Watts + FC (double Y, axe X linéaire en distance ou temps)
+  if (wattsPts.length || hrPts.length) {
+    const datasets = [];
+    if (wattsPts.length) datasets.push({
+      label: 'Watts', data: wattsPts,
+      borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.12)',
+      yAxisID: 'y', pointRadius: 0, borderWidth: 1.2, fill: true, tension: 0.1, spanGaps: true
+    });
+    if (hrPts.length) datasets.push({
+      label: 'FC (bpm)', data: hrPts,
+      borderColor: '#f87171', backgroundColor: 'transparent',
+      yAxisID: 'y1', pointRadius: 0, borderWidth: 1.5, tension: 0.15, spanGaps: true
+    });
+    _modalCharts.push(new Chart(document.getElementById('streams-power-hr'), {
+      type: 'line',
+      data: { datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: false,
+        parsing: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { boxWidth: 10, font: { size: 11 } } },
+          tooltip: { callbacks: { title: tooltipTitle, label: labelInt } },
+          zoom: zoomConfig,
+          decimation: decimationConfig
+        },
+        scales: {
+          x: sharedX,
+          y: { position: 'left', title: { display: true, text: 'Watts' }, ...intY },
+          ...(hrPts.length ? { y1: { position: 'right', title: { display: true, text: 'FC' }, grid: { display: false }, ...intY } } : {})
+        }
+      }
+    }));
+  }
+
+  // Chart 2 : Cadence
+  if (cadencePts.length) {
+    _modalCharts.push(new Chart(document.getElementById('streams-cadence'), {
+      type: 'line',
+      data: { datasets: [{ label: 'Cadence (rpm)', data: cadencePts, borderColor: '#a78bfa', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.2, tension: 0.1, spanGaps: true }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: false,
+        parsing: false,
+        plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } }, tooltip: { callbacks: { title: tooltipTitle, label: labelInt } }, zoom: zoomConfig, decimation: decimationConfig },
+        scales: { x: sharedX, y: { title: { display: true, text: 'rpm' }, ...intY } }
+      }
+    }));
+  }
+
+  // Chart 3 : Altitude
+  if (altPts.length) {
+    _modalCharts.push(new Chart(document.getElementById('streams-alt'), {
+      type: 'line',
+      data: { datasets: [{ label: 'Altitude (m)', data: altPts, borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.12)', pointRadius: 0, borderWidth: 1.2, fill: true, tension: 0.1, spanGaps: true }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: false,
+        parsing: false,
+        plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } }, tooltip: { callbacks: { title: tooltipTitle, label: labelInt } }, zoom: zoomConfig, decimation: decimationConfig },
+        scales: { x: sharedX, y: { title: { display: true, text: 'mètres' }, ...intY } }
+      }
+    }));
+  }
+}
+
+// ========= MODAL DÉTAIL SÉANCE =========
+function openSessionModal(iso, source) {
+  // Reconstruire la date depuis l'iso (les jours futurs ne sont PAS dans data)
+  const date = new Date(iso + 'T12:00:00');
+  if (isNaN(date.getTime())) return;
+  const dateStr = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  // Lookup data uniquement pour le mode Réalisé (les jours futurs ne sont pas dedans)
+  const day = data.find(d => toIsoDate(d.date) === iso);
+
+  const titleEl = document.getElementById('modal-title');
+  const metaEl = document.getElementById('modal-meta');
+  const bodyEl = document.getElementById('modal-body');
+
+  if (source === 'realise') {
+    if (!day) {
+      titleEl.innerHTML = 'Aucune donnée';
+      metaEl.textContent = dateStr;
+      bodyEl.innerHTML = '<div class="modal-placeholder">Pas de données pour ce jour.</div>';
+      document.getElementById('session-modal').classList.add('active');
+      return;
+    }
+    // Activités RÉELLES de ce jour
+    const acts = day.activities && day.activities.length ? day.activities : (day.sessionType ? [day] : []);
+    if (acts.length === 0) {
+      titleEl.innerHTML = 'Pas de séance';
+      metaEl.textContent = dateStr;
+      bodyEl.innerHTML = '<div class="modal-placeholder">Aucune activité enregistrée ce jour-là.</div>';
+    } else {
+      let currentIdx = 0;
+      function renderModalActivity(idx) {
+        currentIdx = idx;
+        const act = acts[idx];
+        const dur = act.duration || 0;
+        const h = Math.floor(dur / 60);
+        const m = (dur % 60).toString().padStart(2, '0');
+        titleEl.innerHTML = `${act.name || act.sessionName || 'Séance'} ${act.type || act.sessionType ? `<span class="pill ${act.type || act.sessionType}">${act.type || act.sessionType}</span>` : ''}`;
+        metaEl.textContent = `${dateStr} · ${h}h${m} · ${act.tss || 0} TSS`;
+
+        const switchHTML = acts.length > 1 ? `
+          <div class="modal-activity-switch">
+            ${acts.map((a, i) => `<button class="${i === idx ? 'active' : ''}" data-i="${i}">${a.name || 'Séance'} (${a.tss || 0} TSS)</button>`).join('')}
+          </div>` : '';
+
+        const zoneColors = ['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f87171'];
+        const zoneLabels = ['Z1 récup','Z2 endurance','Z3 tempo','Z4 seuil','Z5 VO2max'];
+        const zones = act.zones_hr || act.zones_power || act.zones || null;
+        const zonesHTML = zones ? `
+          <div class="modal-section">
+            <div class="modal-section-title">Répartition par zones de FC</div>
+            <div class="zone-bar">${zones.map((z, i) => `<div class="zone-seg" style="width:${z}%;background:${zoneColors[i]};">${z > 5 ? z+'%' : ''}</div>`).join('')}</div>
+            <div class="legend">${zoneLabels.map((l, i) => `<span><span class="legend-dot" style="background:${zoneColors[i]};"></span>${l}</span>`).join('')}</div>
+          </div>` : '';
+
+        // Métriques disponibles : on n'affiche que celles renseignées
+        const metrics = [];
+        metrics.push(`<div class="modal-metric"><div class="m-label">TSS</div><div class="m-value">${act.tss || 0}</div></div>`);
+        metrics.push(`<div class="modal-metric"><div class="m-label">Durée</div><div class="m-value">${h}<span style="font-size:14px;">h</span>${m}</div></div>`);
+        if (act.distance_km) metrics.push(`<div class="modal-metric"><div class="m-label">Distance</div><div class="m-value">${act.distance_km}<span style="font-size:14px;"> km</span></div>${act.avg_speed_kmh ? `<div class="m-sub">${act.avg_speed_kmh} km/h moy</div>` : ''}</div>`);
+        if (act.elevation_gain) metrics.push(`<div class="modal-metric"><div class="m-label">Dénivelé +</div><div class="m-value">${act.elevation_gain}<span style="font-size:14px;"> m</span></div></div>`);
+        if (act.np) metrics.push(`<div class="modal-metric"><div class="m-label">NP / IF</div><div class="m-value">${act.np}<span style="font-size:14px;">W</span></div><div class="m-sub">${act.ftpPct || 0}% FTP${act.intensity ? ` · IF ${act.intensity}` : ''}</div></div>`);
+        if (act.avg_watts) metrics.push(`<div class="modal-metric"><div class="m-label">Puissance moy</div><div class="m-value">${act.avg_watts}<span style="font-size:14px;">W</span></div>${act.max_watts ? `<div class="m-sub">Max ${act.max_watts}W</div>` : ''}</div>`);
+        if (act.hr) metrics.push(`<div class="modal-metric"><div class="m-label">FC moy</div><div class="m-value">${act.hr}<span style="font-size:14px;">bpm</span></div>${act.max_hr ? `<div class="m-sub">Max ${act.max_hr} bpm</div>` : ''}</div>`);
+        if (act.cadence) metrics.push(`<div class="modal-metric"><div class="m-label">Cadence</div><div class="m-value">${act.cadence}<span style="font-size:14px;"> rpm</span></div></div>`);
+        if (act.kj) metrics.push(`<div class="modal-metric"><div class="m-label">Énergie</div><div class="m-value">${act.kj}<span style="font-size:14px;"> kJ</span></div>${act.calories ? `<div class="m-sub">${act.calories} kcal</div>` : ''}</div>`);
+        if (act.variability_index) metrics.push(`<div class="modal-metric"><div class="m-label">VI</div><div class="m-value">${act.variability_index}</div><div class="m-sub">Variabilité</div></div>`);
+        if (act.sport) metrics.push(`<div class="modal-metric"><div class="m-label">Sport</div><div class="m-value" style="font-size:15px;text-transform:capitalize;">${act.sport}</div>${act.raw_type ? `<div class="m-sub">${act.raw_type}</div>` : ''}</div>`);
+
+        // Lien vers intervals.icu si on a l'ID
+        const intervalsLink = act.id ? `
+          <a href="https://intervals.icu/activities/${act.id}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:rgba(96,165,250,0.12);border:1px solid rgba(96,165,250,0.3);color:var(--info);padding:8px 14px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500;">
+            Voir le détail complet sur intervals.icu ↗
+          </a>
+          <div style="font-size:11px;color:var(--text-mute);margin-top:6px;">ID activité : <code>${act.id}</code></div>
+        ` : '';
+
+        bodyEl.innerHTML = `
+          ${switchHTML}
+          <div class="modal-metrics">${metrics.join('')}</div>
+          ${zonesHTML}
+          <div class="modal-section">
+            <div class="modal-section-title">Lien activité</div>
+            ${intervalsLink || '<div class="modal-placeholder">Pas d\'ID intervals.icu disponible pour cette activité.</div>'}
+          </div>
+          <div class="modal-section">
+            <div class="modal-section-title">Streams haute résolution</div>
+            <div id="streams-section"></div>
+          </div>
+        `;
+        // Wire switch buttons (avant le chargement async des streams)
+        bodyEl.querySelectorAll('.modal-activity-switch button').forEach(btn => {
+          btn.addEventListener('click', () => renderModalActivity(+btn.dataset.i));
+        });
+        // Lancer le chargement des streams en async (la modal est déjà visible)
+        if (act.id) {
+          renderStreamsSection(document.getElementById('streams-section'), act.id);
+        } else {
+          document.getElementById('streams-section').innerHTML = '<div class="modal-placeholder">Pas d\'ID activité disponible pour cette séance.</div>';
+        }
+      }
+      renderModalActivity(0);
+    }
+  } else {
+    // Source = 'prevu' : on recompose la proposition pour ce jour
+    const comps = loadCompetitions().map(c => ({ ...c, dateObj: new Date(c.date + 'T12:00:00') }));
+    const dayPhase = determinePhaseForDate(comps, date, todayData.tsb);
+    const dow = date.getDay();
+    let proposal = { ...(PLAN_TEMPLATES[dayPhase][dow]) };
+    // Override compétition
+    const compToday = comps.find(c => toIsoDate(c.dateObj) === iso);
+    if (compToday) {
+      proposal = { type: 'vo2', name: `🏁 ${compToday.name}`, dur: 120, tss: 200, why: `Jour de compétition · priorité ${compToday.priority}` };
+    }
+    proposal = adjustForRecovery(proposal, todayData.recovery);
+
+    const dur = proposal.dur || 0;
+    const h = Math.floor(dur / 60);
+    const m = (dur % 60).toString().padStart(2, '0');
+
+    titleEl.innerHTML = `${proposal.name} ${proposal.type ? `<span class="pill ${proposal.type}">${proposal.type}</span>` : ''}`;
+    metaEl.textContent = `${dateStr} · ${h}h${m} · ${proposal.tss || 0} TSS prévus · phase ${PHASE_LABELS[dayPhase]}`;
+
+    bodyEl.innerHTML = `
+      <div class="modal-metrics">
+        <div class="modal-metric"><div class="m-label">Durée cible</div><div class="m-value">${h}<span style="font-size:14px;">h</span>${m}</div></div>
+        <div class="modal-metric"><div class="m-label">TSS cible</div><div class="m-value">${proposal.tss || 0}</div></div>
+        <div class="modal-metric"><div class="m-label">Type</div><div class="m-value" style="font-size:15px;text-transform:capitalize;">${proposal.type || '—'}</div></div>
+        <div class="modal-metric"><div class="m-label">Phase</div><div class="m-value" style="font-size:15px;">${PHASE_LABELS[dayPhase] || '—'}</div></div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title">Pourquoi cette séance</div>
+        <div style="background:var(--bg-elev2);padding:14px;border-radius:8px;font-size:13px;line-height:1.6;">${proposal.why}</div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title">Structure de l'entraînement (intervalles, target watts)</div>
+        <div class="modal-placeholder">
+          Décomposition par intervalle (échauffement, blocs, récup, retour au calme) avec target watts par segment, à venir en <strong style="color:var(--accent);">Phase 3</strong>.<br>
+          Style Trainerroad / Nolio : un graphe d'étages cliquable.
+        </div>
+      </div>
+    `;
+  }
+  document.getElementById('session-modal').classList.add('active');
+}
+
+function closeSessionModal() {
+  document.getElementById('session-modal').classList.remove('active');
+}
+
+document.getElementById('modal-close').addEventListener('click', closeSessionModal);
+document.getElementById('session-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'session-modal') closeSessionModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeSessionModal();
+});
+
+// Handlers des sous-onglets
+document.querySelectorAll('#calendar-subtabs .subtab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#calendar-subtabs .subtab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    calendarMode = btn.dataset.mode;
+    // Reset du mois sélectionné au changement de mode (évite confusion)
+    selectedMonth = null;
+    document.getElementById('month-input').value = '';
+    renderCalendar();
+  });
+});
+
+// Handlers du filtre mois
+const monthInput = document.getElementById('month-input');
+document.getElementById('month-prev').addEventListener('click', () => {
+  const base = selectedMonth || new Date(today.getFullYear(), today.getMonth(), 1);
+  selectedMonth = new Date(base.getFullYear(), base.getMonth() - 1, 1);
+  monthInput.value = `${selectedMonth.getFullYear()}-${(selectedMonth.getMonth()+1).toString().padStart(2,'0')}`;
+  renderCalendar();
+});
+document.getElementById('month-next').addEventListener('click', () => {
+  const base = selectedMonth || new Date(today.getFullYear(), today.getMonth(), 1);
+  selectedMonth = new Date(base.getFullYear(), base.getMonth() + 1, 1);
+  monthInput.value = `${selectedMonth.getFullYear()}-${(selectedMonth.getMonth()+1).toString().padStart(2,'0')}`;
+  renderCalendar();
+});
+monthInput.addEventListener('change', () => {
+  if (!monthInput.value) {
+    selectedMonth = null;
+  } else {
+    const [y, m] = monthInput.value.split('-').map(Number);
+    selectedMonth = new Date(y, m - 1, 1);
+  }
+  renderCalendar();
+});
+document.getElementById('month-reset').addEventListener('click', () => {
+  selectedMonth = null;
+  monthInput.value = '';
+  renderCalendar();
+});
+
+// ========= CHAT COACH IA =========
+const CHAT_KEY = 'coach_ia_chat_v1';
+const PREFS_KEY = 'coach_ia_prefs_v1';
+
+function loadChatMessages() {
+  try { return JSON.parse(localStorage.getItem(CHAT_KEY)) || []; }
+  catch { return []; }
+}
+function saveChatMessages(msgs) {
+  localStorage.setItem(CHAT_KEY, JSON.stringify(msgs.slice(-50))); // garder max 50 derniers
+}
+function loadPrefs() {
+  try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; }
+  catch { return {}; }
+}
+function savePrefs(prefs) {
+  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+}
+
+const PREF_LABELS = {
+  recoveryMode: 'Mode récup activé',
+  hardMode: 'Mode pousser',
+  blocked: 'Repos forcé (blessure)',
+  focusZone_seuil: 'Focus : Seuil',
+  focusZone_vo2: 'Focus : VO2max',
+  focusZone_endurance: 'Focus : Endurance',
+  focusZone_force: 'Focus : Force',
+  sleepConcern: 'Sommeil dégradé',
+  stressMode: 'Stress signalé',
+};
+
+function renderChatPrefs() {
+  const prefs = loadPrefs();
+  const el = document.getElementById('chat-prefs');
+  const tags = [];
+  if (prefs.recoveryMode) tags.push(PREF_LABELS.recoveryMode);
+  if (prefs.hardMode) tags.push(PREF_LABELS.hardMode);
+  if (prefs.blocked) tags.push(PREF_LABELS.blocked);
+  if (prefs.focusZone) tags.push(PREF_LABELS['focusZone_' + prefs.focusZone] || `Focus : ${prefs.focusZone}`);
+  if (prefs.sleepConcern) tags.push(PREF_LABELS.sleepConcern);
+  if (prefs.stressMode) tags.push(PREF_LABELS.stressMode);
+  if (tags.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = `<span style="color:var(--text-dim);font-size:11px;margin-right:6px;">Préférences actives :</span>` +
+    tags.map(t => `<span class="chat-pref-tag">${t}</span>`).join('');
+}
+
+function renderChat() {
+  const messages = loadChatMessages();
+  const container = document.getElementById('chat-messages');
+  if (messages.length === 0) {
+    container.innerHTML = `<div class="chat-empty">
+      Démarre la conversation avec ton Coach IA.<br>
+      Exemples : "Je me sens fatigué cette semaine" · "Je veux travailler mon seuil" · "J'ai mal au genou" · "Bien dormi, en forme aujourd'hui"
+    </div>`;
+    return;
+  }
+  container.innerHTML = messages.map(m => `
+    <div class="chat-message ${m.role}">
+      <div class="chat-avatar ${m.role}">${m.role === 'user' ? 'TOI' : 'IA'}</div>
+      <div class="chat-bubble-wrap">
+        <div class="chat-bubble">${m.text}</div>
+        <div class="chat-time">${m.time}</div>
+      </div>
+    </div>
+  `).join('');
+  container.scrollTop = container.scrollHeight;
+  renderChatPrefs();
+}
+
+function generateCoachResponse(userText) {
+  const t = userText.toLowerCase();
+  const tsb = todayData?.tsb ?? 0;
+  const rec = todayData?.recovery;
+  const ctxTSB = tsb < -15 ? ` Ton TSB actuel (${tsb.toFixed(0)}) confirme.` : tsb > 5 ? ` Ton TSB est positif (+${tsb.toFixed(0)}), c'est cohérent.` : '';
+  const ctxRec = rec != null ? ` Recovery Whoop du jour : ${rec}%.` : '';
+
+  // Détection d'intentions (ordre de priorité)
+  if (/blesse|blessé|blessee|douleur|mal au|mal a la|tendinit|claqu|knee|genou|cheville|dos|épaule|coude|poignet/.test(t)) {
+    return {
+      message: `Important : ne t'entraîne pas avec une douleur. Repos complet jusqu'à disparition.\n\nSi ça persiste plus de 3-5 jours ou empire, consulte un kiné ou un médecin du sport — c'est non négociable.\n\nJe passe ton plan en mode repos forcé. Quand tu vas mieux, dis-moi pour reprendre progressivement.`,
+      prefs: { recoveryMode: true, blocked: true }
+    };
+  }
+  if (/fatig|crevé|crevee|épuis|epuis|nase|usé|usee|kacho|ko|naze/.test(t)) {
+    return {
+      message: `Compris, fatigue signalée.${ctxTSB}${ctxRec}\n\nJe vais alléger les séances :\n• Pas de blocs VO2max\n• Focus endurance Z2 et récupération active\n• Si la fatigue persiste 2-3 jours, on bascule en semaine de décharge\n\nDors bien, hydrate-toi, mange protéiné.`,
+      prefs: { recoveryMode: true, blocked: false }
+    };
+  }
+  if (/frais|en forme|reposé|reposee|pleine forme|envie de pousser|au top|peche|pêche/.test(t)) {
+    return {
+      message: `Top, tu es frais.${ctxTSB}${ctxRec} Bonne fenêtre pour pousser.\n\nJe peux densifier la semaine avec :\n• Un bloc de seuil supplémentaire\n• Ou un VO2max si ton TSB le permet\n\nTu veux travailler quoi en priorité ? Seuil, VO2max, endurance, force ?`,
+      prefs: { hardMode: true, recoveryMode: false, blocked: false }
+    };
+  }
+  if (/seuil|ftp|threshold/.test(t)) {
+    return {
+      message: `OK, focus sur le seuil.\n\nFormat type : 2 séances/sem de 3×12min ou 4×8min à 95-105% FTP, récup 3-5min.\n\nObjectif : pousser ton FTP dans 4-6 semaines. Re-test FTP dans 4 semaines pour mesurer.`,
+      prefs: { focusZone: 'seuil' }
+    };
+  }
+  if (/vo2|vmax|aerobie max|aérobie max/.test(t)) {
+    return {
+      message: `Compris, VO2max comme axe de travail.\n\nFormat type : 4×4min ou 6×3min à 110-115% FTP, récup 1:1.\nTrès exigeant → 1-2 fois/semaine max, jamais 2 jours de suite.\n\nLa phase Peak de ton plan se déclenche.`,
+      prefs: { focusZone: 'vo2' }
+    };
+  }
+  if (/endur|volume|sortie longue|fond|base aerobie|base aérobie/.test(t)) {
+    return {
+      message: `Bon choix, construire la base aérobie c'est la fondation.\n\nPlan : sorties Z2 longues le week-end (>2h), volume hebdo augmenté de 10% max/semaine. Reste sous 75% FTP, conversation aisée.\n\nC'est moins glamour mais c'est ce qui paie sur la durée.`,
+      prefs: { focusZone: 'endurance' }
+    };
+  }
+  if (/force|muscu|musculation|gainage|renfo/.test(t)) {
+    return {
+      message: `OK, focus force/musculation.\n\n2-3 séances/sem en complément du vélo, format : 4-5 exos polyarticulaires (squat, deadlift, presse, gainage), 3-4 séries de 5-8 reps lourdes.\n\nÉvite le jour avant une grosse séance vélo.`,
+      prefs: { focusZone: 'force' }
+    };
+  }
+  if (/sommeil|dormi mal|mal dormi|insomnie|nuit courte|fatigue chronique/.test(t)) {
+    return {
+      message: `Le sommeil c'est 50% de la récupération.\n\nSi tu dors mal 2+ nuits, j'allège auto le plan : pas plus que Z3 le lendemain.\n\nConseils : couche-toi 30min plus tôt, magnesium le soir, pas d'écran 30min avant. Si chronique, vérifie ton stress et ta charge globale.`,
+      prefs: { sleepConcern: true }
+    };
+  }
+  if (/stress|boulot|travail|charge mentale|presse|pressé|pressee/.test(t)) {
+    return {
+      message: `Stress non-sportif = fatigue cumulative pour le corps.\n\nJe réduis l'intensité cette semaine. Privilégie aussi des séances "plaisir" courtes (1h Z2) au lieu de tout planifier dur.\n\nLa séance dure quand tu es déjà stressé peut empirer les choses.`,
+      prefs: { stressMode: true }
+    };
+  }
+  if (/decharge|décharge|recup|récup|récupération|recuperation/.test(t)) {
+    return {
+      message: `OK, semaine de décharge.\n\nFormat : volume réduit de 30-50%, intensité conservée mais blocs courts. Format type : 3 sorties Z2 courtes + 1 séance modérée.\n\nL'objectif est de surcompenser pour repartir frais la semaine suivante.`,
+      prefs: { recoveryMode: true }
+    };
+  }
+  if (/competition|compétition|course|objectif|preparation|préparation/.test(t)) {
+    return {
+      message: `Pour structurer la prépa, ajoute ta compétition dans la section "Compétitions à venir" en haut de l'onglet.\n\nJe gère ensuite automatiquement les phases :\n• Build (>8 sem)\n• Peak (4-8 sem)\n• Taper (1-4 sem)\n• Race week (< 1 sem)`,
+      prefs: {}
+    };
+  }
+  if (/^(merci|ok|d'accord|compris|bien|super|nickel)/.test(t)) {
+    return {
+      message: `Pas de souci, je note. Si tu changes d'avis ou veux ajuster, dis-le moi à tout moment.`,
+      prefs: {}
+    };
+  }
+  if (/^(salut|bonjour|hello|coucou|hey|yo)/.test(t)) {
+    return {
+      message: `Salut ! Prêt à bosser. Dis-moi comment tu te sens aujourd'hui, ce que tu veux travailler, ou si tu as des douleurs/contraintes.${ctxRec}${ctxTSB}`,
+      prefs: {}
+    };
+  }
+  // Réponse par défaut
+  return {
+    message: `Noté. Je tiens compte pour la suite.\n\nDis-moi par exemple :\n• Ta sensation du jour (frais / fatigué / douleur)\n• Ce que tu veux travailler (seuil / VO2 / endurance / force)\n• Ton sommeil, ton stress, des contraintes spécifiques`,
+    prefs: {}
+  };
+}
+
+function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const messages = loadChatMessages();
+  const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  messages.push({ role: 'user', text, time });
+
+  const { message: response, prefs: newPrefs } = generateCoachResponse(text);
+  messages.push({ role: 'coach', text: response, time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) });
+
+  // Sauvegarder préférences extraites
+  if (newPrefs && Object.keys(newPrefs).length > 0) {
+    const cur = loadPrefs();
+    Object.assign(cur, newPrefs);
+    savePrefs(cur);
+  }
+
+  saveChatMessages(messages);
+  input.value = '';
+  renderChat();
+  // Re-render du calendrier pour appliquer les nouvelles préfs
+  if (typeof renderCalendar === 'function') renderCalendar();
+}
+
+document.getElementById('chat-send').addEventListener('click', sendChatMessage);
+document.getElementById('chat-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage();
   }
 });
+document.getElementById('chat-clear').addEventListener('click', () => {
+  if (!confirm('Effacer la conversation et les préférences ?')) return;
+  localStorage.removeItem(CHAT_KEY);
+  localStorage.removeItem(PREFS_KEY);
+  renderChat();
+  if (typeof renderCalendar === 'function') renderCalendar();
+});
+
+renderChat();
+
+// ========= INTÉGRATION DES PRÉFÉRENCES DANS LE PLAN =========
+// Patch sur adjustForRecovery pour aussi appliquer les prefs du chat
+const _originalAdjustForRecovery = adjustForRecovery;
+adjustForRecovery = function(proposal, recovery) {
+  let p = _originalAdjustForRecovery(proposal, recovery);
+  const prefs = loadPrefs();
+  if (prefs.blocked && p.type !== 'rest') {
+    return { ...p, type: 'rest', name: 'Repos forcé (douleur signalée)', dur: 0, tss: 0, why: 'Repos demandé suite à signalement de douleur — reprendre quand ça va mieux' };
+  }
+  if (prefs.recoveryMode && (p.type === 'vo2' || p.type === 'seuil')) {
+    return { ...p, type: 'endurance', name: 'Endurance Z2 (mode récup activé)', dur: Math.round(p.dur * 0.7), tss: Math.round(p.tss * 0.55), why: 'Mode récup activé via chat — intensité allégée' };
+  }
+  if (prefs.hardMode && p.type === 'endurance' && p.tss < 80) {
+    return { ...p, name: p.name + ' (renforcé)', tss: Math.round(p.tss * 1.2), why: 'Mode pousser activé via chat — un peu plus de stimulation' };
+  }
+  if (prefs.focusZone === 'seuil' && p.type === 'endurance' && p.tss > 50) {
+    return { ...p, type: 'tempo', name: 'Sweet Spot (focus seuil)', tss: Math.round(p.tss * 1.15), why: 'Focus seuil via chat — endurance remplacée par sweet spot' };
+  }
+  return p;
+};
+
+// Init
+renderCompList();
+renderCalendar();
 
 // ========= PANEL 3: LONG TERME (robuste aux nulls Whoop) =========
 // Rolling average qui ignore les nulls (renvoie null si aucun point dans la fenêtre)
@@ -1690,20 +4058,32 @@ document.getElementById('alerts-list').innerHTML = alerts.map(a => `
   </div>`).join('');
 
 // ========= PANEL 4: SESSIONS =========
-const sessions = data.filter(d => d.sessionType).slice(-12).reverse();
-const tbody = document.getElementById('sessions-tbody');
-tbody.innerHTML = sessions.map((s, i) => `
-  <tr data-idx="${i}">
-    <td>${fmtDate(s.date)}</td>
-    <td>${s.sessionName}</td>
-    <td><span class="pill ${s.sessionType}">${s.sessionType}</span></td>
-    <td>${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')}</td>
-    <td>${s.tss}</td>
-    <td>${s.np}W (${s.ftpPct}%)</td>
-    <td>${s.hr} bpm</td>
-    <td><span style="color:${s.compliance>=95?'var(--accent)':s.compliance>=85?'var(--warn)':'var(--danger)'};">${s.compliance}%</span></td>
-  </tr>
-`).join('');
+let sessions = [];
+function renderSessionsTable() {
+  sessions = data.filter(d => d.sessionType).slice(-12).reverse();
+  const tbody = document.getElementById('sessions-tbody');
+  tbody.innerHTML = sessions.map((s, i) => `
+    <tr data-idx="${i}">
+      <td>${fmtDate(s.date)}</td>
+      <td>${s.sessionName}</td>
+      <td><span class="pill ${s.sessionType}">${s.sessionType}</span></td>
+      <td>${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')}</td>
+      <td>${s.tss}</td>
+      <td>${s.np}W (${s.ftpPct}%)</td>
+      <td>${s.hr} bpm</td>
+      <td>${s.compliance != null ? `<span style="color:${s.compliance>=95?'var(--accent)':s.compliance>=85?'var(--warn)':'var(--danger)'};">${s.compliance}%</span>` : '<span style="color:var(--text-mute);">—</span>'}</td>
+    </tr>
+  `).join('');
+  // Auto-affichage de la 1ère séance ou message vide
+  const detailWrap = document.getElementById('session-detail-wrap');
+  if (sessions.length) {
+    tbody.querySelector('tr')?.classList.add('selected');
+    renderSessionDetail(sessions[0]);
+  } else {
+    detailWrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:13px;">Aucune séance pour le filtre sélectionné.</div>';
+  }
+}
+renderSessionsTable();
 
 function renderSessionDetail(s) {
   const zoneColors = ['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f87171'];
@@ -1747,18 +4127,14 @@ function renderSessionDetail(s) {
   document.getElementById('session-detail-wrap').innerHTML = html;
 }
 
-tbody.addEventListener('click', (e) => {
+document.getElementById('sessions-tbody').addEventListener('click', (e) => {
   const tr = e.target.closest('tr');
   if (!tr) return;
+  const tbody = e.currentTarget;
   tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
   tr.classList.add('selected');
   renderSessionDetail(sessions[+tr.dataset.idx]);
 });
-// auto-render première séance
-if (sessions.length) {
-  tbody.querySelector('tr').classList.add('selected');
-  renderSessionDetail(sessions[0]);
-}
 
 // ========= TABS =========
 document.querySelectorAll('.tab').forEach(btn => {
@@ -1767,6 +4143,38 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(btn.dataset.panel).classList.add('active');
+  });
+});
+
+// ========= FILTRES SPORTS (boutons header) =========
+document.querySelectorAll('#sport-filter .sport-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const sport = btn.dataset.sport;
+    if (sport === 'tout') {
+      // Clic sur "Tout" : ne sélectionne QUE Tout
+      activeSports.clear();
+      activeSports.add('tout');
+    } else {
+      activeSports.delete('tout');
+      if (activeSports.has(sport)) {
+        activeSports.delete(sport);
+      } else {
+        activeSports.add(sport);
+      }
+      // Si plus rien de sélectionné, revenir sur Tout
+      if (activeSports.size === 0) activeSports.add('tout');
+      // Si les 3 sports individuels sont sélectionnés → bascule sur Tout
+      const individuals = ['cyclisme', 'course', 'musculation'];
+      if (individuals.every(s => activeSports.has(s))) {
+        activeSports.clear();
+        activeSports.add('tout');
+      }
+    }
+    // MAJ visuelle des boutons
+    document.querySelectorAll('#sport-filter .sport-btn').forEach(b => {
+      b.classList.toggle('active', activeSports.has(b.dataset.sport));
+    });
+    applySportFilter();
   });
 });
 

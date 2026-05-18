@@ -49,7 +49,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f data.js data.json .whoop_tokens.json 2>/dev/null || true
+          git add -f data.js data.json streams.js .whoop_tokens.json 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "Pas de changement, rien à committer."
           else
@@ -68,6 +68,7 @@ jobs:
           cp dashboard.html public_repo/index.html
           cp data.js public_repo/
           cp data.json public_repo/
+          cp streams.js public_repo/ 2>/dev/null || true
 
           cd public_repo
           git config user.name "github-actions[bot]"

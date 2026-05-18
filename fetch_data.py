@@ -34,6 +34,8 @@ ROOT = Path(__file__).parent
 ENV_FILE = ROOT / ".env"
 OUT_JSON = ROOT / "data.json"
 OUT_JS = ROOT / "data.js"
+OUT_STREAMS_JS = ROOT / "streams.js"
+PREFETCH_STREAMS_COUNT = 30  # Nombre d'activités récentes dont on pré-télécharge les streams
 BASE_URL = "https://intervals.icu/api/v1"
 
 
@@ -106,7 +108,37 @@ def fetch_events(session, athlete_id, oldest, newest):
     )
 
 
+def fetch_streams(session, activity_id):
+    """Streams haute resolution (watts, heartrate, cadence, distance, altitude)."""
+    return get(
+        session,
+        f"/activity/{activity_id}/streams",
+        params={"types": "watts,heartrate,cadence,distance,altitude"},
+    )
+
+
 # ============ TRANSFORM ============
+def get_sport_category(activity):
+    """Mappe une activite intervals.icu vers une grande categorie de sport :
+    cyclisme / course / musculation / mobilite / natation / autre."""
+    atype = (activity.get("type") or "").lower()
+    name = (activity.get("name") or "").lower()
+    if any(k in atype for k in ["ride", "bike", "cycle", "mtb"]) or \
+       any(k in name for k in ["velo", "vélo", "cyclisme", "bike"]):
+        return "cyclisme"
+    if any(k in atype for k in ["run"]) or \
+       any(k in name for k in ["course a pied", "course à pied", "footing", "running", "trail"]):
+        return "course"
+    if any(k in atype for k in ["weight", "strength", "workout"]) or \
+       any(k in name for k in ["musculation", "muscu", "renfo", "gym", "crossfit"]):
+        return "musculation"
+    if any(k in atype for k in ["yoga", "stretching"]) or "yoga" in name or "etirement" in name:
+        return "mobilite"
+    if "swim" in atype or "natation" in name:
+        return "natation"
+    return "autre"
+
+
 def classify_session(activity, ftp):
     """Déduit le 'type' simple de séance (endurance/tempo/seuil/vo2/recup/force/autre)
     à partir du type d'activité, du nom, puis de l'intensité (IF ratio 0-1.5)."""
@@ -170,29 +202,36 @@ def _coerce_zone_seconds(raw):
     return 0
 
 
-def extract_zones(activity):
-    """Récupère le temps passé dans chaque zone de FC (5 zones).
-    intervals.icu renvoie selon les cas icu_hr_zone_times ou icu_zone_times
-    soit en liste d'entiers (secondes), soit en liste d'objets
-    {id, secondsInZone, ...}. On normalise en % du temps total."""
-    # Priorité aux zones FC, puis puissance
-    candidates = [
-        activity.get("icu_hr_zone_times"),
-        activity.get("icu_zone_times"),
-        activity.get("zone_times"),
-        activity.get("icu_power_zone_times"),
-    ]
-    zones_sec = None
-    for c in candidates:
-        if c and isinstance(c, list) and len(c) >= 5:
-            zones_sec = [_coerce_zone_seconds(z) for z in c[:5]]
-            break
-    if not zones_sec:
+def _zones_from_key(activity, key):
+    """Extrait les zones d'une clé spécifique et normalise en % du temps total."""
+    c = activity.get(key)
+    if not c or not isinstance(c, list) or len(c) < 5:
         return None
+    zones_sec = [_coerce_zone_seconds(z) for z in c[:5]]
     total = sum(zones_sec)
     if total == 0:
         return None
     return [round(z * 100 / total, 1) for z in zones_sec]
+
+
+def extract_zones_hr(activity):
+    """Zones FC (5 zones, % du temps)."""
+    return _zones_from_key(activity, "icu_hr_zone_times")
+
+
+def extract_zones_power(activity):
+    """Zones puissance (5 zones, % du temps).
+    intervals.icu peut renvoyer ça sous plusieurs noms selon la version."""
+    for key in ["icu_power_zone_times", "icu_zone_times", "zone_times"]:
+        z = _zones_from_key(activity, key)
+        if z is not None:
+            return z
+    return None
+
+
+def extract_zones(activity):
+    """Compat : zones FC en priorité, puissance en fallback (pour ancien code)."""
+    return extract_zones_hr(activity) or extract_zones_power(activity)
 
 
 def build_day_index(activities, wellness, athlete_ftp):
@@ -224,6 +263,49 @@ def build_day_index(activities, wellness, athlete_ftp):
     for d, acts in daily_acts.items():
         # session principale = TSS max
         main = max(acts, key=lambda x: x.get("icu_training_load") or 0)
+
+        # Liste de TOUTES les activités du jour (pour permettre le défilement dans l'UI)
+        all_activities = []
+        for a in sorted(acts, key=lambda x: -(x.get("icu_training_load") or 0)):
+            a_dur_min = (a.get("moving_time") or a.get("elapsed_time") or 0) / 60.0
+            a_np = a.get("icu_normalized_watts") or a.get("icu_weighted_avg_watts") or 0
+            a_intensity = a.get("icu_intensity") or 0
+            if a_intensity and a_intensity > 5:
+                a_intensity = a_intensity / 100.0
+            a_ftp = a.get("icu_ftp") or athlete_ftp or 0
+            # Distance en km
+            dist_m = a.get("distance") or 0
+            # Vitesse moyenne km/h
+            avg_speed = a.get("average_speed") or 0  # m/s
+            all_activities.append({
+                "id": a.get("id"),
+                "name": a.get("name") or a.get("type") or "Activité",
+                "type": classify_session(a, a_ftp),
+                "sport": get_sport_category(a),
+                "raw_type": a.get("type"),  # type brut intervals.icu (Ride, Run, etc.)
+                "tss": round(a.get("icu_training_load") or 0),
+                "duration": round(a_dur_min),
+                "elapsed_time": a.get("elapsed_time"),
+                "moving_time": a.get("moving_time"),
+                "distance_km": round(dist_m / 1000, 2) if dist_m else None,
+                "elevation_gain": round(a.get("total_elevation_gain") or 0) or None,
+                "avg_speed_kmh": round(avg_speed * 3.6, 1) if avg_speed else None,
+                "max_speed_kmh": round((a.get("max_speed") or 0) * 3.6, 1) or None,
+                "np": round(a_np) if a_np else 0,
+                "avg_watts": round(a.get("icu_average_watts") or 0) or None,
+                "max_watts": round(a.get("max_watts") or a.get("icu_max_watts") or 0) or None,
+                "hr": round(a.get("average_heartrate") or 0),
+                "max_hr": round(a.get("max_heartrate") or 0) or None,
+                "cadence": round(a.get("average_cadence") or 0) or None,
+                "kj": round(a.get("kj") or ((a.get("icu_joules") or 0) / 1000)) or None,
+                "calories": round(a.get("calories") or 0) or None,
+                "ftpPct": round(a_intensity * 100) if a_intensity else 0,
+                "intensity": round(a_intensity, 2) if a_intensity else 0,
+                "variability_index": round(a.get("icu_variability_index") or 0, 2) or None,
+                "training_load": round(a.get("icu_training_load") or 0) or None,
+                "zones_hr": extract_zones_hr(a),
+                "zones_power": extract_zones_power(a),
+            })
         ftp_at_time = main.get("icu_ftp") or athlete_ftp or 0
         np = main.get("icu_normalized_watts") or main.get("icu_weighted_avg_watts") or 0
         avg_w = main.get("icu_average_watts") or 0
@@ -256,6 +338,7 @@ def build_day_index(activities, wellness, athlete_ftp):
             "duration": round(duration_min),
             "sessionName": main.get("name") or main.get("type") or "Activité",
             "sessionType": classify_session(main, ftp_at_time),
+            "sport": get_sport_category(main),
             "np": round(np) if np else 0,
             "avgW": round(avg_w) if avg_w else 0,
             "hr": round(main.get("average_heartrate") or 0),
@@ -263,6 +346,9 @@ def build_day_index(activities, wellness, athlete_ftp):
             "intensity": round(intensity, 2) if intensity else 0,
             "compliance": compliance,
             "zones": extract_zones(main),
+            "zones_hr": extract_zones_hr(main),
+            "zones_power": extract_zones_power(main),
+            "activities": all_activities,
             "activityId": main.get("id"),
             "ftp_at_time": ftp_at_time,
         })
@@ -376,6 +462,7 @@ def to_dashboard_format(day_index):
             "duration": d.get("duration", 0),
             "sessionName": d.get("sessionName"),
             "sessionType": d.get("sessionType"),
+            "sport": d.get("sport"),
             "np": d.get("np", 0),
             "avgW": d.get("avgW", 0),
             "hr": d.get("hr", 0),
@@ -383,6 +470,9 @@ def to_dashboard_format(day_index):
             "intensity": d.get("intensity", 0),
             "compliance": d.get("compliance"),
             "zones": d.get("zones"),
+            "zones_hr": d.get("zones_hr"),
+            "zones_power": d.get("zones_power"),
+            "activities": d.get("activities", []),
             # Whoop (réel ou simulé selon whoopSource)
             "recovery": d.get("recovery"),
             "hrv": d.get("hrv"),
@@ -494,6 +584,27 @@ def main():
     print(f"\n[OK] Ecrit {OUT_JSON.name} ({OUT_JSON.stat().st_size // 1024} KB)")
     print(f"[OK] Ecrit {OUT_JS.name}   ({OUT_JS.stat().st_size // 1024} KB)")
     print(f"  Couverture : {rows[0]['date']} ->{rows[-1]['date']} ({len(rows)} jours)")
+
+    # ====== PRE-FETCH STREAMS DES N DERNIERES ACTIVITES ======
+    # Permet une ouverture instantanee de la modal cote dashboard.
+    print(f"\n-> Pre-fetch streams des {PREFETCH_STREAMS_COUNT} dernieres activites...")
+    recent_acts = sorted(
+        [a for a in activities if a.get("id") and a.get("start_date_local")],
+        key=lambda a: a["start_date_local"],
+        reverse=True,
+    )[:PREFETCH_STREAMS_COUNT]
+    streams_cache = {}
+    for i, a in enumerate(recent_acts):
+        aid = a.get("id")
+        try:
+            streams_cache[str(aid)] = fetch_streams(session, aid)
+            if (i + 1) % 5 == 0:
+                print(f"  [OK] {i+1}/{len(recent_acts)} streams")
+        except Exception as e:
+            print(f"  [!] Skip {aid} : {e}", file=sys.stderr)
+    streams_json = json.dumps(streams_cache, ensure_ascii=False, default=str)
+    OUT_STREAMS_JS.write_text(f"window.STREAMS_CACHE = {streams_json};\n", encoding="utf-8")
+    print(f"[OK] Ecrit {OUT_STREAMS_JS.name} ({OUT_STREAMS_JS.stat().st_size // 1024} KB)")
 
 
 if __name__ == "__main__":
