@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-18T10:40:44.158496",
+  "generated_at": "2026-05-18T09:19:03.411267",
   "athlete": {
     "id": "i115086",
     "name": "JABER Yanis",
@@ -35420,7 +35420,7 @@
       "sleepQ": 53,
       "whoopSource": "real",
       "rhr": 44,
-      "strain": 0.7,
+      "strain": 0.8,
       "deepH": 1.2,
       "remH": 1.2
     }
