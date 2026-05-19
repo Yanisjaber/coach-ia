@@ -1,5 +1,5 @@
 window.DASHBOARD_DATA = {
-  "generated_at": "2026-05-18T23:42:42.730844",
+  "generated_at": "2026-05-19T00:02:49.755114",
   "athlete": {
     "id": "i115086",
     "name": "JABER Yanis",
@@ -10,8 +10,8 @@ window.DASHBOARD_DATA = {
     "intervals_icu": true,
     "whoop_real": true,
     "whoop_real_days": 16,
-    "whoop_simulated_days": 1227,
-    "history_days": 1243,
+    "whoop_simulated_days": 1228,
+    "history_days": 1244,
     "activities_count": 739,
     "planned_events_count": 0
   },
@@ -73227,6 +73227,36 @@ window.DASHBOARD_DATA = {
       "strain": 4.3,
       "deepH": 1.2,
       "remH": 1.2
+    },
+    {
+      "date": "2026-05-19",
+      "tss": 0,
+      "ctl": 51.3,
+      "atl": 59.7,
+      "tsb": -8.4,
+      "duration": 0,
+      "sessionName": null,
+      "sessionType": null,
+      "sport": null,
+      "np": 0,
+      "avgW": 0,
+      "hr": 0,
+      "ftpPct": 0,
+      "intensity": 0,
+      "compliance": null,
+      "zones": null,
+      "zones_hr": null,
+      "zones_power": null,
+      "activities": [],
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
+      "strain": null,
+      "deepH": null,
+      "remH": null
     }
   ],
   "plan": []
