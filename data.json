@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-19T08:56:32.839243",
+  "generated_at": "2026-05-19T11:07:39.942673",
   "athlete": {
     "id": "i115086",
     "name": "JABER Yanis",
@@ -9,8 +9,8 @@
   "source": {
     "intervals_icu": true,
     "whoop_real": true,
-    "whoop_real_days": 16,
-    "whoop_simulated_days": 1228,
+    "whoop_real_days": 17,
+    "whoop_simulated_days": 1227,
     "history_days": 1244,
     "activities_count": 739,
     "planned_events_count": 0
@@ -73248,15 +73248,15 @@
       "zones_hr": null,
       "zones_power": null,
       "activities": [],
-      "recovery": null,
-      "hrv": null,
-      "sleepH": null,
-      "sleepQ": null,
-      "whoopSource": "simulated",
-      "rhr": null,
-      "strain": null,
-      "deepH": null,
-      "remH": null
+      "recovery": 75,
+      "hrv": 121,
+      "sleepH": 8.9,
+      "sleepQ": 78,
+      "whoopSource": "real",
+      "rhr": 45,
+      "strain": 0.7,
+      "deepH": 1.6,
+      "remH": 2.2
     }
   ],
   "plan": []

@@ -1100,6 +1100,20 @@
   </div>
   <div class="header-info">
     <span id="last-update"></span>
+    <button id="refresh-btn" type="button" title="Rafraîchir maintenant"
+            style="background:transparent;border:1px solid var(--border);color:var(--text-dim);
+                   border-radius:6px;width:24px;height:24px;cursor:pointer;display:inline-flex;
+                   align-items:center;justify-content:center;padding:0;transition:all 0.15s;"
+            onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--text-dim)'"
+            onmouseout="if(!this.classList.contains('loading')){this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'}">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" id="refresh-icon">
+        <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+        <path d="M21 3v5h-5"/>
+        <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+        <path d="M3 21v-5h5"/>
+      </svg>
+    </button>
     <span class="date" id="today-date">—</span>
   </div>
 </header>
@@ -4184,6 +4198,81 @@ document.querySelectorAll('#sport-filter .sport-btn').forEach(btn => {
 });
 
 })(); // fin IIFE async
+
+// ========= BOUTON REFRESH MANUEL =========
+// Déclenche workflow_dispatch GitHub Actions via le Worker Cloudflare,
+// poll jusqu'à la fin du run, puis recharge la page.
+(function setupRefreshButton() {
+  const btn = document.getElementById('refresh-btn');
+  const icon = document.getElementById('refresh-icon');
+  if (!btn || !icon) return;
+
+  // Injecte le @keyframes spin si absent
+  if (!document.getElementById('refresh-spin-style')) {
+    const style = document.createElement('style');
+    style.id = 'refresh-spin-style';
+    style.textContent = '@keyframes refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+    document.head.appendChild(style);
+  }
+
+  function setLoading(on, label) {
+    btn.disabled = on;
+    btn.classList.toggle('loading', on);
+    if (on) {
+      btn.style.color = 'var(--accent)';
+      btn.style.borderColor = 'var(--accent)';
+      icon.style.animation = 'refresh-spin 0.8s linear infinite';
+      btn.title = label || 'Rafraîchissement en cours...';
+    } else {
+      btn.style.color = 'var(--text-dim)';
+      btn.style.borderColor = 'var(--border)';
+      icon.style.animation = '';
+      btn.title = 'Rafraîchir maintenant';
+    }
+  }
+
+  async function pollStatus(runId, maxSec = 180) {
+    const start = Date.now();
+    while ((Date.now() - start) / 1000 < maxSec) {
+      try {
+        const r = await fetch(`/api/refresh-status?runId=${runId}`, { credentials: 'include' });
+        if (r.ok) {
+          const j = await r.json();
+          if (j.status === 'completed') return j.conclusion === 'success';
+        }
+      } catch (e) { /* on retente */ }
+      await new Promise(res => setTimeout(res, 4000));
+    }
+    return false;
+  }
+
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    setLoading(true, 'Déclenchement du run...');
+    try {
+      const resp = await fetch('/api/refresh', { method: 'POST', credentials: 'include' });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        alert('Erreur déclenchement : ' + resp.status + '\n' + txt.slice(0, 200));
+        setLoading(false);
+        return;
+      }
+      const { runId } = await resp.json();
+      setLoading(true, 'Récupération intervals.icu + Whoop...');
+      const ok = await pollStatus(runId);
+      if (ok) {
+        // Reload avec cache-bust pour forcer la nouvelle data.js
+        location.reload();
+      } else {
+        alert('Le run GitHub Actions a échoué ou pris trop de temps. Voir https://github.com/Yanisjaber/coach-ia/actions');
+        setLoading(false);
+      }
+    } catch (e) {
+      alert('Erreur réseau : ' + e.message);
+      setLoading(false);
+    }
+  });
+})();
 </script>
 </body>
 </html>
