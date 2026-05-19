@@ -119,23 +119,59 @@ def fetch_streams(session, activity_id):
 
 # ============ TRANSFORM ============
 def get_sport_category(activity):
-    """Mappe une activite intervals.icu vers une grande categorie de sport :
-    cyclisme / course / musculation / mobilite / natation / autre."""
+    """Mappe une activite intervals.icu vers une grande categorie de sport.
+
+    Catégories (alignées sur les filtres du dashboard) :
+        cyclisme / course / musculation / natation / randonnee / ski / autre
+
+    Quand le champ ``type`` est absent (entrée manuelle), on tente une
+    inférence depuis les métriques disponibles (watts → cyclisme, etc.).
+    """
     atype = (activity.get("type") or "").lower()
     name = (activity.get("name") or "").lower()
-    if any(k in atype for k in ["ride", "bike", "cycle", "mtb"]) or \
-       any(k in name for k in ["velo", "vélo", "cyclisme", "bike"]):
+
+    # --- Mapping par type intervals.icu ---
+    # Cyclisme : route, MTB, gravel, home-trainer, e-bike
+    if any(k in atype for k in ["ride", "bike", "cycle", "mtb", "spin"]) or \
+       any(k in name for k in ["velo", "vélo", "cyclisme", "bike", "bicycl"]):
         return "cyclisme"
-    if any(k in atype for k in ["run"]) or \
-       any(k in name for k in ["course a pied", "course à pied", "footing", "running", "trail"]):
+    # Course : route, trail, treadmill, virtual
+    if "run" in atype or \
+       any(k in name for k in ["course a pied", "course à pied", "footing", "running", "trail", "jogging"]):
         return "course"
-    if any(k in atype for k in ["weight", "strength", "workout"]) or \
-       any(k in name for k in ["musculation", "muscu", "renfo", "gym", "crossfit"]):
-        return "musculation"
-    if any(k in atype for k in ["yoga", "stretching"]) or "yoga" in name or "etirement" in name:
-        return "mobilite"
-    if "swim" in atype or "natation" in name:
+    # Natation : piscine + eau libre
+    if "swim" in atype or "natation" in name or "piscine" in name:
         return "natation"
+    # Musculation / renforcement
+    if any(k in atype for k in ["weight", "strength", "workout", "crossfit", "gym"]) or \
+       any(k in name for k in ["musculation", "muscu", "renfo", "gym", "crossfit", "weights"]):
+        return "musculation"
+    # Tout le reste (ski, rando, marche, mobilité, sports co, etc.) → "autre"
+    if any(k in atype for k in [
+        "ski", "snowboard", "hike", "walk",
+        "yoga", "stretching", "pilates",
+        "soccer", "tennis", "basket", "volley", "hockey", "golf",
+        "kayak", "rowing", "paddle", "climb",
+        "transition", "ebike",
+    ]) or any(k in name for k in ["ski", "snowboard", "rando", "marche", "hike"]):
+        return "autre"
+
+    # --- Pas de type connu : inférence par métriques ---
+    avg_w = activity.get("icu_average_watts") or activity.get("avg_watts") or 0
+    max_w = activity.get("max_watts") or activity.get("icu_max_watts") or 0
+    avg_pace = activity.get("icu_average_pace") or 0  # min/km
+    dist_m = activity.get("distance") or 0
+    avg_speed = activity.get("average_speed") or 0  # m/s
+    avg_cad = activity.get("average_cadence") or 0
+    if avg_w or max_w:
+        # Puissance dispo → presque toujours du vélo
+        return "cyclisme"
+    if avg_pace or (dist_m and avg_speed and avg_speed < 6 and avg_cad and 60 <= avg_cad <= 100):
+        # Cadence 60-100 rpm + vitesse < 21 km/h = course à pied typique
+        return "course"
+    if dist_m and avg_speed and 6 <= avg_speed <= 25:
+        # Vitesse 21-90 km/h sans watts → souvent vélo route/descente
+        return "cyclisme"
     return "autre"
 
 
@@ -541,6 +577,57 @@ def main():
                          (today + timedelta(days=14)).isoformat())
     print(f"  [OK]{len(events)} events planifiés (14 jours à venir)")
 
+    # ====== PRE-FETCH STREAMS + CALCUL DES MAX MANQUANTS ======
+    # intervals.icu retourne max_watts=null pour beaucoup d'activités.
+    # On le calcule depuis les streams pour les N dernières.
+    print(f"\n-> Pre-fetch streams des {PREFETCH_STREAMS_COUNT} dernieres activites...")
+    recent_acts = sorted(
+        [a for a in activities if a.get("id") and a.get("start_date_local")],
+        key=lambda a: a["start_date_local"],
+        reverse=True,
+    )[:PREFETCH_STREAMS_COUNT]
+    streams_cache = {}
+    streams_max = {}  # id activité -> {max_watts, max_hr, max_cadence}
+    for i, a in enumerate(recent_acts):
+        aid = a.get("id")
+        try:
+            s = fetch_streams(session, aid)
+            streams_cache[str(aid)] = s
+            maxes = {}
+            for stream in s or []:
+                t = stream.get("type")
+                data = stream.get("data") or []
+                non_zero = [x for x in data if x]
+                if not non_zero:
+                    continue
+                if t == "watts":
+                    maxes["max_watts"] = max(non_zero)
+                elif t == "heartrate":
+                    maxes["max_hr"] = max(non_zero)
+                elif t == "cadence":
+                    maxes["max_cadence"] = max(non_zero)
+            streams_max[aid] = maxes
+            if (i + 1) % 5 == 0:
+                print(f"  [OK] {i+1}/{len(recent_acts)} streams")
+        except Exception as e:
+            print(f"  [!] Skip {aid} : {e}", file=sys.stderr)
+
+    # Patch les activités avec les max calculés depuis les streams
+    patched = 0
+    for a in activities:
+        aid = a.get("id")
+        m = streams_max.get(aid)
+        if not m:
+            continue
+        if not a.get("max_watts") and m.get("max_watts"):
+            a["max_watts"] = m["max_watts"]
+            patched += 1
+        if not a.get("max_heartrate") and m.get("max_hr"):
+            a["max_heartrate"] = m["max_hr"]
+        if not a.get("max_cadence") and m.get("max_cadence"):
+            a["max_cadence"] = m["max_cadence"]
+    print(f"  [OK] {patched} max_watts ajoutés depuis les streams")
+
     # Construction
     day_index = build_day_index(activities, wellness, ftp)
 
@@ -583,23 +670,7 @@ def main():
     print(f"[OK] Ecrit {OUT_JS.name}   ({OUT_JS.stat().st_size // 1024} KB)")
     print(f"  Couverture : {rows[0]['date']} ->{rows[-1]['date']} ({len(rows)} jours)")
 
-    # ====== PRE-FETCH STREAMS DES N DERNIERES ACTIVITES ======
-    # Permet une ouverture instantanee de la modal cote dashboard.
-    print(f"\n-> Pre-fetch streams des {PREFETCH_STREAMS_COUNT} dernieres activites...")
-    recent_acts = sorted(
-        [a for a in activities if a.get("id") and a.get("start_date_local")],
-        key=lambda a: a["start_date_local"],
-        reverse=True,
-    )[:PREFETCH_STREAMS_COUNT]
-    streams_cache = {}
-    for i, a in enumerate(recent_acts):
-        aid = a.get("id")
-        try:
-            streams_cache[str(aid)] = fetch_streams(session, aid)
-            if (i + 1) % 5 == 0:
-                print(f"  [OK] {i+1}/{len(recent_acts)} streams")
-        except Exception as e:
-            print(f"  [!] Skip {aid} : {e}", file=sys.stderr)
+    # ====== ÉCRITURE streams.js (déjà téléchargés en amont) ======
     streams_json = json.dumps(streams_cache, ensure_ascii=False, default=str)
     OUT_STREAMS_JS.write_text(f"window.STREAMS_CACHE = {streams_json};\n", encoding="utf-8")
     print(f"[OK] Ecrit {OUT_STREAMS_JS.name} ({OUT_STREAMS_JS.stat().st_size // 1024} KB)")
