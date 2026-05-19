@@ -1,5 +1,5 @@
 window.DASHBOARD_DATA = {
-  "generated_at": "2026-05-19T11:55:56.692517",
+  "generated_at": "2026-05-19T14:38:18.565846",
   "athlete": {
     "id": "i115086",
     "name": "JABER Yanis",
@@ -73254,7 +73254,7 @@ window.DASHBOARD_DATA = {
       "sleepQ": 78,
       "whoopSource": "real",
       "rhr": 45,
-      "strain": 0.8,
+      "strain": 1.1,
       "deepH": 1.6,
       "remH": 2.2
     }
