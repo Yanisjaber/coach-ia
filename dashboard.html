@@ -2504,7 +2504,7 @@ document.querySelectorAll('#weekly-range .preset').forEach(btn => {
 
 // ========= CHART ZONES (avec sélecteur de période) =========
 const zoneLabels = ['Z1 récup', 'Z2 endurance', 'Z3 tempo', 'Z4 seuil', 'Z5 VO2max'];
-const zoneColors = ['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f87171'];
+const zoneColors = ['#bbf7d0','#86efac','#4ade80','#16a34a','#14532d'];
 
 // État : 'hr' (FC) ou 'power' (Watts)
 let currentZoneType = 'hr';
@@ -3233,6 +3233,12 @@ let _modalCharts = [];
 function destroyModalCharts() {
   _modalCharts.forEach(c => {
     try {
+      if (c.canvas && c.canvas._smoothMM) {
+        c.canvas.removeEventListener('mousemove', c.canvas._smoothMM);
+        c.canvas.removeEventListener('mouseleave', c.canvas._smoothML);
+        delete c.canvas._smoothMM;
+        delete c.canvas._smoothML;
+      }
       if (c._stOverlay && c._stOverlay.parentNode) {
         c._stOverlay.parentNode.removeChild(c._stOverlay);
       }
@@ -3259,6 +3265,32 @@ function _ensureOverlay(chart) {
   chart._stOverlay = ov;
   chart._stOverlayCtx = ov.getContext('2d');
   _resizeOverlay(chart);
+
+  // Listener direct sur la canvas pour suivre le curseur MÊME pendant un drag-zoom
+  // (afterEvent peut être bypassé par le plugin zoom pendant la sélection).
+  if (!canvas._smoothMM) {
+    canvas._smoothMM = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (canvas.width / rect.width) / (chart.currentDevicePixelRatio || window.devicePixelRatio || 1);
+      const y = (e.clientY - rect.top) * (canvas.height / rect.height) / (chart.currentDevicePixelRatio || window.devicePixelRatio || 1);
+      const { left, right, top, bottom } = chart.chartArea;
+      if (x < left || x > right || y < top || y > bottom) {
+        if (chart._stxv != null) {
+          _smoothPendingX = null;
+          _scheduleSmoothDraw();
+        }
+        return;
+      }
+      _smoothPendingX = chart.scales.x.getValueForPixel(x);
+      _scheduleSmoothDraw();
+    };
+    canvas._smoothML = () => {
+      _smoothPendingX = null;
+      _scheduleSmoothDraw();
+    };
+    canvas.addEventListener('mousemove', canvas._smoothMM);
+    canvas.addEventListener('mouseleave', canvas._smoothML);
+  }
 }
 function _resizeOverlay(chart) {
   if (!chart._stOverlay) return;
@@ -3272,6 +3304,15 @@ function _resizeOverlay(chart) {
 
 function _drawOverlay(chart) {
   if (!chart._stOverlay) return;
+  // Safety : si une overlay s'est créée par erreur sur un non-stream chart, on la retire
+  if (typeof _isStreamChart === 'function' && !_isStreamChart(chart)) {
+    try {
+      if (chart._stOverlay.parentNode) chart._stOverlay.parentNode.removeChild(chart._stOverlay);
+    } catch (e) {}
+    chart._stOverlay = null;
+    chart._stOverlayCtx = null;
+    return;
+  }
   const ctx = chart._stOverlayCtx;
   const w = chart._stOverlay.width;
   const h = chart._stOverlay.height;
@@ -3397,7 +3438,15 @@ function _drawOverlay(chart) {
     if (lbl && (lbl.includes("W'bal") || lbl.includes('Vitesse'))) return v.toFixed(1);
     return Math.round(v).toString();
   };
-  const lines = items.map(it => `${it.label}: ${fmtV(it.value, it.label)}${it.extra ? ' · pente ' + it.extra : ''}`);
+  // Reformatage : "Altitude (m)" → label "Altitude" + unité "m" placée après la valeur
+  const lines = items.map(it => {
+    const m = (it.label || '').match(/^(.*?)\s*\((.+)\)\s*$/);
+    const labelPart = m ? m[1].trim() : it.label;
+    const unitPart = m ? m[2] : '';
+    const valueStr = fmtV(it.value, it.label);
+    const formatted = `${labelPart}: ${valueStr}${unitPart ? ' ' + unitPart : ''}`;
+    return `${formatted}${it.extra ? ' · pente ' + it.extra : ''}`;
+  });
   const allLines = [title, ...lines];
 
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
@@ -3443,18 +3492,27 @@ function _scheduleSmoothDraw() {
     _smoothFrame = null;
     const v = _smoothPendingX;
     _modalCharts.forEach(c => {
+      if (!_isStreamChart(c)) return; // ignore donuts et autres types
       c._stxv = v;
       _drawOverlay(c);
     });
   });
 }
 
+// Helper : le crosshair ne s'applique qu'aux line charts streams (pas aux donuts, bars, etc.)
+function _isStreamChart(chart) {
+  if (!chart || !chart.config || chart.config.type !== 'line') return false;
+  if (!chart.canvas) return false;
+  const id = chart.canvas.id || '';
+  return id.startsWith('streams-');
+}
 const smoothTooltipPlugin = {
   id: 'smoothTooltip',
-  afterInit(chart) { _ensureOverlay(chart); },
-  afterRender(chart) { _ensureOverlay(chart); _drawOverlay(chart); },
-  resize(chart) { _resizeOverlay(chart); _drawOverlay(chart); },
+  afterInit(chart) { if (_isStreamChart(chart)) _ensureOverlay(chart); },
+  afterRender(chart) { if (_isStreamChart(chart)) { _ensureOverlay(chart); _drawOverlay(chart); } },
+  resize(chart) { if (_isStreamChart(chart)) { _resizeOverlay(chart); _drawOverlay(chart); } },
   afterEvent(chart, args) {
+    if (!_isStreamChart(chart)) return;
     const e = args.event;
     if (e.type === 'mousemove') {
       const { left, right, top, bottom } = chart.chartArea;
@@ -3576,11 +3634,57 @@ async function renderStreamsSection(container, activityId) {
     return streams[type] || null;
   };
 
-  const watts = findStream('watts');
-  const hr = findStream('heartrate');
-  const cadence = findStream('cadence');
+  let watts = findStream('watts');
+  let hr = findStream('heartrate');
+  let cadence = findStream('cadence');
   const altitude = findStream('altitude');
   const distance = findStream('distance');
+
+  // Lissage 3 s (moyenne glissante centrée ±1 s = 3 points) sur Puissance, FC, Cadence
+  // Pour adoucir le bruit instantané sans perdre les variations réelles.
+  function smooth3s(arr) {
+    if (!arr) return arr;
+    const n = arr.length;
+    const out = new Array(n);
+    const win = 1;
+    let sum = 0, count = 0;
+    for (let i = 0; i <= win && i < n; i++) {
+      if (arr[i] != null && !isNaN(arr[i])) { sum += arr[i]; count++; }
+    }
+    for (let i = 0; i < n; i++) {
+      if (i > 0 && i + win < n && arr[i + win] != null && !isNaN(arr[i + win])) {
+        sum += arr[i + win]; count++;
+      }
+      if (i - win - 1 >= 0 && arr[i - win - 1] != null && !isNaN(arr[i - win - 1])) {
+        sum -= arr[i - win - 1]; count--;
+      }
+      out[i] = count > 0 ? sum / count : null;
+    }
+    return out;
+  }
+  // Lissage paramétré : 3s pour watts/FC, 9s pour cadence (plus stable visuellement)
+  function smoothWin(arr, win) {
+    if (!arr) return arr;
+    const n = arr.length;
+    const out = new Array(n);
+    let sum = 0, count = 0;
+    for (let i = 0; i <= win && i < n; i++) {
+      if (arr[i] != null && !isNaN(arr[i])) { sum += arr[i]; count++; }
+    }
+    for (let i = 0; i < n; i++) {
+      if (i > 0 && i + win < n && arr[i + win] != null && !isNaN(arr[i + win])) {
+        sum += arr[i + win]; count++;
+      }
+      if (i - win - 1 >= 0 && arr[i - win - 1] != null && !isNaN(arr[i - win - 1])) {
+        sum -= arr[i - win - 1]; count--;
+      }
+      out[i] = count > 0 ? sum / count : null;
+    }
+    return out;
+  }
+  if (watts) watts = smoothWin(watts, 1);      // ±1 s = 3 s
+  if (hr) hr = smoothWin(hr, 1);                // ±1 s = 3 s
+  if (cadence) cadence = smoothWin(cadence, 4); // ±4 s = 9 s (plus stable)
 
   const length = (watts && watts.length) || (hr && hr.length) || (cadence && cadence.length) || 0;
   if (length === 0) {
@@ -3647,24 +3751,34 @@ async function renderStreamsSection(container, activityId) {
     return out;
   }
 
-  // === Vitesse instantanée (km/h) lissée sur 5 s ===
+  // === Vitesse instantanée (km/h) doublement lissée pour absorber le bruit GPS ===
+  // Pass 1 : moyenne glissante ±15s (smooth les pics GPS courts)
+  // Pass 2 : moyenne glissante ±15s sur la sortie du pass 1 (lissage 2nd ordre)
+  // → Équivalent à un filtre gaussien plus stable qu'une grosse fenêtre simple
   function computeSpeed(distArr) {
     if (!distArr || distArr.length !== length) return null;
     const raw = new Array(length);
     for (let i = 1; i < length; i++) {
-      raw[i] = Math.max(0, (distArr[i] - distArr[i - 1])); // m/s (échantillonnage 1 Hz)
+      raw[i] = Math.max(0, (distArr[i] - distArr[i - 1])); // m/s
     }
     raw[0] = raw[1] || 0;
-    const sm = new Array(length);
-    const win = 5;
-    for (let i = 0; i < length; i++) {
-      let s = 0, c = 0;
-      for (let j = Math.max(0, i - win); j <= Math.min(length - 1, i + win); j++) {
-        if (raw[j] != null) { s += raw[j]; c++; }
+
+    function smoothPass(arr, win) {
+      const n = arr.length;
+      const out = new Array(n);
+      let sum = 0, count = 0;
+      for (let i = 0; i <= win && i < n; i++) { sum += arr[i]; count++; }
+      for (let i = 0; i < n; i++) {
+        if (i > 0 && i + win < n) { sum += arr[i + win]; count++; }
+        if (i - win - 1 >= 0) { sum -= arr[i - win - 1]; count--; }
+        out[i] = count > 0 ? sum / count : 0;
       }
-      sm[i] = c > 0 ? (s / c) * 3.6 : 0;
+      return out;
     }
-    return sm;
+
+    const pass1 = smoothPass(raw, 15);
+    const pass2 = smoothPass(pass1, 15);
+    return pass2.map(v => v * 3.6); // m/s → km/h
   }
 
   const wbal = computeWbal(watts);
@@ -3679,16 +3793,82 @@ async function renderStreamsSection(container, activityId) {
 
   container.innerHTML = `
     <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;margin-bottom:14px;font-size:12px;color:var(--text-dim);">
-      <div>Temps : <strong id="stat-temps" style="color:var(--text);font-size:14px;">—</strong></div>
-      <div>Distance : <strong id="stat-dist" style="color:var(--text);font-size:14px;">—</strong></div>
-      <div>FC moy : <strong id="stat-fc" style="color:var(--text);font-size:14px;">—</strong></div>
-      <div>Puissance moy : <strong id="stat-watts" style="color:var(--text);font-size:14px;">—</strong></div>
-      <button id="streams-zoom-reset" style="margin-left:auto;background:var(--bg-elev2);border:1px solid var(--border);color:var(--text-dim);padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;">Réinitialiser le zoom</button>
+      <div style="display:inline-flex;gap:6px;align-items:baseline;">Temps : <strong id="stat-temps" style="color:var(--text);font-size:14px;min-width:70px;text-align:left;display:inline-block;">—</strong></div>
+      <div style="display:inline-flex;gap:6px;align-items:baseline;">Distance : <strong id="stat-dist" style="color:var(--text);font-size:14px;min-width:80px;text-align:left;display:inline-block;">—</strong></div>
+      <button id="streams-zoom-reset" style="margin-left:auto;visibility:hidden;background:var(--bg-elev2);border:1px solid var(--border);color:var(--text-dim);padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;">Réinitialiser le zoom</button>
     </div>
-    ${(wattsPts.length || hrPts.length) ? `<div class="chart-wrap" style="height:180px;margin-bottom:14px;"><canvas id="streams-power-hr"></canvas></div>` : ''}
-    ${wbalPts.length ? `<div class="chart-wrap" style="height:180px;margin-bottom:14px;"><canvas id="streams-wbal"></canvas></div>` : ''}
-    ${cadencePts.length ? `<div class="chart-wrap" style="height:180px;margin-bottom:14px;"><canvas id="streams-cadence"></canvas></div>` : ''}
-    ${(speedPts.length || altPts.length) ? `<div class="chart-wrap" style="height:180px;"><canvas id="streams-speed-alt"></canvas></div>` : ''}
+    ${(wattsPts.length || hrPts.length) ? `
+      <div id="power-hr-header" style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;font-size:10px;margin-bottom:6px;padding-left:55px;padding-right:60px;gap:8px;overflow:hidden;">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;color:var(--text-dim);min-width:0;">
+          <span style="white-space:nowrap;display:inline-flex;gap:4px;align-items:baseline;"><span style="color:#fbbf24;">moy</span> <strong id="stat-wmoy" style="color:var(--text);font-size:11px;min-width:44px;text-align:left;display:inline-block;">—</strong></span>
+          <span style="white-space:nowrap;display:inline-flex;gap:4px;align-items:baseline;"><span style="color:#fbbf24;">max</span> <strong id="stat-wmaxx" style="color:var(--text);font-size:11px;min-width:44px;text-align:left;display:inline-block;">—</strong></span>
+        </div>
+        <div id="custom-legend-powerhr" style="display:flex;gap:10px;align-items:center;flex-shrink:0;">
+          ${wattsPts.length ? `<button class="cl-btn-phr" data-idx="0" data-yax="y" data-color="#fbbf24" style="background:transparent;border:none;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;padding:0;white-space:nowrap;">
+            <span class="cl-box" style="width:9px;height:9px;background:#fbbf24;border:1.5px solid #fbbf24;border-radius:2px;display:inline-block;"></span>Puissance
+          </button>` : ''}
+          ${hrPts.length ? `<button class="cl-btn-phr" data-idx="${wattsPts.length ? 1 : 0}" data-yax="y1" data-color="#f87171" style="background:transparent;border:none;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;padding:0;white-space:nowrap;">
+            <span class="cl-box" style="width:9px;height:9px;background:#f87171;border:1.5px solid #f87171;border-radius:2px;display:inline-block;"></span>FC
+          </button>` : ''}
+        </div>
+        <div style="display:flex;gap:9px;align-items:center;flex-wrap:nowrap;color:var(--text-dim);justify-self:end;">
+          <span style="white-space:nowrap;"><span style="color:#f87171;">moy</span> <strong id="stat-fcmoy" style="color:var(--text);font-size:11px;">—</strong></span>
+          <span style="white-space:nowrap;"><span style="color:#f87171;">max</span> <strong id="stat-fcmaxx" style="color:var(--text);font-size:11px;">—</strong></span>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:180px;margin-bottom:14px;"><canvas id="streams-power-hr"></canvas></div>` : ''}
+    ${wbalPts.length ? `
+      <div id="wbal-header" style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;font-size:10px;margin-bottom:6px;padding-left:55px;padding-right:60px;gap:8px;overflow:hidden;">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;color:var(--text-dim);min-width:0;">
+          <span style="white-space:nowrap;display:inline-flex;gap:4px;align-items:baseline;"><span style="color:#60a5fa;">moy</span> <strong id="stat-wbalmoy" style="color:var(--text);font-size:11px;min-width:44px;text-align:left;display:inline-block;">—</strong></span>
+          <span style="white-space:nowrap;display:inline-flex;gap:4px;align-items:baseline;"><span style="color:#60a5fa;">min</span> <strong id="stat-wbalmin" style="color:var(--text);font-size:11px;min-width:44px;text-align:left;display:inline-block;">—</strong></span>
+        </div>
+        <div id="custom-legend-wbal" style="display:flex;gap:10px;align-items:center;flex-shrink:0;">
+          <button class="cl-btn-wbal" data-idx="0" data-yax="y" data-color="#60a5fa" style="background:transparent;border:none;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;padding:0;white-space:nowrap;">
+            <span class="cl-box" style="width:9px;height:9px;background:#60a5fa;border:1.5px solid #60a5fa;border-radius:2px;display:inline-block;"></span>W'bal
+          </button>
+        </div>
+        <div style="justify-self:end;"></div>
+      </div>
+      <div class="chart-wrap" style="height:180px;margin-bottom:14px;"><canvas id="streams-wbal"></canvas></div>` : ''}
+    ${cadencePts.length ? `
+      <div id="cadence-header" style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;font-size:10px;margin-bottom:6px;padding-left:55px;padding-right:60px;gap:8px;overflow:hidden;">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;color:var(--text-dim);min-width:0;">
+          <span style="white-space:nowrap;display:inline-flex;gap:4px;align-items:baseline;"><span style="color:#a78bfa;">moy</span> <strong id="stat-cmoy" style="color:var(--text);font-size:11px;min-width:44px;text-align:left;display:inline-block;">—</strong></span>
+          <span style="white-space:nowrap;display:inline-flex;gap:4px;align-items:baseline;"><span style="color:#a78bfa;">max</span> <strong id="stat-cmaxx" style="color:var(--text);font-size:11px;min-width:44px;text-align:left;display:inline-block;">—</strong></span>
+        </div>
+        <div id="custom-legend-cadence" style="display:flex;gap:10px;align-items:center;flex-shrink:0;">
+          <button class="cl-btn-cad" data-idx="0" data-yax="y" data-color="#a78bfa" style="background:transparent;border:none;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;padding:0;white-space:nowrap;">
+            <span class="cl-box" style="width:9px;height:9px;background:#a78bfa;border:1.5px solid #a78bfa;border-radius:2px;display:inline-block;"></span>Cadence
+          </button>
+        </div>
+        <div style="justify-self:end;"></div>
+      </div>
+      <div class="chart-wrap" style="height:180px;margin-bottom:14px;"><canvas id="streams-cadence"></canvas></div>` : ''}
+    ${(speedPts.length || altPts.length) ? `
+      <div id="speed-alt-header" style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;font-size:10px;margin-bottom:6px;padding-left:55px;padding-right:60px;gap:8px;overflow:hidden;">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;color:var(--text-dim);min-width:0;">
+          <span style="white-space:nowrap;display:inline-flex;gap:4px;align-items:baseline;"><span style="color:#4ade80;">D+</span> <strong id="stat-dplus" style="color:var(--text);font-size:11px;min-width:44px;text-align:left;display:inline-block;">—</strong></span>
+          <span style="white-space:nowrap;display:inline-flex;gap:4px;align-items:baseline;"><span style="color:#4ade80;">D-</span> <strong id="stat-dminus" style="color:var(--text);font-size:11px;min-width:44px;text-align:left;display:inline-block;">—</strong></span>
+          <span id="stat-slope-wrap" style="display:none;white-space:nowrap;gap:6px;align-items:center;">
+            <span style="display:inline-flex;gap:4px;align-items:baseline;"><span style="color:#4ade80;">moy</span> <strong id="stat-slopeavg" style="color:var(--text);font-size:11px;min-width:38px;text-align:left;display:inline-block;">—</strong></span>
+            <span style="display:inline-flex;gap:4px;align-items:baseline;"><span style="color:#4ade80;">max</span> <strong id="stat-slopemax" style="color:var(--text);font-size:11px;min-width:38px;text-align:left;display:inline-block;">—</strong></span>
+          </span>
+        </div>
+        <div id="custom-legend-altspeed" style="display:flex;gap:10px;align-items:center;flex-shrink:0;">
+          ${altPts.length ? `<button class="cl-btn" data-idx="0" data-yax="y1" data-color="#4ade80" style="background:transparent;border:none;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;padding:0;white-space:nowrap;">
+            <span class="cl-box" style="width:9px;height:9px;background:#4ade80;border:1.5px solid #4ade80;border-radius:2px;display:inline-block;"></span>Altitude
+          </button>` : ''}
+          ${speedPts.length ? `<button class="cl-btn" data-idx="${altPts.length ? 1 : 0}" data-yax="y" data-color="#22d3ee" style="background:transparent;border:none;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;padding:0;white-space:nowrap;">
+            <span class="cl-box" style="width:9px;height:9px;background:#22d3ee;border:1.5px solid #22d3ee;border-radius:2px;display:inline-block;"></span>Vitesse
+          </button>` : ''}
+        </div>
+        <div style="display:flex;gap:9px;align-items:center;flex-wrap:nowrap;color:var(--text-dim);justify-self:end;">
+          <span style="white-space:nowrap;"><span style="color:#22d3ee;">moy</span> <strong id="stat-vmoy" style="color:var(--text);font-size:11px;">—</strong></span>
+          <span style="white-space:nowrap;"><span style="color:#22d3ee;">max</span> <strong id="stat-vmax" style="color:var(--text);font-size:11px;">—</strong></span>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:180px;"><canvas id="streams-speed-alt"></canvas></div>` : ''}
   `;
 
   // Compute stats sur la plage [minX, maxX] (en m si distance, en s si temps)
@@ -3735,20 +3915,244 @@ async function renderStreamsSection(container, activityId) {
   }
 
   function renderStats(stats) {
-    document.getElementById('stat-temps').textContent = stats && stats.timeElapsed != null ? formatHMS(stats.timeElapsed) : '—';
-    document.getElementById('stat-dist').textContent = stats && stats.distCov != null ? stats.distCov.toFixed(2) + ' km' : '—';
-    document.getElementById('stat-fc').textContent = stats && stats.avgH != null ? stats.avgH + ' bpm' : '—';
-    document.getElementById('stat-watts').textContent = stats && stats.avgW != null ? stats.avgW + ' W' : '—';
+    const tEl = document.getElementById('stat-temps');
+    const dEl = document.getElementById('stat-dist');
+    if (tEl) tEl.textContent = stats && stats.timeElapsed != null ? formatHMS(stats.timeElapsed) : '—';
+    if (dEl) {
+      if (stats && stats.distCov != null) {
+        dEl.textContent = stats.distCov < 1
+          ? Math.round(stats.distCov * 1000) + ' m'
+          : stats.distCov.toFixed(2) + ' km';
+      } else {
+        dEl.textContent = '—';
+      }
+    }
+  }
+
+  // === Stats Altitude + Vitesse (au-dessus du chart speed-alt) ===
+  function computeAltSpeedStats(minX, maxX) {
+    if (!fullX || !fullX.length) return null;
+    let firstIdx = -1, lastIdx = -1;
+    for (let i = 0; i < fullX.length; i++) {
+      if (firstIdx === -1 && fullX[i] >= minX) firstIdx = i;
+      if (fullX[i] <= maxX) lastIdx = i;
+    }
+    if (firstIdx === -1 || lastIdx < firstIdx) return null;
+
+    let dPlus = 0, dMinus = 0, altMax = null;
+    let vSum = 0, vCount = 0, vMax = 0;
+    let prevAlt = null;
+    for (let i = firstIdx; i <= lastIdx; i++) {
+      if (altitude && altitude[i] != null && !isNaN(altitude[i])) {
+        const a = altitude[i];
+        if (altMax === null || a > altMax) altMax = a;
+        if (prevAlt != null) {
+          const dA = a - prevAlt;
+          if (dA > 0) dPlus += dA; else dMinus += -dA;
+        }
+        prevAlt = a;
+      }
+      if (speed && speed[i] != null && !isNaN(speed[i])) {
+        vSum += speed[i]; vCount++;
+        if (speed[i] > vMax) vMax = speed[i];
+      }
+    }
+
+    // Slope stats : uniquement si zoomé (vue restreinte vs activité totale) ET distance dispo
+    const fullSpan = fullX[fullX.length - 1] - fullX[0];
+    const visSpan = maxX - minX;
+    const isZoomed = visSpan < fullSpan * 0.97;
+    let slopeAvg = null, slopeMax = null;
+    if (useDistance && isZoomed && altitude && distance && lastIdx > firstIdx) {
+      // Slope avg = pente nette du début à la fin de la section
+      let fv = -1, lv = -1;
+      for (let i = firstIdx; i <= lastIdx; i++) {
+        if (altitude[i] != null && !isNaN(altitude[i]) && distance[i] != null) {
+          if (fv === -1) fv = i;
+          lv = i;
+        }
+      }
+      if (fv !== -1 && lv > fv) {
+        const dD = distance[lv] - distance[fv];
+        if (dD > 0) slopeAvg = (altitude[lv] - altitude[fv]) / dD * 100;
+      }
+      // Slope max = pente la plus raide sur fenêtre glissante ±50m
+      const winM = 50;
+      for (let i = firstIdx; i <= lastIdx; i++) {
+        if (altitude[i] == null) continue;
+        const xVal = fullX[i];
+        const tLo = xVal - winM, tHi = xVal + winM;
+        let lo = firstIdx, hi = lastIdx;
+        while (lo < hi) {
+          const m = (lo + hi) >> 1;
+          if (fullX[m] < tLo) lo = m + 1; else hi = m;
+        }
+        const i1 = lo;
+        lo = firstIdx; hi = lastIdx;
+        while (lo < hi) {
+          const m = (lo + hi + 1) >> 1;
+          if (fullX[m] > tHi) hi = m - 1; else lo = m;
+        }
+        const i2 = lo;
+        if (i2 > i1 && altitude[i1] != null && altitude[i2] != null) {
+          const dD = fullX[i2] - fullX[i1];
+          if (dD > 0) {
+            const sl = (altitude[i2] - altitude[i1]) / dD * 100;
+            if (slopeMax === null || sl > slopeMax) slopeMax = sl;
+          }
+        }
+      }
+    }
+    return {
+      dPlus: Math.round(dPlus),
+      dMinus: Math.round(dMinus),
+      altMax: altMax !== null ? Math.round(altMax) : null,
+      vAvg: vCount > 0 ? vSum / vCount : null,
+      vMax: vMax > 0 ? vMax : null,
+      slopeAvg, slopeMax, isZoomed
+    };
+  }
+
+  function renderAltSpeedStats(s) {
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    if (!s) {
+      ['stat-dplus','stat-dminus','stat-altmax','stat-vmoy','stat-vmax'].forEach(id => set(id, '—'));
+      const w = document.getElementById('stat-slope-wrap'); if (w) w.style.display = 'none';
+      return;
+    }
+    set('stat-dplus', s.dPlus + ' m');
+    set('stat-dminus', s.dMinus + ' m');
+    set('stat-altmax', s.altMax !== null ? s.altMax + ' m' : '—');
+    set('stat-vmoy', s.vAvg !== null ? s.vAvg.toFixed(1) + ' km/h' : '—');
+    set('stat-vmax', s.vMax !== null ? s.vMax.toFixed(1) + ' km/h' : '—');
+    const wrap = document.getElementById('stat-slope-wrap');
+    if (wrap) {
+      if (s.isZoomed && s.slopeAvg !== null && s.slopeMax !== null) {
+        wrap.style.display = 'inline-flex';
+        set('stat-slopeavg', (s.slopeAvg >= 0 ? '+' : '') + s.slopeAvg.toFixed(1) + '%');
+        set('stat-slopemax', (s.slopeMax >= 0 ? '+' : '') + s.slopeMax.toFixed(1) + '%');
+      } else {
+        wrap.style.display = 'none';
+      }
+    }
+  }
+
+  // === Stats Puissance + FC ===
+  function computePowerHRStats(minX, maxX) {
+    if (!fullX || !fullX.length) return null;
+    let firstIdx = -1, lastIdx = -1;
+    for (let i = 0; i < fullX.length; i++) {
+      if (firstIdx === -1 && fullX[i] >= minX) firstIdx = i;
+      if (fullX[i] <= maxX) lastIdx = i;
+    }
+    if (firstIdx === -1 || lastIdx < firstIdx) return null;
+    let wSum = 0, wCount = 0, wMax = 0;
+    let hSum = 0, hCount = 0, hMax = 0;
+    for (let i = firstIdx; i <= lastIdx; i++) {
+      if (watts && watts[i] != null && !isNaN(watts[i])) {
+        wSum += watts[i]; wCount++;
+        if (watts[i] > wMax) wMax = watts[i];
+      }
+      if (hr && hr[i] != null && !isNaN(hr[i])) {
+        hSum += hr[i]; hCount++;
+        if (hr[i] > hMax) hMax = hr[i];
+      }
+    }
+    return {
+      wAvg: wCount > 0 ? Math.round(wSum / wCount) : null,
+      wMax: wMax > 0 ? Math.round(wMax) : null,
+      hAvg: hCount > 0 ? Math.round(hSum / hCount) : null,
+      hMax: hMax > 0 ? Math.round(hMax) : null,
+    };
+  }
+  function renderPowerHRStats(s) {
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    if (!s) {
+      ['stat-wmoy','stat-wmaxx','stat-fcmoy','stat-fcmaxx'].forEach(id => set(id, '—'));
+      return;
+    }
+    set('stat-wmoy', s.wAvg !== null ? s.wAvg + ' w' : '—');
+    set('stat-wmaxx', s.wMax !== null ? s.wMax + ' w' : '—');
+    set('stat-fcmoy', s.hAvg !== null ? s.hAvg + ' bpm' : '—');
+    set('stat-fcmaxx', s.hMax !== null ? s.hMax + ' bpm' : '—');
+  }
+
+  // === Stats W'bal (moyenne + min en kJ) ===
+  function computeWbalStats(minX, maxX) {
+    if (!fullX || !fullX.length || !wbal) return null;
+    let firstIdx = -1, lastIdx = -1;
+    for (let i = 0; i < fullX.length; i++) {
+      if (firstIdx === -1 && fullX[i] >= minX) firstIdx = i;
+      if (fullX[i] <= maxX) lastIdx = i;
+    }
+    if (firstIdx === -1 || lastIdx < firstIdx) return null;
+    let wSum = 0, wCount = 0, wMin = Infinity;
+    for (let i = firstIdx; i <= lastIdx; i++) {
+      if (wbal[i] != null && !isNaN(wbal[i])) {
+        wSum += wbal[i]; wCount++;
+        if (wbal[i] < wMin) wMin = wbal[i];
+      }
+    }
+    return {
+      avg: wCount > 0 ? wSum / wCount : null,
+      min: wMin !== Infinity ? wMin : null,
+    };
+  }
+  function renderWbalStats(s) {
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    if (!s) { ['stat-wbalmoy','stat-wbalmin'].forEach(id => set(id, '—')); return; }
+    set('stat-wbalmoy', s.avg !== null ? (s.avg / 1000).toFixed(1) + ' kJ' : '—');
+    set('stat-wbalmin', s.min !== null ? (s.min / 1000).toFixed(1) + ' kJ' : '—');
+  }
+
+  // === Stats Cadence ===
+  function computeCadenceStats(minX, maxX) {
+    if (!fullX || !fullX.length) return null;
+    let firstIdx = -1, lastIdx = -1;
+    for (let i = 0; i < fullX.length; i++) {
+      if (firstIdx === -1 && fullX[i] >= minX) firstIdx = i;
+      if (fullX[i] <= maxX) lastIdx = i;
+    }
+    if (firstIdx === -1 || lastIdx < firstIdx) return null;
+    let cSum = 0, cCount = 0, cMax = 0;
+    for (let i = firstIdx; i <= lastIdx; i++) {
+      if (cadence && cadence[i] != null && !isNaN(cadence[i]) && cadence[i] > 0) {
+        cSum += cadence[i]; cCount++;
+        if (cadence[i] > cMax) cMax = cadence[i];
+      }
+    }
+    return {
+      cAvg: cCount > 0 ? Math.round(cSum / cCount) : null,
+      cMax: cMax > 0 ? Math.round(cMax) : null,
+    };
+  }
+  function renderCadenceStats(s) {
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    if (!s) { ['stat-cmoy','stat-cmaxx'].forEach(id => set(id, '—')); return; }
+    set('stat-cmoy', s.cAvg !== null ? s.cAvg + ' rpm' : '—');
+    set('stat-cmaxx', s.cMax !== null ? s.cMax + ' rpm' : '—');
   }
 
   // Stats initiales : toute la plage
   setTimeout(() => {
     renderStats(computeStats(fullX[0], fullX[fullX.length - 1]));
+    renderAltSpeedStats(computeAltSpeedStats(fullX[0], fullX[fullX.length - 1]));
+    renderPowerHRStats(computePowerHRStats(fullX[0], fullX[fullX.length - 1]));
+    renderCadenceStats(computeCadenceStats(fullX[0], fullX[fullX.length - 1]));
+    renderWbalStats(computeWbalStats(fullX[0], fullX[fullX.length - 1]));
   }, 0);
 
   // Expose pour syncZoomToOthers
   window._streamsComputeStats = computeStats;
   window._streamsRenderStats = renderStats;
+  window._streamsComputeAltSpeedStats = computeAltSpeedStats;
+  window._streamsRenderAltSpeedStats = renderAltSpeedStats;
+  window._streamsComputePowerHRStats = computePowerHRStats;
+  window._streamsRenderPowerHRStats = renderPowerHRStats;
+  window._streamsComputeCadenceStats = computeCadenceStats;
+  window._streamsRenderCadenceStats = renderCadenceStats;
+  window._streamsComputeWbalStats = computeWbalStats;
+  window._streamsRenderWbalStats = renderWbalStats;
 
   // Bornes réelles de l'activité (évite l'auto-scaling qui rajoute des km fantômes)
   const xMin = fullX[0];
@@ -3791,9 +4195,27 @@ async function renderStreamsSection(container, activityId) {
       c.options.scales.x.max = max;
       c.update('none');
     });
+    // Afficher le bouton "Réinitialiser le zoom" si on est zoomé
+    const fullSpan = fullX[fullX.length - 1] - fullX[0];
+    const visSpan = max - min;
+    const isZoomed = visSpan < fullSpan * 0.97;
+    const btn = document.getElementById('streams-zoom-reset');
+    if (btn) btn.style.visibility = isZoomed ? 'visible' : 'hidden';
     // Recalculer les stats sur la nouvelle plage visible
     if (window._streamsComputeStats && window._streamsRenderStats) {
       window._streamsRenderStats(window._streamsComputeStats(min, max));
+    }
+    if (window._streamsComputeAltSpeedStats && window._streamsRenderAltSpeedStats) {
+      window._streamsRenderAltSpeedStats(window._streamsComputeAltSpeedStats(min, max));
+    }
+    if (window._streamsComputePowerHRStats && window._streamsRenderPowerHRStats) {
+      window._streamsRenderPowerHRStats(window._streamsComputePowerHRStats(min, max));
+    }
+    if (window._streamsComputeCadenceStats && window._streamsRenderCadenceStats) {
+      window._streamsRenderCadenceStats(window._streamsComputeCadenceStats(min, max));
+    }
+    if (window._streamsComputeWbalStats && window._streamsRenderWbalStats) {
+      window._streamsRenderWbalStats(window._streamsComputeWbalStats(min, max));
     }
   };
   const zoomConfig = {
@@ -3824,6 +4246,21 @@ async function renderStreamsSection(container, activityId) {
       if (window._streamsComputeStats && window._streamsRenderStats) {
         window._streamsRenderStats(window._streamsComputeStats(fullX[0], fullX[fullX.length - 1]));
       }
+      if (window._streamsComputeAltSpeedStats && window._streamsRenderAltSpeedStats) {
+        window._streamsRenderAltSpeedStats(window._streamsComputeAltSpeedStats(fullX[0], fullX[fullX.length - 1]));
+      }
+      if (window._streamsComputePowerHRStats && window._streamsRenderPowerHRStats) {
+        window._streamsRenderPowerHRStats(window._streamsComputePowerHRStats(fullX[0], fullX[fullX.length - 1]));
+      }
+      if (window._streamsComputeCadenceStats && window._streamsRenderCadenceStats) {
+        window._streamsRenderCadenceStats(window._streamsComputeCadenceStats(fullX[0], fullX[fullX.length - 1]));
+      }
+      if (window._streamsComputeWbalStats && window._streamsRenderWbalStats) {
+        window._streamsRenderWbalStats(window._streamsComputeWbalStats(fullX[0], fullX[fullX.length - 1]));
+      }
+      // Cacher le bouton "Réinitialiser le zoom" après reset
+      const btn = document.getElementById('streams-zoom-reset');
+      if (btn) btn.style.visibility = 'hidden';
     };
     ['streams-power-hr', 'streams-wbal', 'streams-cadence', 'streams-speed-alt'].forEach(id => {
       const cv = document.getElementById(id);
@@ -3896,7 +4333,7 @@ async function renderStreamsSection(container, activityId) {
   if (wattsPts.length || hrPts.length) {
     const datasets = [];
     if (wattsPts.length) datasets.push({
-      label: 'Puissance (watt)', data: wattsPts,
+      label: 'Puissance (w)', data: wattsPts,
       borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.12)',
       yAxisID: 'y', pointRadius: 0, borderWidth: 1.2, fill: true, tension: 0.1, spanGaps: true
     });
@@ -3915,18 +4352,42 @@ async function renderStreamsSection(container, activityId) {
         interaction: { intersect: false, mode: 'nearest', axis: 'x' },
         elements: { point: { hoverRadius: 0 } },
         plugins: {
-          legend: legendConfig,
+          legend: { display: false }, // remplacée par la barre HTML custom
           tooltip: { enabled: false },
           zoom: zoomConfig,
           decimation: decimationConfig
         },
         scales: {
           x: sharedX,
-          y: { position: 'left', title: { display: true, text: 'Watts' }, ...intY, afterFit: forceLeftWidth },
-          ...(hrPts.length ? { y1: { position: 'right', title: { display: true, text: 'FC' }, grid: { display: false }, ...intY, afterFit: forceRightWidth } } : {})
+          y: { position: 'left', title: { display: true, text: 'Watts' }, suggestedMin: 0, suggestedMax: 600, ...intY, afterFit: forceLeftWidth },
+          ...(hrPts.length ? { y1: { position: 'right', title: { display: true, text: 'FC' }, grid: { display: false }, suggestedMin: 80, suggestedMax: 200, ...intY, afterFit: forceRightWidth } } : {})
         }
       }
     }));
+    // Wire la légende HTML custom pour Puissance + FC
+    const powerHrChart = _modalCharts[_modalCharts.length - 1];
+    setTimeout(() => {
+      document.querySelectorAll('#custom-legend-powerhr .cl-btn-phr').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = +btn.dataset.idx;
+          const yax = btn.dataset.yax;
+          const color = btn.dataset.color;
+          if (powerHrChart.isDatasetVisible(idx)) powerHrChart.hide(idx);
+          else powerHrChart.show(idx);
+          requestAnimationFrame(() => {
+            const visible = powerHrChart.isDatasetVisible(idx);
+            const sc = powerHrChart.options.scales && powerHrChart.options.scales[yax];
+            if (sc) {
+              if (sc.title) sc.title.display = visible;
+              if (sc.ticks) sc.ticks.display = visible;
+            }
+            powerHrChart.update('none');
+            const box = btn.querySelector('.cl-box');
+            if (box) box.style.background = visible ? color : 'transparent';
+          });
+        });
+      });
+    }, 0);
   }
 
   // Chart 1.5 : W'bal (réserve anaérobie en kJ)
@@ -3951,18 +4412,42 @@ async function renderStreamsSection(container, activityId) {
         interaction: { intersect: false, mode: 'nearest', axis: 'x' },
         elements: { point: { hoverRadius: 0 } },
         plugins: {
-          legend: legendConfig,
+          legend: { display: false },
           tooltip: { enabled: false },
           zoom: zoomConfig,
           decimation: decimationConfig
         },
         scales: {
           x: sharedX,
-          y: { title: { display: true, text: "W'bal (kJ)" }, suggestedMax: wPrime / 1000, ticks: { callback: (v) => v.toFixed(0) }, afterFit: forceLeftWidth },
+          y: { title: { display: true, text: "W'bal (kJ)" }, suggestedMin: 0, suggestedMax: wPrime / 1000, ticks: { callback: (v) => v.toFixed(0) }, afterFit: forceLeftWidth },
           y1: phantomY1
         }
       }
     }));
+    // Wire la légende HTML custom pour W'bal
+    const wbalChart = _modalCharts[_modalCharts.length - 1];
+    setTimeout(() => {
+      document.querySelectorAll('#custom-legend-wbal .cl-btn-wbal').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = +btn.dataset.idx;
+          const yax = btn.dataset.yax;
+          const color = btn.dataset.color;
+          if (wbalChart.isDatasetVisible(idx)) wbalChart.hide(idx);
+          else wbalChart.show(idx);
+          requestAnimationFrame(() => {
+            const visible = wbalChart.isDatasetVisible(idx);
+            const sc = wbalChart.options.scales && wbalChart.options.scales[yax];
+            if (sc) {
+              if (sc.title) sc.title.display = visible;
+              if (sc.ticks) sc.ticks.display = visible;
+            }
+            wbalChart.update('none');
+            const box = btn.querySelector('.cl-box');
+            if (box) box.style.background = visible ? color : 'transparent';
+          });
+        });
+      });
+    }, 0);
   }
 
   // Chart 2 : Cadence
@@ -3976,10 +4461,34 @@ async function renderStreamsSection(container, activityId) {
         parsing: false,
         interaction: { intersect: false, mode: 'nearest', axis: 'x' },
         elements: { point: { hoverRadius: 0 } },
-        plugins: { legend: legendConfig, tooltip: { enabled: false }, zoom: zoomConfig, decimation: decimationConfig },
-        scales: { x: sharedX, y: { title: { display: true, text: 'rpm' }, ...intY, afterFit: forceLeftWidth }, y1: phantomY1 }
+        plugins: { legend: { display: false }, tooltip: { enabled: false }, zoom: zoomConfig, decimation: decimationConfig },
+        scales: { x: sharedX, y: { title: { display: true, text: 'rpm' }, suggestedMin: 0, suggestedMax: 110, ...intY, afterFit: forceLeftWidth }, y1: phantomY1 }
       }
     }));
+    // Wire la légende HTML custom pour Cadence
+    const cadChart = _modalCharts[_modalCharts.length - 1];
+    setTimeout(() => {
+      document.querySelectorAll('#custom-legend-cadence .cl-btn-cad').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = +btn.dataset.idx;
+          const yax = btn.dataset.yax;
+          const color = btn.dataset.color;
+          if (cadChart.isDatasetVisible(idx)) cadChart.hide(idx);
+          else cadChart.show(idx);
+          requestAnimationFrame(() => {
+            const visible = cadChart.isDatasetVisible(idx);
+            const sc = cadChart.options.scales && cadChart.options.scales[yax];
+            if (sc) {
+              if (sc.title) sc.title.display = visible;
+              if (sc.ticks) sc.ticks.display = visible;
+            }
+            cadChart.update('none');
+            const box = btn.querySelector('.cl-box');
+            if (box) box.style.background = visible ? color : 'transparent';
+          });
+        });
+      });
+    }, 0);
   }
 
   // Chart 3 : Altitude (fond) + Vitesse (ligne au-dessus)
@@ -4005,18 +4514,44 @@ async function renderStreamsSection(container, activityId) {
         interaction: { intersect: false, mode: 'nearest', axis: 'x' },
         elements: { point: { hoverRadius: 0 } },
         plugins: {
-          legend: legendConfig,
+          legend: { display: false }, // remplacée par la barre HTML custom
           tooltip: { enabled: false },
           zoom: zoomConfig,
           decimation: decimationConfig
         },
         scales: {
           x: sharedX,
-          y: { position: 'left', title: { display: true, text: 'km/h' }, beginAtZero: true, afterFit: forceLeftWidth },
+          y: { position: 'left', title: { display: true, text: 'km/h' }, suggestedMin: 0, suggestedMax: 50, afterFit: forceLeftWidth },
           ...(altPts.length ? { y1: { position: 'right', title: { display: true, text: 'm' }, grid: { display: false }, ...intY, afterFit: forceRightWidth } } : { y1: phantomY1 })
         }
       }
     }));
+
+    // Wire la légende HTML custom au-dessus du chart
+    const speedAltChart = _modalCharts[_modalCharts.length - 1];
+    setTimeout(() => {
+      document.querySelectorAll('#custom-legend-altspeed .cl-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = +btn.dataset.idx;
+          const yax = btn.dataset.yax;
+          const color = btn.dataset.color;
+          if (speedAltChart.isDatasetVisible(idx)) speedAltChart.hide(idx);
+          else speedAltChart.show(idx);
+          requestAnimationFrame(() => {
+            const visible = speedAltChart.isDatasetVisible(idx);
+            const sc = speedAltChart.options.scales && speedAltChart.options.scales[yax];
+            if (sc) {
+              if (sc.title) sc.title.display = visible;
+              if (sc.ticks) sc.ticks.display = visible;
+            }
+            speedAltChart.update('none');
+            // Toggle visuel : carré plein si visible, vide sinon
+            const box = btn.querySelector('.cl-box');
+            if (box) box.style.background = visible ? color : 'transparent';
+          });
+        });
+      });
+    }, 0);
   }
 }
 
@@ -4058,26 +4593,114 @@ function openSessionModal(iso, source) {
         const m = (dur % 60).toString().padStart(2, '0');
         titleEl.innerHTML = `${act.name || act.sessionName || 'Séance'} ${act.type || act.sessionType ? `<span class="pill ${act.type || act.sessionType}">${act.type || act.sessionType}</span>` : ''}`;
         const sportLabel = act.sport ? (act.sport.charAt(0).toUpperCase() + act.sport.slice(1)) : '';
-        metaEl.textContent = sportLabel ? `${dateStr} · ${sportLabel}` : dateStr;
+        // Heure de début depuis start_date_local (format ISO local)
+        let startTime = '';
+        if (act.start_date_local) {
+          const m = act.start_date_local.match(/T(\d{2}):(\d{2})/);
+          if (m) startTime = `${m[1]}h${m[2]}`;
+        }
+        const parts = [dateStr];
+        if (startTime) parts.push(startTime);
+        if (sportLabel) parts.push(sportLabel);
+        metaEl.textContent = parts.join(' · ');
 
         const switchHTML = acts.length > 1 ? `
           <div class="modal-activity-switch">
             ${acts.map((a, i) => `<button class="${i === idx ? 'active' : ''}" data-i="${i}">${a.name || 'Séance'} (${a.tss || 0} TSS)</button>`).join('')}
           </div>` : '';
 
-        const zoneColors = ['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f87171'];
-        const zoneLabels = ['Z1 récup','Z2 endurance','Z3 tempo','Z4 seuil','Z5 VO2max'];
-        const zones = act.zones_hr || act.zones_power || act.zones || null;
-        const zonesHTML = zones ? `
+        // Palettes vertes : 5 nuances pour FC, 7 pour Puissance (Coggan)
+        const zoneColorsHR = ['#bbf7d0','#86efac','#4ade80','#16a34a','#14532d'];
+        const zoneColorsPow = ['#dcfce7','#bbf7d0','#86efac','#4ade80','#22c55e','#15803d','#14532d'];
+        // Plages
+        const ftp = (window._athleteMeta && window._athleteMeta.ftp) || 250;
+        const hrMax = (window._athleteMeta && window._athleteMeta.hr_max) || (act.max_hr ? Math.max(act.max_hr, 185) : 190);
+        // 6 seuils pour 7 zones Coggan : 55/75/90/105/120/150% FTP
+        const pZ = [
+          Math.round(ftp*0.55), Math.round(ftp*0.75), Math.round(ftp*0.90),
+          Math.round(ftp*1.05), Math.round(ftp*1.20), Math.round(ftp*1.50)
+        ];
+        // 4 seuils pour 5 zones FC : 60/70/80/90% HRmax
+        const hZ = [Math.round(hrMax*0.60), Math.round(hrMax*0.70), Math.round(hrMax*0.80), Math.round(hrMax*0.90)];
+
+        // Calcule la répartition % de temps dans chaque zone à partir d'un stream
+        // N zones = thresholds.length + 1
+        function computeZonesFromStream(values, thresholds) {
+          if (!values || !values.length) return null;
+          const counts = new Array(thresholds.length + 1).fill(0);
+          let total = 0;
+          for (const v of values) {
+            if (v == null || isNaN(v) || v <= 0) continue;
+            total++;
+            let placed = false;
+            for (let i = 0; i < thresholds.length; i++) {
+              if (v < thresholds[i]) { counts[i]++; placed = true; break; }
+            }
+            if (!placed) counts[thresholds.length]++;
+          }
+          if (total === 0) return null;
+          return counts.map(c => +(c / total * 100).toFixed(1));
+        }
+
+        // Récupère les streams en cache si dispo et calcule les zones cohérentes avec les labels
+        let zonesHRComputed = null, zonesPowComputed = null;
+        try {
+          const aid = act.id || act.activityId || day.activityId;
+          const cached = aid && window.STREAMS_CACHE ? window.STREAMS_CACHE[String(aid)] : null;
+          if (cached && Array.isArray(cached)) {
+            let hrData = null, wattsData = null;
+            for (const s of cached) {
+              if (s.type === 'heartrate') hrData = s.data;
+              else if (s.type === 'watts') wattsData = s.data;
+            }
+            if (hrData) zonesHRComputed = computeZonesFromStream(hrData, hZ);
+            if (wattsData) zonesPowComputed = computeZonesFromStream(wattsData, pZ);
+          }
+        } catch (e) { /* fallback sur les zones de l'API */ }
+        // Labels affichés au centre du donut au hover (avec plage bpm/watts)
+        const hrCenterLabels = [
+          `Z1 (<${hZ[0]})`,
+          `Z2 (${hZ[0]}-${hZ[1]})`,
+          `Z3 (${hZ[1]}-${hZ[2]})`,
+          `Z4 (${hZ[2]}-${hZ[3]})`,
+          `Z5 (>${hZ[3]})`
+        ];
+        const powCenterLabels = [
+          `Z1 (<${pZ[0]}w)`,
+          `Z2 (${pZ[0]}-${pZ[1]}w)`,
+          `Z3 (${pZ[1]}-${pZ[2]}w)`,
+          `Z4 (${pZ[2]}-${pZ[3]}w)`,
+          `Z5 (${pZ[3]}-${pZ[4]}w)`,
+          `Z6 (${pZ[4]}-${pZ[5]}w)`,
+          `Z7 (>${pZ[5]}w)`
+        ];
+        // Labels affichés dans la légende sous le donut (noms de zone)
+        const hrNameLabels = ['Z1 récup','Z2 endurance','Z3 tempo','Z4 seuil','Z5 VO2max'];
+        const powNameLabels = ['Z1 récup','Z2 endurance','Z3 tempo','Z4 seuil','Z5 VO2max','Z6 anaérobie','Z7 neuromusc.'];
+        const zonesHR = zonesHRComputed || act.zones_hr || (act.zones && !act.zones_power ? act.zones : null);
+        const zonesPow = zonesPowComputed || act.zones_power || null;
+        const hasAnyZones = !!(zonesHR || zonesPow);
+        const cols = (zonesHR && zonesPow) ? '1fr 1fr' : '1fr';
+        const zonesHTML = hasAnyZones ? `
           <div class="modal-section">
-            <div class="modal-section-title">Répartition par zones de FC</div>
-            <div class="zone-bar">${zones.map((z, i) => `<div class="zone-seg" style="width:${z}%;background:${zoneColors[i]};">${z > 5 ? z+'%' : ''}</div>`).join('')}</div>
-            <div class="legend">${zoneLabels.map((l, i) => `<span><span class="legend-dot" style="background:${zoneColors[i]};"></span>${l}</span>`).join('')}</div>
+            <div class="modal-section-title">Répartition par zones</div>
+            <div style="display:grid;grid-template-columns:${cols};gap:20px;">
+              ${zonesHR ? `<div style="text-align:center;min-width:0;">
+                <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">Zones FC</div>
+                <div style="position:relative;height:180px;width:100%;"><canvas id="modal-zones-hr"></canvas></div>
+                <div id="legend-zones-hr" style="display:flex;flex-wrap:wrap;justify-content:center;align-content:flex-start;gap:4px 10px;padding-top:8px;height:46px;font-size:10px;color:var(--text-dim);"></div>
+              </div>` : ''}
+              ${zonesPow ? `<div style="text-align:center;min-width:0;">
+                <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">Zones Puissance</div>
+                <div style="position:relative;height:180px;width:100%;"><canvas id="modal-zones-power"></canvas></div>
+                <div id="legend-zones-power" style="display:flex;flex-wrap:wrap;justify-content:center;align-content:flex-start;gap:4px 10px;padding-top:8px;height:46px;font-size:10px;color:var(--text-dim);"></div>
+              </div>` : ''}
+            </div>
           </div>` : '';
 
         // === Helpers pour bâtir les sections ===
         const card = (label, value, unit, sub) =>
-          `<div class="modal-metric">
+          `<div class="modal-metric" style="text-align:center;">
              <div class="m-label">${label}</div>
              <div class="m-value">${value}${unit ? `<span style="font-size:14px;"> ${unit}</span>` : ''}</div>
              ${sub ? `<div class="m-sub">${sub}</div>` : ''}
@@ -4092,13 +4715,23 @@ function openSessionModal(iso, source) {
         };
         const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 
-        // --- 1. Synthèse : durée / distance / dénivelé / vitesse ---
+        // --- 1. Synthèse : durée / distance / dénivelé / vitesse / TSS ---
+        // Élapsed (h/m) depuis elapsed_time en secondes
+        let elapsedSub = '';
+        if (act.elapsed_time && act.elapsed_time > (act.moving_time || 0)) {
+          const eh = Math.floor(act.elapsed_time / 3600);
+          const em = Math.floor((act.elapsed_time % 3600) / 60).toString().padStart(2, '0');
+          elapsedSub = `Élapsed ${eh}h${em}`;
+        }
+        const vMaxToShow = act.max_speed_smooth_kmh || act.max_speed_kmh;
         const syntheseHTML = section('Synthèse', [
-          card('Durée', `${h}<span style="font-size:14px;">h</span>${m}`, ''),
+          card('Durée', `${h}<span style="font-size:14px;">h</span>${m}`, '', elapsedSub),
           act.distance_km && card('Distance', act.distance_km, 'km'),
-          act.elevation_gain && card('Dénivelé +', act.elevation_gain, 'm'),
+          act.elevation_gain && card('Dénivelé +', act.elevation_gain, 'm',
+            act.elevation_loss ? `D− ${act.elevation_loss} m` : ''),
           act.avg_speed_kmh && card('Vitesse moy', act.avg_speed_kmh, 'km/h',
-            act.max_speed_kmh ? `Max ${act.max_speed_kmh} km/h` : ''),
+            vMaxToShow ? `Max ${vMaxToShow} km/h` : ''),
+          act.tss && card('TSS', act.tss, ''),
         ]);
 
         // --- 2. Puissance & FC : 4 cards moy/max sur une ligne ---
@@ -4109,15 +4742,14 @@ function openSessionModal(iso, source) {
           act.max_hr && card('FC max', act.max_hr, 'bpm'),
         ]);
 
-        // --- 3. Effort (intensité, énergie, etc.) ---
+        // --- 3. Effort (intensité, énergie, cadence) ---
         const effortHTML = section('Effort', [
           act.np && card('NP', act.np, 'W',
             `IF ${act.intensity || '—'} · ${act.ftpPct || 0}% FTP`),
-          act.cadence && card('Cadence', act.cadence, 'rpm'),
+          act.cadence && card('Cadence', act.cadence, 'rpm',
+            act.max_cadence ? `Max ${act.max_cadence} rpm` : ''),
           act.kj && card('Énergie', act.kj, 'kJ',
             act.calories ? `${act.calories} kcal` : ''),
-          act.variability_index && card('VI', act.variability_index, '',
-            'Variabilité de l\'effort'),
         ]);
 
         // Section Cardio supprimée (intégrée à Puissance & FC)
@@ -4156,6 +4788,135 @@ function openSessionModal(iso, source) {
         bodyEl.querySelectorAll('.modal-activity-switch button').forEach(btn => {
           btn.addEventListener('click', () => renderModalActivity(+btn.dataset.i));
         });
+
+        // Camemberts des zones FC / Puissance — defer pour laisser le layout se calculer
+        setTimeout(() => {
+          // Durée totale (minutes) pour calculer le temps passé dans chaque zone
+          const totalMin = act.duration || 0;
+          const fmtTime = (totalSec) => {
+            const h = Math.floor(totalSec / 3600);
+            const m = Math.floor((totalSec % 3600) / 60);
+            const s = Math.floor(totalSec % 60);
+            if (h > 0) return `${h}h${m.toString().padStart(2,'0')}`;
+            if (m > 0) return `${m}m${s.toString().padStart(2,'0')}`;
+            return `${s}s`;
+          };
+
+          // Plugin texte central : %, temps passé, label centré (avec plage)
+          const centerTextPlugin = {
+            id: 'centerText',
+            afterDraw(chart) {
+              const idx = chart._hoveredIdx;
+              if (idx == null) return;
+              const ds = chart.data.datasets[0];
+              const pct = ds.data[idx];
+              // Si le chart a des labels custom pour le centre, les utilise, sinon fallback labels
+              const label = (chart._centerLabels && chart._centerLabels[idx]) || chart.data.labels[idx];
+              const timeSec = (pct / 100) * totalMin * 60;
+              const { ctx, chartArea } = chart;
+              const cx = (chartArea.left + chartArea.right) / 2;
+              const cy = (chartArea.top + chartArea.bottom) / 2;
+              ctx.save();
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              // % en gros
+              ctx.fillStyle = ds.backgroundColor[idx];
+              ctx.font = 'bold 22px ui-sans-serif, system-ui, sans-serif';
+              ctx.fillText(pct.toFixed(1) + '%', cx, cy - 14);
+              // Temps passé
+              ctx.fillStyle = 'var(--text)'; ctx.fillStyle = '#e6e9ef';
+              ctx.font = '12px ui-sans-serif, system-ui, sans-serif';
+              ctx.fillText(fmtTime(timeSec), cx, cy + 6);
+              // Nom de zone (plus petit pour ne pas déborder)
+              ctx.fillStyle = 'rgba(230,233,239,0.6)';
+              ctx.font = '9px ui-sans-serif, system-ui, sans-serif';
+              ctx.fillText(label, cx, cy + 22);
+              ctx.restore();
+            }
+          };
+
+          const doughnutOpts = () => ({
+            responsive: true, maintainAspectRatio: false,
+            radius: '85%',
+            plugins: {
+              legend: { display: false }, // remplacée par légende HTML custom (hauteur fixe)
+              tooltip: { enabled: false },
+              verticalHoverLine: false
+            },
+            cutout: '62%',
+            animation: { duration: 0 },
+            interaction: { mode: 'nearest', intersect: true },
+            transitions: {
+              active: { animation: { duration: 200, easing: 'easeOutCubic' } }
+            },
+            onHover: (e, els, chart) => {
+              const newIdx = (els && els.length) ? els[0].index : null;
+              if (newIdx === chart._hoveredIdx) return;
+              chart._hoveredIdx = newIdx;
+              chart.setActiveElements(newIdx != null ? [{ datasetIndex: 0, index: newIdx }] : []);
+              chart.update();
+            }
+          });
+          // hoverOffset doit être sur le dataset en Chart.js v4
+          const makeDataset = (data, colors) => ({
+            data,
+            backgroundColor: colors,
+            borderWidth: 0,
+            hoverOffset: 18,
+            hoverBorderWidth: 0
+          });
+          // Helper : crée un donut + attache un listener mouseleave pour bien reset
+          function makeDonut(canvasId, data, legendLabels, centerLabels, colors) {
+            const cv = document.getElementById(canvasId);
+            if (!cv) return null;
+            const chart = new Chart(cv, {
+              type: 'doughnut',
+              data: { labels: legendLabels, datasets: [makeDataset(data, colors)] },
+              options: doughnutOpts(),
+              plugins: [centerTextPlugin]
+            });
+            chart._centerLabels = centerLabels;
+            cv.addEventListener('mouseleave', () => {
+              if (chart._hoveredIdx != null) {
+                chart._hoveredIdx = null;
+                chart.setActiveElements([]);
+                chart.update();
+              }
+            });
+            return chart;
+          }
+          // Helper : génère la légende HTML correspondante
+          function fillLegend(elId, names, colors) {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            el.innerHTML = names.map((n, i) =>
+              `<span style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap;">
+                <span style="width:9px;height:9px;background:${colors[i]};border-radius:2px;display:inline-block;"></span>${n}
+              </span>`
+            ).join('');
+          }
+
+          if (zonesHR) {
+            const c = makeDonut('modal-zones-hr', zonesHR, hrNameLabels, hrCenterLabels, zoneColorsHR);
+            if (c) _modalCharts.push(c);
+            fillLegend('legend-zones-hr', hrNameLabels, zoneColorsHR);
+          }
+          if (zonesPow) {
+            const is7 = zonesPow.length === 7;
+            const powNames = is7 ? powNameLabels : ['Z1 récup','Z2 endurance','Z3 tempo','Z4 seuil','Z5 VO2max'];
+            const powCenters = is7 ? powCenterLabels : [
+              `Z1 (<${pZ[0]}w)`,
+              `Z2 (${pZ[0]}-${pZ[1]}w)`,
+              `Z3 (${pZ[1]}-${pZ[2]}w)`,
+              `Z4 (${pZ[2]}-${pZ[3]}w)`,
+              `Z5 (>${pZ[3]}w)`
+            ];
+            const powColors = is7 ? zoneColorsPow : zoneColorsHR;
+            const c = makeDonut('modal-zones-power', zonesPow, powNames, powCenters, powColors);
+            if (c) _modalCharts.push(c);
+            fillLegend('legend-zones-power', powNames, powColors);
+          }
+        }, 0);
         // Lancer le chargement des streams en async (la modal est déjà visible)
         const streamId = act.id || act.activityId || day.activityId;
         if (streamId) {
@@ -4651,7 +5412,7 @@ function renderSessionsTable() {
 renderSessionsTable();
 
 function renderSessionDetail(s) {
-  const zoneColors = ['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f87171'];
+  const zoneColors = ['#bbf7d0','#86efac','#4ade80','#16a34a','#14532d'];
   const zonesHTML = s.zones.map((z, i) => `<div class="zone-seg" style="width:${z}%;background:${zoneColors[i]};">${z>8?z+'%':''}</div>`).join('');
   const html = `
   <div class="session-detail">

@@ -323,16 +323,20 @@ def build_day_index(activities, wellness, athlete_ftp):
                 "duration": round(a_dur_min),
                 "elapsed_time": a.get("elapsed_time"),
                 "moving_time": a.get("moving_time"),
+                "start_date_local": a.get("start_date_local"),
                 "distance_km": round(dist_m / 1000, 2) if dist_m else None,
                 "elevation_gain": round(a.get("total_elevation_gain") or 0) or None,
+                "elevation_loss": round(a.get("total_elevation_loss") or 0) or None,
                 "avg_speed_kmh": round(avg_speed * 3.6, 1) if avg_speed else None,
                 "max_speed_kmh": round((a.get("max_speed") or 0) * 3.6, 1) or None,
+                "max_speed_smooth_kmh": round((a.get("max_speed_smooth") or 0), 1) or None,
                 "np": round(a_np) if a_np else 0,
                 "avg_watts": round(a.get("icu_average_watts") or 0) or None,
                 "max_watts": round(a.get("max_watts") or a.get("icu_max_watts") or 0) or None,
                 "hr": round(a.get("average_heartrate") or 0),
                 "max_hr": round(a.get("max_heartrate") or 0) or None,
                 "cadence": round(a.get("average_cadence") or 0) or None,
+                "max_cadence": round(a.get("max_cadence") or 0) or None,
                 "kj": round(a.get("kj") or ((a.get("icu_joules") or 0) / 1000)) or None,
                 "calories": round(a.get("calories") or 0) or None,
                 "ftpPct": round(a_intensity * 100) if a_intensity else 0,
@@ -594,10 +598,13 @@ def main():
             s = fetch_streams(session, aid)
             streams_cache[str(aid)] = s
             maxes = {}
+            dist_stream = None
             for stream in s or []:
                 t = stream.get("type")
                 data = stream.get("data") or []
                 non_zero = [x for x in data if x]
+                if t == "distance":
+                    dist_stream = data
                 if not non_zero:
                     continue
                 if t == "watts":
@@ -606,6 +613,29 @@ def main():
                     maxes["max_hr"] = max(non_zero)
                 elif t == "cadence":
                     maxes["max_cadence"] = max(non_zero)
+            # Vitesse max lissée (±15s) depuis le stream distance, en km/h
+            if dist_stream and len(dist_stream) > 30:
+                raw = [0.0] * len(dist_stream)
+                for j in range(1, len(dist_stream)):
+                    raw[j] = max(0, (dist_stream[j] or 0) - (dist_stream[j-1] or 0))
+                raw[0] = raw[1] if len(raw) > 1 else 0
+                win = 15
+                n = len(raw)
+                smooth_max = 0.0
+                # Moyenne glissante centrée via accumulateur
+                window_sum = sum(raw[:min(win + 1, n)])
+                window_count = min(win + 1, n)
+                for j in range(n):
+                    if j > 0 and j + win < n:
+                        window_sum += raw[j + win]
+                        window_count += 1
+                    if j - win - 1 >= 0:
+                        window_sum -= raw[j - win - 1]
+                        window_count -= 1
+                    avg = window_sum / window_count if window_count > 0 else 0
+                    if avg > smooth_max:
+                        smooth_max = avg
+                maxes["max_speed_smooth"] = smooth_max * 3.6  # m/s → km/h
             streams_max[aid] = maxes
             if (i + 1) % 5 == 0:
                 print(f"  [OK] {i+1}/{len(recent_acts)} streams")
@@ -626,6 +656,8 @@ def main():
             a["max_heartrate"] = m["max_hr"]
         if not a.get("max_cadence") and m.get("max_cadence"):
             a["max_cadence"] = m["max_cadence"]
+        if m.get("max_speed_smooth"):
+            a["max_speed_smooth"] = m["max_speed_smooth"]
     print(f"  [OK] {patched} max_watts ajoutés depuis les streams")
 
     # Construction
