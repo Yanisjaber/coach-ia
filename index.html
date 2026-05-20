@@ -1089,7 +1089,7 @@
     <div class="logo-icon">CI</div>
     <div class="logo-text">
       <h1>Coach IA</h1>
-      <p>Entraînement intelligent · intervals.icu × Whoop</p>
+      <p>Entraînement intelligent · Strava × Whoop</p>
     </div>
   </div>
   <div class="sport-filter" id="sport-filter">
@@ -1620,7 +1620,7 @@
 </section>
 
 <footer>
-  Coach IA · prototype dashboard · données simulées sur 90 jours · construit pour valider l'UX avant intégration intervals.icu + Whoop
+  Coach IA · dashboard d'entraînement · Strava + Whoop
 </footer>
 
 <!-- Modal détail séance -->
@@ -1665,12 +1665,12 @@ async function loadData() {
     if (badge) {
       const realDays = (json.source && json.source.whoop_real_days) || 0;
       if (realDays > 0) {
-        badge.textContent = `intervals.icu · Whoop : ${realDays}j réels`;
+        badge.textContent = `Strava · Whoop : ${realDays}j réels`;
         badge.style.background = 'rgba(74, 222, 128, 0.1)';
         badge.style.borderColor = 'rgba(74, 222, 128, 0.3)';
         badge.style.color = 'var(--accent)';
       } else {
-        badge.textContent = 'intervals.icu uniquement · Whoop indisponible';
+        badge.textContent = 'Strava · Whoop indisponible';
       }
     }
 
@@ -2804,9 +2804,8 @@ function renderWeekPlan() {
   const dataByIso = {};
   data.forEach(d => { dataByIso[toIsoDate(d.date)] = d; });
 
-  // Mode Prévu : TOUJOURS 4 semaines glissantes.
-  // Sans selectedMonth → depuis la semaine courante.
-  // Avec selectedMonth → 4 semaines à partir du 1er lundi du mois sélectionné.
+  // Mode Prévu : TOUJOURS 4 semaines glissantes en ORDRE CHRONOLOGIQUE
+  // (semaine courante / 1ère du mois en haut, semaines suivantes vers le bas)
   let weeksStarts = [];
   const startMonday = selectedMonth
     ? getMondayOfWeek(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1))
@@ -2996,7 +2995,7 @@ function renderRealiseCalendar() {
   // Déterminer les semaines à afficher
   let weeksStarts = [];
   if (selectedMonth) {
-    // Mois sélectionné : afficher toutes les semaines qui contiennent au moins un jour de ce mois
+    // Mois sélectionné : juste les semaines de ce mois, sans injection de semaine courante
     const firstDay = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
     const lastDay = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
     const firstMonday = getMondayOfWeek(firstDay);
@@ -3017,7 +3016,7 @@ function renderRealiseCalendar() {
     }
     subEl.textContent = `Réalisé · 4 dernières semaines`;
   }
-  // Inverser pour afficher la semaine la plus récente en haut
+  // Inversion : semaine la plus récente du mois en haut
   weeksStarts.reverse();
 
   const todayIso = toIsoDate(today);
@@ -3229,6 +3228,92 @@ function formatHMS(seconds) {
 }
 
 // Tracker des charts modal pour les détruire à la prochaine ouverture
+// ============================================================
+// CATALOGUE DE SPORTS — tous les types reconnus par intervals.icu
+// Key = type Strava/intervals.icu, value = { fr, category, icon }
+// Utilisé pour : catégorisation activités, sélecteur sport pour
+// création d'entraînements futurs, filtres, affichage modal.
+// ============================================================
+window.SPORTS_CATALOG = {
+  // Cyclisme
+  Ride: { fr: 'Vélo route', category: 'cyclisme', icon: '🚴' },
+  VirtualRide: { fr: 'Home-trainer', category: 'cyclisme', icon: '🚴' },
+  MountainBikeRide: { fr: 'VTT', category: 'cyclisme', icon: '🚵' },
+  GravelRide: { fr: 'Gravel', category: 'cyclisme', icon: '🚴' },
+  EBikeRide: { fr: 'Vélo électrique', category: 'cyclisme', icon: '🚴' },
+  EMountainBikeRide: { fr: 'VTT électrique', category: 'cyclisme', icon: '🚵' },
+  Velomobile: { fr: 'Vélomobile', category: 'cyclisme', icon: '🚲' },
+  Handcycle: { fr: 'Handbike', category: 'cyclisme', icon: '🚴' },
+
+  // Course à pied
+  Run: { fr: 'Course route', category: 'course', icon: '🏃' },
+  TrailRun: { fr: 'Trail', category: 'course', icon: '🏃' },
+  VirtualRun: { fr: 'Tapis de course', category: 'course', icon: '🏃' },
+
+  // Natation
+  Swim: { fr: 'Natation piscine', category: 'natation', icon: '🏊' },
+  OpenWaterSwim: { fr: 'Natation eau libre', category: 'natation', icon: '🏊' },
+
+  // Force / Salle
+  WeightTraining: { fr: 'Musculation', category: 'musculation', icon: '🏋️' },
+  Workout: { fr: 'Entraînement libre', category: 'musculation', icon: '💪' },
+  Crossfit: { fr: 'Crossfit', category: 'musculation', icon: '🏋️' },
+  Elliptical: { fr: 'Elliptique', category: 'musculation', icon: '🏃' },
+  StairStepper: { fr: 'Stepper', category: 'musculation', icon: '🏃' },
+  VirtualWorkout: { fr: 'Entraînement virtuel', category: 'musculation', icon: '💪' },
+
+  // Marche / Rando
+  Walk: { fr: 'Marche', category: 'autre', icon: '🚶' },
+  Hike: { fr: 'Randonnée', category: 'autre', icon: '🥾' },
+  Snowshoe: { fr: 'Raquettes', category: 'autre', icon: '🥾' },
+
+  // Neige
+  AlpineSki: { fr: 'Ski alpin', category: 'autre', icon: '⛷️' },
+  BackcountrySki: { fr: 'Ski rando / hors-piste', category: 'autre', icon: '⛷️' },
+  NordicSki: { fr: 'Ski de fond', category: 'autre', icon: '⛷️' },
+  Snowboard: { fr: 'Snowboard', category: 'autre', icon: '🏂' },
+  IceSkate: { fr: 'Patinage glace', category: 'autre', icon: '⛸️' },
+  InlineSkate: { fr: 'Roller', category: 'autre', icon: '🛼' },
+
+  // Eau
+  Rowing: { fr: 'Aviron', category: 'autre', icon: '🚣' },
+  Kayaking: { fr: 'Kayak', category: 'autre', icon: '🛶' },
+  Canoeing: { fr: 'Canoë', category: 'autre', icon: '🛶' },
+  StandUpPaddling: { fr: 'Paddle (SUP)', category: 'autre', icon: '🏄' },
+  Surfing: { fr: 'Surf', category: 'autre', icon: '🏄' },
+  Windsurf: { fr: 'Planche à voile', category: 'autre', icon: '🏄' },
+  Kitesurf: { fr: 'Kitesurf', category: 'autre', icon: '🪁' },
+  Sailing: { fr: 'Voile', category: 'autre', icon: '⛵' },
+
+  // Sports collectifs
+  Soccer: { fr: 'Football', category: 'autre', icon: '⚽' },
+  Basketball: { fr: 'Basket', category: 'autre', icon: '🏀' },
+  Volleyball: { fr: 'Volley', category: 'autre', icon: '🏐' },
+  Hockey: { fr: 'Hockey', category: 'autre', icon: '🏒' },
+  Tennis: { fr: 'Tennis', category: 'autre', icon: '🎾' },
+  Squash: { fr: 'Squash', category: 'autre', icon: '🎾' },
+  Badminton: { fr: 'Badminton', category: 'autre', icon: '🏸' },
+  TableTennis: { fr: 'Tennis de table', category: 'autre', icon: '🏓' },
+  Cricket: { fr: 'Cricket', category: 'autre', icon: '🏏' },
+  AmericanFootball: { fr: 'Football américain', category: 'autre', icon: '🏈' },
+
+  // Mobilité / Bien-être
+  Yoga: { fr: 'Yoga', category: 'autre', icon: '🧘' },
+  Pilates: { fr: 'Pilates', category: 'autre', icon: '🧘' },
+  Stretching: { fr: 'Étirements', category: 'autre', icon: '🧘' },
+
+  // Divers
+  RockClimbing: { fr: 'Escalade', category: 'autre', icon: '🧗' },
+  Boxing: { fr: 'Boxe', category: 'autre', icon: '🥊' },
+  Dance: { fr: 'Danse', category: 'autre', icon: '💃' },
+  Golf: { fr: 'Golf', category: 'autre', icon: '⛳' },
+  Skateboard: { fr: 'Skate', category: 'autre', icon: '🛹' },
+  Wheelchair: { fr: 'Fauteuil roulant', category: 'autre', icon: '🦽' },
+  Transition: { fr: 'Transition triathlon', category: 'autre', icon: '🏊' },
+};
+// Helper : récupère le nom français d'un type intervals.icu (fallback : type brut)
+window.sportFr = (type) => (window.SPORTS_CATALOG[type] && window.SPORTS_CATALOG[type].fr) || type || 'Activité';
+
 let _modalCharts = [];
 function destroyModalCharts() {
   _modalCharts.forEach(c => {
@@ -3614,7 +3699,7 @@ if (typeof Chart !== 'undefined') {
 async function renderStreamsSection(container, activityId) {
   destroyModalCharts();
   const cached = streamsCache[activityId] !== undefined || loadStreamsFromLS(activityId);
-  container.innerHTML = `<div class="modal-placeholder">${cached ? '📊 Rendu depuis le cache local...' : '⏳ Téléchargement des streams depuis intervals.icu...'}</div>`;
+  container.innerHTML = `<div class="modal-placeholder">${cached ? '📊 Rendu depuis le cache local...' : '⏳ Téléchargement des streams depuis Strava...'}</div>`;
 
   const streams = await loadStreams(activityId);
   if (!streams) {
@@ -4758,13 +4843,15 @@ function openSessionModal(iso, source) {
         // Section Mouvement supprimée (intégrée à Synthèse + Effort)
         const mouvementHTML = '';
 
-        // --- Lien intervals.icu ---
+        // --- Lien Strava ---
         const aId = act.id || act.activityId || day.activityId;
-        const intervalsLink = aId ? `
-          <a href="https://intervals.icu/activities/${aId}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:rgba(96,165,250,0.12);border:1px solid rgba(96,165,250,0.3);color:var(--info);padding:8px 14px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500;">
-            Voir le détail complet sur intervals.icu ↗
+        // Strava utilise des IDs numériques. On retire un préfixe "s" éventuel.
+        const stravaId = aId ? String(aId).replace(/^s/, '').replace(/^i/, '') : '';
+        const intervalsLink = stravaId && /^\d+$/.test(stravaId) ? `
+          <a href="https://www.strava.com/activities/${stravaId}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:rgba(252,76,2,0.12);border:1px solid rgba(252,76,2,0.3);color:#fc5200;padding:8px 14px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500;">
+            Voir le détail complet sur Strava ↗
           </a>
-          <div style="font-size:11px;color:var(--text-mute);margin-top:6px;">ID activité : <code>${aId}</code></div>
+          <div style="font-size:11px;color:var(--text-mute);margin-top:6px;">ID activité : <code>${stravaId}</code></div>
         ` : '';
 
         bodyEl.innerHTML = `
@@ -4781,7 +4868,7 @@ function openSessionModal(iso, source) {
           </div>
           <div class="modal-section">
             <div class="modal-section-title">Lien activité</div>
-            ${intervalsLink || '<div class="modal-placeholder">Pas d\'ID intervals.icu disponible pour cette activité.</div>'}
+            ${intervalsLink || '<div class="modal-placeholder">Pas d\'ID Strava disponible pour cette activité.</div>'}
           </div>
         `;
         // Wire switch buttons (avant le chargement async des streams)
@@ -4988,15 +5075,17 @@ document.querySelectorAll('#calendar-subtabs .subtab').forEach(btn => {
     document.querySelectorAll('#calendar-subtabs .subtab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     calendarMode = btn.dataset.mode;
-    // Reset du mois sélectionné au changement de mode (évite confusion)
+    // Reset selectedMonth mais on garde le mois courant affiché dans l'input
     selectedMonth = null;
-    document.getElementById('month-input').value = '';
+    document.getElementById('month-input').value = `${today.getFullYear()}-${(today.getMonth()+1).toString().padStart(2,'0')}`;
     renderCalendar();
   });
 });
 
 // Handlers du filtre mois
 const monthInput = document.getElementById('month-input');
+// Pré-remplit avec le mois courant à l'init (sans changer selectedMonth = vue par défaut)
+monthInput.value = `${today.getFullYear()}-${(today.getMonth()+1).toString().padStart(2,'0')}`;
 document.getElementById('month-prev').addEventListener('click', () => {
   const base = selectedMonth || new Date(today.getFullYear(), today.getMonth(), 1);
   selectedMonth = new Date(base.getFullYear(), base.getMonth() - 1, 1);
@@ -5020,7 +5109,8 @@ monthInput.addEventListener('change', () => {
 });
 document.getElementById('month-reset').addEventListener('click', () => {
   selectedMonth = null;
-  monthInput.value = '';
+  // Garde le mois courant affiché visuellement (au lieu de tout vider)
+  monthInput.value = `${today.getFullYear()}-${(today.getMonth()+1).toString().padStart(2,'0')}`;
   renderCalendar();
 });
 
@@ -5565,7 +5655,7 @@ document.querySelectorAll('#sport-filter .sport-btn').forEach(btn => {
         return;
       }
       const { runId } = await resp.json();
-      setLoading(true, 'Récupération intervals.icu + Whoop...');
+      setLoading(true, 'Récupération Strava + Whoop...');
       const ok = await pollStatus(runId);
       if (ok) {
         // Reload avec cache-bust pour forcer la nouvelle data.js
