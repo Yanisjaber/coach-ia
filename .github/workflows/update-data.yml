@@ -8,11 +8,9 @@ on:
   push:
     branches: [main]
 
-# Permissions pour committer data.js et tokens
 permissions:
   contents: write
 
-# Empêche deux jobs simultanés (évite conflits de commit)
 concurrency:
   group: update-data
   cancel-in-progress: false
@@ -37,11 +35,14 @@ jobs:
       - name: Build .env from secrets
         run: |
           cat > .env <<EOF
-          INTERVALS_ATHLETE_ID=${{ secrets.INTERVALS_ATHLETE_ID }}
-          INTERVALS_API_KEY=${{ secrets.INTERVALS_API_KEY }}
+          STRAVA_CLIENT_ID=${{ secrets.STRAVA_CLIENT_ID }}
+          STRAVA_CLIENT_SECRET=${{ secrets.STRAVA_CLIENT_SECRET }}
           WHOOP_CLIENT_ID=${{ secrets.WHOOP_CLIENT_ID }}
           WHOOP_CLIENT_SECRET=${{ secrets.WHOOP_CLIENT_SECRET }}
           WHOOP_REDIRECT_URI=http://localhost:8765/callback
+          FTP=${{ secrets.FTP }}
+          HR_MAX=${{ secrets.HR_MAX }}
+          LTHR=${{ secrets.LTHR }}
           EOF
 
       - name: Run fetch_data.py
@@ -54,7 +55,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f data.js data.json streams.js .whoop_tokens.json index.html 2>/dev/null || true
+          git add -f data.js data.json streams.js .whoop_tokens.json .strava_tokens.json index.html 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "Pas de changement, rien à committer."
           else

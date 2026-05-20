@@ -19,7 +19,6 @@ from datetime import datetime, timedelta, date
 from pathlib import Path
 
 import requests
-from requests.auth import HTTPBasicAuth
 
 # Whoop : optionnel, si .whoop_tokens.json présent
 try:
@@ -27,6 +26,103 @@ try:
     WHOOP_AVAILABLE = True
 except ImportError:
     WHOOP_AVAILABLE = False
+
+# Strava : source PRINCIPALE des activités depuis la migration
+import strava as strava_client
+
+
+# ============ HELPERS COMPUTE (TSS, NP, CTL, ATL) ============
+def compute_tss(activity, ftp, lthr):
+    """Calcule TSS à partir des données d'activité.
+
+    Priorité : NP/FTP (puissance) → HR/LTHR (cardio) → 0.
+    Formule Coggan : TSS = duration_hr × IF² × 100.
+    """
+    dur_sec = activity.get("moving_time") or activity.get("elapsed_time") or 0
+    if not dur_sec:
+        return 0
+    dur_hr = dur_sec / 3600.0
+    np = activity.get("weighted_average_watts") or activity.get("icu_normalized_watts") or 0
+    if np and ftp:
+        intensity = np / ftp
+        return round(dur_hr * intensity * intensity * 100)
+    avg_hr = activity.get("average_heartrate") or 0
+    if avg_hr and lthr:
+        intensity = avg_hr / lthr
+        return round(dur_hr * intensity * intensity * 100)
+    return 0
+
+
+def compute_fitness_curves(daily_tss):
+    """Calcule CTL/ATL/TSB par EWMA depuis une liste {date: tss}.
+    Retourne {date: {ctl, atl, tsb}} (date = string YYYY-MM-DD).
+
+    - CTL : EWMA 42 jours (Chronic Training Load = fitness)
+    - ATL : EWMA 7 jours (Acute Training Load = fatigue)
+    - TSB : CTL - ATL (Training Stress Balance = forme)
+    """
+    if not daily_tss:
+        return {}
+    alpha_ctl = 2.0 / (42 + 1)
+    alpha_atl = 2.0 / (7 + 1)
+    ctl = 0.0
+    atl = 0.0
+    result = {}
+    sorted_dates = sorted(daily_tss.keys())
+    if not sorted_dates:
+        return {}
+    cur = datetime.fromisoformat(sorted_dates[0]).date()
+    end = datetime.fromisoformat(sorted_dates[-1]).date()
+    while cur <= end:
+        iso = cur.isoformat()
+        tss = daily_tss.get(iso, 0)
+        ctl = alpha_ctl * tss + (1 - alpha_ctl) * ctl
+        atl = alpha_atl * tss + (1 - alpha_atl) * atl
+        result[iso] = {"ctl": ctl, "atl": atl, "tsb": ctl - atl}
+        cur += timedelta(days=1)
+    return result
+
+
+def strava_to_internal(a, ftp, lthr):
+    """Convertit une activité Strava au format attendu par build_day_index.
+    Calcule TSS / IF / NP côté Python (puisque intervals.icu ne le fait plus).
+    """
+    # Strava utilise sport_type (récent) ou type (legacy) ; on prend les 2
+    sport = a.get("sport_type") or a.get("type") or ""
+    np = a.get("weighted_average_watts") or 0
+    avg_w = a.get("average_watts") or 0
+    intensity = (np / ftp) if (np and ftp) else 0
+    tss = compute_tss(a, ftp, lthr)
+    # ID Strava : numérique. On le préfixe avec "s" pour différencier si besoin.
+    sid = a.get("id")
+    return {
+        "id": str(sid) if sid else None,
+        "name": a.get("name"),
+        "type": sport,
+        "sport_type": sport,
+        "start_date_local": a.get("start_date_local"),
+        "moving_time": a.get("moving_time"),
+        "elapsed_time": a.get("elapsed_time"),
+        "distance": a.get("distance"),
+        "total_elevation_gain": a.get("total_elevation_gain"),
+        "total_elevation_loss": a.get("total_elevation_loss"),
+        "average_speed": a.get("average_speed"),
+        "max_speed": a.get("max_speed"),
+        "average_heartrate": a.get("average_heartrate"),
+        "max_heartrate": a.get("max_heartrate"),
+        "average_cadence": a.get("average_cadence"),
+        "calories": a.get("calories"),
+        "kj": a.get("kilojoules"),
+        # Champs au format intervals.icu pour compatibilité downstream
+        "icu_average_watts": avg_w if avg_w else None,
+        "icu_normalized_watts": np if np else None,
+        "icu_max_watts": a.get("max_watts"),
+        "icu_intensity": round(intensity, 3) if intensity else None,
+        "icu_training_load": tss,
+        "icu_ftp": ftp,  # FTP au moment de l'activité (approximatif : FTP courant)
+        "has_heartrate": a.get("has_heartrate"),
+        "has_power": a.get("device_watts") or bool(np or avg_w),
+    }
 
 
 # ============ CONFIG ============
@@ -36,7 +132,6 @@ OUT_JSON = ROOT / "data.json"
 OUT_JS = ROOT / "data.js"
 OUT_STREAMS_JS = ROOT / "streams.js"
 PREFETCH_STREAMS_COUNT = 30  # Nombre d'activités récentes dont on pré-télécharge les streams
-BASE_URL = "https://intervals.icu/api/v1"
 
 
 def load_env():
@@ -53,124 +148,98 @@ def load_env():
     return env
 
 
-def make_session(api_key):
-    """Session HTTP authentifiée pour intervals.icu."""
-    s = requests.Session()
-    s.auth = HTTPBasicAuth("API_KEY", api_key)
-    s.headers.update({"Accept": "application/json"})
-    return s
-
-
-def get(session, path, params=None):
-    """GET avec gestion d'erreur claire."""
-    url = f"{BASE_URL}{path}"
-    r = session.get(url, params=params or {}, timeout=30)
-    if r.status_code != 200:
-        print(f"[X]{r.status_code} {url}\n   {r.text[:300]}", file=sys.stderr)
-        r.raise_for_status()
-    return r.json()
-
-
-# ============ FETCH ============
-def fetch_athlete(session, athlete_id):
-    """Profil athlète : FTP, poids, nom, zones."""
-    print(f"->Athlète {athlete_id}...")
-    return get(session, f"/athlete/{athlete_id}")
-
-
-def fetch_activities(session, athlete_id, oldest, newest):
-    """Toutes les activités entre deux dates (format YYYY-MM-DD)."""
-    print(f"->Activités {oldest} ->{newest}...")
-    return get(
-        session,
-        f"/athlete/{athlete_id}/activities",
-        params={"oldest": oldest, "newest": newest},
-    )
-
-
-def fetch_wellness(session, athlete_id, oldest, newest):
-    """Wellness (CTL/ATL/TSB calculés par intervals.icu)."""
-    print(f"->Wellness {oldest} ->{newest}...")
-    return get(
-        session,
-        f"/athlete/{athlete_id}/wellness",
-        params={"oldest": oldest, "newest": newest},
-    )
-
-
-def fetch_events(session, athlete_id, oldest, newest):
-    """Événements planifiés (séances futures)."""
-    print(f"->Events planifiés {oldest} ->{newest}...")
-    return get(
-        session,
-        f"/athlete/{athlete_id}/events",
-        params={"oldest": oldest, "newest": newest},
-    )
-
-
-def fetch_streams(session, activity_id):
-    """Streams haute resolution (watts, heartrate, cadence, distance, altitude)."""
-    return get(
-        session,
-        f"/activity/{activity_id}/streams",
-        params={"types": "watts,heartrate,cadence,distance,altitude"},
-    )
+# Note : intervals.icu n'est plus utilisé. Toutes les activités viennent de Strava.
+# Voir strava.py pour le client API et fetch_data.py main() pour l'orchestration.
 
 
 # ============ TRANSFORM ============
+# Catalogue de tous les types Strava/intervals.icu reconnus, mappés vers les 5 catégories
+# de filtre du dashboard. Garder en sync avec window.SPORTS_CATALOG dans dashboard.html.
+SPORT_TYPE_TO_CATEGORY = {
+    # Cyclisme
+    "ride": "cyclisme", "virtualride": "cyclisme", "mountainbikeride": "cyclisme",
+    "gravelride": "cyclisme", "ebikeride": "cyclisme", "emountainbikeride": "cyclisme",
+    "velomobile": "cyclisme", "handcycle": "cyclisme",
+    # Course à pied
+    "run": "course", "trailrun": "course", "virtualrun": "course",
+    # Natation
+    "swim": "natation", "openwaterswim": "natation",
+    # Musculation / salle
+    "weighttraining": "musculation", "workout": "musculation", "crossfit": "musculation",
+    "elliptical": "musculation", "stairstepper": "musculation", "virtualworkout": "musculation",
+    # Autre (rando, ski, eau, sports co, mobilité, etc.)
+    "walk": "autre", "hike": "autre", "snowshoe": "autre",
+    "alpineski": "autre", "backcountryski": "autre", "nordicski": "autre",
+    "snowboard": "autre", "iceskate": "autre", "inlineskate": "autre",
+    "rowing": "autre", "kayaking": "autre", "canoeing": "autre",
+    "standuppaddling": "autre", "surfing": "autre", "windsurf": "autre",
+    "kitesurf": "autre", "sailing": "autre",
+    "soccer": "autre", "basketball": "autre", "volleyball": "autre",
+    "hockey": "autre", "tennis": "autre", "squash": "autre",
+    "badminton": "autre", "tabletennis": "autre", "cricket": "autre",
+    "americanfootball": "autre",
+    "yoga": "autre", "pilates": "autre", "stretching": "autre",
+    "rockclimbing": "autre", "boxing": "autre", "dance": "autre", "golf": "autre",
+    "skateboard": "autre", "wheelchair": "autre", "transition": "autre",
+}
+
+
 def get_sport_category(activity):
     """Mappe une activite intervals.icu vers une grande categorie de sport.
 
-    Catégories (alignées sur les filtres du dashboard) :
-        cyclisme / course / musculation / natation / randonnee / ski / autre
-
-    Quand le champ ``type`` est absent (entrée manuelle), on tente une
-    inférence depuis les métriques disponibles (watts → cyclisme, etc.).
+    Catégories alignées sur les filtres du dashboard : cyclisme / course /
+    musculation / natation / autre.
+    Inférence par métriques si type absent (watts → cyclisme, etc.).
     """
-    atype = (activity.get("type") or "").lower()
+    # intervals.icu utilise plusieurs champs pour le sport selon les cas :
+    # type (Strava legacy), sport_type (Strava récent), activity_type, sport, category
+    raw_type = (
+        activity.get("type")
+        or activity.get("sport_type")
+        or activity.get("activity_type")
+        or activity.get("sport")
+        or activity.get("category")
+        or ""
+    )
+    atype = str(raw_type).lower().replace(" ", "").replace("_", "")
     name = (activity.get("name") or "").lower()
 
-    # --- Mapping par type intervals.icu ---
-    # Cyclisme : route, MTB, gravel, home-trainer, e-bike
-    if any(k in atype for k in ["ride", "bike", "cycle", "mtb", "spin"]) or \
-       any(k in name for k in ["velo", "vélo", "cyclisme", "bike", "bicycl"]):
-        return "cyclisme"
-    # Course : route, trail, treadmill, virtual
-    if "run" in atype or \
-       any(k in name for k in ["course a pied", "course à pied", "footing", "running", "trail", "jogging"]):
-        return "course"
-    # Natation : piscine + eau libre
-    if "swim" in atype or "natation" in name or "piscine" in name:
-        return "natation"
-    # Musculation / renforcement
-    if any(k in atype for k in ["weight", "strength", "workout", "crossfit", "gym"]) or \
-       any(k in name for k in ["musculation", "muscu", "renfo", "gym", "crossfit", "weights"]):
-        return "musculation"
-    # Tout le reste (ski, rando, marche, mobilité, sports co, etc.) → "autre"
-    if any(k in atype for k in [
-        "ski", "snowboard", "hike", "walk",
-        "yoga", "stretching", "pilates",
-        "soccer", "tennis", "basket", "volley", "hockey", "golf",
-        "kayak", "rowing", "paddle", "climb",
-        "transition", "ebike",
-    ]) or any(k in name for k in ["ski", "snowboard", "rando", "marche", "hike"]):
-        return "autre"
+    # 1. Lookup exact dans le catalogue
+    if atype in SPORT_TYPE_TO_CATEGORY:
+        return SPORT_TYPE_TO_CATEGORY[atype]
 
-    # --- Pas de type connu : inférence par métriques ---
+    # 2. Fallback heuristique sur le mot-clé dans le type
+    if any(k in atype for k in ["ride", "bike", "cycle", "mtb", "spin"]):
+        return "cyclisme"
+    if "run" in atype:
+        return "course"
+    if "swim" in atype:
+        return "natation"
+    if any(k in atype for k in ["weight", "strength", "workout", "crossfit", "gym"]):
+        return "musculation"
+
+    # 3. Recherche dans le nom de l'activité
+    if any(k in name for k in ["velo", "vélo", "cyclisme", "bike", "bicycl"]):
+        return "cyclisme"
+    if any(k in name for k in ["course a pied", "course à pied", "footing", "running", "trail", "jogging"]):
+        return "course"
+    if any(k in name for k in ["musculation", "muscu", "renfo", "gym", "crossfit", "weights"]):
+        return "musculation"
+    if "natation" in name or "piscine" in name:
+        return "natation"
+
+    # 4. Inférence par métriques
     avg_w = activity.get("icu_average_watts") or activity.get("avg_watts") or 0
     max_w = activity.get("max_watts") or activity.get("icu_max_watts") or 0
-    avg_pace = activity.get("icu_average_pace") or 0  # min/km
+    avg_pace = activity.get("icu_average_pace") or 0
     dist_m = activity.get("distance") or 0
-    avg_speed = activity.get("average_speed") or 0  # m/s
+    avg_speed = activity.get("average_speed") or 0
     avg_cad = activity.get("average_cadence") or 0
     if avg_w or max_w:
-        # Puissance dispo → presque toujours du vélo
         return "cyclisme"
     if avg_pace or (dist_m and avg_speed and avg_speed < 6 and avg_cad and 60 <= avg_cad <= 100):
-        # Cadence 60-100 rpm + vitesse < 21 km/h = course à pied typique
         return "course"
     if dist_m and avg_speed and 6 <= avg_speed <= 25:
-        # Vitesse 21-90 km/h sans watts → souvent vélo route/descente
         return "cyclisme"
     return "autre"
 
@@ -318,7 +387,7 @@ def build_day_index(activities, wellness, athlete_ftp):
                 "name": a.get("name") or a.get("type") or "Activité",
                 "type": classify_session(a, a_ftp),
                 "sport": get_sport_category(a),
-                "raw_type": a.get("type"),  # type brut intervals.icu (Ride, Run, etc.)
+                "raw_type": (a.get("type") or a.get("sport_type") or a.get("activity_type") or a.get("sport") or a.get("category")),
                 "tss": round(a.get("icu_training_load") or 0),
                 "duration": round(a_dur_min),
                 "elapsed_time": a.get("elapsed_time"),
@@ -552,50 +621,59 @@ def build_plan(events, today):
 # ============ MAIN ============
 def main():
     env = load_env()
-    athlete_id = env.get("INTERVALS_ATHLETE_ID")
-    api_key = env.get("INTERVALS_API_KEY")
-    if not athlete_id or not api_key:
-        sys.exit("[X]INTERVALS_ATHLETE_ID ou INTERVALS_API_KEY manquant dans .env")
 
-    session = make_session(api_key)
+    # Profil athlète : FTP / HRmax / LTHR depuis .env (puisqu'on n'a plus intervals.icu)
+    ftp_env = int(env.get("FTP") or 0) or 240
+    hr_max = int(env.get("HR_MAX") or 0) or 190
+    lthr = int(env.get("LTHR") or 0) or int(hr_max * 0.92)
 
-    # Athlète
-    athlete = fetch_athlete(session, athlete_id)
-    name = athlete.get("name", "Athlète")
-    ftp = athlete.get("icu_ftp") or athlete.get("ftp") or 0
-    weight = athlete.get("icu_weight") or athlete.get("weight") or 0
-    print(f"  [OK]{name} · FTP {ftp}W · {weight}kg")
+    # Strava — source PRINCIPALE des activités
+    print("Connexion Strava...")
+    strava_session = strava_client.get_session()
+    strava_athlete = strava_client.fetch_athlete(strava_session)
+    name = f"{strava_athlete.get('firstname', '')} {strava_athlete.get('lastname', '')}".strip() or "Athlete"
+    weight = strava_athlete.get("weight") or 0
+    ftp = strava_athlete.get("ftp") or ftp_env
+    print(f"  [OK] {name} · FTP {ftp}W · HRmax {hr_max} · LTHR {lthr}bpm · {weight}kg")
 
     # Plage de dates : tout l'historique
     today = date.today()
     newest = today.isoformat()
-    oldest = "2010-01-01"  # bien au-delà du début probable
+    oldest = "2010-01-01"
 
-    activities = fetch_activities(session, athlete_id, oldest, newest)
-    print(f"  [OK]{len(activities)} activités récupérées")
+    print(f"\n-> Récupération des activités Strava (peut prendre 1-2 min pour gros historiques)...")
+    strava_acts = strava_client.fetch_activities(strava_session, after_iso=oldest, before_iso=newest)
+    print(f"  [OK] {len(strava_acts)} activités Strava récupérées")
 
-    wellness = fetch_wellness(session, athlete_id, oldest, newest)
-    print(f"  [OK]{len(wellness)} jours de wellness")
+    # Conversion au format interne (avec calcul TSS / IF / NP côté Python)
+    activities = [strava_to_internal(a, ftp, lthr) for a in strava_acts]
 
-    events = fetch_events(session, athlete_id, today.isoformat(),
-                         (today + timedelta(days=14)).isoformat())
-    print(f"  [OK]{len(events)} events planifiés (14 jours à venir)")
+    # Plus de wellness intervals.icu : on calcule CTL/ATL/TSB nous-mêmes plus bas
+    wellness = []
+
+    # Pas d'events futurs (on n'a plus la planification intervals.icu) → liste vide
+    events = []
 
     # ====== PRE-FETCH STREAMS + CALCUL DES MAX MANQUANTS ======
     # intervals.icu retourne max_watts=null pour beaucoup d'activités.
     # On le calcule depuis les streams pour les N dernières.
-    print(f"\n-> Pre-fetch streams des {PREFETCH_STREAMS_COUNT} dernieres activites...")
+    print(f"\n-> Pre-fetch streams Strava des {PREFETCH_STREAMS_COUNT} dernieres activites...")
     recent_acts = sorted(
         [a for a in activities if a.get("id") and a.get("start_date_local")],
         key=lambda a: a["start_date_local"],
         reverse=True,
     )[:PREFETCH_STREAMS_COUNT]
     streams_cache = {}
-    streams_max = {}  # id activité -> {max_watts, max_hr, max_cadence}
+    streams_max = {}
     for i, a in enumerate(recent_acts):
         aid = a.get("id")
         try:
-            s = fetch_streams(session, aid)
+            # Strava retourne {type: {data: [...]}, ...}, on convertit en [{type, data}, ...]
+            strava_streams = strava_client.fetch_streams(strava_session, aid)
+            s = [
+                {"type": k, "data": (v.get("data") if isinstance(v, dict) else v) or []}
+                for k, v in (strava_streams or {}).items()
+            ] if isinstance(strava_streams, dict) else []
             streams_cache[str(aid)] = s
             maxes = {}
             dist_stream = None
@@ -663,6 +741,17 @@ def main():
     # Construction
     day_index = build_day_index(activities, wellness, ftp)
 
+    # ====== CALCUL CTL/ATL/TSB nous-mêmes (Coggan EWMA) ======
+    # Plus de wellness intervals.icu → on calcule depuis les TSS quotidiens
+    daily_tss = {d: info.get("tss", 0) for d, info in day_index.items()}
+    curves = compute_fitness_curves(daily_tss)
+    for d, c in curves.items():
+        day_index.setdefault(d, {}).update({
+            "ctl": round(c["ctl"], 1),
+            "atl": round(c["atl"], 1),
+        })
+    print(f"  [OK] CTL/ATL/TSB calculés sur {len(curves)} jours")
+
     # Whoop réel uniquement — pas de simulation. Les jours antérieurs au
     # bracelet auront recovery/hrv/sleep = null (trous honnêtes dans l'UI).
     whoop_ok = integrate_whoop(day_index, oldest, newest)
@@ -676,13 +765,16 @@ def main():
     out = {
         "generated_at": datetime.now().isoformat(),
         "athlete": {
-            "id": athlete_id,
+            "id": str(strava_athlete.get("id") or ""),
             "name": name,
             "ftp": ftp,
+            "hr_max": hr_max,
+            "lthr": lthr,
             "weight": weight,
         },
         "source": {
-            "intervals_icu": True,
+            "strava": True,
+            "intervals_icu": False,
             "whoop_real": whoop_ok,
             "whoop_real_days": getattr(integrate_whoop, "last_real_count", 0) if whoop_ok else 0,
             "whoop_simulated_days": len(rows) - (getattr(integrate_whoop, "last_real_count", 0) if whoop_ok else 0),
