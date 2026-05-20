@@ -1079,6 +1079,209 @@
     .hero, .grid-2, .grid-3, .metric-row { grid-template-columns: 1fr; }
     .container { padding: 16px; }
   }
+
+  /* === ENTRAÎNEUR — split layout listing/ajouts === */
+  .entraineur-split {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .entraineur-add-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .add-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .big-add-btn {
+    margin-top: auto;
+    padding: 14px 20px;
+    background: rgba(74, 222, 128, 0.12);
+    border: 1px dashed rgba(74, 222, 128, 0.5);
+    border-radius: 10px;
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    font-family: inherit;
+  }
+  .big-add-btn:hover {
+    background: rgba(74, 222, 128, 0.2);
+    border-color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .entraineur-split { grid-template-columns: 1fr; }
+  }
+
+  /* === Liste compétitions === */
+  .comp-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--text-mute);
+    font-size: 13px;
+    font-style: italic;
+  }
+  .comp-item {
+    display: grid;
+    grid-template-columns: 32px 1fr auto 90px 28px;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--bg-elev2);
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .comp-prio {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .comp-prio.A { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+  .comp-prio.B { background: rgba(200, 200, 200, 0.2); color: #c0c0c0; }
+  .comp-prio.C { background: rgba(205, 127, 50, 0.2); color: #cd7f32; }
+  .comp-name { font-weight: 600; }
+  .comp-date { color: var(--text-dim); font-size: 12px; }
+  .comp-countdown {
+    color: var(--info);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: right;
+  }
+  .comp-del {
+    background: none;
+    border: none;
+    color: var(--text-mute);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: 4px;
+  }
+  .comp-del:hover { color: var(--danger); background: var(--bg); }
+
+  /* === MODAL D'AJOUT (compé + entraînement) === */
+  .modal-overlay.add-modal {
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.92);
+    padding: 24px;
+  }
+  .add-modal-content {
+    max-width: 720px;
+    width: 100%;
+    margin: 0;
+  }
+  .add-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 16px;
+    margin-bottom: 20px;
+  }
+  .form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .form-field.form-col-2 { grid-column: 1 / -1; }
+  .form-field > span {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+  }
+  .form-field input,
+  .form-field select,
+  .form-field textarea {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 11px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .form-field input:focus,
+  .form-field select:focus,
+  .form-field textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .form-field textarea { resize: vertical; min-height: 70px; }
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .btn-primary, .btn-secondary {
+    padding: 9px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    color: #062017;
+  }
+  .btn-primary:hover { background: #5fe898; }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .btn-secondary:hover { color: var(--text); border-color: var(--text-mute); }
+  @media (max-width: 700px) {
+    .add-form-grid { grid-template-columns: 1fr; }
+    .form-field.form-col-2 { grid-column: 1; }
+  }
+
+  /* === DAY CARD : race day (damier F1) + sport label === */
+  .day-card-sport {
+    font-size: 10px;
+    color: var(--text-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-top: 1px dashed var(--border);
+    padding-top: 8px;
+    margin-top: 10px;
+    font-weight: 600;
+  }
+  .day-card.race {
+    position: relative;
+    border: 2px solid transparent;
+    background:
+      linear-gradient(var(--bg-elev2), var(--bg-elev2)) padding-box,
+      repeating-conic-gradient(#fff 0% 25%, #000 0% 50%) border-box;
+    background-size: auto, 8px 8px;
+  }
+  .day-card.race::before {
+    content: "🏆";
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 18px;
+    line-height: 1;
+    z-index: 2;
+  }
+  .day-card.race[data-priority="A"]::before { filter: drop-shadow(0 0 6px #fbbf24); }
+  .day-card.race[data-priority="B"]::before { filter: grayscale(1) brightness(1.5); }
+  .day-card.race[data-priority="C"]::before { filter: sepia(1) saturate(2.5) hue-rotate(-10deg); }
 </style>
 </head>
 <body>
@@ -1125,7 +1328,6 @@
   <button class="tab active" data-panel="p1">Tableau de bord</button>
   <button class="tab" data-panel="p2">Entraîneur</button>
   <button class="tab" data-panel="p3">Tendances long-terme</button>
-  <button class="tab" data-panel="p4">Détail séances</button>
   <button class="tab" data-panel="p5">Termes</button>
 </div>
 
@@ -1264,21 +1466,27 @@
 
 <!-- PANEL 2: Entraîneur -->
 <section class="panel" id="p2">
-  <!-- Compétitions -->
-  <div class="grid-1 card">
-    <div class="section-title">Compétitions à venir</div>
-    <div class="section-subtitle">Ajoute tes objectifs pour que le Coach IA structure ton plan (build → peak → taper → race)</div>
-    <div class="comp-form">
-      <input type="text" id="comp-name" placeholder="Nom de la compétition (ex : Course de Cambrils)">
-      <input type="date" id="comp-date">
-      <select id="comp-priority" title="Priorité">
-        <option value="A">A (objectif principal)</option>
-        <option value="B">B (intermédiaire)</option>
-        <option value="C">C (préparation)</option>
-      </select>
-      <button id="comp-add">Ajouter</button>
+  <!-- Split : listing compé à gauche, boutons d'ajout à droite -->
+  <div class="entraineur-split">
+    <!-- Gauche : listing compétitions -->
+    <div class="card">
+      <div class="section-title">Compétitions à venir</div>
+      <div class="section-subtitle">Tes prochains objectifs structurent le plan (build → peak → taper → race)</div>
+      <div class="comp-list" id="comp-list"></div>
     </div>
-    <div class="comp-list" id="comp-list"></div>
+    <!-- Droite : split haut/bas, boutons d'ajout -->
+    <div class="entraineur-add-stack">
+      <div class="card add-card">
+        <div class="section-title">Ajouter une compétition</div>
+        <div class="section-subtitle">Date, distance, GPX, temps cible...</div>
+        <button class="big-add-btn" id="open-comp-modal">+ Ajouter une compétition</button>
+      </div>
+      <div class="card add-card">
+        <div class="section-title">Ajouter un entraînement</div>
+        <div class="section-subtitle">Planifie une séance dans le calendrier</div>
+        <button class="big-add-btn" id="open-train-modal">+ Ajouter un entraînement</button>
+      </div>
+    </div>
   </div>
 
   <!-- Plan / Calendrier -->
@@ -1298,19 +1506,25 @@
     <div class="week-calendar" id="week-calendar"></div>
   </div>
 
-  <!-- Chat Coach IA -->
+  <!-- Séances récentes (déplacé depuis l'ancien onglet Détail séances) -->
   <div class="grid-1 card">
-    <div class="section-title">
-      <span>Coach IA · Chat</span>
-      <button class="chat-clear" id="chat-clear" title="Effacer la conversation">Effacer</button>
-    </div>
-    <div class="section-subtitle">Décris tes sensations, ce que tu veux travailler, tes douleurs — le coach adapte ton plan en conséquence</div>
-    <div class="chat-messages" id="chat-messages"></div>
-    <div class="chat-input-row">
-      <textarea id="chat-input" placeholder="Ex : Je me sens fatigué cette semaine · Je veux travailler mon seuil · J'ai mal au genou · Bien dormi, en forme..." rows="2"></textarea>
-      <button id="chat-send">Envoyer</button>
-    </div>
-    <div class="chat-prefs" id="chat-prefs"></div>
+    <div class="section-title">Séances récentes</div>
+    <div class="section-subtitle">Cliquer sur une ligne pour voir le détail prévu vs réalisé</div>
+    <table class="session-table">
+      <thead><tr>
+        <th>Date</th><th>Séance</th><th>Type</th><th>Durée</th><th>TSS</th><th>NP / FTP%</th><th>FC moy</th><th>Conformité</th>
+      </tr></thead>
+      <tbody id="sessions-tbody"></tbody>
+    </table>
+    <div id="session-detail-wrap"></div>
+  </div>
+
+  <!-- Compat : anciens IDs cachés pour ne pas casser le JS legacy -->
+  <div style="display:none;">
+    <input type="text" id="comp-name">
+    <input type="date" id="comp-date">
+    <select id="comp-priority"><option value="A">A</option><option value="B">B</option><option value="C">C</option></select>
+    <button id="comp-add"></button>
   </div>
 </section>
 
@@ -1345,20 +1559,7 @@
   </div>
 </section>
 
-<!-- PANEL 4: Détail séances -->
-<section class="panel" id="p4">
-  <div class="card">
-    <div class="section-title">Séances récentes</div>
-    <div class="section-subtitle">Cliquer sur une ligne pour voir le détail prévu vs réalisé</div>
-    <table class="session-table">
-      <thead><tr>
-        <th>Date</th><th>Séance</th><th>Type</th><th>Durée</th><th>TSS</th><th>NP / FTP%</th><th>FC moy</th><th>Conformité</th>
-      </tr></thead>
-      <tbody id="sessions-tbody"></tbody>
-    </table>
-    <div id="session-detail-wrap"></div>
-  </div>
-</section>
+<!-- PANEL 4 supprimé : Séances récentes déplacé dans Entraîneur (p2) -->
 
 <!-- PANEL 5: Termes -->
 <section class="panel" id="p5">
@@ -1634,6 +1835,132 @@
       <button class="modal-close" id="modal-close" title="Fermer (Échap)">×</button>
     </div>
     <div id="modal-body">—</div>
+  </div>
+</div>
+
+<!-- Modal d'ajout de compétition -->
+<div class="modal-overlay add-modal" id="comp-modal">
+  <div class="modal add-modal-content">
+    <div class="modal-header">
+      <div class="modal-title"><h2>Ajouter une compétition</h2></div>
+      <button class="modal-close" id="comp-modal-close" title="Fermer">×</button>
+    </div>
+    <div class="add-form-grid">
+      <label class="form-field form-col-2">
+        <span>Nom de la compétition</span>
+        <input type="text" id="comp-modal-name" placeholder="Ex : Course de Cambrils">
+      </label>
+      <label class="form-field">
+        <span>Date</span>
+        <input type="date" id="comp-modal-date">
+      </label>
+      <label class="form-field">
+        <span>Heure de départ</span>
+        <input type="time" id="comp-modal-time">
+      </label>
+      <label class="form-field">
+        <span>Priorité</span>
+        <select id="comp-modal-priority">
+          <option value="A">A · objectif principal (or)</option>
+          <option value="B">B · intermédiaire (argent)</option>
+          <option value="C">C · préparation (bronze)</option>
+        </select>
+      </label>
+      <label class="form-field">
+        <span>Sport</span>
+        <select id="comp-modal-sport">
+          <option value="cyclisme">Cyclisme</option>
+          <option value="course">Course à pied</option>
+          <option value="natation">Natation</option>
+          <option value="autre">Autre</option>
+        </select>
+      </label>
+      <label class="form-field">
+        <span>Type d'épreuve</span>
+        <input type="text" id="comp-modal-type" placeholder="Course en ligne, contre-la-montre, marathon...">
+      </label>
+      <label class="form-field">
+        <span>Distance (km)</span>
+        <input type="number" id="comp-modal-km" step="0.1" min="0" placeholder="Ex : 42.2">
+      </label>
+      <label class="form-field">
+        <span>Dénivelé + (m)</span>
+        <input type="number" id="comp-modal-dplus" min="0" placeholder="Ex : 850">
+      </label>
+      <label class="form-field">
+        <span>Temps cible</span>
+        <input type="text" id="comp-modal-target" placeholder="Ex : 3h45 ou 1h20">
+      </label>
+      <label class="form-field">
+        <span>Trace GPX</span>
+        <input type="file" id="comp-modal-gpx" accept=".gpx">
+      </label>
+      <label class="form-field form-col-2">
+        <span>Notes</span>
+        <textarea id="comp-modal-notes" rows="3" placeholder="Stratégie, observations, objectifs..."></textarea>
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="comp-modal-cancel">Annuler</button>
+      <button class="btn-primary" id="comp-modal-save">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal d'ajout d'entraînement -->
+<div class="modal-overlay add-modal" id="train-modal">
+  <div class="modal add-modal-content">
+    <div class="modal-header">
+      <div class="modal-title"><h2>Ajouter un entraînement</h2></div>
+      <button class="modal-close" id="train-modal-close" title="Fermer">×</button>
+    </div>
+    <div class="add-form-grid">
+      <label class="form-field form-col-2">
+        <span>Nom de la séance</span>
+        <input type="text" id="train-modal-name" placeholder="Ex : Sortie longue Z2, Seuil 4×8min...">
+      </label>
+      <label class="form-field">
+        <span>Date</span>
+        <input type="date" id="train-modal-date">
+      </label>
+      <label class="form-field">
+        <span>Sport</span>
+        <select id="train-modal-sport">
+          <option value="cyclisme">Cyclisme</option>
+          <option value="course">Course à pied</option>
+          <option value="musculation">Musculation</option>
+          <option value="natation">Natation</option>
+          <option value="autre">Autre</option>
+        </select>
+      </label>
+      <label class="form-field">
+        <span>Type</span>
+        <select id="train-modal-type">
+          <option value="endurance">Endurance</option>
+          <option value="tempo">Tempo / Sweet Spot</option>
+          <option value="seuil">Seuil</option>
+          <option value="vo2">VO2max</option>
+          <option value="recup">Récup active</option>
+          <option value="rest">Repos</option>
+        </select>
+      </label>
+      <label class="form-field">
+        <span>Durée (min)</span>
+        <input type="number" id="train-modal-duration" min="0" placeholder="Ex : 90">
+      </label>
+      <label class="form-field">
+        <span>TSS estimé</span>
+        <input type="number" id="train-modal-tss" min="0" placeholder="Ex : 80">
+      </label>
+      <label class="form-field form-col-2">
+        <span>Notes / structure</span>
+        <textarea id="train-modal-notes" rows="3" placeholder="Détail des intervalles, intentions..."></textarea>
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="train-modal-cancel">Annuler</button>
+      <button class="btn-primary" id="train-modal-save">Enregistrer</button>
+    </div>
   </div>
 </div>
 
@@ -2684,6 +3011,155 @@ document.getElementById('comp-list').addEventListener('click', (e) => {
   renderCalendar();
 });
 
+// ========= MODAL D'AJOUT DE COMPÉTITION =========
+function openCompModal() {
+  const modal = document.getElementById('comp-modal');
+  if (!modal) return;
+  // Reset form
+  ['name','date','time','type','km','dplus','target','notes'].forEach(k => {
+    const el = document.getElementById('comp-modal-' + k);
+    if (el) el.value = '';
+  });
+  const prioEl = document.getElementById('comp-modal-priority');
+  if (prioEl) prioEl.value = 'A';
+  const sportEl = document.getElementById('comp-modal-sport');
+  if (sportEl) sportEl.value = 'cyclisme';
+  const gpxEl = document.getElementById('comp-modal-gpx');
+  if (gpxEl) gpxEl.value = '';
+  modal.classList.add('active');
+}
+function closeCompModal() {
+  const modal = document.getElementById('comp-modal');
+  if (modal) modal.classList.remove('active');
+}
+
+async function saveCompFromModal() {
+  const name = document.getElementById('comp-modal-name').value.trim();
+  const date = document.getElementById('comp-modal-date').value;
+  if (!name || !date) {
+    alert('Renseigne au moins le nom et la date.');
+    return;
+  }
+  const time = document.getElementById('comp-modal-time').value || '';
+  const priority = document.getElementById('comp-modal-priority').value;
+  const sport = document.getElementById('comp-modal-sport').value;
+  const typeEpr = document.getElementById('comp-modal-type').value.trim();
+  const km = parseFloat(document.getElementById('comp-modal-km').value) || null;
+  const dplus = parseInt(document.getElementById('comp-modal-dplus').value, 10) || null;
+  const target = document.getElementById('comp-modal-target').value.trim();
+  const notes = document.getElementById('comp-modal-notes').value.trim();
+
+  // GPX (lecture optionnelle)
+  let gpxContent = null;
+  let gpxName = null;
+  const gpxFile = document.getElementById('comp-modal-gpx').files[0];
+  if (gpxFile) {
+    try {
+      gpxContent = await gpxFile.text();
+      gpxName = gpxFile.name;
+    } catch (e) {
+      console.warn('Lecture GPX impossible :', e);
+    }
+  }
+
+  const comps = loadCompetitions();
+  comps.push({
+    id: Date.now().toString(),
+    name, date, time, priority, sport,
+    type: typeEpr, km, dplus, target, notes,
+    gpxName, gpxContent
+  });
+  saveCompetitions(comps);
+  closeCompModal();
+  renderCompList();
+  renderCalendar();
+}
+
+// Wire up modal triggers (défensif)
+const openCompBtn = document.getElementById('open-comp-modal');
+if (openCompBtn) openCompBtn.addEventListener('click', openCompModal);
+const compModalClose = document.getElementById('comp-modal-close');
+if (compModalClose) compModalClose.addEventListener('click', closeCompModal);
+const compModalCancel = document.getElementById('comp-modal-cancel');
+if (compModalCancel) compModalCancel.addEventListener('click', closeCompModal);
+const compModalSave = document.getElementById('comp-modal-save');
+if (compModalSave) compModalSave.addEventListener('click', saveCompFromModal);
+const compModalOverlay = document.getElementById('comp-modal');
+if (compModalOverlay) compModalOverlay.addEventListener('click', (e) => {
+  if (e.target === compModalOverlay) closeCompModal();
+});
+
+// ========= MODAL D'AJOUT D'ENTRAÎNEMENT =========
+const TRAIN_KEY = 'coach_ia_trainings_v1';
+function loadTrainings() {
+  try {
+    const raw = localStorage.getItem(TRAIN_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw).filter(t => t.date && t.name);
+  } catch (e) { return []; }
+}
+function saveTrainings(arr) {
+  localStorage.setItem(TRAIN_KEY, JSON.stringify(arr));
+}
+
+function openTrainModal() {
+  const modal = document.getElementById('train-modal');
+  if (!modal) return;
+  ['name','date','duration','tss','notes'].forEach(k => {
+    const el = document.getElementById('train-modal-' + k);
+    if (el) el.value = '';
+  });
+  const s = document.getElementById('train-modal-sport');
+  if (s) s.value = 'cyclisme';
+  const t = document.getElementById('train-modal-type');
+  if (t) t.value = 'endurance';
+  modal.classList.add('active');
+}
+function closeTrainModal() {
+  const modal = document.getElementById('train-modal');
+  if (modal) modal.classList.remove('active');
+}
+function saveTrainFromModal() {
+  const name = document.getElementById('train-modal-name').value.trim();
+  const date = document.getElementById('train-modal-date').value;
+  if (!name || !date) {
+    alert('Renseigne au moins le nom et la date.');
+    return;
+  }
+  const sport = document.getElementById('train-modal-sport').value;
+  const type = document.getElementById('train-modal-type').value;
+  const duration = parseInt(document.getElementById('train-modal-duration').value, 10) || 0;
+  const tss = parseInt(document.getElementById('train-modal-tss').value, 10) || 0;
+  const notes = document.getElementById('train-modal-notes').value.trim();
+
+  const arr = loadTrainings();
+  arr.push({ id: Date.now().toString(), name, date, sport, type, duration, tss, notes });
+  saveTrainings(arr);
+  closeTrainModal();
+  renderCalendar();
+}
+
+const openTrainBtn = document.getElementById('open-train-modal');
+if (openTrainBtn) openTrainBtn.addEventListener('click', openTrainModal);
+const trainModalClose = document.getElementById('train-modal-close');
+if (trainModalClose) trainModalClose.addEventListener('click', closeTrainModal);
+const trainModalCancel = document.getElementById('train-modal-cancel');
+if (trainModalCancel) trainModalCancel.addEventListener('click', closeTrainModal);
+const trainModalSave = document.getElementById('train-modal-save');
+if (trainModalSave) trainModalSave.addEventListener('click', saveTrainFromModal);
+const trainModalOverlay = document.getElementById('train-modal');
+if (trainModalOverlay) trainModalOverlay.addEventListener('click', (e) => {
+  if (e.target === trainModalOverlay) closeTrainModal();
+});
+
+// Esc ferme les modals d'ajout aussi
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeCompModal();
+    closeTrainModal();
+  }
+});
+
 // ========= GÉNÉRATION DU PLAN 7 JOURS =========
 function determinePhase(comps, currentTSB) {
   // TSB très bas → forcer décharge avant tout objectif
@@ -2868,16 +3344,24 @@ function renderWeekPlan() {
           weekTotalTss += proposal.tss || 0;
           weekTotalSessions += 1;
         }
+        // Check si c'est un jour de compétition
+        const isRace = comp && toIsoDate(comp.dateObj) === iso;
+        const raceClass = isRace ? ' race' : '';
+        const raceAttr = isRace ? ` data-priority="${comp.priority || 'A'}"` : '';
+        // Sport label : Cyclisme par défaut (templates orientés vélo), ou sport du compé
+        const sportLabel = isRace
+          ? (comp.sport ? comp.sport.charAt(0).toUpperCase() + comp.sport.slice(1) : 'Compétition')
+          : (proposal.sport || 'Cyclisme');
+        const kmStr = isRace && comp.km ? Math.round(comp.km) + ' km' : '';
+        const durStr = proposal.dur ? `${Math.floor(proposal.dur/60)}h${(proposal.dur%60).toString().padStart(2,'0')}` : '';
+        const metaLine = [durStr, kmStr].filter(Boolean).join(' · ');
         cardHTML = `
-          <div class="day-card${isRest ? ' rest' : ''}${todayClass}" data-iso="${iso}" data-source="prevu">
+          <div class="day-card${isRest ? ' rest' : ''}${todayClass}${raceClass}" data-iso="${iso}" data-source="prevu"${raceAttr}>
             <div class="day-card-dow">${dowFr[dow]}${isToday ? " · aujourd'hui" : ''}</div>
             <div class="day-card-date">${d.getDate()}</div>
-            ${proposal.type ? `<span class="day-card-type pill ${proposal.type}">${proposal.type}</span>` : ''}
             <div class="day-card-name">${proposal.name}</div>
-            <div class="day-card-meta">
-              ${proposal.dur ? `${Math.floor(proposal.dur/60)}h${(proposal.dur%60).toString().padStart(2,'0')} · ` : ''}${proposal.tss || 0} TSS
-            </div>
-            <div class="day-card-why">${proposal.why}</div>
+            <div class="day-card-meta">${metaLine}</div>
+            <div class="day-card-sport">${sportLabel}</div>
           </div>
         `;
       }
@@ -2956,14 +3440,26 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   // Fallbacks robustes pour data.js ancien format (champs day-level)
   const aType = act.type || act.sessionType || '';
   const aName = act.name || act.sessionName || 'Séance';
+  const km = act.distance_km ? Math.round(act.distance_km) + ' km' : '';
+  const sportLabel = (window.sportFr && (act.raw_type || act.sport))
+    ? window.sportFr(act.raw_type || act.sport)
+    : (act.sport ? act.sport.charAt(0).toUpperCase() + act.sport.slice(1) : '');
+
+  // Check si c'est un jour de compétition
+  const comps = (typeof loadCompetitions === 'function') ? loadCompetitions() : [];
+  const compToday = comps.find(c => c.date === iso);
+  const raceClass = compToday ? ' race' : '';
+  const raceAttr = compToday ? ` data-priority="${compToday.priority || 'A'}"` : '';
+
+  const metaLine = [dur ? `${h}h${m}` : '', km].filter(Boolean).join(' · ');
+
   return `
-    <div class="day-card past${isToday ? ' today' : ''}" data-iso="${iso}" data-source="realise">
+    <div class="day-card past${isToday ? ' today' : ''}${raceClass}" data-iso="${iso}" data-source="realise"${raceAttr}>
       <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
       ${dateRow}
-      ${aType ? `<span class="day-card-type pill ${aType}">${aType}</span>` : ''}
       <div class="day-card-name">${aName}</div>
-      <div class="day-card-meta">${dur ? `${h}h${m} · ` : ''}${act.tss || 0} TSS</div>
-      <div class="day-card-why">${act.np ? `NP ${act.np}W` : ''}${act.hr ? (act.np ? ' · ' : '') + `FC ${act.hr}` : ''}${(!act.np && !act.hr) ? 'Réalisé' : ''}</div>
+      <div class="day-card-meta">${metaLine}</div>
+      <div class="day-card-sport">${sportLabel}</div>
       ${counter}
     </div>
   `;
@@ -5148,6 +5644,7 @@ const PREF_LABELS = {
 function renderChatPrefs() {
   const prefs = loadPrefs();
   const el = document.getElementById('chat-prefs');
+  if (!el) return; // UI chat retirée
   const tags = [];
   if (prefs.recoveryMode) tags.push(PREF_LABELS.recoveryMode);
   if (prefs.hardMode) tags.push(PREF_LABELS.hardMode);
@@ -5163,6 +5660,7 @@ function renderChatPrefs() {
 function renderChat() {
   const messages = loadChatMessages();
   const container = document.getElementById('chat-messages');
+  if (!container) return; // UI chat retirée
   if (messages.length === 0) {
     container.innerHTML = `<div class="chat-empty">
       Démarre la conversation avec ton Coach IA.<br>
@@ -5302,14 +5800,18 @@ function sendChatMessage() {
   if (typeof renderCalendar === 'function') renderCalendar();
 }
 
-document.getElementById('chat-send').addEventListener('click', sendChatMessage);
-document.getElementById('chat-input').addEventListener('keydown', (e) => {
+// Chat handlers — défensifs car le UI chat a été retiré de PANEL 2 (Entraîneur)
+const _chatSendBtn = document.getElementById('chat-send');
+if (_chatSendBtn) _chatSendBtn.addEventListener('click', sendChatMessage);
+const _chatInputEl = document.getElementById('chat-input');
+if (_chatInputEl) _chatInputEl.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     sendChatMessage();
   }
 });
-document.getElementById('chat-clear').addEventListener('click', () => {
+const _chatClearBtn = document.getElementById('chat-clear');
+if (_chatClearBtn) _chatClearBtn.addEventListener('click', () => {
   if (!confirm('Effacer la conversation et les préférences ?')) return;
   localStorage.removeItem(CHAT_KEY);
   localStorage.removeItem(PREFS_KEY);
@@ -5317,7 +5819,7 @@ document.getElementById('chat-clear').addEventListener('click', () => {
   if (typeof renderCalendar === 'function') renderCalendar();
 });
 
-renderChat();
+try { renderChat(); } catch (e) { console.warn('[renderChat]', e); }
 
 // ========= INTÉGRATION DES PRÉFÉRENCES DANS LE PLAN =========
 // Patch sur adjustForRecovery pour aussi appliquer les prefs du chat
@@ -5499,11 +6001,12 @@ function renderSessionsTable() {
     detailWrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:13px;">Aucune séance pour le filtre sélectionné.</div>';
   }
 }
-renderSessionsTable();
+try { renderSessionsTable(); } catch (e) { console.error('[renderSessionsTable]', e); }
 
 function renderSessionDetail(s) {
   const zoneColors = ['#bbf7d0','#86efac','#4ade80','#16a34a','#14532d'];
-  const zonesHTML = s.zones.map((z, i) => `<div class="zone-seg" style="width:${z}%;background:${zoneColors[i]};">${z>8?z+'%':''}</div>`).join('');
+  const zones = (s.zones && s.zones.length) ? s.zones : (s.zones_hr || s.zones_power || [0,0,0,0,0]);
+  const zonesHTML = zones.map((z, i) => `<div class="zone-seg" style="width:${z}%;background:${zoneColors[i]};">${z>8?z+'%':''}</div>`).join('');
   const html = `
   <div class="session-detail">
     <div class="session-detail-header">
