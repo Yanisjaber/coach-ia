@@ -1251,6 +1251,13 @@
     .form-field.form-col-2 { grid-column: 1; }
   }
 
+  /* === Sport cell dans la table Séances === */
+  .sport-cell {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
   /* === DAY CARD : race day (damier F1) + sport label === */
   .day-card-sport {
     font-size: 10px;
@@ -1512,7 +1519,7 @@
     <div class="section-subtitle">Cliquer sur une ligne pour voir le détail prévu vs réalisé</div>
     <table class="session-table">
       <thead><tr>
-        <th>Date</th><th>Séance</th><th>Type</th><th>Durée</th><th>TSS</th><th>NP / FTP%</th><th>FC moy</th><th>Conformité</th>
+        <th>Date</th><th>Séance</th><th>Sport</th><th>Type</th><th>Durée</th><th>TSS</th><th>NP / FTP%</th><th>FC moy</th><th>Conformité</th>
       </tr></thead>
       <tbody id="sessions-tbody"></tbody>
     </table>
@@ -3348,10 +3355,10 @@ function renderWeekPlan() {
         const isRace = comp && toIsoDate(comp.dateObj) === iso;
         const raceClass = isRace ? ' race' : '';
         const raceAttr = isRace ? ` data-priority="${comp.priority || 'A'}"` : '';
-        // Sport label : Cyclisme par défaut (templates orientés vélo), ou sport du compé
+        // Sport label : nom Strava FR exact, ou sport du compé pour les jours de course
         const sportLabel = isRace
-          ? (comp.sport ? comp.sport.charAt(0).toUpperCase() + comp.sport.slice(1) : 'Compétition')
-          : (proposal.sport || 'Cyclisme');
+          ? (comp.sport ? window.sportFr(comp.sport) : 'Compétition')
+          : window.sportFr(proposal.sport || 'cyclisme');
         const kmStr = isRace && comp.km ? Math.round(comp.km) + ' km' : '';
         const durStr = proposal.dur ? `${Math.floor(proposal.dur/60)}h${(proposal.dur%60).toString().padStart(2,'0')}` : '';
         const metaLine = [durStr, kmStr].filter(Boolean).join(' · ');
@@ -3441,8 +3448,9 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   const aType = act.type || act.sessionType || '';
   const aName = act.name || act.sessionName || 'Séance';
   const km = act.distance_km ? Math.round(act.distance_km) + ' km' : '';
-  const sportLabel = (window.sportFr && (act.raw_type || act.sport))
-    ? window.sportFr(act.raw_type || act.sport)
+  // Nom de sport Strava exact (cohérent partout via helper unique)
+  const sportLabel = window.activitySportLabel
+    ? window.activitySportLabel(act)
     : (act.sport ? act.sport.charAt(0).toUpperCase() + act.sport.slice(1) : '');
 
   // Check si c'est un jour de compétition
@@ -3730,10 +3738,11 @@ function formatHMS(seconds) {
 // Utilisé pour : catégorisation activités, sélecteur sport pour
 // création d'entraînements futurs, filtres, affichage modal.
 // ============================================================
+// Catalogue aligné sur les libellés FR officiels Strava (ce que tu vois sur strava.com)
 window.SPORTS_CATALOG = {
   // Cyclisme
-  Ride: { fr: 'Vélo route', category: 'cyclisme', icon: '🚴' },
-  VirtualRide: { fr: 'Home-trainer', category: 'cyclisme', icon: '🚴' },
+  Ride: { fr: 'Cyclisme', category: 'cyclisme', icon: '🚴' },
+  VirtualRide: { fr: 'Cyclisme virtuel', category: 'cyclisme', icon: '🚴' },
   MountainBikeRide: { fr: 'VTT', category: 'cyclisme', icon: '🚵' },
   GravelRide: { fr: 'Gravel', category: 'cyclisme', icon: '🚴' },
   EBikeRide: { fr: 'Vélo électrique', category: 'cyclisme', icon: '🚴' },
@@ -3742,20 +3751,20 @@ window.SPORTS_CATALOG = {
   Handcycle: { fr: 'Handbike', category: 'cyclisme', icon: '🚴' },
 
   // Course à pied
-  Run: { fr: 'Course route', category: 'course', icon: '🏃' },
+  Run: { fr: 'Course à pied', category: 'course', icon: '🏃' },
   TrailRun: { fr: 'Trail', category: 'course', icon: '🏃' },
-  VirtualRun: { fr: 'Tapis de course', category: 'course', icon: '🏃' },
+  VirtualRun: { fr: 'Course virtuelle', category: 'course', icon: '🏃' },
 
   // Natation
-  Swim: { fr: 'Natation piscine', category: 'natation', icon: '🏊' },
-  OpenWaterSwim: { fr: 'Natation eau libre', category: 'natation', icon: '🏊' },
+  Swim: { fr: 'Natation', category: 'natation', icon: '🏊' },
+  OpenWaterSwim: { fr: 'Natation en eau libre', category: 'natation', icon: '🏊' },
 
   // Force / Salle
   WeightTraining: { fr: 'Musculation', category: 'musculation', icon: '🏋️' },
-  Workout: { fr: 'Entraînement libre', category: 'musculation', icon: '💪' },
-  Crossfit: { fr: 'Crossfit', category: 'musculation', icon: '🏋️' },
-  Elliptical: { fr: 'Elliptique', category: 'musculation', icon: '🏃' },
-  StairStepper: { fr: 'Stepper', category: 'musculation', icon: '🏃' },
+  Workout: { fr: 'Entraînement', category: 'musculation', icon: '💪' },
+  Crossfit: { fr: 'CrossFit', category: 'musculation', icon: '🏋️' },
+  Elliptical: { fr: 'Vélo elliptique', category: 'musculation', icon: '🏃' },
+  StairStepper: { fr: 'Stair-Stepper', category: 'musculation', icon: '🏃' },
   VirtualWorkout: { fr: 'Entraînement virtuel', category: 'musculation', icon: '💪' },
 
   // Marche / Rando
@@ -3765,26 +3774,26 @@ window.SPORTS_CATALOG = {
 
   // Neige
   AlpineSki: { fr: 'Ski alpin', category: 'autre', icon: '⛷️' },
-  BackcountrySki: { fr: 'Ski rando / hors-piste', category: 'autre', icon: '⛷️' },
+  BackcountrySki: { fr: 'Ski hors-piste', category: 'autre', icon: '⛷️' },
   NordicSki: { fr: 'Ski de fond', category: 'autre', icon: '⛷️' },
   Snowboard: { fr: 'Snowboard', category: 'autre', icon: '🏂' },
-  IceSkate: { fr: 'Patinage glace', category: 'autre', icon: '⛸️' },
+  IceSkate: { fr: 'Patinage', category: 'autre', icon: '⛸️' },
   InlineSkate: { fr: 'Roller', category: 'autre', icon: '🛼' },
 
   // Eau
   Rowing: { fr: 'Aviron', category: 'autre', icon: '🚣' },
   Kayaking: { fr: 'Kayak', category: 'autre', icon: '🛶' },
   Canoeing: { fr: 'Canoë', category: 'autre', icon: '🛶' },
-  StandUpPaddling: { fr: 'Paddle (SUP)', category: 'autre', icon: '🏄' },
+  StandUpPaddling: { fr: 'Stand up paddle', category: 'autre', icon: '🏄' },
   Surfing: { fr: 'Surf', category: 'autre', icon: '🏄' },
   Windsurf: { fr: 'Planche à voile', category: 'autre', icon: '🏄' },
   Kitesurf: { fr: 'Kitesurf', category: 'autre', icon: '🪁' },
   Sailing: { fr: 'Voile', category: 'autre', icon: '⛵' },
 
-  // Sports collectifs
+  // Sports collectifs / raquettes
   Soccer: { fr: 'Football', category: 'autre', icon: '⚽' },
-  Basketball: { fr: 'Basket', category: 'autre', icon: '🏀' },
-  Volleyball: { fr: 'Volley', category: 'autre', icon: '🏐' },
+  Basketball: { fr: 'Basketball', category: 'autre', icon: '🏀' },
+  Volleyball: { fr: 'Volleyball', category: 'autre', icon: '🏐' },
   Hockey: { fr: 'Hockey', category: 'autre', icon: '🏒' },
   Tennis: { fr: 'Tennis', category: 'autre', icon: '🎾' },
   Squash: { fr: 'Squash', category: 'autre', icon: '🎾' },
@@ -3805,10 +3814,39 @@ window.SPORTS_CATALOG = {
   Golf: { fr: 'Golf', category: 'autre', icon: '⛳' },
   Skateboard: { fr: 'Skate', category: 'autre', icon: '🛹' },
   Wheelchair: { fr: 'Fauteuil roulant', category: 'autre', icon: '🦽' },
-  Transition: { fr: 'Transition triathlon', category: 'autre', icon: '🏊' },
+  Transition: { fr: 'Transition', category: 'autre', icon: '🏊' },
 };
-// Helper : récupère le nom français d'un type intervals.icu (fallback : type brut)
-window.sportFr = (type) => (window.SPORTS_CATALOG[type] && window.SPORTS_CATALOG[type].fr) || type || 'Activité';
+
+// Fallback de catégorie → libellé FR (utilisé quand raw_type Strava est absent)
+const SPORT_CATEGORY_FR = {
+  cyclisme: 'Cyclisme',
+  course: 'Course à pied',
+  natation: 'Natation',
+  musculation: 'Musculation',
+  autre: 'Autre',
+};
+
+// Helper unique : renvoie le nom Strava FR exact à afficher
+//  Priorité : raw_type Strava traduit → catégorie traduite → 'Activité'
+window.sportFr = (rawTypeOrCategory) => {
+  if (!rawTypeOrCategory) return 'Activité';
+  const entry = window.SPORTS_CATALOG[rawTypeOrCategory];
+  if (entry) return entry.fr;
+  if (SPORT_CATEGORY_FR[rawTypeOrCategory]) return SPORT_CATEGORY_FR[rawTypeOrCategory];
+  return rawTypeOrCategory; // type Strava inconnu : on le montre brut
+};
+
+// Helper qui prend une activité complète et renvoie le nom de sport à afficher
+window.activitySportLabel = (act) => {
+  if (!act) return 'Activité';
+  // Priorité 1 : raw_type Strava (ex: "Ride" → "Cyclisme")
+  if (act.raw_type) return window.sportFr(act.raw_type);
+  // Priorité 2 : type brut Strava sur certaines anciennes activités
+  if (act.type && window.SPORTS_CATALOG[act.type]) return window.sportFr(act.type);
+  // Priorité 3 : catégorie interne
+  if (act.sport) return window.sportFr(act.sport);
+  return 'Activité';
+};
 
 let _modalCharts = [];
 function destroyModalCharts() {
@@ -5173,7 +5211,8 @@ function openSessionModal(iso, source) {
         const h = Math.floor(dur / 60);
         const m = (dur % 60).toString().padStart(2, '0');
         titleEl.innerHTML = `${act.name || act.sessionName || 'Séance'} ${act.type || act.sessionType ? `<span class="pill ${act.type || act.sessionType}">${act.type || act.sessionType}</span>` : ''}`;
-        const sportLabel = act.sport ? (act.sport.charAt(0).toUpperCase() + act.sport.slice(1)) : '';
+        // Nom de sport Strava exact (ex: "Cyclisme", "Course à pied", "Ski alpin")
+        const sportLabel = window.activitySportLabel(act);
         // Heure de début depuis start_date_local (format ISO local)
         let startTime = '';
         if (act.start_date_local) {
@@ -5980,10 +6019,15 @@ let sessions = [];
 function renderSessionsTable() {
   sessions = data.filter(d => d.sessionType).slice(-12).reverse();
   const tbody = document.getElementById('sessions-tbody');
-  tbody.innerHTML = sessions.map((s, i) => `
+  tbody.innerHTML = sessions.map((s, i) => {
+    // Récup du sport Strava depuis la 1re activité du jour, sinon depuis la racine
+    const firstAct = (s.activities && s.activities.length) ? s.activities[0] : s;
+    const sportLabel = window.activitySportLabel ? window.activitySportLabel(firstAct) : (s.sport || '—');
+    return `
     <tr data-idx="${i}">
       <td>${fmtDate(s.date)}</td>
       <td>${s.sessionName}</td>
+      <td><span class="sport-cell">${sportLabel}</span></td>
       <td><span class="pill ${s.sessionType}">${s.sessionType}</span></td>
       <td>${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')}</td>
       <td>${s.tss}</td>
@@ -5991,7 +6035,8 @@ function renderSessionsTable() {
       <td>${s.hr} bpm</td>
       <td>${s.compliance != null ? `<span style="color:${s.compliance>=95?'var(--accent)':s.compliance>=85?'var(--warn)':'var(--danger)'};">${s.compliance}%</span>` : '<span style="color:var(--text-mute);">—</span>'}</td>
     </tr>
-  `).join('');
+    `;
+  }).join('');
   // Auto-affichage de la 1ère séance ou message vide
   const detailWrap = document.getElementById('session-detail-wrap');
   if (sessions.length) {
