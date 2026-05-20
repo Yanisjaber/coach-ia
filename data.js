@@ -1,5 +1,5 @@
 window.DASHBOARD_DATA = {
-  "generated_at": "2026-05-20T11:53:24.039705",
+  "generated_at": "2026-05-20T14:17:46.561538",
   "athlete": {
     "id": "25665243",
     "name": "Yanis Jaber",
@@ -11,9 +11,9 @@ window.DASHBOARD_DATA = {
   "source": {
     "strava": true,
     "intervals_icu": false,
-    "whoop_real": true,
-    "whoop_real_days": 17,
-    "whoop_simulated_days": 3154,
+    "whoop_real": false,
+    "whoop_real_days": 0,
+    "whoop_simulated_days": 3171,
     "history_days": 3171,
     "activities_count": 1334,
     "planned_events_count": 0
@@ -139494,9 +139494,9 @@ window.DASHBOARD_DATA = {
       "hrv": null,
       "sleepH": null,
       "sleepQ": null,
-      "whoopSource": "real",
+      "whoopSource": "simulated",
       "rhr": null,
-      "strain": 0.0,
+      "strain": null,
       "deepH": null,
       "remH": null
     },
@@ -139558,9 +139558,9 @@ window.DASHBOARD_DATA = {
       "hrv": null,
       "sleepH": null,
       "sleepQ": null,
-      "whoopSource": "real",
+      "whoopSource": "simulated",
       "rhr": null,
-      "strain": 0.0,
+      "strain": null,
       "deepH": null,
       "remH": null
     },
@@ -139652,9 +139652,9 @@ window.DASHBOARD_DATA = {
       "hrv": null,
       "sleepH": null,
       "sleepQ": null,
-      "whoopSource": "real",
+      "whoopSource": "simulated",
       "rhr": null,
-      "strain": 0.0,
+      "strain": null,
       "deepH": null,
       "remH": null
     },
@@ -139716,9 +139716,9 @@ window.DASHBOARD_DATA = {
       "hrv": null,
       "sleepH": null,
       "sleepQ": null,
-      "whoopSource": "real",
+      "whoopSource": "simulated",
       "rhr": null,
-      "strain": 4.0,
+      "strain": null,
       "deepH": null,
       "remH": null
     },
@@ -139746,9 +139746,9 @@ window.DASHBOARD_DATA = {
       "hrv": null,
       "sleepH": null,
       "sleepQ": null,
-      "whoopSource": "real",
+      "whoopSource": "simulated",
       "rhr": null,
-      "strain": 20.5,
+      "strain": null,
       "deepH": null,
       "remH": null
     },
@@ -139806,15 +139806,15 @@ window.DASHBOARD_DATA = {
           "zones_power": null
         }
       ],
-      "recovery": 87,
-      "hrv": 123,
-      "sleepH": 6.8,
-      "sleepQ": 83,
-      "whoopSource": "real",
-      "rhr": 44,
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
       "strain": null,
-      "deepH": 1.7,
-      "remH": 1.8
+      "deepH": null,
+      "remH": null
     },
     {
       "date": "2026-05-09",
@@ -139836,15 +139836,15 @@ window.DASHBOARD_DATA = {
       "zones_hr": null,
       "zones_power": null,
       "activities": [],
-      "recovery": 64,
-      "hrv": 95,
-      "sleepH": 7.7,
-      "sleepQ": 78,
-      "whoopSource": "real",
-      "rhr": 50,
-      "strain": 6.4,
-      "deepH": 1.4,
-      "remH": 2.0
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
+      "strain": null,
+      "deepH": null,
+      "remH": null
     },
     {
       "date": "2026-05-10",
@@ -139866,15 +139866,15 @@ window.DASHBOARD_DATA = {
       "zones_hr": null,
       "zones_power": null,
       "activities": [],
-      "recovery": 27,
-      "hrv": 88,
-      "sleepH": 3.5,
-      "sleepQ": 32,
-      "whoopSource": "real",
-      "rhr": 52,
-      "strain": 11.5,
-      "deepH": 1.1,
-      "remH": 0.6
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
+      "strain": null,
+      "deepH": null,
+      "remH": null
     },
     {
       "date": "2026-05-11",
@@ -139896,15 +139896,15 @@ window.DASHBOARD_DATA = {
       "zones_hr": null,
       "zones_power": null,
       "activities": [],
-      "recovery": 74,
-      "hrv": 98,
-      "sleepH": 10.9,
-      "sleepQ": 78,
-      "whoopSource": "real",
-      "rhr": 50,
-      "strain": 2.5,
-      "deepH": 1.4,
-      "remH": 3.1
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
+      "strain": null,
+      "deepH": null,
+      "remH": null
     },
     {
       "date": "2026-05-12",
@@ -139960,15 +139960,15 @@ window.DASHBOARD_DATA = {
           "zones_power": null
         }
       ],
-      "recovery": 96,
-      "hrv": 122,
-      "sleepH": 7.0,
-      "sleepQ": 78,
-      "whoopSource": "real",
-      "rhr": 44,
-      "strain": 17.8,
-      "deepH": 1.5,
-      "remH": 1.6
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
+      "strain": null,
+      "deepH": null,
+      "remH": null
     },
     {
       "date": "2026-05-13",
@@ -139990,15 +139990,15 @@ window.DASHBOARD_DATA = {
       "zones_hr": null,
       "zones_power": null,
       "activities": [],
-      "recovery": 46,
-      "hrv": 135,
-      "sleepH": 3.9,
-      "sleepQ": 41,
-      "whoopSource": "real",
-      "rhr": 44,
-      "strain": 6.0,
-      "deepH": 1.5,
-      "remH": 0.5
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
+      "strain": null,
+      "deepH": null,
+      "remH": null
     },
     {
       "date": "2026-05-14",
@@ -140054,15 +140054,15 @@ window.DASHBOARD_DATA = {
           "zones_power": null
         }
       ],
-      "recovery": 82,
-      "hrv": 127,
-      "sleepH": 5.9,
-      "sleepQ": 55,
-      "whoopSource": "real",
-      "rhr": 46,
-      "strain": 4.2,
-      "deepH": 1.0,
-      "remH": 1.4
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
+      "strain": null,
+      "deepH": null,
+      "remH": null
     },
     {
       "date": "2026-05-15",
@@ -140084,15 +140084,15 @@ window.DASHBOARD_DATA = {
       "zones_hr": null,
       "zones_power": null,
       "activities": [],
-      "recovery": 52,
-      "hrv": 117,
-      "sleepH": 5.9,
-      "sleepQ": 58,
-      "whoopSource": "real",
-      "rhr": 45,
-      "strain": 20.6,
-      "deepH": 1.2,
-      "remH": 1.2
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
+      "strain": null,
+      "deepH": null,
+      "remH": null
     },
     {
       "date": "2026-05-16",
@@ -140148,15 +140148,15 @@ window.DASHBOARD_DATA = {
           "zones_power": null
         }
       ],
-      "recovery": 80,
-      "hrv": 128,
-      "sleepH": 6.8,
-      "sleepQ": 75,
-      "whoopSource": "real",
-      "rhr": 44,
-      "strain": 4.9,
-      "deepH": 1.8,
-      "remH": 1.5
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
+      "strain": null,
+      "deepH": null,
+      "remH": null
     },
     {
       "date": "2026-05-17",
@@ -140178,15 +140178,15 @@ window.DASHBOARD_DATA = {
       "zones_hr": null,
       "zones_power": null,
       "activities": [],
-      "recovery": 54,
-      "hrv": 113,
-      "sleepH": 7.2,
-      "sleepQ": 76,
-      "whoopSource": "real",
-      "rhr": 51,
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
       "strain": null,
-      "deepH": 1.7,
-      "remH": 1.3
+      "deepH": null,
+      "remH": null
     },
     {
       "date": "2026-05-18",
@@ -140208,15 +140208,15 @@ window.DASHBOARD_DATA = {
       "zones_hr": null,
       "zones_power": null,
       "activities": [],
-      "recovery": 43,
-      "hrv": 116,
-      "sleepH": 5.0,
-      "sleepQ": 53,
-      "whoopSource": "real",
-      "rhr": 44,
-      "strain": 4.3,
-      "deepH": 1.2,
-      "remH": 1.2
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
+      "strain": null,
+      "deepH": null,
+      "remH": null
     },
     {
       "date": "2026-05-19",
@@ -140272,15 +140272,15 @@ window.DASHBOARD_DATA = {
           "zones_power": null
         }
       ],
-      "recovery": 75,
-      "hrv": 121,
-      "sleepH": 8.9,
-      "sleepQ": 78,
-      "whoopSource": "real",
-      "rhr": 45,
-      "strain": 14.3,
-      "deepH": 1.6,
-      "remH": 2.2
+      "recovery": null,
+      "hrv": null,
+      "sleepH": null,
+      "sleepQ": null,
+      "whoopSource": "simulated",
+      "rhr": null,
+      "strain": null,
+      "deepH": null,
+      "remH": null
     }
   ],
   "plan": []
