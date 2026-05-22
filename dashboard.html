@@ -11,6 +11,9 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/fr.js"></script>
+<!-- Leaflet : cartes pour tracer les parcours GPX -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="data.js" onerror="window._dataJsMissing=true"></script>
 <script src="streams.js" onerror="window._streamsJsMissing=true"></script>
 <style>
@@ -785,7 +788,16 @@
     margin-bottom: 8px;
     align-self: flex-start;
   }
-  .day-card-name { font-size: 12px; font-weight: 600; margin-bottom: 6px; line-height: 1.3; }
+  .day-card-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; line-height: 1.3; }
+  .day-card-stage {
+    font-size: 10px;
+    color: var(--accent);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
   .day-card-meta { font-size: 11px; color: var(--text-dim); margin-bottom: auto; }
   .day-card-why {
     font-size: 10px;
@@ -996,6 +1008,29 @@
     border-radius: 6px;
   }
   .modal-close:hover { color: var(--danger); background: var(--bg-elev2); }
+  .modal-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .modal-action-btn {
+    background: none;
+    border: none;
+    color: var(--text-mute);
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: inherit;
+    transition: color 0.12s, background 0.12s;
+  }
+  .modal-action-btn:hover { color: var(--accent); background: var(--bg-elev2); }
+  .modal-action-btn .dots {
+    display: inline-block;
+    transform: translateY(-3px);
+    font-weight: 700;
+  }
   .modal-metrics {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1032,6 +1067,367 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 10px;
+  }
+  .modal-info-box {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+  }
+  .modal-info-box strong { color: var(--accent); }
+  /* Métriques "importantes" : Sport, Allure → mises en valeur */
+  .modal-metric.accent {
+    background: linear-gradient(135deg, rgba(74,222,128,0.10), rgba(34,197,94,0.06));
+    border: 1px solid rgba(74,222,128,0.3);
+  }
+  .modal-metric.accent .m-value { color: var(--accent); }
+  /* Carte trace GPX */
+  .gpx-map-wrap {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    overflow: hidden;
+  }
+  .gpx-svg {
+    display: block;
+    width: 100%;
+    height: 350px;
+    border-radius: 6px;
+  }
+  .gpx-leaflet {
+    width: 100%;
+    height: 400px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #1c2230;
+  }
+  .gpx-leaflet .leaflet-control-attribution {
+    background: rgba(20,24,33,0.85) !important;
+    color: var(--text-mute) !important;
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+  }
+  .gpx-leaflet .leaflet-control-attribution a { color: var(--text-dim) !important; }
+  .gpx-leaflet .leaflet-bar {
+    background: var(--bg-elev) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .gpx-leaflet .leaflet-bar a {
+    background: var(--bg-elev) !important;
+    color: var(--text) !important;
+    border-bottom-color: var(--border) !important;
+  }
+  .gpx-leaflet .leaflet-bar a:hover {
+    background: var(--bg-elev2) !important;
+    color: var(--accent) !important;
+  }
+  /* Flèches directionnelles sur la trace GPX (vraie flèche tige + tête) */
+  .gpx-arrow {
+    pointer-events: none;
+  }
+  .gpx-arrow-wrap {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.9));
+  }
+  .gpx-arrow-wrap svg {
+    display: block;
+  }
+  /* Marker mobile "bike" qui suit le curseur du profil d'altitude */
+  .gpx-bike-marker { transition: opacity 0.15s; }
+  .gpx-bike-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ef4444;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.85), 0 0 12px rgba(239, 68, 68, 0.8);
+    animation: gpx-pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes gpx-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(0,0,0,0.85), 0 0 12px rgba(239, 68, 68, 0.8); }
+    50% { box-shadow: 0 0 0 2px rgba(0,0,0,0.85), 0 0 22px rgba(239, 68, 68, 1); }
+  }
+
+  /* Markers GPX custom (départ / arrivée) style Tour de France */
+  .gpx-marker { position: relative; }
+  .gpx-marker-dot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.85), 0 3px 10px rgba(0,0,0,0.5);
+  }
+  .gpx-marker-label {
+    position: absolute;
+    left: 24px;
+    top: -3px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    background: rgba(0,0,0,0.85);
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .gpx-elev-wrap {
+    position: relative;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    overflow: hidden;
+    height: 200px;
+  }
+  /* Stats du profil (Distance, D+, D-, pentes...) au-dessus du chart */
+  .gpx-stats-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .gpx-stat {
+    flex: 1;
+    min-width: 90px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    text-align: center;
+  }
+  .gpx-stat .g-l {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .gpx-stat .g-v {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  /* Bouton "Ajouter segment" affiché quand un range est sélectionné */
+  .add-segment-btn {
+    flex: 1;
+    min-width: 140px;
+    background: rgba(74, 222, 128, 0.14);
+    border: 1px dashed rgba(74, 222, 128, 0.6);
+    color: var(--accent);
+    border-radius: 8px;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .add-segment-btn:hover {
+    background: rgba(74, 222, 128, 0.22);
+    border-color: var(--accent);
+    border-style: solid;
+  }
+  /* Croix de suppression d'un segment */
+  .seg-del-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-mute);
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: inherit;
+    transition: color 0.12s, background 0.12s;
+  }
+  .seg-del-btn:hover {
+    color: var(--danger);
+    background: rgba(248, 113, 113, 0.12);
+  }
+  .gpx-elev-wrap canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  .gpx-elev-line {
+    position: absolute;
+    width: 1px;
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.5) 50%, transparent 50%);
+    background-size: 1px 6px;
+    pointer-events: none;
+    z-index: 10;
+    display: none;
+  }
+  .gpx-elev-dot {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #4ade80;
+    border: 2px solid #062017;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.3);
+    pointer-events: none;
+    z-index: 11;
+    display: none;
+  }
+  /* Liste des montées significatives détectées dans le GPX */
+  .climbs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .climb-item {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    overflow: hidden;
+  }
+  .climb-item:hover { border-color: var(--accent); }
+  .climb-item.expanded { border-color: var(--accent); }
+  .climb-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+  }
+  .climb-row:hover { background: rgba(74, 222, 128, 0.06); }
+  .climb-chevron {
+    color: var(--text-mute);
+    font-size: 10px;
+    transition: transform 0.18s;
+    margin-left: 6px;
+  }
+  /* Bloc détail expandable d'une bosse */
+  .climb-detail {
+    border-top: 1px solid var(--border);
+    padding: 12px 14px 14px;
+    background: rgba(0,0,0,0.2);
+  }
+  .climb-detail-inner { display: flex; flex-direction: column; gap: 10px; }
+  .climb-svg {
+    width: 100%;
+    height: 220px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.3);
+  }
+  .climb-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .climb-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .climb-legend .dot,
+  .climb-steep-item .dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+  }
+  .climb-steep-list { margin-top: 4px; }
+  .climb-steep-title {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .climb-steep-item {
+    display: grid;
+    grid-template-columns: 16px 1fr 60px 70px;
+    gap: 10px;
+    align-items: center;
+    font-size: 12px;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .climb-steep-item:last-child { border-bottom: none; }
+  .climb-steep-item .ss-range { color: var(--text-dim); }
+  .climb-steep-item .ss-slope { font-weight: 700; color: var(--text); text-align: right; }
+  .climb-steep-item .ss-gain { color: var(--text-mute); text-align: right; }
+  .climb-cat {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    flex-shrink: 0;
+    color: #062017;
+  }
+  .climb-cat.cat-HC { background: #ef4444; color: white; }
+  .climb-cat.cat-1  { background: #f97316; }
+  .climb-cat.cat-2  { background: #fbbf24; }
+  .climb-cat.cat-3  { background: #84cc16; }
+  .climb-cat.cat-4  { background: #4ade80; }
+  .climb-info { flex: 1; min-width: 0; }
+  .climb-range {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .climb-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .gpx-elev-tooltip {
+    position: absolute;
+    background: rgba(20, 24, 33, 0.96);
+    border: 1px solid #4ade80;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text);
+    pointer-events: none;
+    z-index: 11;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.7);
+    line-height: 1.45;
+    min-width: 150px;
+  }
+  .gpx-elev-tooltip .t-km {
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .gpx-elev-tooltip .t-ele {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .gpx-elev-dplus-badge {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: rgba(74,222,128,0.18);
+    color: var(--accent);
+    border: 1px solid rgba(74,222,128,0.4);
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    pointer-events: none;
+    z-index: 5;
   }
   .modal-placeholder {
     background: var(--bg-elev2);
@@ -1460,19 +1856,32 @@
     text-transform: uppercase;
     letter-spacing: 0.4px;
   }
-  .flatpickr-days { padding: 4px 0 !important; }
-  .dayContainer { padding: 0 !important; }
+  .flatpickr-days {
+    padding: 4px 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+  .flatpickr-rContainer { width: 100% !important; }
+  .dayContainer {
+    padding: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
   .flatpickr-day {
     color: var(--text) !important;
     background: transparent !important;
     border: 1px solid transparent !important;
     border-radius: 6px !important;
     font-weight: 500 !important;
-    height: 36px !important;
-    line-height: 34px !important;
-    max-width: 38px !important;
-    margin: 1px;
+    height: 38px !important;
+    line-height: 38px !important;
+    max-width: none !important;
+    width: 14.28% !important; /* 7 jours par ligne, équitable */
+    margin: 0;
     transition: background 0.12s, color 0.12s !important;
+    flex-basis: 14.28% !important;
   }
   .flatpickr-day:hover {
     background: rgba(74, 222, 128, 0.15) !important;
@@ -1524,6 +1933,175 @@
   }
   .flatpickr-time .flatpickr-time-separator,
   .flatpickr-time .flatpickr-am-pm { color: var(--text-dim) !important; }
+
+  /* === TABS DES ÉTAPES (course par étapes) — pleine largeur, segmenté === */
+  /* `:not([hidden])` pour ne PAS override le display:none du hidden attribute */
+  .stages-tabs[hidden] { display: none !important; }
+  .stages-tabs:not([hidden]) {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    padding: 0;
+    height: 39px;
+    grid-column: 1 / -1; /* force pleine largeur dans le grid 2 cols */
+  }
+  .stage-tabs-list {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+  }
+  .stage-tab {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 12px;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s;
+    position: relative;
+    min-width: 0;
+    text-align: center;
+    overflow: hidden;
+  }
+  /* Si la tab a une croix de suppression, réserver de l'espace à droite pour qu'elle
+     n'écrase pas le label */
+  .stage-tab:has(.stage-tab-close) {
+    padding-right: 24px;
+  }
+  /* Fallback pour les navigateurs sans :has() : on ajoute la même classe en JS */
+  .stage-tab.has-close { padding-right: 24px; }
+  .stage-tab:hover {
+    background: rgba(74, 222, 128, 0.06);
+    color: var(--text);
+  }
+  .stage-tab.active {
+    background: var(--accent);
+    color: #062017;
+  }
+  .stage-tab.active:hover {
+    background: #5fe898;
+  }
+  .stage-tab-close {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: inherit;
+    opacity: 0.45;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 4px 6px;
+    font-family: inherit;
+    transition: opacity 0.12s, color 0.12s;
+  }
+  .stage-tab-close:hover {
+    opacity: 1;
+    color: var(--danger);
+  }
+  .stage-tab-add {
+    width: 44px;
+    background: var(--bg-elev2);
+    border: none;
+    border-left: 1px solid var(--border);
+    color: var(--accent);
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 1;
+    flex-shrink: 0;
+    font-family: inherit;
+    transition: background 0.15s, transform 0.1s;
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .stage-tab-add:hover {
+    background: rgba(74, 222, 128, 0.15);
+    color: var(--accent);
+  }
+  .stage-tab-add:active { transform: scale(0.92); }
+
+  /* === TOGGLE SWITCH (course par étapes) === */
+  .form-field-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+  .form-field-header > span {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+  }
+  .toggle-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .toggle-switch input { display: none; }
+  .toggle-track {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: background 0.18s, border-color 0.18s;
+  }
+  .toggle-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: var(--text-mute);
+    border-radius: 50%;
+    transition: transform 0.18s, background 0.18s;
+  }
+  .toggle-switch input:checked + .toggle-track {
+    background: rgba(74, 222, 128, 0.18);
+    border-color: var(--accent);
+  }
+  .toggle-switch input:checked + .toggle-track .toggle-thumb {
+    transform: translateX(16px);
+    background: var(--accent);
+  }
+  .toggle-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    transition: color 0.18s;
+  }
+  .toggle-switch input:checked ~ .toggle-label {
+    color: var(--accent);
+  }
 
   /* === FILE PICKER CUSTOM (au lieu du bouton "Choisir un fichier" natif) === */
   .file-picker {
@@ -1939,6 +2517,13 @@
     background: var(--bg-elev2);
     border-radius: 8px;
     font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    border: 1px solid transparent;
+  }
+  .comp-item:hover {
+    background: rgba(74, 222, 128, 0.06);
+    border-color: rgba(74, 222, 128, 0.25);
   }
   .comp-prio {
     display: inline-flex;
@@ -1955,6 +2540,18 @@
   .comp-prio.C { background: rgba(205, 127, 50, 0.2); color: #cd7f32; }
   .comp-name { font-weight: 600; }
   .comp-date { color: var(--text-dim); font-size: 12px; }
+  .comp-stages-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    background: rgba(167, 139, 250, 0.15);
+    color: #a78bfa;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
   .comp-countdown {
     color: var(--info);
     font-size: 12px;
@@ -2704,7 +3301,12 @@
         <h2 id="modal-title">—</h2>
         <div class="modal-meta" id="modal-meta">—</div>
       </div>
-      <button class="modal-close" id="modal-close" title="Fermer (Échap)">×</button>
+      <div class="modal-header-actions">
+        <button class="modal-action-btn" id="modal-edit-btn" title="Modifier" hidden>
+          <span class="dots">⋯</span>
+        </button>
+        <button class="modal-close" id="modal-close" title="Fermer (Échap)">×</button>
+      </div>
     </div>
     <div id="modal-body">—</div>
   </div>
@@ -2718,10 +3320,37 @@
       <button class="modal-close" id="comp-modal-close" title="Fermer">×</button>
     </div>
     <div class="add-form-grid">
-      <label class="form-field form-col-2">
-        <span>Nom de la compétition</span>
+      <div class="form-field form-col-2">
+        <div class="form-field-header">
+          <span>Nom de la compétition</span>
+          <label class="toggle-switch" title="Course par étapes (Tour de France, Vuelta, etc.)">
+            <input type="checkbox" id="comp-modal-stages-toggle">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">Course par étapes</span>
+          </label>
+        </div>
         <input type="text" id="comp-modal-name" placeholder="Ex : Course de Cambrils">
+      </div>
+
+      <!-- Priorité + Sport : infos GLOBALES de la compé (ne changent pas par étape) -->
+      <label class="form-field">
+        <span>Priorité</span>
+        <select id="comp-modal-priority">
+          <option value="A">Objectif principal</option>
+          <option value="B">Intermédiaire</option>
+          <option value="C">Préparation</option>
+        </select>
       </label>
+      <label class="form-field">
+        <span>Sport</span>
+        <select id="comp-modal-sport"></select>
+      </label>
+
+      <!-- Tabs des étapes (visible uniquement si toggle "Course par étapes" activé) -->
+      <div class="stages-tabs form-col-2" id="comp-stages-tabs" hidden>
+        <div class="stage-tabs-list" id="comp-stage-tabs-list"></div>
+        <button type="button" class="stage-tab-add" id="comp-stage-tab-add" title="Ajouter une étape">+</button>
+      </div>
       <label class="form-field">
         <span>Date</span>
         <input type="date" id="comp-modal-date">
@@ -2744,20 +3373,8 @@
         <input type="hidden" id="comp-modal-time" value="12:00">
       </div>
       <label class="form-field">
-        <span>Priorité</span>
-        <select id="comp-modal-priority">
-          <option value="A">Objectif principal</option>
-          <option value="B">Intermédiaire</option>
-          <option value="C">Préparation</option>
-        </select>
-      </label>
-      <label class="form-field">
-        <span>Sport</span>
-        <select id="comp-modal-sport"></select>
-      </label>
-      <label class="form-field">
         <span>Type d'épreuve</span>
-        <input type="text" id="comp-modal-type" placeholder="Course en ligne, contre-la-montre, marathon...">
+        <select id="comp-modal-type"></select>
       </label>
       <label class="form-field">
         <span>Distance (km)</span>
@@ -3880,6 +4497,44 @@ function loadCompetitions() {
   } catch (e) { return []; }
 }
 
+// Renvoie la liste des compés "à plat" : chaque course par étapes est expansée
+// en une entrée par étape (avec date/sport/km/etc de l'étape).
+// Les compés simples restent telles quelles. Sert au calendrier.
+function loadCompetitionsExpanded() {
+  const out = [];
+  for (const c of loadCompetitions()) {
+    if (c.stages && Array.isArray(c.stagesList) && c.stagesList.length > 0) {
+      c.stagesList.forEach((st, idx) => {
+        if (!st.date) return; // ignore les étapes sans date
+        out.push({
+          id: `${c.id}-stage-${idx}`,
+          parentId: c.id,
+          name: `${c.name} — Étape ${idx + 1}`,
+          date: st.date,
+          time: st.time || null,
+          // Priority et sport sont GLOBAUX (depuis la compé), pas par étape
+          priority: c.priority || 'A',
+          sport: c.sport || 'Ride',
+          type: st.type || null,
+          km: st.km || null,
+          dplus: st.dplus || null,
+          target: st.target || null,
+          laps: st.laps || null,
+          notes: st.notes || null,
+          gpxName: st.gpxName || null,
+          gpxContent: st.gpxContent || null,
+          stageIdx: idx,
+          totalStages: c.stagesList.length,
+          stages: false, // pour les render, on traite chaque étape comme une compé simple
+        });
+      });
+    } else {
+      out.push(c);
+    }
+  }
+  return out;
+}
+
 function saveCompetitions(comps) {
   localStorage.setItem(COMP_KEY, JSON.stringify(comps));
 }
@@ -3916,9 +4571,26 @@ function savePlanSnapshot(iso, proposal, allowOverwrite) {
 }
 
 function renderCompList() {
+  // Helpers de format
+  const fmtFullDate = d => d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+  const fmtShortDayMonth = d => d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+  const fmtYear = d => d.getFullYear();
+
   const comps = loadCompetitions()
-    .map(c => ({ ...c, dateObj: new Date(c.date + 'T12:00:00') }))
-    .filter(c => c.dateObj >= today)
+    .map(c => {
+      // Pour les courses par étapes : start = première étape, end = dernière étape
+      let startDate = c.date, endDate = c.date;
+      if (c.stages && Array.isArray(c.stagesList) && c.stagesList.length) {
+        const dates = c.stagesList.map(s => s.date).filter(Boolean).sort();
+        if (dates.length) { startDate = dates[0]; endDate = dates[dates.length - 1]; }
+      }
+      return {
+        ...c,
+        dateObj: new Date(startDate + 'T12:00:00'),
+        endDateObj: new Date(endDate + 'T12:00:00'),
+      };
+    })
+    .filter(c => c.endDateObj >= today) // affiche tant que la dernière étape n'est pas passée
     .sort((a, b) => a.dateObj - b.dateObj);
 
   const list = document.getElementById('comp-list');
@@ -3928,12 +4600,27 @@ function renderCompList() {
   }
   list.innerHTML = comps.map(c => {
     const daysUntil = Math.ceil((c.dateObj - today) / 86400000);
-    const dateStr = c.dateObj.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
-    return `<div class="comp-item">
+    let dateStr;
+    if (c.stages && c.endDateObj.getTime() !== c.dateObj.getTime()) {
+      // Course par étapes : start → end
+      // Si même année, on ne répète pas l'année
+      const sameYear = c.dateObj.getFullYear() === c.endDateObj.getFullYear();
+      if (sameYear) {
+        dateStr = `${fmtShortDayMonth(c.dateObj)} → ${fmtShortDayMonth(c.endDateObj)} ${fmtYear(c.endDateObj)}`;
+      } else {
+        dateStr = `${fmtShortDayMonth(c.dateObj)} ${fmtYear(c.dateObj)} → ${fmtShortDayMonth(c.endDateObj)} ${fmtYear(c.endDateObj)}`;
+      }
+      // Ajoute un petit indicateur du nb d'étapes
+      const nbStages = c.stagesList.length;
+      dateStr += ` <span class="comp-stages-badge" title="${nbStages} étapes">· ${nbStages} étapes</span>`;
+    } else {
+      dateStr = fmtFullDate(c.dateObj);
+    }
+    return `<div class="comp-item" data-comp-id="${c.id}" title="Voir le détail de la compétition">
       <span class="comp-prio ${c.priority}">${c.priority}</span>
       <span class="comp-name">${c.name}</span>
       <span class="comp-date">${dateStr}</span>
-      <span class="comp-countdown">dans ${daysUntil} j</span>
+      <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'dans ' + daysUntil + ' j'}</span>
       <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
     </div>`;
   }).join('');
@@ -3957,12 +4644,33 @@ document.getElementById('comp-add').addEventListener('click', () => {
 });
 
 document.getElementById('comp-list').addEventListener('click', (e) => {
-  if (!e.target.classList.contains('comp-del')) return;
-  const id = e.target.dataset.id;
-  const comps = loadCompetitions().filter(c => c.id !== id);
-  saveCompetitions(comps);
-  renderCompList();
-  renderCalendar();
+  // Clic sur la croix de suppression
+  if (e.target.classList.contains('comp-del')) {
+    e.stopPropagation();
+    const id = e.target.dataset.id;
+    const comps = loadCompetitions().filter(c => c.id !== id);
+    saveCompetitions(comps);
+    renderCompList();
+    renderCalendar();
+    return;
+  }
+  // Clic sur la ligne de compé → ouvre la modal de détail
+  const item = e.target.closest('.comp-item');
+  if (!item) return;
+  const compId = item.dataset.compId;
+  if (!compId) return;
+  const comp = loadCompetitions().find(c => c.id === compId);
+  if (!comp) return;
+  // Pour course par étapes : ouvrir la 1ère étape ; sinon la date principale
+  let openDate = comp.date;
+  if (comp.stages && Array.isArray(comp.stagesList) && comp.stagesList.length) {
+    const dates = comp.stagesList.map(s => s.date).filter(Boolean).sort();
+    if (dates.length) openDate = dates[0];
+  }
+  if (openDate) {
+    // S'assure d'être sur l'onglet Entraîneur (le modal nécessite que today soit accessible)
+    if (typeof openSessionModal === 'function') openSessionModal(openDate, 'prevu');
+  }
 });
 
 // ========= MODAL D'AJOUT DE COMPÉTITION =========
@@ -4420,15 +5128,279 @@ function initFlatpickrAll() {
 // Init initial + ré-init si la liste change
 initFlatpickrAll();
 
+// === Options "Type d'épreuve" selon le sport choisi ===
+// Pour Cyclisme : 2 choix (Course en ligne, Contre la montre)
+// Pour les autres sports : pas d'options spécifiques pour l'instant (champ vide)
+const TYPE_OPTIONS_BY_SPORT = {
+  // Cyclisme et variantes
+  Ride: ['Course en ligne', 'Contre la montre'],
+  GravelRide: ['Course en ligne', 'Contre la montre'],
+  VirtualRide: ['Course en ligne', 'Contre la montre'],
+  MountainBikeRide: ['Course en ligne', 'Contre la montre'],
+  EBikeRide: ['Course en ligne', 'Contre la montre'],
+};
+
+function populateTypeSelectForSport(rawType) {
+  const sel = document.getElementById('comp-modal-type');
+  if (!sel) return;
+  const opts = TYPE_OPTIONS_BY_SPORT[rawType] || [];
+  const prev = sel.value;
+  sel.innerHTML = '';
+  // Option vide par défaut (texte libre / non précisé)
+  const empty = document.createElement('option');
+  empty.value = '';
+  empty.textContent = opts.length ? 'Sélectionner...' : 'Non précisé';
+  sel.appendChild(empty);
+  opts.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o;
+    opt.textContent = o;
+    sel.appendChild(opt);
+  });
+  // Réessaye de garder la valeur précédente si possible
+  if (prev && Array.from(sel.options).some(o => o.value === prev)) {
+    sel.value = prev;
+  } else {
+    sel.value = '';
+  }
+  // Re-enhance le custom dropdown
+  if (typeof enhanceSelect === 'function') enhanceSelect('comp-modal-type');
+  if (sel._customUpdate) sel._customUpdate();
+}
+
+// Écoute les changements de sport pour mettre à jour les options du type
+(function wireTypeSelectToSport() {
+  const sportSel = document.getElementById('comp-modal-sport');
+  if (!sportSel) return;
+  sportSel.addEventListener('change', () => populateTypeSelectForSport(sportSel.value));
+})();
+
+// ========= GESTION DES ÉTAPES (course par étapes) =========
+let stagesData = []; // [{name, date, time, sport, type, km, dplus, target, laps, notes, gpxName, gpxContent}, ...]
+let activeStageIdx = 0;
+
+// Champs gérés par les étapes (tout sauf le nom global qui reste partagé)
+const STAGE_FIELDS = ['date','time','type','km','dplus','target','laps','notes','sport','priority','gpx'];
+
+// Priority et Sport sont GLOBAUX à la compé (ne changent pas par étape)
+// → ils ne sont pas inclus dans le snapshot stage
+function readFormToStage() {
+  const stage = {};
+  stage.date = document.getElementById('comp-modal-date').value || '';
+  stage.time = document.getElementById('comp-modal-time').value || '';
+  stage.type = document.getElementById('comp-modal-type').value || '';
+  stage.km = document.getElementById('comp-modal-km').value || '';
+  stage.dplus = document.getElementById('comp-modal-dplus').value || '';
+  stage.target = document.getElementById('comp-modal-target').value || '';
+  stage.laps = document.getElementById('comp-modal-laps').value || '';
+  stage.notes = document.getElementById('comp-modal-notes').value || '';
+  const gpxInput = document.getElementById('comp-modal-gpx');
+  stage.gpxFile = gpxInput && gpxInput.files[0] ? gpxInput.files[0] : null;
+  stage.gpxName = stage.gpxFile ? stage.gpxFile.name : null;
+  return stage;
+}
+
+function writeStageToForm(stage) {
+  if (!stage) stage = {};
+  // NOTE: priority et sport NE sont PAS touchés (globaux à la compé)
+  document.getElementById('comp-modal-date').value = stage.date || '';
+  document.getElementById('comp-modal-type').value = stage.type || '';
+  document.getElementById('comp-modal-km').value = stage.km || '';
+  document.getElementById('comp-modal-dplus').value = stage.dplus || '';
+  document.getElementById('comp-modal-target').value = stage.target || '';
+  document.getElementById('comp-modal-laps').value = stage.laps || '';
+  document.getElementById('comp-modal-notes').value = stage.notes || '';
+  // Time stepper
+  const [h, m] = (stage.time || '12:00').split(':').map(n => parseInt(n, 10) || 0);
+  if (window.resetTimeStepper) window.resetTimeStepper('comp-modal-time', h, m);
+  // Flatpickr date
+  const dateInput = document.getElementById('comp-modal-date');
+  if (dateInput && dateInput._flatpickr) {
+    if (stage.date) dateInput._flatpickr.setDate(stage.date, false);
+    else dateInput._flatpickr.clear();
+  }
+  // Custom select Type (priority/sport non touchés)
+  const typeEl = document.getElementById('comp-modal-type');
+  if (typeEl && typeEl._customUpdate) typeEl._customUpdate();
+  // GPX picker : reset visual
+  const gpxInput = document.getElementById('comp-modal-gpx');
+  if (gpxInput) {
+    gpxInput.value = '';
+    const picker = gpxInput.closest('.file-picker');
+    if (picker) {
+      picker.classList.remove('has-file');
+      const lbl = picker.querySelector('.file-picker-label');
+      if (lbl) lbl.textContent = stage.gpxName || 'Choisir un fichier GPX';
+      if (stage.gpxName) picker.classList.add('has-file');
+      const clr = picker.querySelector('.file-picker-clear');
+      if (clr) clr.hidden = !stage.gpxName;
+    }
+  }
+}
+
+function renderStageTabs() {
+  const list = document.getElementById('comp-stage-tabs-list');
+  if (!list) return;
+  // Garde-fou : si stagesData vide, init avec 2 étapes vides
+  if (!stagesData || stagesData.length < 2) {
+    stagesData = [stagesData[0] || {}, stagesData[1] || {}];
+    activeStageIdx = 0;
+  }
+  const hasClose = stagesData.length > 2;
+  list.innerHTML = stagesData.map((s, i) => `
+    <button type="button" class="stage-tab${i === activeStageIdx ? ' active' : ''}${hasClose ? ' has-close' : ''}" data-stage="${i}">
+      <span class="stage-tab-label" data-long="Étape ${i + 1}" data-short="E${i + 1}">Étape ${i + 1}</span>
+      ${hasClose ? `<span class="stage-tab-close" data-close="${i}" title="Supprimer cette étape">×</span>` : ''}
+    </button>
+  `).join('');
+  // Wire clicks
+  list.querySelectorAll('.stage-tab').forEach(t => {
+    t.addEventListener('click', (e) => {
+      if (e.target.classList.contains('stage-tab-close')) return;
+      const idx = +t.dataset.stage;
+      if (idx === activeStageIdx) return;
+      stagesData[activeStageIdx] = readFormToStage();
+      activeStageIdx = idx;
+      writeStageToForm(stagesData[activeStageIdx]);
+      renderStageTabs();
+    });
+  });
+  list.querySelectorAll('.stage-tab-close').forEach(c => {
+    c.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = +c.dataset.close;
+      if (stagesData.length <= 2) return;
+      stagesData.splice(idx, 1);
+      if (activeStageIdx >= stagesData.length) activeStageIdx = stagesData.length - 1;
+      writeStageToForm(stagesData[activeStageIdx]);
+      renderStageTabs();
+    });
+  });
+  // Désactive visuellement le + si on atteint la limite (10)
+  const addBtn = document.getElementById('comp-stage-tab-add');
+  if (addBtn) {
+    if (stagesData.length >= 10) {
+      addBtn.disabled = true;
+      addBtn.style.opacity = '0.3';
+      addBtn.style.cursor = 'not-allowed';
+      addBtn.title = 'Maximum 10 étapes';
+    } else {
+      addBtn.disabled = false;
+      addBtn.style.opacity = '';
+      addBtn.style.cursor = '';
+      addBtn.title = 'Ajouter une étape';
+    }
+  }
+  // Après render : check si les tabs débordent et raccourcir si besoin
+  adjustStageTabLabels();
+}
+
+// Détecte si UN des labels passe à la ligne (le chiffre va sur une 2e ligne)
+// et bascule TOUS les labels en version courte (E1, E2, etc.)
+function adjustStageTabLabels() {
+  const list = document.getElementById('comp-stage-tabs-list');
+  if (!list) return;
+  const labels = list.querySelectorAll('.stage-tab-label');
+  // Reset en version longue
+  labels.forEach(l => { l.textContent = l.dataset.long; });
+  // Mesure : si un label a une hauteur > 1 ligne (passage à la ligne), bascule en short
+  requestAnimationFrame(() => {
+    let mustShorten = false;
+    // Compare scrollHeight (incluant wrapping) vs hauteur 1 ligne (~22px pour font 13)
+    const oneLineMaxHeight = 22;
+    labels.forEach(l => {
+      // Méthode 1 : si le contenu wrap, offsetHeight dépasse une ligne
+      if (l.offsetHeight > oneLineMaxHeight) mustShorten = true;
+      // Méthode 2 : si le texte est tronqué horizontalement (avec nowrap)
+      if (l.scrollWidth > l.clientWidth + 1) mustShorten = true;
+    });
+    if (mustShorten) {
+      labels.forEach(l => { l.textContent = l.dataset.short; });
+    }
+  });
+}
+
+// ResizeObserver pour re-vérifier si la modal change de taille (responsive)
+if (typeof ResizeObserver !== 'undefined') {
+  const list = document.getElementById('comp-stage-tabs-list');
+  if (list) new ResizeObserver(() => adjustStageTabLabels()).observe(list);
+}
+
+function setStagesMode(on) {
+  const tabsBar = document.getElementById('comp-stages-tabs');
+  if (!tabsBar) return;
+  if (on) {
+    // 1ère activation : snapshot le form en stage 1 + ajoute un stage 2 vide
+    // Réactivation : on garde toutes les étapes en mémoire, mais on sync le form courant
+    // (qui a pu être édité en mode simple) sur l'étape 0
+    if (stagesData.length >= 2) {
+      stagesData[0] = readFormToStage();
+      activeStageIdx = Math.min(activeStageIdx, stagesData.length - 1);
+    } else {
+      const current = readFormToStage();
+      stagesData = [current, {}];
+      activeStageIdx = 0;
+    }
+    tabsBar.hidden = false;
+    renderStageTabs();
+    writeStageToForm(stagesData[activeStageIdx]);
+  } else {
+    // Avant de cacher, snapshot le form courant dans l'étape active
+    // → si on réactive plus tard, on retrouve les éditions
+    if (stagesData.length > 0) {
+      stagesData[activeStageIdx] = readFormToStage();
+    }
+    tabsBar.hidden = true;
+    // Affiche les valeurs de l'étape 0 (= valeurs "principales" de la compé)
+    if (stagesData.length > 0) writeStageToForm(stagesData[0]);
+    // /!\ NE PAS vider stagesData → on garde tout en mémoire pour réactivation
+  }
+}
+
+// Wire le toggle stages
+const stagesToggleEl = document.getElementById('comp-modal-stages-toggle');
+if (stagesToggleEl) {
+  stagesToggleEl.addEventListener('change', () => {
+    setStagesMode(stagesToggleEl.checked);
+  });
+}
+// Wire le bouton + d'ajout d'étape
+const MAX_STAGES = 10;
+const stageAddBtn = document.getElementById('comp-stage-tab-add');
+if (stageAddBtn) {
+  stageAddBtn.addEventListener('click', () => {
+    if (stagesData.length >= MAX_STAGES) return; // limite à 10 étapes
+    stagesData[activeStageIdx] = readFormToStage();
+    stagesData.push({});
+    activeStageIdx = stagesData.length - 1;
+    writeStageToForm(stagesData[activeStageIdx]);
+    renderStageTabs();
+  });
+}
+
 function openCompModal() {
   const modal = document.getElementById('comp-modal');
   if (!modal) return;
   initFlatpickrAll(); // au cas où
+  // Reset mode édition (sera ré-activé par openCompModalForEdit si applicable)
+  window._editingCompId = null;
+  // Restaure le titre et le bouton en mode "création" par défaut
+  const titleH2 = document.querySelector('#comp-modal .modal-title h2');
+  if (titleH2) titleH2.textContent = 'Ajouter une compétition';
+  const saveBtn = document.getElementById('comp-modal-save');
+  if (saveBtn) saveBtn.textContent = 'Enregistrer';
   // Reset form (sauf "time" qui est géré par le stepper)
   ['name','date','type','km','dplus','target','laps','notes'].forEach(k => {
     const el = document.getElementById('comp-modal-' + k);
     if (el) el.value = '';
   });
+  // Reset toggle course par étapes + state stages
+  const stagesToggle = document.getElementById('comp-modal-stages-toggle');
+  if (stagesToggle) stagesToggle.checked = false;
+  stagesData = [];
+  activeStageIdx = 0;
+  const tabsBar = document.getElementById('comp-stages-tabs');
+  if (tabsBar) tabsBar.hidden = true;
   // Reset le stepper d'heure à 12h00 par défaut
   if (window.resetTimeStepper) window.resetTimeStepper('comp-modal-time', 12, 0);
   const prioEl = document.getElementById('comp-modal-priority');
@@ -4442,6 +5414,8 @@ function openCompModal() {
   const sportEl = document.getElementById('comp-modal-sport');
   if (sportEl) sportEl.value = 'Ride';
   if (sportEl && sportEl._customUpdate) sportEl._customUpdate();
+  // Peuple le select Type d'épreuve selon le sport actif
+  if (typeof populateTypeSelectForSport === 'function') populateTypeSelectForSport('Ride');
   const gpxEl = document.getElementById('comp-modal-gpx');
   if (gpxEl) {
     gpxEl.value = '';
@@ -4479,6 +5453,36 @@ async function saveCompFromModal() {
   const target = document.getElementById('comp-modal-target').value.trim();
   const laps = parseInt(document.getElementById('comp-modal-laps').value, 10) || null;
   const notes = document.getElementById('comp-modal-notes').value.trim();
+  const stagesEl = document.getElementById('comp-modal-stages-toggle');
+  const stages = !!(stagesEl && stagesEl.checked);
+
+  // Si course par étapes : on récupère la liste des étapes (snapshot du form pour l'étape active)
+  let stagesList = null;
+  if (stages) {
+    stagesData[activeStageIdx] = readFormToStage();
+    // Lit les GPX async (chaque étape peut en avoir un)
+    stagesList = [];
+    for (let i = 0; i < stagesData.length; i++) {
+      const s = stagesData[i];
+      let gpxContent = null;
+      if (s.gpxFile) {
+        try { gpxContent = await s.gpxFile.text(); } catch (e) { console.warn('GPX étape ' + (i + 1) + ' :', e); }
+      }
+      stagesList.push({
+        date: s.date || null,
+        time: s.time || null,
+        // priority et sport ne sont PAS stockés par étape (globaux à la compé)
+        type: s.type || null,
+        km: parseFloat(s.km) || null,
+        dplus: parseInt(s.dplus, 10) || null,
+        target: s.target || null,
+        laps: parseInt(s.laps, 10) || null,
+        notes: s.notes || null,
+        gpxName: s.gpxName || null,
+        gpxContent,
+      });
+    }
+  }
 
   // GPX (lecture optionnelle)
   let gpxContent = null;
@@ -4494,12 +5498,42 @@ async function saveCompFromModal() {
   }
 
   const comps = loadCompetitions();
-  comps.push({
-    id: Date.now().toString(),
+  const newEntry = {
+    id: window._editingCompId || Date.now().toString(),
     name, date, time, priority, sport,
     type: typeEpr, km, dplus, target, laps, notes,
+    stages,
+    stagesList,
     gpxName, gpxContent
-  });
+  };
+  if (window._editingCompId) {
+    // Mode édition : remplace la compé existante
+    const idx = comps.findIndex(c => c.id === window._editingCompId);
+    if (idx >= 0) {
+      // Conserve les éventuels champs GPX existants si non modifiés
+      const old = comps[idx];
+      if (!gpxContent && old.gpxContent) {
+        newEntry.gpxName = old.gpxName;
+        newEntry.gpxContent = old.gpxContent;
+      }
+      // Conserve gpxContent par étape si l'utilisateur n'a pas ré-uploadé
+      if (stagesList && old.stagesList) {
+        for (let i = 0; i < stagesList.length; i++) {
+          if (!stagesList[i].gpxContent && old.stagesList[i] && old.stagesList[i].gpxContent) {
+            stagesList[i].gpxContent = old.stagesList[i].gpxContent;
+            stagesList[i].gpxName = old.stagesList[i].gpxName;
+          }
+        }
+        newEntry.stagesList = stagesList;
+      }
+      comps[idx] = newEntry;
+    } else {
+      comps.push(newEntry); // au cas où l'ID a disparu, on l'ajoute
+    }
+    window._editingCompId = null;
+  } else {
+    comps.push(newEntry);
+  }
   saveCompetitions(comps);
   closeCompModal();
   renderCompList();
@@ -4733,7 +5767,7 @@ function determinePhaseForDate(comps, fromDate, currentTSB) {
 }
 
 function renderWeekPlan() {
-  const comps = loadCompetitions().map(c => ({ ...c, dateObj: new Date(c.date + 'T12:00:00') }));
+  const comps = loadCompetitionsExpanded().map(c => ({ ...c, dateObj: new Date(c.date + 'T12:00:00') }));
   const { phase, daysUntil, comp } = determinePhase(comps, todayData.tsb);
 
   // Pill de phase supprimée — l'info est dans le sous-titre
@@ -4812,22 +5846,72 @@ function renderWeekPlan() {
           continue;
         }
       } else {
-        // Cas 2 : aujourd'hui ou futur → on génère le prévu
-        const dayPhase = determinePhaseForDate(comps, d, todayData.tsb);
-        const tmpl = PLAN_TEMPLATES[dayPhase][dow];
-        proposal = { ...tmpl };
+        // Cas 2 : aujourd'hui ou futur
+        // On collecte TOUS les items du jour : compés/étapes + entraînements manuels
+        // Si rien → template AI. Si ≥ 1 → on ignore le template.
+        const items = [];
 
-        // Override si c'est le jour de compétition
-        if (comp && toIsoDate(comp.dateObj) === iso) {
-          proposal = { type: 'vo2', name: `🏁 ${comp.name}`, dur: 120, tss: 200, why: `Jour de compétition · priorité ${comp.priority}` };
-        } else if (isToday) {
-          // Ajuster selon recovery du jour pour aujourd'hui
-          proposal = adjustForRecovery(proposal, todayData.recovery);
+        // 1) Toutes les compés (chaque étape compte comme un item)
+        const compsForToday = comps.filter(c => toIsoDate(c.dateObj) === iso);
+        for (const c of compsForToday) {
+          let raceDur = 120;
+          if (c.target) {
+            const m = c.target.match(/(\d+)\s*h\s*(\d{0,2})/i);
+            if (m) raceDur = parseInt(m[1], 10) * 60 + (parseInt(m[2], 10) || 0);
+          }
+          const raceTss = Math.round(raceDur * 1.0);
+          let raceName, stageInfo = '';
+          if (c.stageIdx !== undefined && c.totalStages) {
+            raceName = c.name.replace(/ — Étape \d+$/, '');
+            stageInfo = `Étape ${c.stageIdx + 1}/${c.totalStages}`;
+          } else {
+            raceName = c.name;
+          }
+          items.push({
+            type: 'vo2',
+            name: raceName,
+            stageInfo,
+            isRace: true,
+            dur: raceDur,
+            tss: raceTss,
+            sport: c.sport || 'Ride',
+            km: c.km || null,
+            priority: c.priority,
+            why: `Compétition · priorité ${c.priority || 'A'}${c.km ? ' · ' + Math.round(c.km) + ' km' : ''}`,
+          });
         }
 
-        // Snapshot : aujourd'hui est ré-écrasé à chaque render (le plan ajusté est figé
-        // au moment où la journée se termine, grâce au refresh à minuit qui re-render).
-        // Les jours futurs ne sont PAS snapshotés (ils peuvent encore changer).
+        // 2) Tous les entraînements prévus manuels pour ce jour
+        const manualTrainings = (typeof loadTrainings === 'function') ? loadTrainings() : [];
+        const manualForToday = manualTrainings.filter(t => t.date === iso);
+        for (const m of manualForToday) {
+          items.push({
+            type: m.type || 'endurance',
+            name: m.name,
+            dur: m.duration || 0,
+            tss: m.tss || 0,
+            sport: m.sport || 'Ride',
+            why: m.notes || 'Séance ajoutée manuellement',
+            _manual: true,
+          });
+        }
+
+        // 3) Si aucun item explicite → template AI
+        if (items.length === 0) {
+          const dayPhase = determinePhaseForDate(comps, d, todayData.tsb);
+          const tmpl = PLAN_TEMPLATES[dayPhase][dow];
+          let tmplProposal = { ...tmpl };
+          if (isToday) tmplProposal = adjustForRecovery(tmplProposal, todayData.recovery);
+          items.push(tmplProposal);
+        }
+
+        // Index de l'item actuellement affiché (pour multi-items)
+        const curIdx = Math.min(dayPrevuIndex[iso] || 0, items.length - 1);
+        proposal = items[curIdx];
+        proposal._totalItems = items.length;
+        proposal._itemIdx = curIdx;
+
+        // Snapshot : aujourd'hui est ré-écrasé à chaque render
         if (isToday) savePlanSnapshot(iso, proposal, true);
       }
 
@@ -4840,35 +5924,50 @@ function renderWeekPlan() {
         weekTotalTss += proposal.tss || 0;
         weekTotalSessions += 1;
       }
-      // Check si c'est un jour de compétition
-      const isRace = comp && toIsoDate(comp.dateObj) === iso;
+      // L'item actuellement affiché peut être une compé ou un entraînement manuel
+      const isRace = !!proposal.isRace;
       const raceClass = isRace ? ' race' : '';
-      const raceAttr = isRace ? ` data-priority="${comp.priority || 'A'}"` : '';
-      // Sport label : nom Strava FR exact, ou sport du compé pour les jours de course
-      // Pas de sport sur les jours de repos
+      const raceAttr = isRace ? ` data-priority="${proposal.priority || 'A'}"` : '';
+      // Sport label
       let sportLabel = '';
       let sportCat = 'autre';
-      if (isRace) {
-        sportLabel = comp.sport ? window.sportFr(comp.sport) : 'Compétition';
-        sportCat = window.activitySportColorKey({ sport: comp.sport }) || 'autre';
-      } else if (!isRest) {
+      if (!isRest) {
         sportLabel = window.sportFr(proposal.sport || 'cyclisme');
         sportCat = window.activitySportColorKey({ sport: proposal.sport || 'cyclisme' }) || 'autre';
       }
-      const kmStr = isRace && comp.km ? Math.round(comp.km) + ' km' : '';
+      const kmStr = proposal.km ? Math.round(proposal.km) + ' km' : '';
       const durStr = proposal.dur ? `${Math.floor(proposal.dur/60)}h${(proposal.dur%60).toString().padStart(2,'0')}` : '';
       const metaLine = [durStr, kmStr].filter(Boolean).join(' · ');
       const sportBlock = sportLabel
         ? `<div class="day-card-sport"><span class="sport-pill" data-sport-cat="${sportCat}">${sportLabel}</span></div>`
         : '';
-      const dowSuffix = isToday ? " · aujourd'hui" : (isPast ? ' · passé' : '');
+      const dowSuffix = isToday ? " · auj." : (isPast ? ' · passé' : '');
+      const stageInfoLine = (proposal.stageInfo)
+        ? `<div class="day-card-stage">${proposal.stageInfo}</div>`
+        : '';
+      // Multi-items : flèches ‹ › + compteur, comme pour Réalisé
+      const totalItems = proposal._totalItems || 1;
+      const curItemIdx = proposal._itemIdx || 0;
+      const hasMulti = totalItems > 1;
+      const dateRow = hasMulti ? `
+        <div class="day-card-date-row">
+          <div class="day-card-date">${d.getDate()}</div>
+          <div class="day-card-arrows-wrapper">
+            <button class="day-card-arrow-inline arrow-prev-prevu" data-iso="${iso}" title="Activité précédente">‹</button>
+            <button class="day-card-arrow-inline arrow-next-prevu" data-iso="${iso}" title="Activité suivante">›</button>
+          </div>
+        </div>
+      ` : `<div class="day-card-date">${d.getDate()}</div>`;
+      const counter = hasMulti ? `<div class="day-card-counter">${curItemIdx + 1}/${totalItems}</div>` : '';
       cardHTML = `
         <div class="day-card${isRest ? ' rest' : ''}${todayClass}${pastClass}${raceClass}" data-iso="${iso}" data-source="prevu"${raceAttr}>
           <div class="day-card-dow">${dowFr[dow]}${dowSuffix}</div>
-          <div class="day-card-date">${d.getDate()}</div>
+          ${dateRow}
           <div class="day-card-name">${proposal.name}</div>
+          ${stageInfoLine}
           <div class="day-card-meta">${metaLine}</div>
           ${sportBlock}
+          ${counter}
         </div>
       `;
       dayCards.push(cardHTML);
@@ -4926,6 +6025,8 @@ let calendarMode = 'prevu';
 let selectedMonth = null; // null = 4 dernières semaines, sinon Date 1er du mois sélectionné
 // Index de l'activité affichée par jour (pour les jours multi-activités). Clé = ISO date.
 const dayActivityIndex = {};
+// Index de l'item Prévu affiché par jour (pour jours avec plusieurs compés/entraînements)
+const dayPrevuIndex = {};
 
 function getDisplayedActivity(realDay) {
   // Renvoie l'activité actuellement à afficher pour ce jour (selon dayActivityIndex)
@@ -4970,7 +6071,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   const sportCat = window.activitySportColorKey ? window.activitySportColorKey(act) : 'autre';
 
   // Check si c'est un jour de compétition
-  const comps = (typeof loadCompetitions === 'function') ? loadCompetitions() : [];
+  const comps = (typeof loadCompetitionsExpanded === 'function') ? loadCompetitionsExpanded() : [];
   const compToday = comps.find(c => c.date === iso);
   const raceClass = compToday ? ' race' : '';
   const raceAttr = compToday ? ` data-priority="${compToday.priority || 'A'}"` : '';
@@ -5072,8 +6173,33 @@ function renderRealiseCalendar() {
           </div>
         `;
       } else {
-        const realDay = dataByIso[iso];
-        // Mémorise le dernier jour avec CTL/ATL pour les totaux de la semaine
+        let realDay = dataByIso[iso];
+        // Récupère les entraînements MANUELS réalisés (ex: muscu, yoga ajoutés à la main)
+        const manualRealised = (typeof loadRealisedTrainings === 'function') ? loadRealisedTrainings().filter(t => t.date === iso) : [];
+        // Si on a des manuels et pas de realDay Strava, on en crée un virtuel
+        // Si on a déjà un realDay Strava, on merge les activités manuelles dedans
+        if (manualRealised.length > 0) {
+          if (!realDay) realDay = { date: iso, activities: [], sessionType: 'autre' };
+          if (!realDay.activities) realDay.activities = [];
+          for (const m of manualRealised) {
+            realDay.activities.push({
+              name: m.name,
+              sport: m.sport || 'autre',
+              raw_type: m.sport,
+              type: m.type || 'endurance',
+              duration: m.duration || 0,
+              tss: m.tss || 0,
+              distance_km: m.distance_km || null,
+              _manual: true,
+            });
+          }
+          // Recalcule duration et tss au niveau jour si pas déjà set
+          if (!realDay.duration) realDay.duration = realDay.activities.reduce((s, a) => s + (a.duration || 0), 0);
+          if (!realDay.tss) realDay.tss = realDay.activities.reduce((s, a) => s + (a.tss || 0), 0);
+          if (!realDay.sessionType) realDay.sessionType = realDay.activities[0].type || 'endurance';
+          if (!realDay.sessionName) realDay.sessionName = realDay.activities[0].name;
+        }
+        // Mémorise le dernier jour avec CTL/ATL
         if (realDay && (realDay.ctl != null || realDay.atl != null)) {
           lastDayWithMetrics = realDay;
         }
@@ -5081,9 +6207,7 @@ function renderRealiseCalendar() {
           const dur = realDay.duration || 0;
           weekTotalDur += dur;
           weekTotalTss += realDay.tss || 0;
-          // Compte chaque activité séparément (un jour peut en avoir plusieurs)
           weekTotalSessions += (realDay.activities && realDay.activities.length) ? realDay.activities.length : 1;
-          // Somme des km : depuis les activités si présentes, sinon depuis le jour
           if (realDay.activities && realDay.activities.length) {
             for (const a of realDay.activities) weekTotalKm += a.distance_km || 0;
           } else if (realDay.distance_km) {
@@ -5162,7 +6286,7 @@ document.getElementById('week-calendar').addEventListener('click', (e) => {
     return;
   }
 
-  // Flèches multi-activités sur les cartes jour
+  // Flèches multi-activités sur les cartes jour (mode Réalisé)
   const isPrev = e.target.classList.contains('arrow-prev');
   const isNext = e.target.classList.contains('arrow-next');
   if (isPrev || isNext) {
@@ -5176,6 +6300,28 @@ document.getElementById('week-calendar').addEventListener('click', (e) => {
     if (next < 0) next = day.activities.length - 1;
     if (next >= day.activities.length) next = 0;
     dayActivityIndex[iso] = next;
+    renderCalendar();
+    return;
+  }
+  // Flèches multi-items sur les cartes Prévu (compés + entraînements manuels)
+  const isPrevPrevu = e.target.classList.contains('arrow-prev-prevu');
+  const isNextPrevu = e.target.classList.contains('arrow-next-prevu');
+  if (isPrevPrevu || isNextPrevu) {
+    e.stopPropagation();
+    const iso = e.target.dataset.iso;
+    // On compte le nombre d'items pour ce jour (compés + manuels)
+    const compsExp = (typeof loadCompetitionsExpanded === 'function') ? loadCompetitionsExpanded() : [];
+    const nbComps = compsExp.filter(c => c.date === iso).length;
+    const manualTr = (typeof loadTrainings === 'function') ? loadTrainings() : [];
+    const nbManual = manualTr.filter(t => t.date === iso).length;
+    const total = nbComps + nbManual;
+    if (total < 2) return;
+    const dir = isNextPrevu ? 1 : -1;
+    const current = dayPrevuIndex[iso] || 0;
+    let next = current + dir;
+    if (next < 0) next = total - 1;
+    if (next >= total) next = 0;
+    dayPrevuIndex[iso] = next;
     renderCalendar();
     return;
   }
@@ -6787,6 +7933,1111 @@ async function renderStreamsSection(container, activityId) {
 }
 
 // ========= MODAL DÉTAIL SÉANCE =========
+// === Rendu du profil d'altitude d'un GPX en SVG (distance vs élévation) ===
+function renderGpxElevation(gpxContent, svgId) {
+  const svg = document.getElementById(svgId);
+  if (!svg || !gpxContent) return;
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(gpxContent, 'application/xml');
+    const trkpts = doc.getElementsByTagName('trkpt');
+    const pts = trkpts.length ? trkpts : (doc.getElementsByTagName('rtept').length ? doc.getElementsByTagName('rtept') : doc.getElementsByTagName('wpt'));
+    if (!pts.length) {
+      svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="12">Pas de points GPS</text>';
+      return;
+    }
+    // Haversine distance helper (km)
+    function dist(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+    // Construit la série (cumKm, ele)
+    const series = [];
+    let cumKm = 0, prevLat = null, prevLon = null;
+    let hasEle = false;
+    for (let i = 0; i < pts.length; i++) {
+      const lat = parseFloat(pts[i].getAttribute('lat'));
+      const lon = parseFloat(pts[i].getAttribute('lon'));
+      if (isNaN(lat) || isNaN(lon)) continue;
+      if (prevLat !== null) cumKm += dist(prevLat, prevLon, lat, lon);
+      prevLat = lat; prevLon = lon;
+      const eleEl = pts[i].getElementsByTagName('ele')[0];
+      const ele = eleEl ? parseFloat(eleEl.textContent) : NaN;
+      if (!isNaN(ele)) hasEle = true;
+      series.push({ km: cumKm, ele: isNaN(ele) ? null : ele });
+    }
+    if (!hasEle) {
+      svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="12">Pas de données d\'altitude dans le GPX</text>';
+      return;
+    }
+    // Bounds
+    const elevs = series.map(p => p.ele).filter(e => e != null);
+    let minEle = Math.min(...elevs);
+    let maxEle = Math.max(...elevs);
+    const totalKm = series[series.length - 1].km;
+    if (totalKm <= 0) {
+      svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="12">Distance nulle</text>';
+      return;
+    }
+    // Marge pour que la courbe ne touche pas les bords
+    const eleRange = Math.max(maxEle - minEle, 10);
+    const elePad = eleRange * 0.1;
+    minEle -= elePad;
+    maxEle += elePad;
+    // Calcul D+ total (positive elevation gain)
+    let elevGain = 0;
+    for (let i = 1; i < series.length; i++) {
+      const d = (series[i].ele || 0) - (series[i-1].ele || 0);
+      if (d > 0) elevGain += d;
+    }
+
+    const W = 900, H = 180, padL = 40, padR = 16, padT = 16, padB = 28;
+    const drawW = W - padL - padR;
+    const drawH = H - padT - padB;
+    // Path area (du bas vers le haut)
+    let path = '';
+    for (let i = 0; i < series.length; i++) {
+      const p = series[i];
+      if (p.ele == null) continue;
+      const x = padL + (p.km / totalKm) * drawW;
+      const y = padT + drawH - ((p.ele - minEle) / (maxEle - minEle)) * drawH;
+      path += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+    }
+    // Fermer l'area pour fill
+    const lastX = padL + drawW;
+    const baseY = padT + drawH;
+    const area = path + `L${lastX.toFixed(1)} ${baseY.toFixed(1)} L${padL} ${baseY.toFixed(1)} Z`;
+
+    // Axes labels (3 ticks Y, distance min/mid/max)
+    const ticks = [];
+    for (let t = 0; t <= 3; t++) {
+      const eleT = minEle + (maxEle - minEle) * (1 - t / 3);
+      const yT = padT + (drawH * t / 3);
+      ticks.push({ y: yT, label: Math.round(eleT) + ' m' });
+    }
+    const xTicks = [];
+    for (let t = 0; t <= 4; t++) {
+      const kmT = (totalKm * t) / 4;
+      const xT = padL + (drawW * t / 4);
+      xTicks.push({ x: xT, label: kmT.toFixed(0) + ' km' });
+    }
+
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = `
+      <defs>
+        <linearGradient id="elevGrad-${svgId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="rgba(74,222,128,0.7)"/>
+          <stop offset="100%" stop-color="rgba(74,222,128,0.05)"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="${W}" height="${H}" fill="rgba(74,222,128,0.03)" rx="8"/>
+      ${ticks.map(t => `
+        <line x1="${padL}" y1="${t.y}" x2="${W - padR}" y2="${t.y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+        <text x="${padL - 6}" y="${t.y + 4}" text-anchor="end" fill="#64748b" font-size="11">${t.label}</text>
+      `).join('')}
+      ${xTicks.map(t => `
+        <text x="${t.x}" y="${H - 8}" text-anchor="middle" fill="#64748b" font-size="11">${t.label}</text>
+      `).join('')}
+      <path d="${area}" fill="url(#elevGrad-${svgId})" stroke="none"/>
+      <path d="${path}" stroke="#4ade80" stroke-width="2" fill="none" stroke-linejoin="round"/>
+      <text x="${W - padR - 8}" y="${padT + 14}" text-anchor="end" fill="#4ade80" font-size="11" font-weight="700">D+ ${Math.round(elevGain)} m</text>
+      <line class="cursor-line" id="${svgId}-cursor-line" x1="0" y1="${padT}" x2="0" y2="${baseY}" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" opacity="0" pointer-events="none"/>
+      <circle class="cursor-dot" id="${svgId}-cursor-dot" cx="0" cy="0" r="5" fill="#4ade80" stroke="#062017" stroke-width="2" opacity="0" pointer-events="none"/>
+    `;
+
+    // ====== Interactivité curseur (crosshair + tooltip) ======
+    const wrap = svg.parentNode;
+    const tooltip = wrap ? wrap.querySelector('.gpx-elev-tooltip') : null;
+    const cursorLine = svg.querySelector('.cursor-line');
+    const cursorDot = svg.querySelector('.cursor-dot');
+    if (!wrap || !tooltip || !cursorLine || !cursorDot) return;
+
+    // Trouve l'altitude interpolée à un km donné
+    function eleAtKm(km) {
+      if (km <= 0) return series[0].ele;
+      if (km >= totalKm) return series[series.length - 1].ele;
+      // Binary search
+      let lo = 0, hi = series.length - 1;
+      while (lo < hi - 1) {
+        const mid = (lo + hi) >> 1;
+        if (series[mid].km < km) lo = mid; else hi = mid;
+      }
+      const a = series[lo], b = series[hi];
+      const t = (km - a.km) / (b.km - a.km || 1);
+      return (a.ele || 0) + ((b.ele || 0) - (a.ele || 0)) * t;
+    }
+
+    // Pente locale sur fenêtre +/- 100m
+    function slopeAtKm(km) {
+      const window = 0.1; // km
+      const km1 = Math.max(0, km - window);
+      const km2 = Math.min(totalKm, km + window);
+      const e1 = eleAtKm(km1);
+      const e2 = eleAtKm(km2);
+      const dx = (km2 - km1) * 1000; // m
+      if (dx === 0) return 0;
+      return ((e2 - e1) / dx) * 100; // %
+    }
+
+    function onMove(e) {
+      const rect = wrap.getBoundingClientRect();
+      const xPx = e.clientX - rect.left;
+      // Mappe xPx (en pixels conteneur) → x SVG (viewBox)
+      const xSvg = (xPx / rect.width) * W;
+      if (xSvg < padL || xSvg > W - padR) { onLeave(); return; }
+      const km = ((xSvg - padL) / drawW) * totalKm;
+      const ele = eleAtKm(km);
+      const slope = slopeAtKm(km);
+      const ySvg = padT + drawH - ((ele - minEle) / (maxEle - minEle)) * drawH;
+      cursorLine.setAttribute('x1', xSvg);
+      cursorLine.setAttribute('x2', xSvg);
+      cursorLine.setAttribute('opacity', '0.5');
+      cursorDot.setAttribute('cx', xSvg);
+      cursorDot.setAttribute('cy', ySvg);
+      cursorDot.setAttribute('opacity', '1');
+      // Tooltip en HTML, positionné en pixels conteneur
+      tooltip.style.display = 'block';
+      tooltip.innerHTML = `
+        <div class="t-km">${km.toFixed(2)} km</div>
+        <div class="t-ele">Altitude : ${Math.round(ele)} m · pente ${slope >= 0 ? '+' : ''}${slope.toFixed(1)}%</div>
+      `;
+      // Positionnement : à droite du curseur sauf si trop près du bord
+      const tipW = 170;
+      let left = xPx + 12;
+      if (left + tipW > rect.width) left = xPx - tipW - 12;
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = '8px';
+    }
+    function onLeave() {
+      cursorLine.setAttribute('opacity', '0');
+      cursorDot.setAttribute('opacity', '0');
+      tooltip.style.display = 'none';
+    }
+    // Nettoie d'éventuels listeners précédents
+    if (wrap._gpxElevMove) wrap.removeEventListener('mousemove', wrap._gpxElevMove);
+    if (wrap._gpxElevLeave) wrap.removeEventListener('mouseleave', wrap._gpxElevLeave);
+    wrap._gpxElevMove = onMove;
+    wrap._gpxElevLeave = onLeave;
+    wrap.addEventListener('mousemove', onMove);
+    wrap.addEventListener('mouseleave', onLeave);
+  } catch (e) {
+    console.warn('[renderGpxElevation]', e);
+    svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="12">Erreur de lecture de l\'altitude</text>';
+  }
+}
+
+// === Extraction des MONTÉES significatives (>= minGain m) depuis le GPX ===
+// Détecte les portions de montée continue, en ignorant les petites descentes (< 5m)
+function extractGpxClimbs(gpxContent, minGain = 30) {
+  if (!gpxContent) return [];
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(gpxContent, 'application/xml');
+    const trkpts = doc.getElementsByTagName('trkpt');
+    const pts = trkpts.length ? trkpts : (doc.getElementsByTagName('rtept').length ? doc.getElementsByTagName('rtept') : doc.getElementsByTagName('wpt'));
+    if (!pts.length) return [];
+    function _d(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+    // Construit la série (km cumulé, altitude)
+    const series = [];
+    let cumKm = 0, prevLat = null, prevLon = null;
+    for (let i = 0; i < pts.length; i++) {
+      const lat = parseFloat(pts[i].getAttribute('lat'));
+      const lon = parseFloat(pts[i].getAttribute('lon'));
+      if (isNaN(lat) || isNaN(lon)) continue;
+      if (prevLat !== null) cumKm += _d(prevLat, prevLon, lat, lon);
+      prevLat = lat; prevLon = lon;
+      const eleEl = pts[i].getElementsByTagName('ele')[0];
+      const ele = eleEl ? parseFloat(eleEl.textContent) : NaN;
+      if (!isNaN(ele)) series.push({ km: cumKm, ele });
+    }
+    if (series.length < 2) return [];
+
+    // Helper : pente locale en % sur fenêtre 300m autour de l'index
+    function localSlope(idx, halfWin = 0.15) {
+      let j1 = idx, j2 = idx;
+      while (j1 > 0 && series[idx].km - series[j1-1].km < halfWin) j1--;
+      while (j2 < series.length - 1 && series[j2+1].km - series[idx].km < halfWin) j2++;
+      const dx = (series[j2].km - series[j1].km) * 1000;
+      if (dx <= 0) return 0;
+      return ((series[j2].ele - series[j1].ele) / dx) * 100;
+    }
+
+    // === NOUVELLE APPROCHE : scan slope-based + merging ===
+    // 1. Pour chaque point, calculer la pente locale (300m window)
+    // 2. Marquer les points "climbing" (slope >= 2%)
+    // 3. Trouver les runs continus + merger ceux séparés par <300m
+    // 4. Pour chaque run, calculer D+ réel et garder si >= minGain
+    const SLOPE_ENTRY = 2; // % minimum pour entrer en "climbing"
+    const MERGE_GAP_KM = 0.3; // on fusionne deux runs séparés de < 300m
+
+    const slopes = series.map((_, i) => localSlope(i));
+
+    // Trouve les runs continus où slope >= SLOPE_ENTRY
+    const runs = [];
+    let runStart = -1;
+    for (let i = 0; i < slopes.length; i++) {
+      if (slopes[i] >= SLOPE_ENTRY) {
+        if (runStart < 0) runStart = i;
+      } else {
+        if (runStart >= 0) {
+          runs.push({ s: runStart, e: i - 1 });
+          runStart = -1;
+        }
+      }
+    }
+    if (runStart >= 0) runs.push({ s: runStart, e: slopes.length - 1 });
+
+    // Merge des runs proches (gap < MERGE_GAP_KM)
+    const merged = [];
+    for (const r of runs) {
+      const last = merged[merged.length - 1];
+      if (last && series[r.s].km - series[last.e].km < MERGE_GAP_KM) {
+        last.e = r.e;
+      } else {
+        merged.push({ s: r.s, e: r.e });
+      }
+    }
+
+    // Pour chaque run mergé : calcul D+ réel + filtre par minGain
+    const climbs = [];
+    for (const r of merged) {
+      let s = r.s, e = r.e;
+      // Petite extension en amont/aval tant qu'on continue à monter doucement
+      while (s > 0 && series[s].ele - series[s-1].ele > 0 && localSlope(s-1) > 0) s--;
+      while (e < series.length - 1 && series[e+1].ele - series[e].ele > 0 && localSlope(e+1) > 0) e++;
+      // D+ smart sur la portion [s..e]
+      let lastSignif = series[s].ele;
+      let gain = 0;
+      const TH = 3;
+      for (let i = s + 1; i <= e; i++) {
+        const dd = series[i].ele - lastSignif;
+        if (dd > TH) { gain += dd; lastSignif = series[i].ele; }
+        else if (dd < -TH) { lastSignif = series[i].ele; }
+      }
+      if (gain < minGain) continue;
+      const distKm = series[e].km - series[s].km;
+      const avgSlope = distKm > 0 ? ((series[e].ele - series[s].ele) / (distKm * 1000)) * 100 : 0;
+      // Pente max
+      let maxSlope = -Infinity;
+      for (let j = s; j <= e; j++) {
+        const sl = localSlope(j);
+        if (sl > maxSlope) maxSlope = sl;
+      }
+      climbs.push({
+        startKm: series[s].km, endKm: series[e].km,
+        startEle: series[s].ele, endEle: series[e].ele,
+        distKm, gain, avgSlope,
+        maxSlope: isFinite(maxSlope) ? maxSlope : avgSlope,
+      });
+    }
+    return climbs;
+  } catch (e) {
+    console.warn('[extractGpxClimbs]', e);
+    return [];
+  }
+}
+
+// === Extraction des stats principales (km, D+, D-) depuis le contenu GPX ===
+// Utilisé pour override les valeurs manuellement saisies si un GPX est uploadé
+function extractGpxStats(gpxContent) {
+  if (!gpxContent) return null;
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(gpxContent, 'application/xml');
+    const trkpts = doc.getElementsByTagName('trkpt');
+    const pts = trkpts.length ? trkpts : (doc.getElementsByTagName('rtept').length ? doc.getElementsByTagName('rtept') : doc.getElementsByTagName('wpt'));
+    if (!pts.length) return null;
+    function _d(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+    let cumKm = 0, prevLat = null, prevLon = null;
+    const elevs = [];
+    for (let i = 0; i < pts.length; i++) {
+      const lat = parseFloat(pts[i].getAttribute('lat'));
+      const lon = parseFloat(pts[i].getAttribute('lon'));
+      if (isNaN(lat) || isNaN(lon)) continue;
+      if (prevLat !== null) cumKm += _d(prevLat, prevLon, lat, lon);
+      prevLat = lat; prevLon = lon;
+      const eleEl = pts[i].getElementsByTagName('ele')[0];
+      const ele = eleEl ? parseFloat(eleEl.textContent) : NaN;
+      if (!isNaN(ele)) elevs.push(ele);
+    }
+    // D+ smart avec threshold 3m
+    let gain = 0, loss = 0;
+    if (elevs.length > 1) {
+      let lastSignif = elevs[0];
+      const TH = 3;
+      for (let i = 1; i < elevs.length; i++) {
+        const dd = elevs[i] - lastSignif;
+        if (dd > TH) { gain += dd; lastSignif = elevs[i]; }
+        else if (dd < -TH) { loss += -dd; lastSignif = elevs[i]; }
+      }
+    }
+    return {
+      km: +cumKm.toFixed(2),
+      dplus: Math.round(gain),
+      dminus: Math.round(loss),
+    };
+  } catch (e) {
+    console.warn('[extractGpxStats]', e);
+    return null;
+  }
+}
+
+// === Rendu du profil d'altitude GPX via Chart.js (même look que les streams réalisés) ===
+let _gpxElevChart = null;
+function renderGpxElevationChart(gpxContent, canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !gpxContent || typeof Chart === 'undefined') return;
+  // Detruit le chart précédent si existant
+  if (_gpxElevChart) {
+    try { _gpxElevChart.destroy(); } catch (e) {}
+    _gpxElevChart = null;
+  }
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(gpxContent, 'application/xml');
+    const trkpts = doc.getElementsByTagName('trkpt');
+    const pts = trkpts.length ? trkpts : (doc.getElementsByTagName('rtept').length ? doc.getElementsByTagName('rtept') : doc.getElementsByTagName('wpt'));
+    if (!pts.length) {
+      canvas.parentNode.innerHTML = '<div class="modal-placeholder">Pas de points GPS dans le fichier GPX</div>';
+      return;
+    }
+    function dist(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+    const series = []; // [{x:km, y:ele}]
+    let cumKm = 0, prevLat = null, prevLon = null;
+    let hasEle = false;
+    for (let i = 0; i < pts.length; i++) {
+      const lat = parseFloat(pts[i].getAttribute('lat'));
+      const lon = parseFloat(pts[i].getAttribute('lon'));
+      if (isNaN(lat) || isNaN(lon)) continue;
+      if (prevLat !== null) cumKm += dist(prevLat, prevLon, lat, lon);
+      prevLat = lat; prevLon = lon;
+      const eleEl = pts[i].getElementsByTagName('ele')[0];
+      const ele = eleEl ? parseFloat(eleEl.textContent) : NaN;
+      if (!isNaN(ele)) hasEle = true;
+      series.push({ x: cumKm, y: isNaN(ele) ? null : ele });
+    }
+    if (!hasEle) {
+      canvas.parentNode.innerHTML = '<div class="modal-placeholder">Pas de données d\'altitude dans le GPX</div>';
+      return;
+    }
+    // Calcul D+ total : algo "smart" avec threshold 3m pour filtrer le bruit GPS
+    function _smartGainTotal(arr) {
+      if (!arr || arr.length < 2) return 0;
+      let gain = 0;
+      let lastSignif = arr[0].y;
+      const TH = 3;
+      for (let i = 1; i < arr.length; i++) {
+        const d = arr[i].y - lastSignif;
+        if (d > TH) { gain += d; lastSignif = arr[i].y; }
+        else if (d < -TH) { lastSignif = arr[i].y; }
+      }
+      return gain;
+    }
+    const elevGain = _smartGainTotal(series.filter(p => p.y != null));
+    // PAS de lissage pour l'affichage : on garde la finesse du GPX
+    // (la quantification 5m est gérée seulement par le tooltip pente sur fenêtre)
+    let plot = series.filter(p => p.y != null);
+    // Décimation seulement si vraiment beaucoup de points (>2000)
+    if (plot.length > 2000) {
+      const step = Math.ceil(plot.length / 2000);
+      plot = plot.filter((_, i) => i % step === 0);
+    }
+    const totalKm = series[series.length - 1].x;
+
+    // Pour les stats : on travaille sur la série BRUTE (non lissée pour l'affichage)
+    // avec un filtre de bruit type OpenRunner / Strava :
+    //   - on accumule un D+ "candidat" et on ne le compte que s'il franchit un seuil (3m)
+    //   - sinon on retombe au point bas et on continue
+    const rawSeries = series.filter(p => p.y != null);
+
+    // Calcul slope sur fenêtre glissante (~200m) pour éviter le bruit instantané
+    function slopeOnWindow(arr, idx, windowKm = 0.2) {
+      let i1 = idx, i2 = idx;
+      while (i1 > 0 && arr[idx].x - arr[i1-1].x < windowKm/2) i1--;
+      while (i2 < arr.length - 1 && arr[i2+1].x - arr[idx].x < windowKm/2) i2++;
+      const dx = (arr[i2].x - arr[i1].x) * 1000;
+      if (dx <= 0) return 0;
+      return ((arr[i2].y - arr[i1].y) / dx) * 100;
+    }
+
+    // D+ / D- "smart" : threshold de 3m sur chaque segment monotone (filtre noise GPS)
+    function smartElevation(arr) {
+      if (arr.length < 2) return { gain: 0, loss: 0 };
+      let gain = 0, loss = 0;
+      let lastSignif = arr[0].y;
+      let trend = 0; // +1 = montée, -1 = descente, 0 = aucune
+      const TH = 3; // mètres
+      for (let i = 1; i < arr.length; i++) {
+        const d = arr[i].y - lastSignif;
+        if (d > TH) {
+          gain += d;
+          lastSignif = arr[i].y;
+          trend = 1;
+        } else if (d < -TH) {
+          loss += -d;
+          lastSignif = arr[i].y;
+          trend = -1;
+        }
+      }
+      return { gain, loss };
+    }
+
+    function computeStats(kmMin, kmMax) {
+      const filtered = rawSeries.filter(p => p.x >= kmMin && p.x <= kmMax);
+      if (filtered.length < 2) return null;
+      const { gain, loss } = smartElevation(filtered);
+      // Pente max/min sur fenêtres ~200m
+      let maxSlope = -Infinity, minSlope = Infinity;
+      for (let i = 0; i < filtered.length; i++) {
+        const s = slopeOnWindow(filtered, i, 0.2);
+        if (s > maxSlope) maxSlope = s;
+        if (s < minSlope) minSlope = s;
+      }
+      const startEle = filtered[0].y;
+      const endEle = filtered[filtered.length - 1].y;
+      const distKm = filtered[filtered.length - 1].x - filtered[0].x;
+      const avgSlope = distKm > 0 ? ((endEle - startEle) / (distKm * 1000)) * 100 : 0;
+      return { distKm, gain, loss, avgSlope, maxSlope, minSlope, startEle, endEle, kmMin: filtered[0].x, kmMax: filtered[filtered.length - 1].x };
+    }
+    function renderStats(stats, isSelection = false) {
+      const row = document.getElementById('gpx-stats-row-prevu');
+      if (!row) return;
+      if (!stats) {
+        row.innerHTML = '';
+        window._gpxCurrentSelectionStats = null;
+        return;
+      }
+      // Stocke la sélection courante en global pour que le bouton puisse la lire
+      window._gpxCurrentSelectionStats = isSelection ? stats : null;
+      const fmtSlope = s => (s >= 0 ? '+' : '') + s.toFixed(1) + '%';
+      const addBtn = isSelection
+        ? `<button class="add-segment-btn" id="add-segment-btn" title="Sauvegarder cette portion comme segment">+ Ajouter segment</button>`
+        : '';
+      row.innerHTML = `
+        <div class="gpx-stat"><div class="g-l">Distance</div><div class="g-v">${stats.distKm.toFixed(2)} km</div></div>
+        <div class="gpx-stat"><div class="g-l">D+</div><div class="g-v">${Math.round(stats.gain)} m</div></div>
+        <div class="gpx-stat"><div class="g-l">D−</div><div class="g-v">${Math.round(stats.loss)} m</div></div>
+        <div class="gpx-stat"><div class="g-l">Pente moy.</div><div class="g-v">${fmtSlope(stats.avgSlope)}</div></div>
+        <div class="gpx-stat"><div class="g-l">Pente max</div><div class="g-v">${fmtSlope(stats.maxSlope)}</div></div>
+        <div class="gpx-stat"><div class="g-l">Pente min</div><div class="g-v">${fmtSlope(stats.minSlope)}</div></div>
+        ${addBtn}
+      `;
+      const btn = document.getElementById('add-segment-btn');
+      if (btn) btn.addEventListener('click', () => {
+        if (typeof window.gpxAddCurrentSelectionAsSegment === 'function') {
+          window.gpxAddCurrentSelectionAsSegment();
+        }
+      });
+    }
+    // Stats initiales (parcours complet)
+    renderStats(computeStats(0, totalKm));
+
+    // Fonction pour highlighter un segment sur la carte Leaflet
+    function highlightSegmentOnMap(kmMin, kmMax) {
+      const linked = window._gpxLinkedData;
+      if (!linked || !linked.map) return;
+      // Supprime le précédent highlight
+      if (linked._highlightLayer) {
+        try { linked.map.removeLayer(linked._highlightLayer); } catch (e) {}
+        linked._highlightLayer = null;
+        try { linked.map.removeLayer(linked._highlightBg); } catch (e) {}
+        linked._highlightBg = null;
+      }
+      if (kmMin == null || kmMax == null) return;
+      // Sélectionne les coords correspondant au range km
+      const segCoords = [];
+      for (let i = 0; i < linked.cumKmByIdx.length; i++) {
+        if (linked.cumKmByIdx[i] >= kmMin && linked.cumKmByIdx[i] <= kmMax) {
+          segCoords.push(linked.coords[i]);
+        }
+      }
+      if (segCoords.length < 2) return;
+      // Double couche : contour vert épais + intérieur noir → effet "tube vert"
+      linked._highlightBg = L.polyline(segCoords, {
+        color: '#4ade80', weight: 11, opacity: 1, lineCap: 'round', lineJoin: 'round',
+      }).addTo(linked.map);
+      linked._highlightLayer = L.polyline(segCoords, {
+        color: '#000', weight: 6, opacity: 1, lineCap: 'round', lineJoin: 'round',
+      }).addTo(linked.map);
+      // Recadrage léger
+      linked.map.fitBounds(linked._highlightLayer.getBounds(), { padding: [40, 40], maxZoom: 17, animate: true });
+    }
+
+    // Chart.js area chart avec drag-select
+    _gpxElevChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'Altitude',
+          data: plot,
+          borderColor: '#4ade80',
+          backgroundColor: 'rgba(74,222,128,0.20)',
+          borderWidth: 1.4,
+          pointRadius: 0,
+          fill: true,
+          tension: 0, // pas de lissage Bezier : on garde la forme exacte du GPX
+          parsing: false,
+          spanGaps: true,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        parsing: false,
+        interaction: { intersect: false, mode: 'nearest', axis: 'x' },
+        elements: { point: { hoverRadius: 0 } },
+        plugins: {
+          legend: { display: false },
+          // Tooltip Chart.js désactivé : on utilise un tooltip HTML custom interpolé
+          tooltip: { enabled: false },
+          // Désactive le plugin global verticalHoverLine qui dessinait une 2e ligne
+          // snappée au point le plus proche
+          verticalHoverLine: false,
+          // Drag-select pour sélectionner une portion du parcours (zoom plugin)
+          zoom: {
+            zoom: {
+              drag: {
+                enabled: true,
+                backgroundColor: 'rgba(74, 222, 128, 0.18)',
+                borderColor: 'rgba(74, 222, 128, 0.6)',
+                borderWidth: 1,
+              },
+              mode: 'x',
+              onZoomComplete: ({ chart }) => {
+                const xScale = chart.scales.x;
+                const kmMin = xScale.min;
+                const kmMax = xScale.max;
+                const stats = computeStats(kmMin, kmMax);
+                renderStats(stats, true); // true = c'est une sélection (affiche bouton + ajouter segment)
+                if (stats) highlightSegmentOnMap(stats.kmMin, stats.kmMax);
+              },
+            },
+            limits: { x: { min: 'original', max: 'original' } },
+          },
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            min: 0,
+            max: totalKm,
+            ticks: {
+              color: '#64748b',
+              font: { size: 11 },
+              callback: v => v.toFixed(0) + ' km',
+              maxTicksLimit: 8,
+            },
+            grid: { display: false }, // pas de lignes de grille verticales (évite confusion avec le curseur)
+            border: { display: false },
+          },
+          y: {
+            ticks: {
+              color: '#64748b',
+              font: { size: 11 },
+              callback: v => Math.round(v) + ' m',
+              maxTicksLimit: 4,
+            },
+            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+            border: { display: false },
+            title: { display: false },
+          },
+        },
+      },
+    });
+
+    // Pas de badge D+ : l'info est déjà dans la barre de stats au-dessus du graphique
+    const wrap = canvas.parentNode;
+    const oldBadge = wrap.querySelector('.gpx-elev-dplus-badge');
+    if (oldBadge) oldBadge.remove();
+
+    // === CROSSHAIR INTERPOLÉ (DOM divs, pixel-perfect) ===
+    const tooltipEl = wrap.querySelector('.gpx-elev-tooltip');
+    // Cleanup AGGRESSIF : retire toutes les crosshair lines/dots/overlays existant
+    // dans le document (au cas où d'anciennes instances traînent quelque part)
+    document.querySelectorAll('.gpx-elev-line').forEach(n => n.remove());
+    document.querySelectorAll('.gpx-elev-dot').forEach(n => n.remove());
+    document.querySelectorAll('.gpx-elev-overlay').forEach(n => n.remove());
+    // Crosshair vertical (div absolute) + dot — fraîchement créés
+    const cursorLine = document.createElement('div');
+    cursorLine.className = 'gpx-elev-line';
+    wrap.appendChild(cursorLine);
+    const cursorDot = document.createElement('div');
+    cursorDot.className = 'gpx-elev-dot';
+    wrap.appendChild(cursorDot);
+
+    function interpolateY(km) {
+      // Binary search dans plot pour interpoler l'altitude au km exact
+      if (!plot.length) return null;
+      if (km <= plot[0].x) return plot[0].y;
+      if (km >= plot[plot.length - 1].x) return plot[plot.length - 1].y;
+      let lo = 0, hi = plot.length - 1;
+      while (lo < hi - 1) {
+        const mid = (lo + hi) >> 1;
+        if (plot[mid].x < km) lo = mid; else hi = mid;
+      }
+      const t = (km - plot[lo].x) / (plot[hi].x - plot[lo].x || 1);
+      return plot[lo].y + (plot[hi].y - plot[lo].y) * t;
+    }
+    function slopeAt(km, win = 0.1) {
+      const e1 = interpolateY(km - win);
+      const e2 = interpolateY(km + win);
+      if (e1 == null || e2 == null) return 0;
+      return ((e2 - e1) / (win * 2 * 1000)) * 100;
+    }
+
+    function onChartMove(e) {
+      const cRect = canvas.getBoundingClientRect();
+      const wRect = wrap.getBoundingClientRect();
+      const xInCanvas = e.clientX - cRect.left;   // px relatifs au canvas chart
+      const yInCanvas = e.clientY - cRect.top;
+      const chartArea = _gpxElevChart.chartArea;
+      if (xInCanvas < chartArea.left || xInCanvas > chartArea.right ||
+          yInCanvas < chartArea.top || yInCanvas > chartArea.bottom) {
+        clearCursor();
+        return;
+      }
+      const km = _gpxElevChart.scales.x.getValueForPixel(xInCanvas);
+      const ele = interpolateY(km);
+      if (ele == null) { clearCursor(); return; }
+      const yOnLineInCanvas = _gpxElevChart.scales.y.getPixelForValue(ele);
+      const slope = slopeAt(km);
+
+      // Positions converties en coords relatives au WRAP (pour le DOM positioning)
+      const xInWrap = (cRect.left - wRect.left) + xInCanvas;
+      const yInWrap = (cRect.top - wRect.top) + yOnLineInCanvas;
+      const topInWrap = (cRect.top - wRect.top) + chartArea.top;
+      const bottomInWrap = (cRect.top - wRect.top) + chartArea.bottom;
+
+      // Ligne verticale (DOM div)
+      cursorLine.style.left = xInWrap + 'px';
+      cursorLine.style.top = topInWrap + 'px';
+      cursorLine.style.height = (bottomInWrap - topInWrap) + 'px';
+      cursorLine.style.display = 'block';
+
+      // Dot
+      cursorDot.style.left = (xInWrap - 6) + 'px';
+      cursorDot.style.top = (yInWrap - 6) + 'px';
+      cursorDot.style.display = 'block';
+
+      // Tooltip
+      tooltipEl.style.display = 'block';
+      tooltipEl.innerHTML = `
+        <div class="t-km">${km.toFixed(2)} km</div>
+        <div class="t-ele">Altitude : ${Math.round(ele)} m · pente ${slope >= 0 ? '+' : ''}${slope.toFixed(1)}%</div>
+      `;
+      const tipW = 180;
+      let left = xInWrap + 14;
+      if (left + tipW > wRect.width) left = xInWrap - tipW - 14;
+      tooltipEl.style.left = left + 'px';
+      tooltipEl.style.top = '8px';
+
+      // Bike marker sur la carte (interpolation pixel-perfect)
+      const linked = window._gpxLinkedData;
+      if (linked && linked.bikeMarker && linked.cumKmByIdx) {
+        const arr = linked.cumKmByIdx;
+        let lo2 = 0, hi2 = arr.length - 1;
+        while (lo2 < hi2 - 1) {
+          const mid = (lo2 + hi2) >> 1;
+          if (arr[mid] < km) lo2 = mid; else hi2 = mid;
+        }
+        const t2 = (km - arr[lo2]) / (arr[hi2] - arr[lo2] || 1);
+        const lat = linked.coords[lo2][0] + (linked.coords[hi2][0] - linked.coords[lo2][0]) * t2;
+        const lon = linked.coords[lo2][1] + (linked.coords[hi2][1] - linked.coords[lo2][1]) * t2;
+        linked.bikeMarker.setLatLng([lat, lon]);
+        linked.bikeMarker.setOpacity(1);
+      }
+    }
+    function clearCursor() {
+      cursorLine.style.display = 'none';
+      cursorDot.style.display = 'none';
+      tooltipEl.style.display = 'none';
+      const linked = window._gpxLinkedData;
+      if (linked && linked.bikeMarker) linked.bikeMarker.setOpacity(0);
+    }
+    // Cleanup old listeners
+    if (canvas._gpxMove) canvas.removeEventListener('mousemove', canvas._gpxMove);
+    if (canvas._gpxLeave) canvas.removeEventListener('mouseleave', canvas._gpxLeave);
+    canvas._gpxMove = onChartMove;
+    canvas._gpxLeave = clearCursor;
+    canvas.addEventListener('mousemove', onChartMove);
+    canvas.addEventListener('mouseleave', clearCursor);
+
+    // Double-clic → reset zoom + stats + retire highlight
+    canvas.addEventListener('dblclick', () => {
+      try { _gpxElevChart.resetZoom(); } catch (e) {}
+      renderStats(computeStats(0, totalKm));
+      highlightSegmentOnMap(null, null);
+    });
+  } catch (e) {
+    console.warn('[renderGpxElevationChart]', e);
+    canvas.parentNode.innerHTML = '<div class="modal-placeholder">Erreur de lecture du GPX</div>';
+  }
+}
+
+// Helper qui attache le système de crosshair smooth (overlay canvas + interpolation)
+// utilisé par les streams realised, sur n'importe quel chart Chart.js
+function _attachSmoothCrosshair(chart) {
+  if (!chart || !chart.canvas) return;
+  const canvas = chart.canvas;
+  const parent = canvas.parentNode;
+  if (!parent) return;
+  // Crée overlay si pas existant
+  if (!chart._stOverlay) {
+    const cs = getComputedStyle(parent);
+    if (cs.position === 'static') parent.style.position = 'relative';
+    const ov = document.createElement('canvas');
+    ov.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2;';
+    parent.appendChild(ov);
+    chart._stOverlay = ov;
+    chart._stOverlayCtx = ov.getContext('2d');
+    if (typeof _resizeOverlay === 'function') _resizeOverlay(chart);
+  }
+  // Réutilise _smoothMM / _smoothML déjà définis pour les streams realised
+  if (!canvas._smoothMM) {
+    canvas._smoothMM = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (canvas.width / rect.width) / (chart.currentDevicePixelRatio || window.devicePixelRatio || 1);
+      const y = (e.clientY - rect.top) * (canvas.height / rect.height) / (chart.currentDevicePixelRatio || window.devicePixelRatio || 1);
+      const { left, right, top, bottom } = chart.chartArea;
+      if (x < left || x > right || y < top || y > bottom) {
+        if (typeof _smoothPendingX !== 'undefined') {
+          _smoothPendingX = null;
+          if (typeof _scheduleSmoothDraw === 'function') _scheduleSmoothDraw();
+        }
+        return;
+      }
+      if (typeof _smoothPendingX !== 'undefined') {
+        _smoothPendingX = chart.scales.x.getValueForPixel(x);
+        if (typeof _scheduleSmoothDraw === 'function') _scheduleSmoothDraw();
+      }
+    };
+    canvas._smoothML = () => {
+      if (typeof _smoothPendingX !== 'undefined') {
+        _smoothPendingX = null;
+        if (typeof _scheduleSmoothDraw === 'function') _scheduleSmoothDraw();
+      }
+    };
+    canvas.addEventListener('mousemove', canvas._smoothMM);
+    canvas.addEventListener('mouseleave', canvas._smoothML);
+  }
+}
+
+// === Rendu d'une trace GPX sur une vraie carte Leaflet (OpenStreetMap) ===
+let _gpxLeafletMap = null;
+function renderGpxLeafletMap(gpxContent, divId) {
+  const el = document.getElementById(divId);
+  if (!el || !gpxContent || typeof L === 'undefined') return;
+  // Cleanup map précédente
+  if (_gpxLeafletMap) {
+    try { _gpxLeafletMap.remove(); } catch (e) {}
+    _gpxLeafletMap = null;
+  }
+  el.innerHTML = '';
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(gpxContent, 'application/xml');
+    const trkpts = doc.getElementsByTagName('trkpt');
+    const pts = trkpts.length ? trkpts : (doc.getElementsByTagName('rtept').length ? doc.getElementsByTagName('rtept') : doc.getElementsByTagName('wpt'));
+    if (!pts.length) {
+      el.innerHTML = '<div class="modal-placeholder">Pas de points GPS dans le fichier GPX</div>';
+      return;
+    }
+    const coords = [];
+    for (let i = 0; i < pts.length; i++) {
+      const lat = parseFloat(pts[i].getAttribute('lat'));
+      const lon = parseFloat(pts[i].getAttribute('lon'));
+      if (isNaN(lat) || isNaN(lon)) continue;
+      coords.push([lat, lon]);
+    }
+    if (!coords.length) {
+      el.innerHTML = '<div class="modal-placeholder">Trace illisible</div>';
+      return;
+    }
+
+    // Init la carte
+    _gpxLeafletMap = L.map(el, {
+      zoomControl: true,
+      attributionControl: false,
+    });
+
+    // 1) Couche de base : hillshade ESRI subtil pour donner du relief
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 16,
+      opacity: 0.6,
+    }).addTo(_gpxLeafletMap);
+
+    // 2) Couche principale : OSM standard quasi opaque → look propre, lisible
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      opacity: 0.88,
+    }).addTo(_gpxLeafletMap);
+
+    // Attribution discrète en bas à droite
+    L.control.attribution({
+      prefix: false,
+      position: 'bottomright',
+    }).addAttribution('© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> · Relief © <a href="https://www.esri.com/" target="_blank">Esri</a>').addTo(_gpxLeafletMap);
+
+    // Trace en double couche : contour noir épais en dessous + vert accent au-dessus
+    L.polyline(coords, {
+      color: '#000',
+      weight: 8,
+      opacity: 0.55,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(_gpxLeafletMap);
+    const trace = L.polyline(coords, {
+      color: '#4ade80',
+      weight: 5,
+      opacity: 1,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(_gpxLeafletMap);
+
+    // === Flèches indiquant le sens du parcours ===
+    // On en place une tous les ~N points (ajusté pour avoir 8-12 flèches au total)
+    const arrowEvery = Math.max(20, Math.floor(coords.length / 10));
+    function bearing(lat1, lon1, lat2, lon2) {
+      const toRad = d => d * Math.PI / 180;
+      const toDeg = r => r * 180 / Math.PI;
+      const φ1 = toRad(lat1), φ2 = toRad(lat2);
+      const Δλ = toRad(lon2 - lon1);
+      const y = Math.sin(Δλ) * Math.cos(φ2);
+      const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+      return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    }
+    // SVG d'une vraie flèche (tige + pointe), pointant vers le HAUT par défaut
+    // Tige + tête → direction sans ambiguïté possible
+    const arrowSvg = `<svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2 L18 11 L14 11 L14 22 L10 22 L10 11 L6 11 Z"
+            fill="#fff" stroke="#000" stroke-width="1.4" stroke-linejoin="round"/>
+    </svg>`;
+    for (let i = arrowEvery; i < coords.length - 1; i += arrowEvery) {
+      let prevIdx = i - 1, nextIdx = i + 1;
+      while (prevIdx > 0 && Math.abs(coords[prevIdx][0] - coords[i][0]) < 0.0001 && Math.abs(coords[prevIdx][1] - coords[i][1]) < 0.0001) prevIdx--;
+      while (nextIdx < coords.length - 1 && Math.abs(coords[nextIdx][0] - coords[i][0]) < 0.0001 && Math.abs(coords[nextIdx][1] - coords[i][1]) < 0.0001) nextIdx++;
+      const angle = bearing(coords[prevIdx][0], coords[prevIdx][1], coords[nextIdx][0], coords[nextIdx][1]);
+      const arrowIcon = L.divIcon({
+        className: 'gpx-arrow',
+        html: `<div class="gpx-arrow-wrap" style="transform:rotate(${angle}deg);">${arrowSvg}</div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+      });
+      L.marker(coords[i], { icon: arrowIcon, interactive: false, keyboard: false }).addTo(_gpxLeafletMap);
+    }
+
+    // === Référence globale pour le curseur du profil → marker mobile sur la carte ===
+    // Calcul du cumul de distance par point pour pouvoir mapper km → lat/lon
+    const cumKmByIdx = [0];
+    for (let i = 1; i < coords.length; i++) {
+      cumKmByIdx.push(cumKmByIdx[i-1] + dist(coords[i-1][0], coords[i-1][1], coords[i][0], coords[i][1]));
+    }
+    const totalKm = cumKmByIdx[cumKmByIdx.length - 1];
+    window._gpxLinkedData = { coords, cumKmByIdx, totalKm, map: _gpxLeafletMap };
+    // Marker bike (caché par défaut)
+    const bikeIcon = L.divIcon({
+      className: 'gpx-bike-marker',
+      html: `<div class="gpx-bike-dot"></div>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+    });
+    const bikeMarker = L.marker(coords[0], { icon: bikeIcon, interactive: false, keyboard: false, opacity: 0 }).addTo(_gpxLeafletMap);
+    window._gpxLinkedData.bikeMarker = bikeMarker;
+    // Helper distance pour le linkage
+    function dist(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    // Markers départ + arrivée (avec gestion boucle)
+    const start = coords[0];
+    const end = coords[coords.length - 1];
+    const isLoop = Math.abs(start[0] - end[0]) < 0.0002 && Math.abs(start[1] - end[1]) < 0.0002;
+
+    // Icônes custom : cercles colorés via DivIcon
+    function makeIcon(color, label) {
+      return L.divIcon({
+        className: 'gpx-marker',
+        html: `<div class="gpx-marker-dot" style="background:${color};"></div><div class="gpx-marker-label" style="color:${color};">${label}</div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      });
+    }
+    if (isLoop) {
+      L.marker(start, { icon: makeIcon('#fbbf24', 'DÉPART / ARRIVÉE') }).addTo(_gpxLeafletMap);
+    } else {
+      L.marker(start, { icon: makeIcon('#4ade80', 'DÉPART') }).addTo(_gpxLeafletMap);
+      L.marker(end, { icon: makeIcon('#ef4444', 'ARRIVÉE') }).addTo(_gpxLeafletMap);
+    }
+
+    // Cadre la vue sur la trace avec un peu de padding
+    const bounds = trace.getBounds();
+    _gpxLeafletMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+
+    // Plusieurs invalidateSize + refit pour gérer le rendu différé de la modal
+    // (la modal peut prendre du temps à atteindre sa taille finale après animation)
+    const refit = () => {
+      if (!_gpxLeafletMap) return;
+      _gpxLeafletMap.invalidateSize(true);
+      _gpxLeafletMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+    };
+    requestAnimationFrame(refit);
+    setTimeout(refit, 150);
+    setTimeout(refit, 400);
+    setTimeout(refit, 800);
+  } catch (e) {
+    console.warn('[renderGpxLeafletMap]', e);
+    el.innerHTML = '<div class="modal-placeholder">Erreur de lecture du GPX</div>';
+  }
+}
+
+// === Rendu d'une trace GPX en SVG (parse le XML + projette lat/lon en path SVG) — legacy, conservé pour compat ===
+function renderGpxTrack(gpxContent, svgId) {
+  const svg = document.getElementById(svgId);
+  if (!svg || !gpxContent) return;
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(gpxContent, 'application/xml');
+    const trkpts = doc.getElementsByTagName('trkpt');
+    if (!trkpts.length) {
+      // Fallback : essaye les routes (rtept) ou waypoints (wpt)
+      const alts = doc.getElementsByTagName('rtept').length ? doc.getElementsByTagName('rtept') : doc.getElementsByTagName('wpt');
+      if (!alts.length) {
+        svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="12">Aucun point GPS dans le fichier GPX</text>';
+        return;
+      }
+    }
+    const pts = trkpts.length ? trkpts : (doc.getElementsByTagName('rtept').length ? doc.getElementsByTagName('rtept') : doc.getElementsByTagName('wpt'));
+    let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    const coords = [];
+    for (let i = 0; i < pts.length; i++) {
+      const lat = parseFloat(pts[i].getAttribute('lat'));
+      const lon = parseFloat(pts[i].getAttribute('lon'));
+      if (isNaN(lat) || isNaN(lon)) continue;
+      coords.push([lat, lon]);
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lon < minLon) minLon = lon;
+      if (lon > maxLon) maxLon = lon;
+    }
+    if (!coords.length) {
+      svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="12">Trace illisible</text>';
+      return;
+    }
+
+    // Projection simple Mercator-like sur la bounding box
+    const W = 900, H = 400, pad = 16;
+    const lonRange = maxLon - minLon || 0.0001;
+    const latRange = maxLat - minLat || 0.0001;
+    const aspect = lonRange / latRange * Math.cos(((minLat + maxLat) / 2) * Math.PI / 180);
+    let drawW, drawH;
+    if (aspect * (H - 2 * pad) >= (W - 2 * pad)) {
+      drawW = W - 2 * pad;
+      drawH = drawW / aspect;
+    } else {
+      drawH = H - 2 * pad;
+      drawW = drawH * aspect;
+    }
+    const offX = (W - drawW) / 2;
+    const offY = (H - drawH) / 2;
+
+    const path = coords.map((c, i) => {
+      const x = offX + ((c[1] - minLon) / lonRange) * drawW;
+      // y inversé (lat croissante vers le haut)
+      const y = offY + (1 - (c[0] - minLat) / latRange) * drawH;
+      return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+    }).join(' ');
+
+    const startX = offX + ((coords[0][1] - minLon) / lonRange) * drawW;
+    const startY = offY + (1 - (coords[0][0] - minLat) / latRange) * drawH;
+    const endX = offX + ((coords[coords.length-1][1] - minLon) / lonRange) * drawW;
+    const endY = offY + (1 - (coords[coords.length-1][0] - minLat) / latRange) * drawH;
+
+    // Détection de superposition (boucle) : si départ et arrivée sont proches (< 30px)
+    const distPx = Math.hypot(endX - startX, endY - startY);
+    const isLoop = distPx < 30;
+
+    // Helper pour placer le label DÉPART/ARRIVÉE en évitant les bords
+    function placeLabel(cx, cy, text, color, prefer = 'right') {
+      const padX = 12, padY = 4;
+      const approxW = text.length * 6.5 + 4; // largeur estimée
+      let lx = cx + padX, ly = cy + padY;
+      let anchor = 'start';
+      // Si trop près du bord droit, place à gauche
+      if (lx + approxW > W - 8) { lx = cx - padX; anchor = 'end'; }
+      // Si trop près du bord haut, descend
+      if (ly < 14) ly = cy + 16;
+      // Si trop près du bord bas
+      if (ly > H - 8) ly = cy - 10;
+      return `<text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="${color}" font-size="11" font-weight="700" stroke="#062017" stroke-width="3" paint-order="stroke" stroke-linejoin="round">${text}</text>`;
+    }
+
+    let markersSvg;
+    if (isLoop) {
+      // Cercle unique mi-vert mi-rouge + label combiné
+      markersSvg = `
+        <circle cx="${startX}" cy="${startY}" r="7" fill="#4ade80" stroke="#062017" stroke-width="2"/>
+        <path d="M ${startX - 7} ${startY} A 7 7 0 0 1 ${startX + 7} ${startY} Z" fill="#ef4444" stroke="#062017" stroke-width="0"/>
+        <circle cx="${startX}" cy="${startY}" r="7" fill="none" stroke="#062017" stroke-width="2"/>
+        ${placeLabel(startX, startY, 'DÉPART / ARRIVÉE', '#fbbf24')}
+      `;
+    } else {
+      markersSvg = `
+        <circle cx="${startX}" cy="${startY}" r="6" fill="#4ade80" stroke="#062017" stroke-width="2"/>
+        ${placeLabel(startX, startY, 'DÉPART', '#4ade80')}
+        <circle cx="${endX}" cy="${endY}" r="6" fill="#ef4444" stroke="#062017" stroke-width="2"/>
+        ${placeLabel(endX, endY, 'ARRIVÉE', '#ef4444')}
+      `;
+    }
+
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = `
+      <defs>
+        <linearGradient id="gpxGrad-${svgId}" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#4ade80"/>
+          <stop offset="100%" stop-color="#22c55e"/>
+        </linearGradient>
+      </defs>
+      <rect width="${W}" height="${H}" fill="rgba(74,222,128,0.03)" rx="8"/>
+      <path d="${path}" stroke="url(#gpxGrad-${svgId})" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      ${markersSvg}
+    `;
+  } catch (e) {
+    console.warn('[renderGpxTrack] erreur de parsing :', e);
+    svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="12">Erreur de lecture du GPX</text>';
+  }
+}
+
 function openSessionModal(iso, source) {
   // Reconstruire la date depuis l'iso (les jours futurs ne sont PAS dans data)
   const date = new Date(iso + 'T12:00:00');
@@ -6799,6 +9050,10 @@ function openSessionModal(iso, source) {
   const titleEl = document.getElementById('modal-title');
   const metaEl = document.getElementById('modal-meta');
   const bodyEl = document.getElementById('modal-body');
+
+  // Cache le bouton modifier par défaut (sera affiché par renderCompModal si comp)
+  const _editBtn = document.getElementById('modal-edit-btn');
+  if (_editBtn) _editBtn.hidden = true;
 
   if (source === 'realise') {
     if (!day) {
@@ -7165,44 +9420,554 @@ function openSessionModal(iso, source) {
       renderModalActivity(0);
     }
   } else {
-    // Source = 'prevu' : on recompose la proposition pour ce jour
-    const comps = loadCompetitions().map(c => ({ ...c, dateObj: new Date(c.date + 'T12:00:00') }));
-    const dayPhase = determinePhaseForDate(comps, date, todayData.tsb);
-    const dow = date.getDay();
-    let proposal = { ...(PLAN_TEMPLATES[dayPhase][dow]) };
-    // Override compétition
-    const compToday = comps.find(c => toIsoDate(c.dateObj) === iso);
-    if (compToday) {
-      proposal = { type: 'vo2', name: `🏁 ${compToday.name}`, dur: 120, tss: 200, why: `Jour de compétition · priorité ${compToday.priority}` };
+    // ============= Source = 'prevu' =============
+    const compsAll = loadCompetitionsExpanded().map(c => ({ ...c, dateObj: new Date(c.date + 'T12:00:00') }));
+    const compsForToday = compsAll.filter(c => toIsoDate(c.dateObj) === iso);
+    const manualTrainings = (typeof loadTrainings === 'function') ? loadTrainings() : [];
+    const manualForToday = manualTrainings.filter(t => t.date === iso);
+
+    // Si une compé du jour est une étape d'une course multi-étapes,
+    // on inclut TOUTES les étapes de cette course dans la liste (pour navigation directe)
+    let stageRaceItems = [];
+    const stageComp = compsForToday.find(c => c.parentId);
+    if (stageComp) {
+      // Récupère toutes les étapes du même parent, triées par ordre
+      stageRaceItems = compsAll
+        .filter(c => c.parentId === stageComp.parentId)
+        .sort((a, b) => (a.stageIdx || 0) - (b.stageIdx || 0));
     }
-    proposal = adjustForRecovery(proposal, todayData.recovery);
 
-    const dur = proposal.dur || 0;
-    const h = Math.floor(dur / 60);
-    const m = (dur % 60).toString().padStart(2, '0');
+    // Build la liste d'items finale
+    // Si on est sur un jour de stage race : toutes les étapes + manuels du jour courant
+    // Sinon : compés du jour + manuels du jour
+    const items = [];
+    if (stageRaceItems.length) {
+      stageRaceItems.forEach(c => items.push({ kind: 'comp', data: c }));
+    } else {
+      compsForToday.forEach(c => items.push({ kind: 'comp', data: c }));
+    }
+    manualForToday.forEach(t => items.push({ kind: 'manual', data: t }));
 
-    titleEl.innerHTML = `${proposal.name} ${proposal.type ? `<span class="pill ${proposal.type}">${proposal.type}</span>` : ''}`;
-    metaEl.textContent = `${dateStr} · ${h}h${m} · ${proposal.tss || 0} TSS prévus · phase ${PHASE_LABELS[dayPhase]}`;
+    // Si rien d'explicite : item template AI seul
+    if (items.length === 0) {
+      const dayPhase = determinePhaseForDate(compsAll, date, todayData.tsb);
+      const dow = date.getDay();
+      let proposal = { ...(PLAN_TEMPLATES[dayPhase][dow]) };
+      proposal = adjustForRecovery(proposal, todayData.recovery);
+      items.push({ kind: 'template', data: proposal, phase: dayPhase });
+    }
 
-    bodyEl.innerHTML = `
-      <div class="modal-metrics">
-        <div class="modal-metric"><div class="m-label">Durée cible</div><div class="m-value">${h}<span style="font-size:14px;">h</span>${m}</div></div>
-        <div class="modal-metric"><div class="m-label">TSS cible</div><div class="m-value">${proposal.tss || 0}</div></div>
-        <div class="modal-metric"><div class="m-label">Type</div><div class="m-value" style="font-size:15px;text-transform:capitalize;">${proposal.type || '—'}</div></div>
-        <div class="modal-metric"><div class="m-label">Phase</div><div class="m-value" style="font-size:15px;">${PHASE_LABELS[dayPhase] || '—'}</div></div>
-      </div>
-      <div class="modal-section">
-        <div class="modal-section-title">Pourquoi cette séance</div>
-        <div style="background:var(--bg-elev2);padding:14px;border-radius:8px;font-size:13px;line-height:1.6;">${proposal.why}</div>
-      </div>
-      <div class="modal-section">
-        <div class="modal-section-title">Structure de l'entraînement (intervalles, target watts)</div>
-        <div class="modal-placeholder">
-          Décomposition par intervalle (échauffement, blocs, récup, retour au calme) avec target watts par segment, à venir en <strong style="color:var(--accent);">Phase 3</strong>.<br>
-          Style Trainerroad / Nolio : un graphe d'étages cliquable.
+    // Index initial : si on est sur un stage race, retrouve l'étape correspondant à iso
+    let curIdx = 0;
+    if (stageRaceItems.length) {
+      const idx = items.findIndex(it => it.kind === 'comp' && it.data.date === iso);
+      if (idx >= 0) curIdx = idx;
+    } else {
+      curIdx = dayPrevuIndex[iso] || 0;
+    }
+    if (curIdx >= items.length) curIdx = 0;
+
+    function renderPrevuItem(idx) {
+      curIdx = idx;
+      const item = items[idx];
+      // Mise à jour de la date affichée si l'item est une étape sur une autre date
+      let effectiveDateStr = dateStr;
+      if (item.kind === 'comp' && item.data.date && item.data.date !== iso) {
+        const d2 = new Date(item.data.date + 'T12:00:00');
+        if (!isNaN(d2.getTime())) {
+          effectiveDateStr = d2.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        }
+      }
+      const switchHTML = items.length > 1 ? `
+        <div class="modal-activity-switch">
+          ${items.map((it, i) => {
+            const label = it.kind === 'comp'
+              ? (it.data.stageIdx !== undefined ? `Étape ${it.data.stageIdx + 1}` : it.data.name.split(' — ')[0])
+              : (it.kind === 'manual' ? it.data.name : 'IA');
+            return `<button class="${i === idx ? 'active' : ''}" data-i="${i}">${label}</button>`;
+          }).join('')}
+        </div>` : '';
+
+      if (item.kind === 'comp') {
+        renderCompModal(item.data, switchHTML, effectiveDateStr);
+      } else if (item.kind === 'manual') {
+        renderManualTrainingModal(item.data, switchHTML, effectiveDateStr);
+      } else {
+        renderTemplateModal(item.data, item.phase, switchHTML, effectiveDateStr);
+      }
+    }
+
+    function renderCompModal(c, switchHTML, dateStrOverride) {
+      const _dateStr = dateStrOverride || dateStr;
+      const isStage = c.stageIdx !== undefined && c.totalStages;
+      // Affiche le bouton "Modifier" et le câble à l'ID de la compé parente (ou directe)
+      const editBtn = document.getElementById('modal-edit-btn');
+      if (editBtn) {
+        editBtn.hidden = false;
+        editBtn.dataset.compId = c.parentId || c.id;
+      }
+      const parentName = isStage ? c.name.replace(/ — Étape \d+$/, '') : c.name;
+      const sportLabel = window.sportFr(c.sport || 'Ride');
+      const sportCat = window.activitySportColorKey({ sport: c.sport }) || 'autre';
+      const sportPill = `<span class="sport-pill" data-sport-cat="${sportCat}" style="margin-left:10px;vertical-align:middle;">${sportLabel}</span>`;
+
+      // Title : juste le nom de la course (pas le numéro d'étape — déjà visible dans le switcher + section dédiée)
+      titleEl.innerHTML = `🏁 ${parentName}`;
+
+      // Meta : date + heure + sport pill
+      const timeStr = c.time ? ` · ${c.time.replace(':', 'h')}` : '';
+      metaEl.innerHTML = `${_dateStr}${timeStr}${sportPill}`;
+
+      // Parse target → minutes
+      let raceMinutes = null;
+      if (c.target) {
+        const m = c.target.match(/(\d+)\s*h\s*(\d{0,2})/i);
+        if (m) raceMinutes = parseInt(m[1], 10) * 60 + (parseInt(m[2], 10) || 0);
+      }
+
+      // Calcule l'allure si km + target dispo (adapté au sport)
+      let allure = null, allureLabel = 'Allure';
+      if (c.km && raceMinutes) {
+        const hours = raceMinutes / 60;
+        const cyclingSports = ['Ride','VirtualRide','GravelRide','EBikeRide','MountainBikeRide','EMountainBikeRide','Velomobile','Handcycle'];
+        const runSports = ['Run','TrailRun','VirtualRun'];
+        const swimSports = ['Swim','OpenWaterSwim'];
+        if (cyclingSports.includes(c.sport)) {
+          allure = (c.km / hours).toFixed(1) + ' km/h';
+        } else if (runSports.includes(c.sport)) {
+          const minPerKm = raceMinutes / c.km;
+          const mm = Math.floor(minPerKm);
+          const ss = Math.round((minPerKm - mm) * 60);
+          allure = `${mm}'${ss.toString().padStart(2,'0')}"/km`;
+        } else if (swimSports.includes(c.sport)) {
+          const minPer100m = (raceMinutes / c.km) / 10;
+          const mm = Math.floor(minPer100m);
+          const ss = Math.round((minPer100m - mm) * 60);
+          allure = `${mm}'${ss.toString().padStart(2,'0')}"/100m`;
+        } else {
+          allure = (c.km / hours).toFixed(1) + ' km/h';
+        }
+      }
+
+      // Si GPX présent : on override km / D+ avec les valeurs calculées depuis le fichier
+      // (priorité au GPX → vérité terrain — sinon valeurs saisies manuellement)
+      const gpxStats = c.gpxContent ? (typeof extractGpxStats === 'function' ? extractGpxStats(c.gpxContent) : null) : null;
+      const effectiveKm = (gpxStats && gpxStats.km) || c.km;
+      const effectiveDplus = (gpxStats && gpxStats.dplus) || c.dplus;
+      // Recalcule l'allure si km vient du GPX
+      if (gpxStats && gpxStats.km && raceMinutes) {
+        const hours = raceMinutes / 60;
+        const cyclingSports = ['Ride','VirtualRide','GravelRide','EBikeRide','MountainBikeRide','EMountainBikeRide','Velomobile','Handcycle'];
+        const runSports = ['Run','TrailRun','VirtualRun'];
+        const swimSports = ['Swim','OpenWaterSwim'];
+        if (cyclingSports.includes(c.sport)) {
+          allure = (gpxStats.km / hours).toFixed(1) + ' km/h';
+        } else if (runSports.includes(c.sport)) {
+          const minPerKm = raceMinutes / gpxStats.km;
+          const mm = Math.floor(minPerKm);
+          const ss = Math.round((minPerKm - mm) * 60);
+          allure = `${mm}'${ss.toString().padStart(2,'0')}"/km`;
+        } else if (swimSports.includes(c.sport)) {
+          const minPer100m = (raceMinutes / gpxStats.km) / 10;
+          const mm = Math.floor(minPer100m);
+          const ss = Math.round((minPer100m - mm) * 60);
+          allure = `${mm}'${ss.toString().padStart(2,'0')}"/100m`;
+        } else {
+          allure = (gpxStats.km / hours).toFixed(1) + ' km/h';
+        }
+      }
+
+      // Ordre demandé : Temps cible → Distance → Dénivelé → Allure
+      // Type d'épreuve en titre texte. Tours en complément.
+      const cards = [];
+      if (c.target) cards.push({ label: 'Temps cible', value: c.target, unit: '' });
+      if (effectiveKm != null) cards.push({ label: 'Distance', value: effectiveKm, unit: 'km' });
+      // Si GPX → D+ visible dans la barre stats du profil → on ne le montre pas en gros
+      if (effectiveDplus != null && !gpxStats) cards.push({ label: 'Dénivelé +', value: effectiveDplus, unit: 'm' });
+      if (allure) cards.push({ label: allureLabel, value: allure });
+      if (c.laps != null) cards.push({ label: 'Tours', value: c.laps, unit: '' });
+
+      // Sections détaillées
+      const sections = [];
+      // Section GPX : si content présent → profil d'altitude + trace en grand
+      if (c.gpxContent) {
+        sections.push(`<div class="modal-section">
+          <div class="modal-section-title">Profil d'altitude</div>
+          <div class="gpx-stats-row" id="gpx-stats-row-prevu"></div>
+          <div class="gpx-elev-wrap" id="gpx-elev-wrap-prevu" style="margin-bottom:14px;">
+            <canvas id="gpx-elev-canvas-prevu"></canvas>
+            <div class="gpx-elev-tooltip" id="gpx-elev-tooltip-prevu" style="display:none;"></div>
+          </div>
+          <div class="modal-section-title">Tracé du parcours</div>
+          <div class="gpx-map-wrap"><div class="gpx-leaflet" id="gpx-leaflet-prevu"></div></div>
+        </div>`);
+      } else if (c.gpxName) {
+        sections.push(`<div class="modal-section">
+          <div class="modal-section-title">Trace GPX</div>
+          <div class="modal-info-box">📍 <strong>${c.gpxName}</strong></div>
+        </div>`);
+      }
+      if (c.notes) {
+        sections.push(`<div class="modal-section">
+          <div class="modal-section-title">Notes / Stratégie</div>
+          <div class="modal-info-box" style="white-space:pre-wrap;">${escapeHtml(c.notes)}</div>
+        </div>`);
+      }
+      // Section "Segments" : la liste des segments AJOUTÉS manuellement par l'utilisateur
+      // (via drag-select + bouton "Ajouter segment")
+      if (c.gpxContent) {
+        sections.push(`<div class="modal-section">
+          <div class="modal-section-title">Segments</div>
+          <div class="climbs-list" id="gpx-segments-list"></div>
+        </div>`);
+        window._gpxClimbContent = c.gpxContent;
+        window._gpxCurrentCompId = c.parentId || c.id;
+      }
+
+      // Titre "Type d'épreuve" au-dessus des cards
+      const typeTitle = c.type
+        ? `<div class="modal-section-title" style="margin-bottom:12px;font-size:18px;color:var(--text);text-transform:none;letter-spacing:0;">${c.type}</div>`
+        : '';
+      bodyEl.innerHTML = `
+        ${switchHTML}
+        ${typeTitle}
+        <div class="modal-metrics">
+          ${cards.map(card => `<div class="modal-metric${card.accent ? ' accent' : ''}"><div class="m-label">${card.label}</div><div class="m-value" style="${card.isText ? 'font-size:16px;' : ''}">${card.value}${card.unit ? `<span style="font-size:13px;font-weight:500;margin-left:2px;">${card.unit}</span>` : ''}</div></div>`).join('')}
         </div>
-      </div>
-    `;
+        ${sections.join('')}
+      `;
+      wireSwitchButtons();
+      // Rendu GPX si présent : profil altitude Chart.js + tracé Leaflet
+      if (c.gpxContent) {
+        renderGpxElevationChart(c.gpxContent, 'gpx-elev-canvas-prevu');
+        renderGpxLeafletMap(c.gpxContent, 'gpx-leaflet-prevu');
+        wireClimbsList();
+      }
+    }
+
+    // === SEGMENTS UTILISATEUR (exposés sur window pour le bouton du chart) ===
+    window._gpxSegKey = (compId) => `coach_ia_gpx_segments_${compId || 'global'}`;
+    window.gpxLoadSegments = (compId) => {
+      try {
+        const raw = localStorage.getItem(window._gpxSegKey(compId));
+        if (!raw) return [];
+        return JSON.parse(raw);
+      } catch (e) { return []; }
+    };
+    window.gpxSaveSegments = (compId, arr) => {
+      localStorage.setItem(window._gpxSegKey(compId), JSON.stringify(arr));
+    };
+    window.gpxRenderSegmentsList = () => {
+      const list = document.getElementById('gpx-segments-list');
+      if (!list) return;
+      const compId = window._gpxCurrentCompId;
+      const segs = window.gpxLoadSegments(compId);
+      if (segs.length === 0) {
+        list.innerHTML = `<div class="comp-empty" style="padding:14px;">Sélectionne une portion du profil pour créer un segment.</div>`;
+        return;
+      }
+      list.innerHTML = segs.map((s, i) => {
+        const cat = s.gain >= 1000 ? 'HC' : s.gain >= 600 ? '1' : s.gain >= 300 ? '2' : s.gain >= 150 ? '3' : '4';
+        return `<div class="climb-item" data-seg-idx="${i}">
+          <div class="climb-row">
+            <div class="climb-cat cat-${cat}">${cat}</div>
+            <div class="climb-info">
+              <div class="climb-range">${s.name || `Segment ${i + 1}`}</div>
+              <div class="climb-meta">km ${s.startKm.toFixed(1)} → ${s.endKm.toFixed(1)} · ${s.distKm.toFixed(2)} km · D+ ${Math.round(s.gain)} m · ${s.avgSlope.toFixed(1)}% moy. · ${s.maxSlope.toFixed(1)}% max</div>
+            </div>
+            <button class="seg-del-btn" data-seg-del="${i}" title="Supprimer">×</button>
+            <div class="climb-chevron">▼</div>
+          </div>
+          <div class="climb-detail" hidden></div>
+        </div>`;
+      }).join('');
+    };
+    window.gpxAddCurrentSelectionAsSegment = () => {
+      const sel = window._gpxCurrentSelectionStats;
+      if (!sel) { alert('Sélectionne une portion du profil d\'abord.'); return; }
+      const compId = window._gpxCurrentCompId;
+      const segs = window.gpxLoadSegments(compId);
+      const idx = segs.length + 1;
+      const name = prompt('Nom du segment ?', `Segment ${idx}`);
+      if (name === null) return;
+      segs.push({
+        startKm: sel.kmMin,
+        endKm: sel.kmMax,
+        distKm: sel.distKm,
+        gain: sel.gain,
+        loss: sel.loss,
+        avgSlope: sel.avgSlope,
+        maxSlope: sel.maxSlope,
+        minSlope: sel.minSlope,
+        name: (name && name.trim()) || `Segment ${idx}`,
+        createdAt: new Date().toISOString(),
+      });
+      window.gpxSaveSegments(compId, segs);
+      window.gpxRenderSegmentsList();
+    };
+    // Aliases pour compat interne (utilisés par wireClimbsList plus bas)
+    const loadSegments = window.gpxLoadSegments;
+    const saveSegments = window.gpxSaveSegments;
+    const renderSegmentsList = window.gpxRenderSegmentsList;
+
+    function wireClimbsList() {
+      const list = document.getElementById('gpx-segments-list');
+      if (!list) return;
+      renderSegmentsList();
+      list.addEventListener('click', (e) => {
+        // Bouton suppression
+        const delBtn = e.target.closest('.seg-del-btn');
+        if (delBtn) {
+          e.stopPropagation();
+          const i = +delBtn.dataset.segDel;
+          const compId = window._gpxCurrentCompId;
+          const segs = loadSegments(compId);
+          segs.splice(i, 1);
+          saveSegments(compId, segs);
+          renderSegmentsList();
+          return;
+        }
+        const item = e.target.closest('.climb-item');
+        if (!item) return;
+        const idx = +item.dataset.segIdx;
+        const compId = window._gpxCurrentCompId;
+        const segs = loadSegments(compId);
+        const gpx = window._gpxClimbContent;
+        if (!segs[idx] || !gpx) return;
+        const detail = item.querySelector('.climb-detail');
+        const chevron = item.querySelector('.climb-chevron');
+        const isOpen = !detail.hidden;
+        list.querySelectorAll('.climb-item').forEach(it => {
+          const d = it.querySelector('.climb-detail');
+          const c = it.querySelector('.climb-chevron');
+          if (d && d !== detail) { d.hidden = true; d.innerHTML = ''; }
+          if (c) c.style.transform = '';
+          it.classList.remove('expanded');
+        });
+        if (isOpen) {
+          detail.hidden = true;
+          detail.innerHTML = '';
+          chevron.style.transform = '';
+          item.classList.remove('expanded');
+        } else {
+          detail.innerHTML = renderClimbDetail(segs[idx], gpx);
+          detail.hidden = false;
+          chevron.style.transform = 'rotate(180deg)';
+          item.classList.add('expanded');
+        }
+      });
+    }
+
+    // Rendu HTML du détail d'une bosse : profil découpé en segments coloréés par pente
+    function renderClimbDetail(climb, gpxContent) {
+      // Re-parse et filtre la série dans [startKm, endKm]
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(gpxContent, 'application/xml');
+      const trkpts = doc.getElementsByTagName('trkpt');
+      const pts = trkpts.length ? trkpts : (doc.getElementsByTagName('rtept').length ? doc.getElementsByTagName('rtept') : []);
+      function _d(lat1, lon1, lat2, lon2) {
+        const R = 6371, toRad = d => d * Math.PI / 180;
+        const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+        const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+        return 2 * R * Math.asin(Math.sqrt(a));
+      }
+      let cumKm = 0, prevLat = null, prevLon = null;
+      const fullSeries = [];
+      for (let i = 0; i < pts.length; i++) {
+        const lat = parseFloat(pts[i].getAttribute('lat'));
+        const lon = parseFloat(pts[i].getAttribute('lon'));
+        if (isNaN(lat) || isNaN(lon)) continue;
+        if (prevLat !== null) cumKm += _d(prevLat, prevLon, lat, lon);
+        prevLat = lat; prevLon = lon;
+        const eleEl = pts[i].getElementsByTagName('ele')[0];
+        const ele = eleEl ? parseFloat(eleEl.textContent) : NaN;
+        if (!isNaN(ele)) fullSeries.push({ km: cumKm, ele });
+      }
+      const series = fullSeries.filter(p => p.km >= climb.startKm && p.km <= climb.endKm);
+      if (series.length < 2) return '<div class="modal-placeholder">Pas assez de points</div>';
+
+      // Découpage en segments de ~100m
+      const segLen = 0.1; // km
+      const segments = [];
+      let segStart = series[0];
+      for (let i = 1; i < series.length; i++) {
+        const p = series[i];
+        if (p.km - segStart.km >= segLen || i === series.length - 1) {
+          const dx = (p.km - segStart.km) * 1000;
+          const dy = p.ele - segStart.ele;
+          const slope = dx > 0 ? (dy / dx) * 100 : 0;
+          segments.push({
+            startKm: segStart.km, endKm: p.km,
+            startEle: segStart.ele, endEle: p.ele,
+            slope,
+            dist: p.km - segStart.km,
+            gain: Math.max(0, dy),
+          });
+          segStart = p;
+        }
+      }
+
+      // Couleur selon pente
+      function slopeColor(s) {
+        if (s < 3) return '#4ade80';
+        if (s < 6) return '#fbbf24';
+        if (s < 9) return '#f97316';
+        if (s < 12) return '#ef4444';
+        return '#b91c1c';
+      }
+
+      // SVG du profil découpé
+      const W = 900, H = 240, padL = 30, padR = 16, padT = 16, padB = 30;
+      const dw = W - padL - padR, dh = H - padT - padB;
+      const totalSegKm = climb.endKm - climb.startKm;
+      const minE = Math.min(...series.map(p => p.ele));
+      const maxE = Math.max(...series.map(p => p.ele));
+      const rng = Math.max(maxE - minE, 5);
+
+      // Dessine chaque segment comme un polygone coloré
+      const segmentsSvg = segments.map(s => {
+        const x1 = padL + ((s.startKm - climb.startKm) / totalSegKm) * dw;
+        const x2 = padL + ((s.endKm - climb.startKm) / totalSegKm) * dw;
+        const y1 = padT + dh - ((s.startEle - minE) / rng) * dh;
+        const y2 = padT + dh - ((s.endEle - minE) / rng) * dh;
+        const baseY = padT + dh;
+        const color = slopeColor(s.slope);
+        return `<polygon points="${x1},${baseY} ${x1},${y1} ${x2},${y2} ${x2},${baseY}" fill="${color}" stroke="rgba(0,0,0,0.2)" stroke-width="0.5">
+          <title>km ${s.startKm.toFixed(2)} → ${s.endKm.toFixed(2)} · ${s.slope.toFixed(1)}% · +${s.gain.toFixed(0)}m</title>
+        </polygon>`;
+      }).join('');
+
+      // Ticks Y (altitude)
+      const yTicks = [];
+      for (let i = 0; i <= 3; i++) {
+        const e = minE + (rng * (1 - i / 3));
+        const y = padT + (dh * i / 3);
+        yTicks.push(`<text x="${padL - 4}" y="${y + 4}" text-anchor="end" fill="#64748b" font-size="10">${Math.round(e)}m</text>`);
+      }
+      // Ticks X (km depuis début bosse)
+      const xTicks = [];
+      const nTicks = Math.min(5, Math.max(2, Math.round(totalSegKm)));
+      for (let i = 0; i <= nTicks; i++) {
+        const km = climb.startKm + (totalSegKm * i / nTicks);
+        const x = padL + (dw * i / nTicks);
+        xTicks.push(`<text x="${x}" y="${H - 10}" text-anchor="middle" fill="#64748b" font-size="10">${km.toFixed(1)}</text>`);
+      }
+
+      // Légende des couleurs de pente
+      const legend = `
+        <div class="climb-legend">
+          <span><span class="dot" style="background:#4ade80;"></span>&lt; 3%</span>
+          <span><span class="dot" style="background:#fbbf24;"></span>3-6%</span>
+          <span><span class="dot" style="background:#f97316;"></span>6-9%</span>
+          <span><span class="dot" style="background:#ef4444;"></span>9-12%</span>
+          <span><span class="dot" style="background:#b91c1c;"></span>≥ 12%</span>
+        </div>
+      `;
+
+      // Liste des segments raides (>= 6%)
+      const steepSegs = segments.filter(s => s.slope >= 6);
+      const steepList = steepSegs.length ? `
+        <div class="climb-steep-list">
+          <div class="climb-steep-title">Sections les plus raides</div>
+          ${steepSegs.map(s => `
+            <div class="climb-steep-item">
+              <span class="dot" style="background:${slopeColor(s.slope)};"></span>
+              <span class="ss-range">km ${s.startKm.toFixed(2)} → ${s.endKm.toFixed(2)}</span>
+              <span class="ss-slope">${s.slope.toFixed(1)}%</span>
+              <span class="ss-gain">+${s.gain.toFixed(0)}m</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : '';
+
+      return `
+        <div class="climb-detail-inner">
+          <svg class="climb-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+            <rect x="0" y="0" width="${W}" height="${H}" fill="rgba(0,0,0,0.2)" rx="6"/>
+            ${segmentsSvg}
+            ${yTicks.join('')}
+            ${xTicks.join('')}
+          </svg>
+          ${legend}
+          ${steepList}
+        </div>
+      `;
+    }
+
+    function renderManualTrainingModal(t, switchHTML, dateStrOverride) {
+      const _dateStr = dateStrOverride || dateStr;
+      // Pas d'édition pour les entraînements manuels (pour l'instant)
+      const editBtn = document.getElementById('modal-edit-btn');
+      if (editBtn) editBtn.hidden = true;
+      const sportLabel = window.sportFr(t.sport || 'Ride');
+      const sportCat = window.activitySportColorKey({ sport: t.sport }) || 'autre';
+      const sportPill = `<span class="sport-pill" data-sport-cat="${sportCat}" style="margin-left:8px;vertical-align:middle;">${sportLabel}</span>`;
+      titleEl.innerHTML = `${t.name} ${t.type ? `<span class="pill ${t.type}" style="margin-left:8px;">${t.type}</span>` : ''}${sportPill}`;
+      metaEl.innerHTML = `${_dateStr} · Séance ajoutée manuellement`;
+      const dur = t.duration || 0;
+      const h = Math.floor(dur / 60), mm = (dur % 60).toString().padStart(2, '0');
+      const cards = [];
+      if (dur) cards.push({ label: 'Durée', value: `${h}h${mm}`, unit: '' });
+      if (t.tss) cards.push({ label: 'TSS', value: t.tss, unit: '' });
+      if (t.type) cards.push({ label: 'Type', value: t.type, unit: '', isText: true });
+
+      const sections = [];
+      if (t.notes) {
+        sections.push(`<div class="modal-section">
+          <div class="modal-section-title">Notes / Structure</div>
+          <div class="modal-info-box" style="white-space:pre-wrap;">${escapeHtml(t.notes)}</div>
+        </div>`);
+      }
+      bodyEl.innerHTML = `
+        ${switchHTML}
+        <div class="modal-metrics">
+          ${cards.map(c => `<div class="modal-metric"><div class="m-label">${c.label}</div><div class="m-value" style="${c.isText ? 'font-size:15px;text-transform:capitalize;' : ''}">${c.value}</div></div>`).join('')}
+        </div>
+        ${sections.join('')}
+      `;
+      wireSwitchButtons();
+    }
+
+    function renderTemplateModal(proposal, phase, switchHTML, dateStrOverride) {
+      const _dateStr = dateStrOverride || dateStr;
+      // Pas d'édition pour les suggestions AI (template)
+      const editBtn = document.getElementById('modal-edit-btn');
+      if (editBtn) editBtn.hidden = true;
+      const dur = proposal.dur || 0;
+      const h = Math.floor(dur / 60), mm = (dur % 60).toString().padStart(2, '0');
+      titleEl.innerHTML = `${proposal.name} ${proposal.type ? `<span class="pill ${proposal.type}">${proposal.type}</span>` : ''}`;
+      metaEl.textContent = `${_dateStr} · ${h}h${mm} · ${proposal.tss || 0} TSS prévus · phase ${PHASE_LABELS[phase] || phase}`;
+      bodyEl.innerHTML = `
+        ${switchHTML}
+        <div class="modal-metrics">
+          <div class="modal-metric"><div class="m-label">Durée cible</div><div class="m-value">${h}<span style="font-size:14px;">h</span>${mm}</div></div>
+          <div class="modal-metric"><div class="m-label">TSS cible</div><div class="m-value">${proposal.tss || 0}</div></div>
+          <div class="modal-metric"><div class="m-label">Type</div><div class="m-value" style="font-size:15px;text-transform:capitalize;">${proposal.type || '—'}</div></div>
+          <div class="modal-metric"><div class="m-label">Phase</div><div class="m-value" style="font-size:15px;">${PHASE_LABELS[phase] || '—'}</div></div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-title">Pourquoi cette séance</div>
+          <div class="modal-info-box">${proposal.why || '—'}</div>
+        </div>
+      `;
+      wireSwitchButtons();
+    }
+
+    function wireSwitchButtons() {
+      bodyEl.querySelectorAll('.modal-activity-switch button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const i = +btn.dataset.i;
+          dayPrevuIndex[iso] = i;
+          renderPrevuItem(i);
+        });
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    renderPrevuItem(curIdx);
   }
   document.getElementById('session-modal').classList.add('active');
 }
@@ -7212,6 +9977,88 @@ function closeSessionModal() {
 }
 
 document.getElementById('modal-close').addEventListener('click', closeSessionModal);
+
+// Bouton "Modifier" (⋯) dans le header du modal détail compé
+const _modalEditBtn = document.getElementById('modal-edit-btn');
+if (_modalEditBtn) {
+  _modalEditBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const compId = _modalEditBtn.dataset.compId;
+    if (!compId) return;
+    const comp = loadCompetitions().find(c => c.id === compId);
+    if (!comp) return;
+    // Ferme la modal de détail puis ouvre la modal d'édition pré-remplie
+    closeSessionModal();
+    openCompModalForEdit(comp);
+  });
+}
+
+// Ouvre la modal d'ajout de compétition en mode édition (préremplie + sauvegarde update)
+function openCompModalForEdit(comp) {
+  if (typeof openCompModal !== 'function') return;
+  openCompModal();
+  // Marque le mode édition
+  window._editingCompId = comp.id;
+  // Pré-remplit les champs principaux
+  document.getElementById('comp-modal-name').value = comp.name || '';
+  document.getElementById('comp-modal-date').value = comp.date || '';
+  if (document.getElementById('comp-modal-date')._flatpickr && comp.date) {
+    document.getElementById('comp-modal-date')._flatpickr.setDate(comp.date, false);
+  }
+  // Time
+  if (comp.time && window.resetTimeStepper) {
+    const [h, m] = comp.time.split(':').map(n => parseInt(n, 10) || 0);
+    window.resetTimeStepper('comp-modal-time', h, m);
+  }
+  // Selects (priority, sport, type)
+  ['priority', 'sport', 'type'].forEach(k => {
+    const el = document.getElementById('comp-modal-' + k);
+    if (el && comp[k] !== undefined && comp[k] !== null) {
+      el.value = comp[k];
+      if (el._customUpdate) el._customUpdate();
+    }
+  });
+  if (typeof populateTypeSelectForSport === 'function' && comp.sport) {
+    populateTypeSelectForSport(comp.sport);
+    const t = document.getElementById('comp-modal-type');
+    if (t && comp.type) { t.value = comp.type; if (t._customUpdate) t._customUpdate(); }
+  }
+  // Champs simples
+  document.getElementById('comp-modal-km').value = comp.km != null ? comp.km : '';
+  document.getElementById('comp-modal-dplus').value = comp.dplus != null ? comp.dplus : '';
+  document.getElementById('comp-modal-target').value = comp.target || '';
+  document.getElementById('comp-modal-laps').value = comp.laps != null ? comp.laps : '';
+  document.getElementById('comp-modal-notes').value = comp.notes || '';
+  // Toggle stages + remplissage stagesData si applicable
+  const stagesToggle = document.getElementById('comp-modal-stages-toggle');
+  if (stagesToggle) {
+    stagesToggle.checked = !!comp.stages;
+    if (comp.stages && Array.isArray(comp.stagesList) && comp.stagesList.length) {
+      stagesData = comp.stagesList.map(s => ({
+        date: s.date || '',
+        time: s.time || '',
+        type: s.type || '',
+        km: s.km || '',
+        dplus: s.dplus || '',
+        target: s.target || '',
+        laps: s.laps || '',
+        notes: s.notes || '',
+        gpxName: s.gpxName || null,
+        gpxFile: null, // les fichiers ne peuvent pas être pré-remplis (sécurité browser)
+      }));
+      activeStageIdx = 0;
+      const tabsBar = document.getElementById('comp-stages-tabs');
+      if (tabsBar) tabsBar.hidden = false;
+      renderStageTabs();
+      writeStageToForm(stagesData[0]);
+    }
+  }
+  // Adapter le titre + label du bouton "Enregistrer"
+  const titleH2 = document.querySelector('#comp-modal .modal-title h2');
+  if (titleH2) titleH2.textContent = 'Modifier la compétition';
+  const saveBtn = document.getElementById('comp-modal-save');
+  if (saveBtn) saveBtn.textContent = 'Enregistrer les modifications';
+}
 document.getElementById('session-modal').addEventListener('click', (e) => {
   if (e.target.id === 'session-modal') closeSessionModal();
 });
