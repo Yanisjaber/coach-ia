@@ -749,6 +749,9 @@
     font-weight: 600;
   }
   .day-card.rest { background: var(--bg); border-style: dashed; }
+  /* Day card de séance ajoutée MANUELLEMENT (pas tracké par Strava) : fond standard,
+     pas de différenciation visuelle bizarre. Garde le même look que Strava. */
+  .day-card.manual { background: var(--bg-elev2); }
   /* .day-card.past : même apparence que les cartes "prévu" → on n'override rien */
   /* Mode Prévu : jours passés affichés mais grisés (comme "déjà fait/passé") */
   .day-card.prevu-past {
@@ -968,6 +971,96 @@
     overflow-y: auto;
   }
   .modal-overlay.active { display: flex; }
+  /* === Modal de confirmation custom === */
+  .confirm-modal-overlay {
+    align-items: center;
+    padding: 20px;
+    z-index: 5000; /* au-dessus des autres modals */
+  }
+  .confirm-modal {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+    width: 100%;
+    max-width: 440px;
+    padding: 24px 26px 20px;
+    animation: confirmModalIn 0.16s ease-out;
+  }
+  @keyframes confirmModalIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .confirm-modal-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .confirm-modal-message {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin-bottom: 22px;
+    white-space: pre-wrap;
+  }
+  .confirm-modal-message strong { color: var(--text); font-weight: 600; }
+  .confirm-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .confirm-modal-actions .btn-secondary,
+  .confirm-modal-actions .btn-primary {
+    padding: 9px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .confirm-modal-actions .btn-secondary {
+    background: transparent;
+    color: var(--text-dim);
+  }
+  .confirm-modal-actions .btn-secondary:hover {
+    background: var(--bg-elev2);
+    color: var(--text);
+  }
+  .confirm-modal-actions .btn-primary {
+    background: var(--accent);
+    color: #0b1410;
+    border-color: var(--accent);
+  }
+  .confirm-modal-actions .btn-primary:hover {
+    filter: brightness(1.08);
+  }
+  /* Variante danger (suppression) */
+  .confirm-modal.is-danger .confirm-modal-actions .btn-primary {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #fff;
+  }
+  /* Input dans le prompt modal */
+  .prompt-modal-input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    margin-bottom: 18px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .prompt-modal-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
+  }
   .modal {
     background: var(--bg-elev);
     border: 1px solid var(--border);
@@ -1026,16 +1119,53 @@
     transition: color 0.12s, background 0.12s;
   }
   .modal-action-btn:hover { color: var(--accent); background: var(--bg-elev2); }
+  .modal-action-btn[hidden] { display: none !important; }
   .modal-action-btn .dots {
     display: inline-block;
     transform: translateY(-3px);
     font-weight: 700;
   }
+  .modal-action-btn.modal-action-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+  }
+  .modal-action-btn.modal-action-danger[hidden] { display: none !important; }
+  .modal-action-btn.modal-action-danger:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
   .modal-metrics {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 12px;
     margin-bottom: 20px;
+  }
+  /* État "jour de repos" : modal épurée */
+  .modal-rest-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 20px 18px;
+    text-align: center;
+  }
+  .modal-rest-icon {
+    color: var(--accent);
+    margin-bottom: 14px;
+    opacity: 0.9;
+  }
+  .modal-rest-text {
+    color: var(--text);
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .modal-rest-hint {
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+  .modal-rest-hint strong {
+    color: var(--text);
+    font-weight: 700;
   }
   .modal-metric {
     background: var(--bg-elev2);
@@ -2103,18 +2233,53 @@
     color: var(--accent);
   }
 
+  /* === ÉTAT D'ERREUR sur un champ requis (validation inline) === */
+  .field-error input,
+  .field-error select,
+  .field-error textarea,
+  .field-error .flatpickr-input,
+  .field-error .file-picker-btn,
+  .field-error .time-stepper,
+  .field-error .custom-select-btn {
+    border-color: var(--danger) !important;
+    box-shadow: 0 0 0 1px var(--danger);
+    animation: field-shake 0.4s ease-out;
+  }
+  .field-error-msg {
+    color: var(--danger);
+    font-size: 11px;
+    margin-top: 4px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .field-error-msg::before {
+    content: "⚠";
+    font-size: 12px;
+  }
+  @keyframes field-shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-4px); }
+    40%, 80% { transform: translateX(4px); }
+  }
+
   /* === FILE PICKER CUSTOM (au lieu du bouton "Choisir un fichier" natif) === */
   .file-picker {
     display: flex;
     align-items: stretch;
     gap: 6px;
     width: 100%;
+    min-width: 0; /* permet la troncature des enfants longs */
+    height: 39px;
   }
   .file-picker-btn {
     display: flex;
     align-items: center;
     gap: 10px;
     flex: 1;
+    min-width: 0; /* essentiel pour que text-overflow:ellipsis fonctionne dans un flex-child */
+    max-width: 100%;
     height: 39px;
     padding: 0 14px;
     background: var(--bg-elev2);
@@ -2593,7 +2758,9 @@
   }
   .add-form-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    /* minmax(0, 1fr) au lieu de 1fr → permet aux enfants de shrink sous leur taille de contenu
+       (1fr defaults to minmax(auto, 1fr) qui peut être poussé par un nom de fichier long) */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 14px 16px;
     margin-bottom: 20px;
   }
@@ -2601,6 +2768,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+    min-width: 0; /* permet la troncature dans les flex-children comme le file-picker */
   }
   .form-field.form-col-2 { grid-column: 1 / -1; }
   .form-field > span {
@@ -2659,6 +2827,29 @@
     color: var(--text-dim);
   }
   .btn-secondary:hover { color: var(--text); border-color: var(--text-mute); }
+  /* Bouton poubelle : visible uniquement en mode édition */
+  .btn-trash[hidden] { display: none !important; }
+  .btn-trash:not([hidden]) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-mute);
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+    font-family: inherit;
+    padding: 0;
+  }
+  .btn-trash:hover {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: rgba(248, 113, 113, 0.10);
+  }
+  .btn-trash svg { display: block; }
   @media (max-width: 700px) {
     .add-form-grid { grid-template-columns: 1fr; }
     .form-field.form-col-2 { grid-column: 1; }
@@ -2739,18 +2930,7 @@
       repeating-conic-gradient(#fff 0% 25%, #000 0% 50%) border-box;
     background-size: auto, 8px 8px;
   }
-  .day-card.race::before {
-    content: "🏆";
-    position: absolute;
-    top: 4px;
-    right: 6px;
-    font-size: 18px;
-    line-height: 1;
-    z-index: 2;
-  }
-  .day-card.race[data-priority="A"]::before { filter: drop-shadow(0 0 6px #fbbf24); }
-  .day-card.race[data-priority="B"]::before { filter: grayscale(1) brightness(1.5); }
-  .day-card.race[data-priority="C"]::before { filter: sepia(1) saturate(2.5) hue-rotate(-10deg); }
+  /* Trophée supprimé : on garde juste le damier F1 sur les jours de course */
 </style>
 </head>
 <body>
@@ -3305,10 +3485,54 @@
         <button class="modal-action-btn" id="modal-edit-btn" title="Modifier" hidden>
           <span class="dots">⋯</span>
         </button>
+        <button class="modal-action-btn modal-action-danger" id="modal-delete-btn" title="Supprimer" hidden>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"></path>
+            <path d="M10 11v6"></path><path d="M14 11v6"></path>
+            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
         <button class="modal-close" id="modal-close" title="Fermer (Échap)">×</button>
       </div>
     </div>
     <div id="modal-body">—</div>
+  </div>
+</div>
+
+<!-- Modal de confirmation custom (remplace window.confirm) -->
+<div class="modal-overlay confirm-modal-overlay" id="confirm-modal">
+  <div class="confirm-modal">
+    <div class="confirm-modal-title" id="confirm-modal-title">Confirmer</div>
+    <div class="confirm-modal-message" id="confirm-modal-message">—</div>
+    <div class="confirm-modal-actions">
+      <button class="btn-secondary" id="confirm-modal-cancel">Annuler</button>
+      <button class="btn-primary confirm-modal-ok" id="confirm-modal-ok">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de saisie texte custom (remplace window.prompt) -->
+<div class="modal-overlay confirm-modal-overlay" id="prompt-modal">
+  <div class="confirm-modal">
+    <div class="confirm-modal-title" id="prompt-modal-title">Saisir une valeur</div>
+    <div class="confirm-modal-message" id="prompt-modal-message"></div>
+    <input type="text" class="prompt-modal-input" id="prompt-modal-input" autocomplete="off">
+    <div class="confirm-modal-actions">
+      <button class="btn-secondary" id="prompt-modal-cancel">Annuler</button>
+      <button class="btn-primary" id="prompt-modal-ok">Valider</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal d'alerte custom (remplace window.alert) -->
+<div class="modal-overlay confirm-modal-overlay" id="alert-modal">
+  <div class="confirm-modal">
+    <div class="confirm-modal-title" id="alert-modal-title">Information</div>
+    <div class="confirm-modal-message" id="alert-modal-message">—</div>
+    <div class="confirm-modal-actions">
+      <button class="btn-primary" id="alert-modal-ok">OK</button>
+    </div>
   </div>
 </div>
 
@@ -3329,7 +3553,7 @@
             <span class="toggle-label">Course par étapes</span>
           </label>
         </div>
-        <input type="text" id="comp-modal-name" placeholder="Ex : Course de Cambrils">
+        <input type="text" id="comp-modal-name" placeholder="Nom de la compétition">
       </div>
 
       <!-- Priorité + Sport : infos GLOBALES de la compé (ne changent pas par étape) -->
@@ -3378,15 +3602,15 @@
       </label>
       <label class="form-field">
         <span>Distance (km)</span>
-        <input type="number" id="comp-modal-km" step="0.1" min="0" placeholder="Ex : 42.2">
+        <input type="number" id="comp-modal-km" step="0.1" min="0" placeholder="Distance en km">
       </label>
       <label class="form-field">
         <span>Dénivelé + (m)</span>
-        <input type="number" id="comp-modal-dplus" min="0" placeholder="Ex : 850">
+        <input type="number" id="comp-modal-dplus" min="0" placeholder="Dénivelé positif en mètres">
       </label>
       <label class="form-field">
         <span>Temps cible</span>
-        <input type="text" id="comp-modal-target" placeholder="Ex : 3h45 ou 1h20">
+        <input type="text" id="comp-modal-target" placeholder="Temps cible (ex : 3h45)">
       </label>
       <div class="form-field">
         <span>Trace GPX</span>
@@ -3401,7 +3625,7 @@
       </div>
       <label class="form-field">
         <span>Nombre de tours</span>
-        <input type="number" id="comp-modal-laps" min="1" step="1" placeholder="Ex : 8">
+        <input type="number" id="comp-modal-laps" min="1" step="1" placeholder="Nombre de tours">
       </label>
       <label class="form-field form-col-2">
         <span>Notes</span>
@@ -3409,6 +3633,15 @@
       </label>
     </div>
     <div class="modal-footer">
+      <button class="btn-trash" id="comp-modal-delete" title="Supprimer cette compétition" hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+          <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+        </svg>
+      </button>
+      <div style="flex:1;"></div>
       <button class="btn-secondary" id="comp-modal-cancel">Annuler</button>
       <button class="btn-primary" id="comp-modal-save">Enregistrer</button>
     </div>
@@ -3425,7 +3658,7 @@
     <div class="add-form-grid">
       <label class="form-field form-col-2">
         <span>Nom de la séance</span>
-        <input type="text" id="train-modal-name" placeholder="Ex : Sortie longue Z2, Seuil 4×8min...">
+        <input type="text" id="train-modal-name" placeholder="Nom de la séance">
       </label>
       <label class="form-field">
         <span>Date</span>
@@ -3448,11 +3681,11 @@
       </label>
       <label class="form-field">
         <span>Durée (min)</span>
-        <input type="number" id="train-modal-duration" min="0" placeholder="Ex : 90">
+        <input type="number" id="train-modal-duration" min="0" placeholder="Durée en minutes">
       </label>
       <label class="form-field">
         <span>TSS estimé</span>
-        <input type="number" id="train-modal-tss" min="0" placeholder="Ex : 80">
+        <input type="number" id="train-modal-tss" min="0" placeholder="TSS estimé">
       </label>
       <label class="form-field form-col-2">
         <span>Notes / structure</span>
@@ -3460,6 +3693,15 @@
       </label>
     </div>
     <div class="modal-footer">
+      <button class="btn-trash" id="train-modal-delete" title="Supprimer cet entraînement" hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+          <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+        </svg>
+      </button>
+      <div style="flex:1;"></div>
       <button class="btn-secondary" id="train-modal-cancel">Annuler</button>
       <button class="btn-primary" id="train-modal-save">Enregistrer</button>
     </div>
@@ -4626,12 +4868,15 @@ function renderCompList() {
   }).join('');
 }
 
-document.getElementById('comp-add').addEventListener('click', () => {
+document.getElementById('comp-add').addEventListener('click', async () => {
   const name = document.getElementById('comp-name').value.trim();
   const date = document.getElementById('comp-date').value;
   const priority = document.getElementById('comp-priority').value;
   if (!name || !date) {
-    alert('Renseigne au moins le nom et la date.');
+    await appAlert({
+      title: 'Champs manquants',
+      message: 'Renseigne au moins le nom et la date.',
+    });
     return;
   }
   const comps = loadCompetitions();
@@ -5195,8 +5440,19 @@ function readFormToStage() {
   stage.laps = document.getElementById('comp-modal-laps').value || '';
   stage.notes = document.getElementById('comp-modal-notes').value || '';
   const gpxInput = document.getElementById('comp-modal-gpx');
-  stage.gpxFile = gpxInput && gpxInput.files[0] ? gpxInput.files[0] : null;
-  stage.gpxName = stage.gpxFile ? stage.gpxFile.name : null;
+  const newFile = gpxInput && gpxInput.files[0] ? gpxInput.files[0] : null;
+  if (newFile) {
+    // L'utilisateur a uploadé un nouveau fichier pour cette étape
+    stage.gpxFile = newFile;
+    stage.gpxName = newFile.name;
+    stage.gpxContent = null; // sera lu en async au save
+  } else {
+    // Pas de nouveau fichier : on PRÉSERVE le gpx existant (en mémoire dans stagesData)
+    const existing = (typeof stagesData !== 'undefined' && stagesData[activeStageIdx]) || {};
+    stage.gpxFile = existing.gpxFile || null;
+    stage.gpxName = existing.gpxName || null;
+    stage.gpxContent = existing.gpxContent || null;
+  }
   return stage;
 }
 
@@ -5205,8 +5461,18 @@ function writeStageToForm(stage) {
   // NOTE: priority et sport NE sont PAS touchés (globaux à la compé)
   document.getElementById('comp-modal-date').value = stage.date || '';
   document.getElementById('comp-modal-type').value = stage.type || '';
-  document.getElementById('comp-modal-km').value = stage.km || '';
-  document.getElementById('comp-modal-dplus').value = stage.dplus || '';
+  // km/dplus : si GPX présent pour cette étape, on calcule depuis le fichier (vérité terrain)
+  let effKm = stage.km, effDplus = stage.dplus;
+  const lapsForStage = parseInt(stage.laps, 10) || 1;
+  if (stage.gpxContent && typeof extractGpxStats === 'function') {
+    const gs = extractGpxStats(stage.gpxContent, lapsForStage);
+    if (gs) {
+      effKm = gs.km;
+      effDplus = gs.dplus;
+    }
+  }
+  document.getElementById('comp-modal-km').value = effKm || '';
+  document.getElementById('comp-modal-dplus').value = effDplus || '';
   document.getElementById('comp-modal-target').value = stage.target || '';
   document.getElementById('comp-modal-laps').value = stage.laps || '';
   document.getElementById('comp-modal-notes').value = stage.notes || '';
@@ -5378,10 +5644,41 @@ if (stageAddBtn) {
   });
 }
 
+// Helper : auto-remplit km et D+ depuis le GPX courant dans la modal compé,
+// en multipliant par le nombre de tours saisi
+function _autofillKmDplusFromCompGpx() {
+  const gpxInput = document.getElementById('comp-modal-gpx');
+  const kmInput = document.getElementById('comp-modal-km');
+  const dplusInput = document.getElementById('comp-modal-dplus');
+  if (!gpxInput || !kmInput || !dplusInput) return;
+  const file = gpxInput.files && gpxInput.files[0];
+  const lapsVal = parseInt(document.getElementById('comp-modal-laps').value, 10) || 1;
+  // Source du contenu : soit nouveau fichier upload, soit contenu déjà en mémoire (mode édition)
+  function applyStats(gpxContent) {
+    if (!gpxContent || typeof extractGpxStats !== 'function') return;
+    const stats = extractGpxStats(gpxContent, lapsVal);
+    if (!stats) return;
+    kmInput.value = stats.km;
+    dplusInput.value = stats.dplus;
+    // Sync aussi le snapshot stage si on est en mode étapes
+    if (typeof stagesData !== 'undefined' && stagesData[activeStageIdx]) {
+      stagesData[activeStageIdx].km = String(stats.km);
+      stagesData[activeStageIdx].dplus = String(stats.dplus);
+    }
+  }
+  if (file) {
+    file.text().then(applyStats).catch(() => {});
+  } else if (typeof stagesData !== 'undefined' && stagesData[activeStageIdx] && stagesData[activeStageIdx].gpxContent) {
+    applyStats(stagesData[activeStageIdx].gpxContent);
+  }
+}
+
 function openCompModal() {
   const modal = document.getElementById('comp-modal');
   if (!modal) return;
   initFlatpickrAll(); // au cas où
+  // Reset éventuels états d'erreur d'une précédente saisie
+  if (typeof _clearAllFieldErrors === 'function') _clearAllFieldErrors('#comp-modal');
   // Reset mode édition (sera ré-activé par openCompModalForEdit si applicable)
   window._editingCompId = null;
   // Restaure le titre et le bouton en mode "création" par défaut
@@ -5389,6 +5686,9 @@ function openCompModal() {
   if (titleH2) titleH2.textContent = 'Ajouter une compétition';
   const saveBtn = document.getElementById('comp-modal-save');
   if (saveBtn) saveBtn.textContent = 'Enregistrer';
+  // Cache le bouton poubelle par défaut (sera affiché par openCompModalForEdit)
+  const delBtn = document.getElementById('comp-modal-delete');
+  if (delBtn) delBtn.hidden = true;
   // Reset form (sauf "time" qui est géré par le stepper)
   ['name','date','type','km','dplus','target','laps','notes'].forEach(k => {
     const el = document.getElementById('comp-modal-' + k);
@@ -5416,10 +5716,15 @@ function openCompModal() {
   if (sportEl && sportEl._customUpdate) sportEl._customUpdate();
   // Peuple le select Type d'épreuve selon le sport actif
   if (typeof populateTypeSelectForSport === 'function') populateTypeSelectForSport('Ride');
+  // Reset AGRESSIF du file-picker GPX (l'input file peut garder son state entre ouvertures)
   const gpxEl = document.getElementById('comp-modal-gpx');
   if (gpxEl) {
-    gpxEl.value = '';
-    // Reset le label du file-picker custom
+    try { gpxEl.value = ''; } catch (e) {}
+    // Force aussi un FileList vide via DataTransfer (plus fiable que value='')
+    try {
+      const dt = new DataTransfer();
+      gpxEl.files = dt.files;
+    } catch (e) { /* navigateurs anciens */ }
     const picker = gpxEl.closest('.file-picker');
     if (picker) {
       picker.classList.remove('has-file');
@@ -5429,6 +5734,19 @@ function openCompModal() {
       if (clr) clr.hidden = true;
     }
   }
+  // Cleanup global de tous les file-pickers de la modal compé (au cas où il y en aurait plusieurs)
+  document.querySelectorAll('#comp-modal .file-picker').forEach(p => {
+    p.classList.remove('has-file');
+    const lbl = p.querySelector('.file-picker-label');
+    if (lbl) lbl.textContent = 'Choisir un fichier GPX';
+    const clr = p.querySelector('.file-picker-clear');
+    if (clr) clr.hidden = true;
+    const inp = p.querySelector('input[type="file"]');
+    if (inp) {
+      try { inp.value = ''; } catch (e) {}
+      try { inp.files = new DataTransfer().files; } catch (e) {}
+    }
+  });
   if (typeof initFilePickers === 'function') initFilePickers();
   modal.classList.add('active');
 }
@@ -5437,11 +5755,47 @@ function closeCompModal() {
   if (modal) modal.classList.remove('active');
 }
 
+// Helper validation : marque un champ comme requis manquant + affiche un mini message
+function _markFieldError(inputId, message) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  // Cherche le form-field parent (peut être un label ou un div)
+  const field = el.closest('.form-field') || el.parentElement;
+  if (!field) return;
+  field.classList.add('field-error');
+  // Si un message d'erreur existe déjà, on l'update, sinon on le crée
+  let msg = field.querySelector('.field-error-msg');
+  if (!msg) {
+    msg = document.createElement('div');
+    msg.className = 'field-error-msg';
+    field.appendChild(msg);
+  }
+  msg.textContent = message;
+  // Cleanup auto au prochain input/change
+  const clearOnce = () => {
+    field.classList.remove('field-error');
+    if (msg && msg.parentNode) msg.parentNode.removeChild(msg);
+    el.removeEventListener('input', clearOnce);
+    el.removeEventListener('change', clearOnce);
+  };
+  el.addEventListener('input', clearOnce);
+  el.addEventListener('change', clearOnce);
+}
+function _clearAllFieldErrors(modalSel) {
+  document.querySelectorAll(`${modalSel} .field-error`).forEach(f => f.classList.remove('field-error'));
+  document.querySelectorAll(`${modalSel} .field-error-msg`).forEach(m => m.remove());
+}
+
 async function saveCompFromModal() {
+  _clearAllFieldErrors('#comp-modal');
   const name = document.getElementById('comp-modal-name').value.trim();
   const date = document.getElementById('comp-modal-date').value;
   if (!name || !date) {
-    alert('Renseigne au moins le nom et la date.');
+    if (!name) _markFieldError('comp-modal-name', 'Champ requis');
+    if (!date) _markFieldError('comp-modal-date', 'Champ requis');
+    // Scroll vers le premier champ en erreur
+    const first = document.querySelector('#comp-modal .field-error');
+    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
   const time = document.getElementById('comp-modal-time').value || '';
@@ -5464,7 +5818,8 @@ async function saveCompFromModal() {
     stagesList = [];
     for (let i = 0; i < stagesData.length; i++) {
       const s = stagesData[i];
-      let gpxContent = null;
+      // Priorité : nouveau fichier > contenu existant en mémoire (édition sans re-upload)
+      let gpxContent = s.gpxContent || null;
       if (s.gpxFile) {
         try { gpxContent = await s.gpxFile.text(); } catch (e) { console.warn('GPX étape ' + (i + 1) + ' :', e); }
       }
@@ -5554,6 +5909,22 @@ if (compModalOverlay) compModalOverlay.addEventListener('click', (e) => {
   if (e.target === compModalOverlay) closeCompModal();
 });
 
+// Auto-remplit km + D+ depuis le GPX dès qu'un fichier est sélectionné
+const _compGpxInput = document.getElementById('comp-modal-gpx');
+if (_compGpxInput) {
+  _compGpxInput.addEventListener('change', () => {
+    // Petit délai pour que le file-picker UI mette d'abord à jour son visuel
+    setTimeout(() => { if (typeof _autofillKmDplusFromCompGpx === 'function') _autofillKmDplusFromCompGpx(); }, 50);
+  });
+}
+// Recalcule km + D+ quand le nombre de tours change (si un GPX est présent)
+const _compLapsInput = document.getElementById('comp-modal-laps');
+if (_compLapsInput) {
+  _compLapsInput.addEventListener('input', () => {
+    if (typeof _autofillKmDplusFromCompGpx === 'function') _autofillKmDplusFromCompGpx();
+  });
+}
+
 // ========= MODAL D'AJOUT D'ENTRAÎNEMENT =========
 const TRAIN_KEY = 'coach_ia_trainings_v1';
 function loadTrainings() {
@@ -5586,11 +5957,19 @@ function openTrainModal(mode) {
   if (!modal) return;
   trainModalMode = (mode === 'realise') ? 'realise' : 'prevu';
   initFlatpickrAll(); // au cas où
-  // Titre dynamique
+  if (typeof _clearAllFieldErrors === 'function') _clearAllFieldErrors('#train-modal');
+  // Reset mode édition par défaut (sera ré-activé par openTrainModalForEdit)
+  window._editingTrainId = null;
+  window._editingTrainMode = null;
   const titleEl = document.getElementById('train-modal-title');
-  if (titleEl) titleEl.textContent = trainModalMode === 'realise'
+  if (titleEl) titleEl.textContent = (trainModalMode === 'realise')
     ? 'Ajouter un entraînement réalisé'
     : 'Ajouter un entraînement prévu';
+  const saveBtn = document.getElementById('train-modal-save');
+  if (saveBtn) saveBtn.textContent = 'Enregistrer';
+  // Poubelle cachée par défaut (visible seulement en édition)
+  const delBtn = document.getElementById('train-modal-delete');
+  if (delBtn) delBtn.hidden = true;
   ['name','date','duration','tss','notes'].forEach(k => {
     const el = document.getElementById('train-modal-' + k);
     if (el) el.value = '';
@@ -5620,11 +5999,78 @@ function closeTrainModal() {
   const modal = document.getElementById('train-modal');
   if (modal) modal.classList.remove('active');
 }
+// Ouvre la modal entraînement en mode édition (pré-remplie)
+function openTrainModalForEdit(training, mode) {
+  if (!training || typeof openTrainModal !== 'function') return;
+  openTrainModal(mode);
+  window._editingTrainId = training.id;
+  window._editingTrainMode = mode;
+  trainModalMode = mode;
+  document.getElementById('train-modal-name').value = training.name || '';
+  document.getElementById('train-modal-date').value = training.date || '';
+  if (document.getElementById('train-modal-date')._flatpickr && training.date) {
+    document.getElementById('train-modal-date')._flatpickr.setDate(training.date, false);
+  }
+  if (training.sport) {
+    const s = document.getElementById('train-modal-sport');
+    if (s) { s.value = training.sport; if (s._customUpdate) s._customUpdate(); }
+  }
+  if (training.type) {
+    const t = document.getElementById('train-modal-type');
+    if (t) { t.value = training.type; if (t._customUpdate) t._customUpdate(); }
+  }
+  document.getElementById('train-modal-duration').value = training.duration != null ? training.duration : '';
+  document.getElementById('train-modal-tss').value = training.tss != null ? training.tss : '';
+  document.getElementById('train-modal-notes').value = training.notes || '';
+  // Adapter titre + bouton + affiche poubelle
+  const titleEl = document.getElementById('train-modal-title');
+  if (titleEl) titleEl.textContent = (mode === 'realise')
+    ? 'Modifier l\'entraînement réalisé'
+    : 'Modifier l\'entraînement prévu';
+  const saveBtn = document.getElementById('train-modal-save');
+  if (saveBtn) saveBtn.textContent = 'Enregistrer les modifications';
+  const delBtn = document.getElementById('train-modal-delete');
+  if (delBtn) delBtn.hidden = false;
+}
+
+// Handler suppression entraînement depuis la modal d'édition
+const _trainModalDelBtn = document.getElementById('train-modal-delete');
+if (_trainModalDelBtn) {
+  _trainModalDelBtn.addEventListener('click', async () => {
+    const id = window._editingTrainId;
+    const mode = window._editingTrainMode || trainModalMode;
+    if (!id) return;
+    const arr = mode === 'realise' ? loadRealisedTrainings() : loadTrainings();
+    const t = arr.find(x => x.id === id);
+    const name = t ? t.name : 'cet entraînement';
+    const ok = await appConfirm({
+      title: 'Supprimer cet entraînement',
+      html: `Supprimer <strong>${window._confirmEscape(name)}</strong> ?`,
+      confirmLabel: 'Supprimer',
+      danger: true,
+    });
+    if (!ok) return;
+    const remaining = arr.filter(x => x.id !== id);
+    if (mode === 'realise') saveRealisedTrainings(remaining);
+    else saveTrainings(remaining);
+    window._editingTrainId = null;
+    window._editingTrainMode = null;
+    closeTrainModal();
+    if (typeof renderCalendar === 'function') renderCalendar();
+  });
+}
+
 function saveTrainFromModal() {
+  if (typeof _clearAllFieldErrors === 'function') _clearAllFieldErrors('#train-modal');
   const name = document.getElementById('train-modal-name').value.trim();
   const date = document.getElementById('train-modal-date').value;
   if (!name || !date) {
-    alert('Renseigne au moins le nom et la date.');
+    if (typeof _markFieldError === 'function') {
+      if (!name) _markFieldError('train-modal-name', 'Champ requis');
+      if (!date) _markFieldError('train-modal-date', 'Champ requis');
+      const first = document.querySelector('#train-modal .field-error');
+      if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     return;
   }
   const sport = document.getElementById('train-modal-sport').value;
@@ -5632,20 +6078,53 @@ function saveTrainFromModal() {
   const duration = parseInt(document.getElementById('train-modal-duration').value, 10) || 0;
   const tss = parseInt(document.getElementById('train-modal-tss').value, 10) || 0;
   const notes = document.getElementById('train-modal-notes').value.trim();
-  const entry = { id: Date.now().toString(), name, date, sport, type, duration, tss, notes, mode: trainModalMode };
+  const editingId = window._editingTrainId;
+  const entry = {
+    id: editingId || Date.now().toString(),
+    name, date, sport, type, duration, tss, notes,
+    mode: trainModalMode,
+  };
 
-  if (trainModalMode === 'realise') {
-    const arr = loadRealisedTrainings();
-    arr.push(entry);
-    saveRealisedTrainings(arr);
+  const loadFn = trainModalMode === 'realise' ? loadRealisedTrainings : loadTrainings;
+  const saveFn = trainModalMode === 'realise' ? saveRealisedTrainings : saveTrainings;
+  const arr = loadFn();
+  if (editingId) {
+    // Mode édition : remplace l'entry existante
+    const idx = arr.findIndex(t => t.id === editingId);
+    if (idx >= 0) arr[idx] = entry; else arr.push(entry);
   } else {
-    const arr = loadTrainings();
     arr.push(entry);
-    saveTrainings(arr);
   }
+  saveFn(arr);
+  window._editingTrainId = null;
+  window._editingTrainMode = null;
   closeTrainModal();
   renderCalendar();
 }
+
+// Helpers globaux pour edit/delete depuis n'importe où
+window.gpxEditTraining = function(id, mode) {
+  const arr = mode === 'realise' ? loadRealisedTrainings() : loadTrainings();
+  const t = arr.find(x => x.id === id);
+  if (t && typeof openTrainModalForEdit === 'function') openTrainModalForEdit(t, mode);
+};
+window.gpxDeleteTraining = async function(id, mode) {
+  const arr = mode === 'realise' ? loadRealisedTrainings() : loadTrainings();
+  const t = arr.find(x => x.id === id);
+  if (!t) return;
+  const ok = await appConfirm({
+    title: 'Supprimer cet entraînement',
+    html: `Supprimer <strong>${window._confirmEscape(t.name)}</strong> ?`,
+    confirmLabel: 'Supprimer',
+    danger: true,
+  });
+  if (!ok) return;
+  const remaining = arr.filter(x => x.id !== id);
+  if (mode === 'realise') saveRealisedTrainings(remaining);
+  else saveTrainings(remaining);
+  if (typeof closeSessionModal === 'function') closeSessionModal();
+  if (typeof renderCalendar === 'function') renderCalendar();
+};
 
 const openTrainBtn = document.getElementById('open-train-modal');
 if (openTrainBtn) openTrainBtn.addEventListener('click', () => openTrainModal('prevu'));
@@ -5854,12 +6333,18 @@ function renderWeekPlan() {
         // 1) Toutes les compés (chaque étape compte comme un item)
         const compsForToday = comps.filter(c => toIsoDate(c.dateObj) === iso);
         for (const c of compsForToday) {
-          let raceDur = 120;
+          // Si pas de temps cible saisi → on n'affiche PAS de durée par défaut
+          // (on garde un fallback de 120 min en interne pour le calcul TSS)
+          let raceDur = null;
+          let raceDurForTss = 120;
           if (c.target) {
             const m = c.target.match(/(\d+)\s*h\s*(\d{0,2})/i);
-            if (m) raceDur = parseInt(m[1], 10) * 60 + (parseInt(m[2], 10) || 0);
+            if (m) {
+              raceDur = parseInt(m[1], 10) * 60 + (parseInt(m[2], 10) || 0);
+              raceDurForTss = raceDur;
+            }
           }
-          const raceTss = Math.round(raceDur * 1.0);
+          const raceTss = Math.round(raceDurForTss * 1.0);
           let raceName, stageInfo = '';
           if (c.stageIdx !== undefined && c.totalStages) {
             raceName = c.name.replace(/ — Étape \d+$/, '');
@@ -5896,12 +6381,15 @@ function renderWeekPlan() {
           });
         }
 
-        // 3) Si aucun item explicite → template AI
+        // 3) Si aucun item explicite → template AI (ou repos si l'utilisateur a override le jour)
         if (items.length === 0) {
+          const _isForcedRest = (typeof isTemplateRestDay === 'function') && isTemplateRestDay(iso);
           const dayPhase = determinePhaseForDate(comps, d, todayData.tsb);
-          const tmpl = PLAN_TEMPLATES[dayPhase][dow];
+          const tmpl = _isForcedRest
+            ? { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Repos forcé (override utilisateur)' }
+            : PLAN_TEMPLATES[dayPhase][dow];
           let tmplProposal = { ...tmpl };
-          if (isToday) tmplProposal = adjustForRecovery(tmplProposal, todayData.recovery);
+          if (isToday && !_isForcedRest) tmplProposal = adjustForRecovery(tmplProposal, todayData.recovery);
           items.push(tmplProposal);
         }
 
@@ -5915,7 +6403,9 @@ function renderWeekPlan() {
         if (isToday) savePlanSnapshot(iso, proposal, true);
       }
 
-      const isRest = !proposal.tss || proposal.type === 'rest';
+      // Une séance est "rest" uniquement si son TYPE est 'rest'
+      // (un entraînement manuel sans TSS reste un vrai entraînement, pas un repos)
+      const isRest = proposal.type === 'rest';
       const todayClass = isToday ? ' today' : '';
       const pastClass = isPast ? ' prevu-past' : '';
       // On comptabilise dans les totaux uniquement aujourd'hui + futur (pas le passé)
@@ -6076,15 +6566,30 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   const raceClass = compToday ? ' race' : '';
   const raceAttr = compToday ? ` data-priority="${compToday.priority || 'A'}"` : '';
 
-  const metaLine = [dur ? `${h}h${m}` : '', km].filter(Boolean).join(' · ');
+  // Meta : durée + km (Strava) OU durée + TSS (manuel sans km, ex: muscu/yoga)
+  let metaParts = [];
+  if (dur) metaParts.push(`${h}h${m}`);
+  if (km) metaParts.push(km);
+  else if (act.tss) metaParts.push(act.tss + ' TSS'); // pas de km → on met TSS
+  const metaLine = metaParts.join(' · ');
+
+  // Marqueur si TOUTES les activités du jour sont manuelles (= pas tracké par Strava)
+  const allManual = realDay && realDay.activities && realDay.activities.length
+    && realDay.activities.every(a => a._manual);
+  const manualClass = allManual ? ' manual' : '';
+
+  // Sport block : ne rendre QUE si on a un label (sinon = ligne dashed orpheline qui fait croire à un jour de repos)
+  const sportBlock = sportLabel
+    ? `<div class="day-card-sport"><span class="sport-pill" data-sport-cat="${sportCat}">${sportLabel}</span></div>`
+    : '';
 
   return `
-    <div class="day-card past${isToday ? ' today' : ''}${raceClass}" data-iso="${iso}" data-source="realise"${raceAttr}>
+    <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass}" data-iso="${iso}" data-source="realise"${raceAttr}>
       <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
       ${dateRow}
       <div class="day-card-name">${aName}</div>
       <div class="day-card-meta">${metaLine}</div>
-      <div class="day-card-sport"><span class="sport-pill" data-sport-cat="${sportCat}">${sportLabel}</span></div>
+      ${sportBlock}
       ${counter}
     </div>
   `;
@@ -6174,6 +6679,19 @@ function renderRealiseCalendar() {
         `;
       } else {
         let realDay = dataByIso[iso];
+        // Filtre les activités Strava masquées par l'utilisateur (suppression locale)
+        if (realDay && realDay.activities && typeof isStravaIgnored === 'function') {
+          const filtered = realDay.activities.filter(a => {
+            if (a._manual) return true;
+            const aid = a.id || a.activityId;
+            return !aid || !isStravaIgnored(aid);
+          });
+          if (filtered.length !== realDay.activities.length) {
+            realDay = { ...realDay, activities: filtered };
+            // Si plus aucune activité après filtrage, on traite comme un jour sans data
+            if (filtered.length === 0) realDay = null;
+          }
+        }
         // Récupère les entraînements MANUELS réalisés (ex: muscu, yoga ajoutés à la main)
         const manualRealised = (typeof loadRealisedTrainings === 'function') ? loadRealisedTrainings().filter(t => t.date === iso) : [];
         // Si on a des manuels et pas de realDay Strava, on en crée un virtuel
@@ -6182,15 +6700,21 @@ function renderRealiseCalendar() {
           if (!realDay) realDay = { date: iso, activities: [], sessionType: 'autre' };
           if (!realDay.activities) realDay.activities = [];
           for (const m of manualRealised) {
+            // Le sport peut être un raw_type Strava (Ride, WeightTraining...) OU une catégorie
+            const sportVal = m.sport || 'autre';
             realDay.activities.push({
               name: m.name,
-              sport: m.sport || 'autre',
-              raw_type: m.sport,
+              sport: sportVal,
+              raw_type: sportVal, // utilisé par activitySportLabel / Color pour le pill
               type: m.type || 'endurance',
+              sessionType: m.type || 'endurance',
+              sessionName: m.name,
               duration: m.duration || 0,
               tss: m.tss || 0,
-              distance_km: m.distance_km || null,
+              distance_km: null,
               _manual: true,
+              _manualId: m.id, // id pour edit/delete depuis la modal
+              notes: m.notes || '',
             });
           }
           // Recalcule duration et tss au niveau jour si pas déjà set
@@ -8250,8 +8774,10 @@ function extractGpxClimbs(gpxContent, minGain = 30) {
 
 // === Extraction des stats principales (km, D+, D-) depuis le contenu GPX ===
 // Utilisé pour override les valeurs manuellement saisies si un GPX est uploadé
-function extractGpxStats(gpxContent) {
+// Si laps > 1 : multiplie km/D+/D- (le parcours est répété N fois)
+function extractGpxStats(gpxContent, laps = 1) {
   if (!gpxContent) return null;
+  laps = Math.max(1, parseInt(laps, 10) || 1);
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(gpxContent, 'application/xml');
@@ -8290,9 +8816,12 @@ function extractGpxStats(gpxContent) {
       }
     }
     return {
-      km: +cumKm.toFixed(2),
-      dplus: Math.round(gain),
-      dminus: Math.round(loss),
+      km: +(cumKm * laps).toFixed(2),
+      dplus: Math.round(gain * laps),
+      dminus: Math.round(loss * laps),
+      laps,
+      lapKm: +cumKm.toFixed(2),
+      lapDplus: Math.round(gain),
     };
   } catch (e) {
     console.warn('[extractGpxStats]', e);
@@ -8302,7 +8831,8 @@ function extractGpxStats(gpxContent) {
 
 // === Rendu du profil d'altitude GPX via Chart.js (même look que les streams réalisés) ===
 let _gpxElevChart = null;
-function renderGpxElevationChart(gpxContent, canvasId) {
+function renderGpxElevationChart(gpxContent, canvasId, laps = 1) {
+  laps = Math.max(1, parseInt(laps, 10) || 1);
   const canvas = document.getElementById(canvasId);
   if (!canvas || !gpxContent || typeof Chart === 'undefined') return;
   // Detruit le chart précédent si existant
@@ -8361,20 +8891,39 @@ function renderGpxElevationChart(gpxContent, canvasId) {
     }
     const elevGain = _smartGainTotal(series.filter(p => p.y != null));
     // PAS de lissage pour l'affichage : on garde la finesse du GPX
-    // (la quantification 5m est gérée seulement par le tooltip pente sur fenêtre)
-    let plot = series.filter(p => p.y != null);
+    let basePlot = series.filter(p => p.y != null);
+    const lapKm = basePlot.length ? basePlot[basePlot.length - 1].x : 0;
+
+    // Répétition de la série N fois (laps) avec offset de km cumulé
+    let plot = [];
+    if (laps > 1 && lapKm > 0) {
+      for (let L = 0; L < laps; L++) {
+        const offset = L * lapKm;
+        for (const p of basePlot) {
+          plot.push({ x: p.x + offset, y: p.y });
+        }
+      }
+    } else {
+      plot = basePlot.slice();
+    }
+
     // Décimation seulement si vraiment beaucoup de points (>2000)
     if (plot.length > 2000) {
       const step = Math.ceil(plot.length / 2000);
       plot = plot.filter((_, i) => i % step === 0);
     }
-    const totalKm = series[series.length - 1].x;
+    const totalKm = plot.length ? plot[plot.length - 1].x : 0;
 
-    // Pour les stats : on travaille sur la série BRUTE (non lissée pour l'affichage)
-    // avec un filtre de bruit type OpenRunner / Strava :
-    //   - on accumule un D+ "candidat" et on ne le compte que s'il franchit un seuil (3m)
-    //   - sinon on retombe au point bas et on continue
-    const rawSeries = series.filter(p => p.y != null);
+    // Pour les stats : série brute répétée N fois (laps)
+    let rawSeries = series.filter(p => p.y != null);
+    if (laps > 1 && lapKm > 0) {
+      const baseRaw = rawSeries.slice();
+      rawSeries = [];
+      for (let L = 0; L < laps; L++) {
+        const offset = L * lapKm;
+        for (const p of baseRaw) rawSeries.push({ x: p.x + offset, y: p.y });
+      }
+    }
 
     // Calcul slope sur fenêtre glissante (~200m) pour éviter le bruit instantané
     function slopeOnWindow(arr, idx, windowKm = 0.2) {
@@ -8658,15 +9207,19 @@ function renderGpxElevationChart(gpxContent, canvasId) {
       tooltipEl.style.top = '8px';
 
       // Bike marker sur la carte (interpolation pixel-perfect)
+      // Si laps > 1 : on prend km modulo lapKm pour retrouver la position sur la boucle
       const linked = window._gpxLinkedData;
       if (linked && linked.bikeMarker && linked.cumKmByIdx) {
         const arr = linked.cumKmByIdx;
+        const lapLen = linked.totalKm || (arr[arr.length - 1] || 0);
+        let kmOnLoop = km;
+        if (lapLen > 0) kmOnLoop = ((km % lapLen) + lapLen) % lapLen;
         let lo2 = 0, hi2 = arr.length - 1;
         while (lo2 < hi2 - 1) {
           const mid = (lo2 + hi2) >> 1;
-          if (arr[mid] < km) lo2 = mid; else hi2 = mid;
+          if (arr[mid] < kmOnLoop) lo2 = mid; else hi2 = mid;
         }
-        const t2 = (km - arr[lo2]) / (arr[hi2] - arr[lo2] || 1);
+        const t2 = (kmOnLoop - arr[lo2]) / (arr[hi2] - arr[lo2] || 1);
         const lat = linked.coords[lo2][0] + (linked.coords[hi2][0] - linked.coords[lo2][0]) * t2;
         const lon = linked.coords[lo2][1] + (linked.coords[hi2][1] - linked.coords[lo2][1]) * t2;
         linked.bikeMarker.setLatLng([lat, lon]);
@@ -9051,9 +9604,26 @@ function openSessionModal(iso, source) {
   const metaEl = document.getElementById('modal-meta');
   const bodyEl = document.getElementById('modal-body');
 
-  // Cache le bouton modifier par défaut (sera affiché par renderCompModal si comp)
+  // Cache les boutons d'action par défaut (seront ré-affichés au besoin)
   const _editBtn = document.getElementById('modal-edit-btn');
-  if (_editBtn) _editBtn.hidden = true;
+  const _delBtn = document.getElementById('modal-delete-btn');
+  if (_editBtn) {
+    _editBtn.hidden = true;
+    // Reset des datasets (évite de garder l'état du précédent appel)
+    delete _editBtn.dataset.compId;
+    delete _editBtn.dataset.trainingId;
+    delete _editBtn.dataset.trainingMode;
+    delete _editBtn.dataset.templateIso;
+    delete _editBtn.dataset.kind;
+  }
+  if (_delBtn) {
+    _delBtn.hidden = true;
+    delete _delBtn.dataset.compId;
+    delete _delBtn.dataset.trainingId;
+    delete _delBtn.dataset.trainingMode;
+    delete _delBtn.dataset.activityId;
+    delete _delBtn.dataset.kind;
+  }
 
   if (source === 'realise') {
     if (!day) {
@@ -9074,6 +9644,31 @@ function openSessionModal(iso, source) {
       function renderModalActivity(idx) {
         currentIdx = idx;
         const act = acts[idx];
+        // Boutons d'action : seulement pour les activités manuelles (Strava est read-only)
+        const _editBtn2 = document.getElementById('modal-edit-btn');
+        const _delBtn2 = document.getElementById('modal-delete-btn');
+        if (act._manual) {
+          if (_editBtn2) {
+            _editBtn2.hidden = false;
+            _editBtn2.dataset.kind = 'training';
+            _editBtn2.dataset.trainingId = act._manualId || act.id;
+            _editBtn2.dataset.trainingMode = 'realise';
+          }
+          if (_delBtn2) {
+            _delBtn2.hidden = false;
+            _delBtn2.dataset.kind = 'training';
+            _delBtn2.dataset.trainingId = act._manualId || act.id;
+            _delBtn2.dataset.trainingMode = 'realise';
+          }
+        } else {
+          // Activité Strava : pas modifiable (source de vérité). Mais on offre "Masquer" via delete.
+          if (_editBtn2) _editBtn2.hidden = true;
+          if (_delBtn2) {
+            _delBtn2.hidden = false;
+            _delBtn2.dataset.kind = 'strava';
+            _delBtn2.dataset.activityId = String(act.id || act.activityId || '');
+          }
+        }
         const dur = act.duration || 0;
         const h = Math.floor(dur / 60);
         const m = (dur % 60).toString().padStart(2, '0');
@@ -9426,44 +10021,57 @@ function openSessionModal(iso, source) {
     const manualTrainings = (typeof loadTrainings === 'function') ? loadTrainings() : [];
     const manualForToday = manualTrainings.filter(t => t.date === iso);
 
-    // Si une compé du jour est une étape d'une course multi-étapes,
-    // on inclut TOUTES les étapes de cette course dans la liste (pour navigation directe)
-    let stageRaceItems = [];
-    const stageComp = compsForToday.find(c => c.parentId);
-    if (stageComp) {
-      // Récupère toutes les étapes du même parent, triées par ordre
-      stageRaceItems = compsAll
-        .filter(c => c.parentId === stageComp.parentId)
-        .sort((a, b) => (a.stageIdx || 0) - (b.stageIdx || 0));
-    }
+    // === Items affichables sur la day card (source de vérité pour la sélection clavier/flèches) ===
+    // L'ordre DOIT correspondre à la day card : compsForToday + manualForToday
+    const dayItems = [];
+    compsForToday.forEach(c => dayItems.push({ kind: 'comp', data: c }));
+    manualForToday.forEach(t => dayItems.push({ kind: 'manual', data: t }));
 
-    // Build la liste d'items finale
-    // Si on est sur un jour de stage race : toutes les étapes + manuels du jour courant
-    // Sinon : compés du jour + manuels du jour
+    // Item sélectionné par l'utilisateur via les flèches du calendrier
+    let dayCurIdx = dayPrevuIndex[iso] || 0;
+    if (dayCurIdx >= dayItems.length) dayCurIdx = 0;
+    const selectedItem = dayItems[dayCurIdx] || null;
+
+    // Build la liste d'items finale (avec enrichissement étapes si applicable)
+    // - Si l'item sélectionné est une étape de stage race : enrichit avec TOUTES les étapes
+    //   du parent pour permettre la navigation entre étapes via le switcher de la modal
+    // - Sinon : la liste = items du jour
     const items = [];
-    if (stageRaceItems.length) {
+    let curIdx = 0;
+    if (selectedItem && selectedItem.kind === 'comp' && selectedItem.data.parentId) {
+      const stageRaceItems = compsAll
+        .filter(c => c.parentId === selectedItem.data.parentId)
+        .sort((a, b) => (a.stageIdx || 0) - (b.stageIdx || 0));
       stageRaceItems.forEach(c => items.push({ kind: 'comp', data: c }));
+      // Insère les autres items du jour (compés non-stage + manuels) qui ne sont pas déjà dedans
+      dayItems.forEach(it => {
+        if (it.kind !== 'comp' || it.data.parentId !== selectedItem.data.parentId) {
+          items.push(it);
+        }
+      });
+      // Trouve l'étape correspondant à l'item sélectionné
+      const idx = items.findIndex(it => it.kind === 'comp' && it.data.id === selectedItem.data.id);
+      curIdx = idx >= 0 ? idx : 0;
+    } else if (dayItems.length > 0) {
+      dayItems.forEach(it => items.push(it));
+      curIdx = dayCurIdx;
     } else {
-      compsForToday.forEach(c => items.push({ kind: 'comp', data: c }));
-    }
-    manualForToday.forEach(t => items.push({ kind: 'manual', data: t }));
-
-    // Si rien d'explicite : item template AI seul
-    if (items.length === 0) {
+      // Rien d'explicite : item template AI seul
+      // IMPORTANT : on doit suivre EXACTEMENT la même logique que renderPlanned (day card)
+      // sinon la modal contredit ce qui est affiché sur la carte.
+      const _isForcedRest = (typeof isTemplateRestDay === 'function') && isTemplateRestDay(iso);
       const dayPhase = determinePhaseForDate(compsAll, date, todayData.tsb);
       const dow = date.getDay();
-      let proposal = { ...(PLAN_TEMPLATES[dayPhase][dow]) };
-      proposal = adjustForRecovery(proposal, todayData.recovery);
+      // Détermine si c'est aujourd'hui (compare iso à la date locale du jour)
+      const _todayIso = toIsoDate(new Date());
+      const _isToday = iso === _todayIso;
+      const tmpl = _isForcedRest
+        ? { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Repos forcé (override utilisateur)' }
+        : PLAN_TEMPLATES[dayPhase][dow];
+      let proposal = { ...tmpl };
+      if (_isToday && !_isForcedRest) proposal = adjustForRecovery(proposal, todayData.recovery);
       items.push({ kind: 'template', data: proposal, phase: dayPhase });
-    }
-
-    // Index initial : si on est sur un stage race, retrouve l'étape correspondant à iso
-    let curIdx = 0;
-    if (stageRaceItems.length) {
-      const idx = items.findIndex(it => it.kind === 'comp' && it.data.date === iso);
-      if (idx >= 0) curIdx = idx;
-    } else {
-      curIdx = dayPrevuIndex[iso] || 0;
+      curIdx = 0;
     }
     if (curIdx >= items.length) curIdx = 0;
 
@@ -9500,11 +10108,18 @@ function openSessionModal(iso, source) {
     function renderCompModal(c, switchHTML, dateStrOverride) {
       const _dateStr = dateStrOverride || dateStr;
       const isStage = c.stageIdx !== undefined && c.totalStages;
-      // Affiche le bouton "Modifier" et le câble à l'ID de la compé parente (ou directe)
+      // Affiche les boutons "Modifier" et "Supprimer" pour cette compé
       const editBtn = document.getElementById('modal-edit-btn');
+      const delBtn = document.getElementById('modal-delete-btn');
       if (editBtn) {
         editBtn.hidden = false;
+        editBtn.dataset.kind = 'comp';
         editBtn.dataset.compId = c.parentId || c.id;
+      }
+      if (delBtn) {
+        delBtn.hidden = false;
+        delBtn.dataset.kind = 'comp';
+        delBtn.dataset.compId = c.parentId || c.id;
       }
       const parentName = isStage ? c.name.replace(/ — Étape \d+$/, '') : c.name;
       const sportLabel = window.sportFr(c.sport || 'Ride');
@@ -9551,7 +10166,9 @@ function openSessionModal(iso, source) {
 
       // Si GPX présent : on override km / D+ avec les valeurs calculées depuis le fichier
       // (priorité au GPX → vérité terrain — sinon valeurs saisies manuellement)
-      const gpxStats = c.gpxContent ? (typeof extractGpxStats === 'function' ? extractGpxStats(c.gpxContent) : null) : null;
+      // Si nombre de tours défini, on multiplie km/D+/D- par le nombre de tours
+      const lapsCount = parseInt(c.laps, 10) || 1;
+      const gpxStats = c.gpxContent ? (typeof extractGpxStats === 'function' ? extractGpxStats(c.gpxContent, lapsCount) : null) : null;
       const effectiveKm = (gpxStats && gpxStats.km) || c.km;
       const effectiveDplus = (gpxStats && gpxStats.dplus) || c.dplus;
       // Recalcule l'allure si km vient du GPX
@@ -9639,7 +10256,7 @@ function openSessionModal(iso, source) {
       wireSwitchButtons();
       // Rendu GPX si présent : profil altitude Chart.js + tracé Leaflet
       if (c.gpxContent) {
-        renderGpxElevationChart(c.gpxContent, 'gpx-elev-canvas-prevu');
+        renderGpxElevationChart(c.gpxContent, 'gpx-elev-canvas-prevu', lapsCount);
         renderGpxLeafletMap(c.gpxContent, 'gpx-leaflet-prevu');
         wireClimbsList();
       }
@@ -9682,13 +10299,25 @@ function openSessionModal(iso, source) {
         </div>`;
       }).join('');
     };
-    window.gpxAddCurrentSelectionAsSegment = () => {
+    window.gpxAddCurrentSelectionAsSegment = async () => {
       const sel = window._gpxCurrentSelectionStats;
-      if (!sel) { alert('Sélectionne une portion du profil d\'abord.'); return; }
+      if (!sel) {
+        await appAlert({
+          title: 'Aucune sélection',
+          message: 'Sélectionne d\'abord une portion du profil d\'altitude (glisse sur le graphique).',
+        });
+        return;
+      }
       const compId = window._gpxCurrentCompId;
       const segs = window.gpxLoadSegments(compId);
       const idx = segs.length + 1;
-      const name = prompt('Nom du segment ?', `Segment ${idx}`);
+      const name = await appPrompt({
+        title: 'Nouveau segment',
+        message: 'Donne un nom à ce segment du parcours.',
+        defaultValue: `Segment ${idx}`,
+        placeholder: `Segment ${idx}`,
+        okLabel: 'Ajouter',
+      });
       if (name === null) return;
       segs.push({
         startKm: sel.kmMin,
@@ -9896,9 +10525,21 @@ function openSessionModal(iso, source) {
 
     function renderManualTrainingModal(t, switchHTML, dateStrOverride) {
       const _dateStr = dateStrOverride || dateStr;
-      // Pas d'édition pour les entraînements manuels (pour l'instant)
+      // Affiche les boutons Modifier + Supprimer pour cet entraînement manuel prévu
       const editBtn = document.getElementById('modal-edit-btn');
-      if (editBtn) editBtn.hidden = true;
+      const delBtn = document.getElementById('modal-delete-btn');
+      if (editBtn) {
+        editBtn.hidden = false;
+        editBtn.dataset.kind = 'training';
+        editBtn.dataset.trainingId = t.id;
+        editBtn.dataset.trainingMode = 'prevu';
+      }
+      if (delBtn) {
+        delBtn.hidden = false;
+        delBtn.dataset.kind = 'training';
+        delBtn.dataset.trainingId = t.id;
+        delBtn.dataset.trainingMode = 'prevu';
+      }
       const sportLabel = window.sportFr(t.sport || 'Ride');
       const sportCat = window.activitySportColorKey({ sport: t.sport }) || 'autre';
       const sportPill = `<span class="sport-pill" data-sport-cat="${sportCat}" style="margin-left:8px;vertical-align:middle;">${sportLabel}</span>`;
@@ -9930,9 +10571,65 @@ function openSessionModal(iso, source) {
 
     function renderTemplateModal(proposal, phase, switchHTML, dateStrOverride) {
       const _dateStr = dateStrOverride || dateStr;
-      // Pas d'édition pour les suggestions AI (template)
+      const isRest = proposal.type === 'rest' || (proposal.dur === 0 && proposal.tss === 0);
       const editBtn = document.getElementById('modal-edit-btn');
-      if (editBtn) editBtn.hidden = true;
+      const delBtn = document.getElementById('modal-delete-btn');
+
+      // === Jour de repos : modal ultra-épurée ===
+      if (isRest) {
+        // ⋯ "personnaliser" reste utile (ajouter une séance ce jour-là)
+        // 🗑️ caché (déjà repos, rien à supprimer)
+        if (editBtn) {
+          editBtn.hidden = false;
+          editBtn.dataset.kind = 'template';
+          editBtn.dataset.templateIso = iso;
+          editBtn.dataset.templateData = JSON.stringify({
+            name: 'Nouvelle séance',
+            type: 'endurance',
+            duration: 60,
+            tss: 50,
+            sport: 'Ride',
+            notes: ''
+          });
+        }
+        if (delBtn) delBtn.hidden = true;
+        titleEl.textContent = 'Jour de repos';
+        metaEl.textContent = _dateStr;
+        bodyEl.innerHTML = `
+          ${switchHTML}
+          <div class="modal-rest-state">
+            <div class="modal-rest-icon">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </div>
+            <div class="modal-rest-text">Récupération complète.</div>
+            <div class="modal-rest-hint">Utilise <strong>⋯</strong> pour ajouter une séance ce jour-là.</div>
+          </div>
+        `;
+        wireSwitchButtons();
+        return;
+      }
+
+      // === Suggestion IA normale ===
+      if (editBtn) {
+        editBtn.hidden = false;
+        editBtn.dataset.kind = 'template';
+        editBtn.dataset.templateIso = iso;
+        editBtn.dataset.templateData = JSON.stringify({
+          name: proposal.name || 'Séance IA',
+          type: proposal.type || 'endurance',
+          duration: proposal.dur || 0,
+          tss: proposal.tss || 0,
+          sport: proposal.sport || 'Ride',
+          notes: proposal.why || ''
+        });
+      }
+      if (delBtn) {
+        delBtn.hidden = false;
+        delBtn.dataset.kind = 'template';
+        delBtn.dataset.templateIso = iso;
+      }
       const dur = proposal.dur || 0;
       const h = Math.floor(dur / 60), mm = (dur % 60).toString().padStart(2, '0');
       titleEl.innerHTML = `${proposal.name} ${proposal.type ? `<span class="pill ${proposal.type}">${proposal.type}</span>` : ''}`;
@@ -9978,22 +10675,288 @@ function closeSessionModal() {
 
 document.getElementById('modal-close').addEventListener('click', closeSessionModal);
 
-// Bouton "Modifier" (⋯) dans le header du modal détail compé
+// ========= Modal de confirmation custom (remplace window.confirm) =========
+// Usage : const ok = await appConfirm({ title, message, confirmLabel, cancelLabel, danger })
+window.appConfirm = function(opts) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('confirm-modal');
+    const titleEl = document.getElementById('confirm-modal-title');
+    const msgEl = document.getElementById('confirm-modal-message');
+    const okBtn = document.getElementById('confirm-modal-ok');
+    const cancelBtn = document.getElementById('confirm-modal-cancel');
+    const inner = overlay.querySelector('.confirm-modal');
+    if (!overlay || !titleEl || !msgEl || !okBtn || !cancelBtn || !inner) {
+      // Fallback ultra-safe
+      resolve(window.confirm(opts && opts.message ? opts.message : 'Confirmer ?'));
+      return;
+    }
+    // Configuration
+    titleEl.textContent = (opts && opts.title) || 'Confirmer';
+    // Support du HTML simple (pour mettre en gras le nom)
+    if (opts && opts.html) msgEl.innerHTML = opts.html;
+    else msgEl.textContent = (opts && opts.message) || '';
+    okBtn.textContent = (opts && opts.confirmLabel) || 'Confirmer';
+    cancelBtn.textContent = (opts && opts.cancelLabel) || 'Annuler';
+    inner.classList.toggle('is-danger', !!(opts && opts.danger));
+
+    function cleanup() {
+      overlay.classList.remove('active');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      overlay.removeEventListener('click', onOverlayClick);
+      document.removeEventListener('keydown', onKey);
+    }
+    function onOk() { cleanup(); resolve(true); }
+    function onCancel() { cleanup(); resolve(false); }
+    function onOverlayClick(e) { if (e.target === overlay) onCancel(); }
+    function onKey(e) {
+      if (e.key === 'Escape') onCancel();
+      else if (e.key === 'Enter') onOk();
+    }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onOverlayClick);
+    document.addEventListener('keydown', onKey);
+    overlay.classList.add('active');
+    // Focus sur le bouton de confirmation pour Enter direct
+    setTimeout(() => okBtn.focus(), 50);
+  });
+};
+// Helper d'escape HTML pour les noms d'item dans les messages de confirmation
+window._confirmEscape = function(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+};
+
+// ========= Modal de saisie texte (remplace window.prompt) =========
+// Usage : const txt = await appPrompt({ title, message, defaultValue, placeholder, okLabel })
+// Retourne la string saisie, ou null si annulé.
+window.appPrompt = function(opts) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('prompt-modal');
+    const titleEl = document.getElementById('prompt-modal-title');
+    const msgEl = document.getElementById('prompt-modal-message');
+    const input = document.getElementById('prompt-modal-input');
+    const okBtn = document.getElementById('prompt-modal-ok');
+    const cancelBtn = document.getElementById('prompt-modal-cancel');
+    if (!overlay || !titleEl || !msgEl || !input || !okBtn || !cancelBtn) {
+      resolve(window.prompt((opts && opts.message) || '', (opts && opts.defaultValue) || ''));
+      return;
+    }
+    titleEl.textContent = (opts && opts.title) || 'Saisir une valeur';
+    msgEl.textContent = (opts && opts.message) || '';
+    msgEl.style.display = (opts && opts.message) ? '' : 'none';
+    input.value = (opts && opts.defaultValue) || '';
+    input.placeholder = (opts && opts.placeholder) || '';
+    okBtn.textContent = (opts && opts.okLabel) || 'Valider';
+    cancelBtn.textContent = (opts && opts.cancelLabel) || 'Annuler';
+
+    function cleanup() {
+      overlay.classList.remove('active');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      overlay.removeEventListener('click', onOverlayClick);
+      document.removeEventListener('keydown', onKey);
+    }
+    function onOk() { const v = input.value; cleanup(); resolve(v); }
+    function onCancel() { cleanup(); resolve(null); }
+    function onOverlayClick(e) { if (e.target === overlay) onCancel(); }
+    function onKey(e) {
+      if (e.key === 'Escape') onCancel();
+      else if (e.key === 'Enter') onOk();
+    }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onOverlayClick);
+    document.addEventListener('keydown', onKey);
+    overlay.classList.add('active');
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+  });
+};
+
+// ========= Modal d'alerte (remplace window.alert) =========
+// Usage : await appAlert({ title, message, okLabel })
+window.appAlert = function(opts) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('alert-modal');
+    const titleEl = document.getElementById('alert-modal-title');
+    const msgEl = document.getElementById('alert-modal-message');
+    const okBtn = document.getElementById('alert-modal-ok');
+    if (!overlay || !titleEl || !msgEl || !okBtn) {
+      window.alert((opts && opts.message) || '');
+      resolve();
+      return;
+    }
+    titleEl.textContent = (opts && opts.title) || 'Information';
+    msgEl.textContent = (opts && opts.message) || '';
+    okBtn.textContent = (opts && opts.okLabel) || 'OK';
+
+    function cleanup() {
+      overlay.classList.remove('active');
+      okBtn.removeEventListener('click', onOk);
+      overlay.removeEventListener('click', onOverlayClick);
+      document.removeEventListener('keydown', onKey);
+    }
+    function onOk() { cleanup(); resolve(); }
+    function onOverlayClick(e) { if (e.target === overlay) onOk(); }
+    function onKey(e) { if (e.key === 'Escape' || e.key === 'Enter') onOk(); }
+    okBtn.addEventListener('click', onOk);
+    overlay.addEventListener('click', onOverlayClick);
+    document.addEventListener('keydown', onKey);
+    overlay.classList.add('active');
+    setTimeout(() => okBtn.focus(), 50);
+  });
+};
+
+// ========= STRAVA IGNORE LIST (masquer des activités Strava localement) =========
+const STRAVA_IGNORE_KEY = 'coach_ia_strava_ignored_v1';
+function loadStravaIgnored() {
+  try { return JSON.parse(localStorage.getItem(STRAVA_IGNORE_KEY) || '[]'); }
+  catch { return []; }
+}
+function isStravaIgnored(id) { return loadStravaIgnored().includes(String(id)); }
+function addStravaIgnored(id) {
+  const arr = loadStravaIgnored();
+  if (!arr.includes(String(id))) arr.push(String(id));
+  localStorage.setItem(STRAVA_IGNORE_KEY, JSON.stringify(arr));
+}
+
+// ========= TEMPLATE IA OVERRIDES (marquer un jour en repos / personnalisation) =========
+const TEMPLATE_REST_KEY = 'coach_ia_template_rest_days_v1';
+function loadTemplateRestDays() {
+  try { return JSON.parse(localStorage.getItem(TEMPLATE_REST_KEY) || '[]'); }
+  catch { return []; }
+}
+function isTemplateRestDay(iso) { return loadTemplateRestDays().includes(iso); }
+function addTemplateRestDay(iso) {
+  const arr = loadTemplateRestDays();
+  if (!arr.includes(iso)) arr.push(iso);
+  localStorage.setItem(TEMPLATE_REST_KEY, JSON.stringify(arr));
+}
+
+// ========= Bouton "Modifier" (⋯) dans le header du modal détail =========
+// Route selon kind : comp → édition compé, training → édition entraînement, template → matérialiser
 const _modalEditBtn = document.getElementById('modal-edit-btn');
 if (_modalEditBtn) {
   _modalEditBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const compId = _modalEditBtn.dataset.compId;
-    if (!compId) return;
-    const comp = loadCompetitions().find(c => c.id === compId);
-    if (!comp) return;
-    // Ferme la modal de détail puis ouvre la modal d'édition pré-remplie
-    closeSessionModal();
-    openCompModalForEdit(comp);
+    const kind = _modalEditBtn.dataset.kind;
+    if (kind === 'comp') {
+      const compId = _modalEditBtn.dataset.compId;
+      if (!compId) return;
+      const comp = loadCompetitions().find(c => c.id === compId);
+      if (!comp) return;
+      closeSessionModal();
+      openCompModalForEdit(comp);
+    } else if (kind === 'training') {
+      const id = _modalEditBtn.dataset.trainingId;
+      const mode = _modalEditBtn.dataset.trainingMode || 'prevu';
+      if (!id) return;
+      closeSessionModal();
+      if (typeof window.gpxEditTraining === 'function') window.gpxEditTraining(id, mode);
+    } else if (kind === 'template') {
+      // Matérialise la suggestion IA en entraînement manuel prévu modifiable
+      const isoT = _modalEditBtn.dataset.templateIso;
+      let payload = {};
+      try { payload = JSON.parse(_modalEditBtn.dataset.templateData || '{}'); } catch {}
+      closeSessionModal();
+      if (typeof openTrainModal === 'function') {
+        openTrainModal('prevu');
+        // Préremplit les champs (Date + valeurs du template)
+        const setVal = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+        setVal('train-modal-name', payload.name);
+        setVal('train-modal-date', isoT);
+        const dateEl = document.getElementById('train-modal-date');
+        if (dateEl && dateEl._flatpickr && isoT) dateEl._flatpickr.setDate(isoT, false);
+        setVal('train-modal-duration', payload.duration);
+        setVal('train-modal-tss', payload.tss);
+        setVal('train-modal-notes', payload.notes);
+        const sportEl = document.getElementById('train-modal-sport');
+        if (sportEl && payload.sport) { sportEl.value = payload.sport; if (sportEl._customUpdate) sportEl._customUpdate(); }
+        const typeEl = document.getElementById('train-modal-type');
+        if (typeEl && payload.type) { typeEl.value = payload.type; if (typeEl._customUpdate) typeEl._customUpdate(); }
+      }
+    }
+  });
+}
+
+// ========= Bouton "Supprimer" (🗑️) dans le header du modal détail =========
+const _modalDelBtn = document.getElementById('modal-delete-btn');
+if (_modalDelBtn) {
+  _modalDelBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const kind = _modalDelBtn.dataset.kind;
+    if (kind === 'comp') {
+      const compId = _modalDelBtn.dataset.compId;
+      if (!compId) return;
+      const comp = loadCompetitions().find(c => c.id === compId);
+      const name = comp ? comp.name : 'cette compétition';
+      const ok = await appConfirm({
+        title: 'Supprimer cette compétition',
+        html: `Supprimer <strong>${window._confirmEscape(name)}</strong> ?`,
+        confirmLabel: 'Supprimer',
+        danger: true,
+      });
+      if (!ok) return;
+      const remaining = loadCompetitions().filter(c => c.id !== compId);
+      saveCompetitions(remaining);
+      closeSessionModal();
+      if (typeof renderCalendar === 'function') renderCalendar();
+      if (typeof renderCompetitions === 'function') renderCompetitions();
+    } else if (kind === 'training') {
+      const id = _modalDelBtn.dataset.trainingId;
+      const mode = _modalDelBtn.dataset.trainingMode || 'prevu';
+      if (!id) return;
+      if (typeof window.gpxDeleteTraining === 'function') window.gpxDeleteTraining(id, mode);
+    } else if (kind === 'strava') {
+      const aid = _modalDelBtn.dataset.activityId;
+      if (!aid) return;
+      const ok = await appConfirm({
+        title: 'Masquer cette activité',
+        message: 'Masquer cette activité Strava du calendrier ?\n\nElle reste sur Strava, c\'est juste un filtre local.',
+        confirmLabel: 'Masquer',
+        danger: true,
+      });
+      if (!ok) return;
+      addStravaIgnored(aid);
+      closeSessionModal();
+      if (typeof renderCalendar === 'function') renderCalendar();
+    } else if (kind === 'template') {
+      const isoT = _modalDelBtn.dataset.templateIso;
+      if (!isoT) return;
+      const ok = await appConfirm({
+        title: 'Marquer ce jour comme repos',
+        message: 'Ignorer la suggestion IA et marquer ce jour comme repos ?',
+        confirmLabel: 'Marquer en repos',
+        danger: true,
+      });
+      if (!ok) return;
+      addTemplateRestDay(isoT);
+      closeSessionModal();
+      if (typeof renderCalendar === 'function') renderCalendar();
+    }
   });
 }
 
 // Ouvre la modal d'ajout de compétition en mode édition (préremplie + sauvegarde update)
+// Helper : applique l'état visuel "fichier sélectionné" au file-picker compé
+function _setCompModalGpxVisual(gpxName) {
+  const gpxEl = document.getElementById('comp-modal-gpx');
+  if (!gpxEl) return;
+  const picker = gpxEl.closest('.file-picker');
+  if (!picker) return;
+  const lbl = picker.querySelector('.file-picker-label');
+  const clr = picker.querySelector('.file-picker-clear');
+  if (gpxName) {
+    picker.classList.add('has-file');
+    if (lbl) lbl.textContent = gpxName;
+    if (clr) clr.hidden = false;
+  } else {
+    picker.classList.remove('has-file');
+    if (lbl) lbl.textContent = 'Choisir un fichier GPX';
+    if (clr) clr.hidden = true;
+  }
+}
+
 function openCompModalForEdit(comp) {
   if (typeof openCompModal !== 'function') return;
   openCompModal();
@@ -10023,9 +10986,18 @@ function openCompModalForEdit(comp) {
     const t = document.getElementById('comp-modal-type');
     if (t && comp.type) { t.value = comp.type; if (t._customUpdate) t._customUpdate(); }
   }
-  // Champs simples
-  document.getElementById('comp-modal-km').value = comp.km != null ? comp.km : '';
-  document.getElementById('comp-modal-dplus').value = comp.dplus != null ? comp.dplus : '';
+  // Champs simples — si GPX présent, calcule km/dplus depuis le GPX (vérité terrain)
+  // et écrase les valeurs manuelles (l'utilisateur veut que ça reflète le fichier)
+  let effKm = comp.km, effDplus = comp.dplus;
+  if (comp.gpxContent && typeof extractGpxStats === 'function') {
+    const gs = extractGpxStats(comp.gpxContent, parseInt(comp.laps, 10) || 1);
+    if (gs) {
+      effKm = gs.km;
+      effDplus = gs.dplus;
+    }
+  }
+  document.getElementById('comp-modal-km').value = effKm != null ? effKm : '';
+  document.getElementById('comp-modal-dplus').value = effDplus != null ? effDplus : '';
   document.getElementById('comp-modal-target').value = comp.target || '';
   document.getElementById('comp-modal-laps').value = comp.laps != null ? comp.laps : '';
   document.getElementById('comp-modal-notes').value = comp.notes || '';
@@ -10038,26 +11010,61 @@ function openCompModalForEdit(comp) {
         date: s.date || '',
         time: s.time || '',
         type: s.type || '',
-        km: s.km || '',
-        dplus: s.dplus || '',
+        km: s.km != null ? String(s.km) : '',
+        dplus: s.dplus != null ? String(s.dplus) : '',
         target: s.target || '',
-        laps: s.laps || '',
+        laps: s.laps != null ? String(s.laps) : '',
         notes: s.notes || '',
         gpxName: s.gpxName || null,
-        gpxFile: null, // les fichiers ne peuvent pas être pré-remplis (sécurité browser)
+        gpxContent: s.gpxContent || null, // conserve le contenu en mémoire
+        gpxFile: null, // les fichiers File API ne peuvent pas être pré-remplis
       }));
       activeStageIdx = 0;
       const tabsBar = document.getElementById('comp-stages-tabs');
       if (tabsBar) tabsBar.hidden = false;
       renderStageTabs();
       writeStageToForm(stagesData[0]);
+      // Force l'affichage du nom GPX de l'étape 0 dans le picker
+      _setCompModalGpxVisual(stagesData[0].gpxName);
+    } else {
+      // Compé simple : restaure le picker GPX si présent au niveau racine
+      _setCompModalGpxVisual(comp.gpxName);
     }
+  } else {
+    _setCompModalGpxVisual(comp.gpxName);
   }
   // Adapter le titre + label du bouton "Enregistrer"
   const titleH2 = document.querySelector('#comp-modal .modal-title h2');
   if (titleH2) titleH2.textContent = 'Modifier la compétition';
   const saveBtn = document.getElementById('comp-modal-save');
   if (saveBtn) saveBtn.textContent = 'Enregistrer les modifications';
+  // Affiche le bouton poubelle (uniquement en édition)
+  const delBtn = document.getElementById('comp-modal-delete');
+  if (delBtn) delBtn.hidden = false;
+}
+
+// Handler suppression compé depuis la modal d'édition
+const _compModalDelBtn = document.getElementById('comp-modal-delete');
+if (_compModalDelBtn) {
+  _compModalDelBtn.addEventListener('click', async () => {
+    const id = window._editingCompId;
+    if (!id) return;
+    const comp = (typeof loadCompetitions === 'function') ? loadCompetitions().find(c => c.id === id) : null;
+    const name = comp ? comp.name : 'cette compétition';
+    const ok = await appConfirm({
+      title: 'Supprimer cette compétition',
+      html: `Supprimer <strong>${window._confirmEscape(name)}</strong> ? Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+      danger: true,
+    });
+    if (!ok) return;
+    const remaining = loadCompetitions().filter(c => c.id !== id);
+    saveCompetitions(remaining);
+    window._editingCompId = null;
+    if (typeof closeCompModal === 'function') closeCompModal();
+    if (typeof renderCompList === 'function') renderCompList();
+    if (typeof renderCalendar === 'function') renderCalendar();
+  });
 }
 document.getElementById('session-modal').addEventListener('click', (e) => {
   if (e.target.id === 'session-modal') closeSessionModal();
@@ -10190,497 +11197,4 @@ function generateCoachResponse(userText) {
   const ctxRec = rec != null ? ` Recovery Whoop du jour : ${rec}%.` : '';
 
   // Détection d'intentions (ordre de priorité)
-  if (/blesse|blessé|blessee|douleur|mal au|mal a la|tendinit|claqu|knee|genou|cheville|dos|épaule|coude|poignet/.test(t)) {
-    return {
-      message: `Important : ne t'entraîne pas avec une douleur. Repos complet jusqu'à disparition.\n\nSi ça persiste plus de 3-5 jours ou empire, consulte un kiné ou un médecin du sport — c'est non négociable.\n\nJe passe ton plan en mode repos forcé. Quand tu vas mieux, dis-moi pour reprendre progressivement.`,
-      prefs: { recoveryMode: true, blocked: true }
-    };
-  }
-  if (/fatig|crevé|crevee|épuis|epuis|nase|usé|usee|kacho|ko|naze/.test(t)) {
-    return {
-      message: `Compris, fatigue signalée.${ctxTSB}${ctxRec}\n\nJe vais alléger les séances :\n• Pas de blocs VO2max\n• Focus endurance Z2 et récupération active\n• Si la fatigue persiste 2-3 jours, on bascule en semaine de décharge\n\nDors bien, hydrate-toi, mange protéiné.`,
-      prefs: { recoveryMode: true, blocked: false }
-    };
-  }
-  if (/frais|en forme|reposé|reposee|pleine forme|envie de pousser|au top|peche|pêche/.test(t)) {
-    return {
-      message: `Top, tu es frais.${ctxTSB}${ctxRec} Bonne fenêtre pour pousser.\n\nJe peux densifier la semaine avec :\n• Un bloc de seuil supplémentaire\n• Ou un VO2max si ton TSB le permet\n\nTu veux travailler quoi en priorité ? Seuil, VO2max, endurance, force ?`,
-      prefs: { hardMode: true, recoveryMode: false, blocked: false }
-    };
-  }
-  if (/seuil|ftp|threshold/.test(t)) {
-    return {
-      message: `OK, focus sur le seuil.\n\nFormat type : 2 séances/sem de 3×12min ou 4×8min à 95-105% FTP, récup 3-5min.\n\nObjectif : pousser ton FTP dans 4-6 semaines. Re-test FTP dans 4 semaines pour mesurer.`,
-      prefs: { focusZone: 'seuil' }
-    };
-  }
-  if (/vo2|vmax|aerobie max|aérobie max/.test(t)) {
-    return {
-      message: `Compris, VO2max comme axe de travail.\n\nFormat type : 4×4min ou 6×3min à 110-115% FTP, récup 1:1.\nTrès exigeant → 1-2 fois/semaine max, jamais 2 jours de suite.\n\nLa phase Peak de ton plan se déclenche.`,
-      prefs: { focusZone: 'vo2' }
-    };
-  }
-  if (/endur|volume|sortie longue|fond|base aerobie|base aérobie/.test(t)) {
-    return {
-      message: `Bon choix, construire la base aérobie c'est la fondation.\n\nPlan : sorties Z2 longues le week-end (>2h), volume hebdo augmenté de 10% max/semaine. Reste sous 75% FTP, conversation aisée.\n\nC'est moins glamour mais c'est ce qui paie sur la durée.`,
-      prefs: { focusZone: 'endurance' }
-    };
-  }
-  if (/force|muscu|musculation|gainage|renfo/.test(t)) {
-    return {
-      message: `OK, focus force/musculation.\n\n2-3 séances/sem en complément du vélo, format : 4-5 exos polyarticulaires (squat, deadlift, presse, gainage), 3-4 séries de 5-8 reps lourdes.\n\nÉvite le jour avant une grosse séance vélo.`,
-      prefs: { focusZone: 'force' }
-    };
-  }
-  if (/sommeil|dormi mal|mal dormi|insomnie|nuit courte|fatigue chronique/.test(t)) {
-    return {
-      message: `Le sommeil c'est 50% de la récupération.\n\nSi tu dors mal 2+ nuits, j'allège auto le plan : pas plus que Z3 le lendemain.\n\nConseils : couche-toi 30min plus tôt, magnesium le soir, pas d'écran 30min avant. Si chronique, vérifie ton stress et ta charge globale.`,
-      prefs: { sleepConcern: true }
-    };
-  }
-  if (/stress|boulot|travail|charge mentale|presse|pressé|pressee/.test(t)) {
-    return {
-      message: `Stress non-sportif = fatigue cumulative pour le corps.\n\nJe réduis l'intensité cette semaine. Privilégie aussi des séances "plaisir" courtes (1h Z2) au lieu de tout planifier dur.\n\nLa séance dure quand tu es déjà stressé peut empirer les choses.`,
-      prefs: { stressMode: true }
-    };
-  }
-  if (/decharge|décharge|recup|récup|récupération|recuperation/.test(t)) {
-    return {
-      message: `OK, semaine de décharge.\n\nFormat : volume réduit de 30-50%, intensité conservée mais blocs courts. Format type : 3 sorties Z2 courtes + 1 séance modérée.\n\nL'objectif est de surcompenser pour repartir frais la semaine suivante.`,
-      prefs: { recoveryMode: true }
-    };
-  }
-  if (/competition|compétition|course|objectif|preparation|préparation/.test(t)) {
-    return {
-      message: `Pour structurer la prépa, ajoute ta compétition dans la section "Compétitions à venir" en haut de l'onglet.\n\nJe gère ensuite automatiquement les phases :\n• Build (>8 sem)\n• Peak (4-8 sem)\n• Taper (1-4 sem)\n• Race week (< 1 sem)`,
-      prefs: {}
-    };
-  }
-  if (/^(merci|ok|d'accord|compris|bien|super|nickel)/.test(t)) {
-    return {
-      message: `Pas de souci, je note. Si tu changes d'avis ou veux ajuster, dis-le moi à tout moment.`,
-      prefs: {}
-    };
-  }
-  if (/^(salut|bonjour|hello|coucou|hey|yo)/.test(t)) {
-    return {
-      message: `Salut ! Prêt à bosser. Dis-moi comment tu te sens aujourd'hui, ce que tu veux travailler, ou si tu as des douleurs/contraintes.${ctxRec}${ctxTSB}`,
-      prefs: {}
-    };
-  }
-  // Réponse par défaut
-  return {
-    message: `Noté. Je tiens compte pour la suite.\n\nDis-moi par exemple :\n• Ta sensation du jour (frais / fatigué / douleur)\n• Ce que tu veux travailler (seuil / VO2 / endurance / force)\n• Ton sommeil, ton stress, des contraintes spécifiques`,
-    prefs: {}
-  };
-}
-
-function sendChatMessage() {
-  const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if (!text) return;
-
-  const messages = loadChatMessages();
-  const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  messages.push({ role: 'user', text, time });
-
-  const { message: response, prefs: newPrefs } = generateCoachResponse(text);
-  messages.push({ role: 'coach', text: response, time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) });
-
-  // Sauvegarder préférences extraites
-  if (newPrefs && Object.keys(newPrefs).length > 0) {
-    const cur = loadPrefs();
-    Object.assign(cur, newPrefs);
-    savePrefs(cur);
-  }
-
-  saveChatMessages(messages);
-  input.value = '';
-  renderChat();
-  // Re-render du calendrier pour appliquer les nouvelles préfs
-  if (typeof renderCalendar === 'function') renderCalendar();
-}
-
-// Chat handlers — défensifs car le UI chat a été retiré de PANEL 2 (Entraîneur)
-const _chatSendBtn = document.getElementById('chat-send');
-if (_chatSendBtn) _chatSendBtn.addEventListener('click', sendChatMessage);
-const _chatInputEl = document.getElementById('chat-input');
-if (_chatInputEl) _chatInputEl.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendChatMessage();
-  }
-});
-const _chatClearBtn = document.getElementById('chat-clear');
-if (_chatClearBtn) _chatClearBtn.addEventListener('click', () => {
-  if (!confirm('Effacer la conversation et les préférences ?')) return;
-  localStorage.removeItem(CHAT_KEY);
-  localStorage.removeItem(PREFS_KEY);
-  renderChat();
-  if (typeof renderCalendar === 'function') renderCalendar();
-});
-
-try { renderChat(); } catch (e) { console.warn('[renderChat]', e); }
-
-// ========= INTÉGRATION DES PRÉFÉRENCES DANS LE PLAN =========
-// Patch sur adjustForRecovery pour aussi appliquer les prefs du chat
-const _originalAdjustForRecovery = adjustForRecovery;
-adjustForRecovery = function(proposal, recovery) {
-  let p = _originalAdjustForRecovery(proposal, recovery);
-  const prefs = loadPrefs();
-  if (prefs.blocked && p.type !== 'rest') {
-    return { ...p, type: 'rest', name: 'Repos forcé (douleur signalée)', dur: 0, tss: 0, why: 'Repos demandé suite à signalement de douleur — reprendre quand ça va mieux' };
-  }
-  if (prefs.recoveryMode && (p.type === 'vo2' || p.type === 'seuil')) {
-    return { ...p, type: 'endurance', name: 'Endurance Z2 (mode récup activé)', dur: Math.round(p.dur * 0.7), tss: Math.round(p.tss * 0.55), why: 'Mode récup activé via chat — intensité allégée' };
-  }
-  if (prefs.hardMode && p.type === 'endurance' && p.tss < 80) {
-    return { ...p, name: p.name + ' (renforcé)', tss: Math.round(p.tss * 1.2), why: 'Mode pousser activé via chat — un peu plus de stimulation' };
-  }
-  if (prefs.focusZone === 'seuil' && p.type === 'endurance' && p.tss > 50) {
-    return { ...p, type: 'tempo', name: 'Sweet Spot (focus seuil)', tss: Math.round(p.tss * 1.15), why: 'Focus seuil via chat — endurance remplacée par sweet spot' };
-  }
-  return p;
-};
-
-// Init
-renderCompList();
-renderCalendar();
-
-// ========= PANEL 3: LONG TERME (robuste aux nulls Whoop) =========
-// Rolling average qui ignore les nulls (renvoie null si aucun point dans la fenêtre)
-const rolling = (arr, n) => arr.map((_, i, a) => {
-  const s = a.slice(Math.max(0, i-n+1), i+1).filter(v => v != null);
-  if (s.length === 0) return null;
-  return +(s.reduce((x,y)=>x+y,0)/s.length).toFixed(1);
-});
-const hrv7 = rolling(data.map(d=>d.hrv), 7);
-
-new Chart(document.getElementById('chart-hrv'), {
-  type: 'line',
-  data: { labels, datasets: [{ data: hrv7, borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.15)', tension: 0.3, pointRadius: 0, fill: true, spanGaps: false }] },
-  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } }, y: { title: { display: true, text: 'ms' } } } }
-});
-
-// Sommeil : 30 derniers jours, nulls → barre vide
-const sleepSlice = data.slice(-30);
-new Chart(document.getElementById('chart-sleep'), {
-  type: 'bar',
-  data: {
-    labels: sleepSlice.map(d => fmtDate(d.date)),
-    datasets: [{
-      data: sleepSlice.map(d => d.sleepH),
-      backgroundColor: sleepSlice.map(d => d.sleepH == null ? '#2a3142' : d.sleepH < 6.5 ? '#f87171' : d.sleepH < 7 ? '#fbbf24' : '#4ade80'),
-      borderRadius: 2
-    }]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: { callbacks: { label: (ctx) => ctx.parsed.y == null ? 'Pas de donnée Whoop' : ctx.parsed.y + ' h' } }
-    },
-    scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } }, y: { title: { display: true, text: 'heures' }, min: 0 } }
-  }
-});
-
-const ratio = data.map(d => d.ctl > 0 ? +(d.atl / d.ctl).toFixed(2) : 1);
-new Chart(document.getElementById('chart-ratio'), {
-  type: 'line',
-  data: { labels, datasets: [
-    { data: ratio, borderColor: '#fbbf24', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0 },
-    { data: data.map(()=>1.3), borderColor: 'rgba(248,113,113,0.5)', borderDash: [3,3], pointRadius: 0 },
-    { data: data.map(()=>0.8), borderColor: 'rgba(74,222,128,0.5)', borderDash: [3,3], pointRadius: 0 }
-  ] },
-  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } }, y: { title: { display: true, text: 'ATL/CTL' }, min: 0.5, max: 1.6 } } }
-});
-
-new Chart(document.getElementById('chart-ctl-trend'), {
-  type: 'line',
-  data: {
-    labels,
-    datasets: [{ label: 'CTL', data: data.map(d=>d.ctl), borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.2)', tension: 0.3, pointRadius: 0, fill: true }]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: { x: { ticks: { maxTicksLimit: 10 }, grid: { display: false } }, y: { title: { display: true, text: 'CTL (fitness)' } } }
-  }
-});
-
-// Alertes long-terme — calculées sur les vraies données
-const alerts = [];
-
-// 1. Évolution CTL sur 90j
-const last90 = data.slice(-90);
-if (last90.length >= 30) {
-  const ctlStart = last90[0].ctl;
-  const ctlEnd = last90[last90.length - 1].ctl;
-  const ctlPct = ctlStart > 0 ? Math.round((ctlEnd - ctlStart) / ctlStart * 100) : 0;
-  alerts.push({
-    class: ctlPct > 5 ? 'good' : ctlPct < -10 ? 'danger' : 'warn',
-    title: `Évolution de la forme : ${ctlPct >= 0 ? '+' : ''}${ctlPct}% sur 90 jours`,
-    body: `CTL passé de ${ctlStart.toFixed(0)} à ${ctlEnd.toFixed(0)}. ${ctlPct > 10 ? 'Progression saine.' : ctlPct < -10 ? 'Régression — vérifier la cause (blessure, pause, démotivation).' : ctlPct > 0 ? 'Progression légère.' : 'Forme stable.'}`
-  });
-}
-
-// 2. Ratio ATL/CTL : périodes à risque
-const riskDays = data.filter(d => d.ctl > 10 && d.atl / d.ctl > 1.3).length;
-if (riskDays > 0) {
-  alerts.push({
-    class: riskDays > 14 ? 'danger' : 'warn',
-    title: `Ratio ATL/CTL > 1.3 sur ${riskDays} jour${riskDays>1?'s':''}`,
-    body: riskDays > 14 ? 'Plusieurs périodes de surcharge — risque de blessure majoré. Bien intercaler des semaines de décharge.' : 'Période ponctuelle de surcharge bien gérée.'
-  });
-} else if (data.length > 30) {
-  alerts.push({
-    class: 'good',
-    title: 'Aucune surcharge aiguë détectée',
-    body: 'Ratio ATL/CTL toujours sous 1.3 → tu absorbes ta charge sans pic de risque.'
-  });
-}
-
-// 3. HRV — seulement si données réelles
-const realHrv = data.filter(d => d.whoopSource === 'real' && d.hrv != null);
-if (realHrv.length >= 3) {
-  const avgHrv = realHrv.reduce((s,d)=>s+d.hrv,0) / realHrv.length;
-  const stdHrv = Math.sqrt(realHrv.reduce((s,d)=>s+Math.pow(d.hrv-avgHrv,2),0) / realHrv.length);
-  alerts.push({
-    class: stdHrv < 8 ? 'good' : 'warn',
-    title: `HRV moyenne ${avgHrv.toFixed(0)} ms (σ ${stdHrv.toFixed(1)})`,
-    body: stdHrv < 8 ? 'Variabilité faible → état de récup stable.' : 'Variabilité élevée → état fluctuant. Surveiller les soirs avant séance dure.'
-  });
-} else {
-  alerts.push({
-    class: 'warn',
-    title: 'HRV : pas assez de données Whoop',
-    body: `Seulement ${realHrv.length} jour${realHrv.length>1?'s':''} de mesures HRV réelles. Les analyses long-terme demandent 14j+.`
-  });
-}
-
-// 4. Sommeil — seulement si données réelles
-const realSleep = data.filter(d => d.whoopSource === 'real' && d.sleepH != null);
-if (realSleep.length >= 3) {
-  const avgSleep = realSleep.reduce((s,d)=>s+d.sleepH,0) / realSleep.length;
-  const shortNights = realSleep.filter(d => d.sleepH < 7).length;
-  alerts.push({
-    class: avgSleep >= 7.5 && shortNights < realSleep.length * 0.3 ? 'good' : 'warn',
-    title: `Sommeil moyen ${avgSleep.toFixed(1)}h · ${shortNights}/${realSleep.length} nuit${realSleep.length>1?'s':''} < 7h`,
-    body: avgSleep >= 7.5 ? 'Volume correct. Les jours après une nuit courte sont à modérer en intensité.' : 'Volume insuffisant — priorité au sommeil pour récupérer.'
-  });
-}
-
-document.getElementById('alerts-list').innerHTML = alerts.map(a => `
-  <div class="insight ${a.class}">
-    <div class="insight-title">${a.title}</div>
-    <div class="insight-body">${a.body}</div>
-  </div>`).join('');
-
-// ========= PANEL 4: SESSIONS =========
-let sessions = [];
-function renderSessionsTable() {
-  sessions = data.filter(d => d.sessionType).slice(-12).reverse();
-  const tbody = document.getElementById('sessions-tbody');
-  tbody.innerHTML = sessions.map((s, i) => {
-    // Récup du sport Strava depuis la 1re activité du jour, sinon depuis la racine
-    const firstAct = (s.activities && s.activities.length) ? s.activities[0] : s;
-    const sportLabel = window.activitySportLabel ? window.activitySportLabel(firstAct) : (s.sport || '—');
-    const sportCat = window.activitySportColorKey ? window.activitySportColorKey(firstAct) : 'autre';
-    return `
-    <tr data-idx="${i}">
-      <td>${fmtDate(s.date)}</td>
-      <td>${s.sessionName}</td>
-      <td><span class="sport-pill" data-sport-cat="${sportCat}">${sportLabel}</span></td>
-      <td><span class="pill ${s.sessionType}">${s.sessionType}</span></td>
-      <td>${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')}</td>
-      <td>${s.tss}</td>
-      <td>${s.np}W (${s.ftpPct}%)</td>
-      <td>${s.hr} bpm</td>
-      <td>${s.compliance != null ? `<span style="color:${s.compliance>=95?'var(--accent)':s.compliance>=85?'var(--warn)':'var(--danger)'};">${s.compliance}%</span>` : '<span style="color:var(--text-mute);">—</span>'}</td>
-    </tr>
-    `;
-  }).join('');
-  // Auto-affichage de la 1ère séance ou message vide
-  const detailWrap = document.getElementById('session-detail-wrap');
-  if (sessions.length) {
-    tbody.querySelector('tr')?.classList.add('selected');
-    renderSessionDetail(sessions[0]);
-  } else {
-    detailWrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:13px;">Aucune séance pour le filtre sélectionné.</div>';
-  }
-}
-try { renderSessionsTable(); } catch (e) { console.error('[renderSessionsTable]', e); }
-
-function renderSessionDetail(s) {
-  const zoneColors = ['#bbf7d0','#86efac','#4ade80','#16a34a','#14532d'];
-  const zones = (s.zones && s.zones.length) ? s.zones : (s.zones_hr || s.zones_power || [0,0,0,0,0]);
-  const zonesHTML = zones.map((z, i) => `<div class="zone-seg" style="width:${z}%;background:${zoneColors[i]};">${z>8?z+'%':''}</div>`).join('');
-  const html = `
-  <div class="session-detail">
-    <div class="session-detail-header">
-      <div>
-        <h3>${s.sessionName} <span class="pill ${s.sessionType}" style="margin-left:8px;">${s.sessionType}</span></h3>
-        <div class="meta">${s.date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · ${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')} · ${s.tss} TSS</div>
-      </div>
-      <div style="text-align:right;font-size:12px;color:var(--text-dim);">Recovery avant : <strong style="color:var(--text);">${s.recovery != null ? s.recovery + '%' : '—'}</strong></div>
-    </div>
-    <div class="metric-row">
-      <div class="mini-metric"><div class="label">NP / Puissance norm.</div><div class="value">${s.np} W</div><div class="compare">${s.ftpPct}% FTP</div></div>
-      <div class="mini-metric"><div class="label">FC moyenne</div><div class="value">${s.hr} bpm</div><div class="compare">Max ${s.hr + randInt(15,30)} bpm</div></div>
-      <div class="mini-metric"><div class="label">TSS réalisé</div><div class="value">${s.tss}</div><div class="compare ${s.compliance>=95?'up':'down'}">${s.compliance}% du prévu</div></div>
-      <div class="mini-metric"><div class="label">Variabilité</div><div class="value">${(rand(1.02,1.18)).toFixed(2)}</div><div class="compare">IF ${(s.ftpPct/100).toFixed(2)}</div></div>
-    </div>
-    <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">Répartition du temps par zone de FC</div>
-    <div class="zone-bar">${zonesHTML}</div>
-    <div class="legend">
-      <span><span class="legend-dot" style="background:#4ade80;"></span>Z1 récup</span>
-      <span><span class="legend-dot" style="background:#60a5fa;"></span>Z2 endurance</span>
-      <span><span class="legend-dot" style="background:#a78bfa;"></span>Z3 tempo</span>
-      <span><span class="legend-dot" style="background:#fbbf24;"></span>Z4 seuil</span>
-      <span><span class="legend-dot" style="background:#f87171;"></span>Z5 VO2max</span>
-    </div>
-    <div style="margin-top:14px;padding:12px;background:var(--bg);border-radius:6px;font-size:13px;">
-      <strong style="color:var(--info);">Analyse Coach IA :</strong>
-      ${(() => {
-        const c = s.compliance;
-        const recTxt = s.recovery != null ? s.recovery + '%' : 'inconnue';
-        if (c == null) return `Pas de TSS planifié pour cette séance (mode libre). NP ${s.np}W sur ${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')}.`;
-        if (c >= 95) return `Séance conforme au plan. Exécution propre, ${s.ftpPct}% FTP atteint comme prévu.`;
-        if (c >= 85) return `Léger écart (${c}% du prévu). Probablement lié à la récupération de départ (${recTxt}). Pas d'inquiétude — adapter la prochaine séance similaire.`;
-        return `Écart significatif (${c}%). Possible signe de fatigue accumulée ou objectif trop ambitieux. Suggérer une décharge.`;
-      })()}
-    </div>
-  </div>`;
-  document.getElementById('session-detail-wrap').innerHTML = html;
-}
-
-document.getElementById('sessions-tbody').addEventListener('click', (e) => {
-  const tr = e.target.closest('tr');
-  if (!tr) return;
-  const tbody = e.currentTarget;
-  tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
-  tr.classList.add('selected');
-  renderSessionDetail(sessions[+tr.dataset.idx]);
-});
-
-// ========= TABS =========
-document.querySelectorAll('.tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(btn.dataset.panel).classList.add('active');
-  });
-});
-
-// ========= FILTRES SPORTS (boutons header) =========
-document.querySelectorAll('#sport-filter .sport-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const sport = btn.dataset.sport;
-    if (sport === 'tout') {
-      // Clic sur "Tout" : ne sélectionne QUE Tout
-      activeSports.clear();
-      activeSports.add('tout');
-    } else {
-      activeSports.delete('tout');
-      if (activeSports.has(sport)) {
-        activeSports.delete(sport);
-      } else {
-        activeSports.add(sport);
-      }
-      // Si plus rien de sélectionné, revenir sur Tout
-      if (activeSports.size === 0) activeSports.add('tout');
-      // Si TOUS les sports individuels sont sélectionnés → bascule sur Tout
-      const individuals = ['cyclisme', 'course', 'musculation', 'natation', 'autre'];
-      if (individuals.every(s => activeSports.has(s))) {
-        activeSports.clear();
-        activeSports.add('tout');
-      }
-    }
-    // MAJ visuelle des boutons
-    document.querySelectorAll('#sport-filter .sport-btn').forEach(b => {
-      b.classList.toggle('active', activeSports.has(b.dataset.sport));
-    });
-    applySportFilter();
-  });
-});
-
-})(); // fin IIFE async
-
-// ========= BOUTON REFRESH MANUEL =========
-// Déclenche workflow_dispatch GitHub Actions via le Worker Cloudflare,
-// poll jusqu'à la fin du run, puis recharge la page.
-(function setupRefreshButton() {
-  const btn = document.getElementById('refresh-btn');
-  const icon = document.getElementById('refresh-icon');
-  if (!btn || !icon) return;
-
-  // Injecte le @keyframes spin si absent
-  if (!document.getElementById('refresh-spin-style')) {
-    const style = document.createElement('style');
-    style.id = 'refresh-spin-style';
-    style.textContent = '@keyframes refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
-    document.head.appendChild(style);
-  }
-
-  function setLoading(on, label) {
-    btn.disabled = on;
-    btn.classList.toggle('loading', on);
-    if (on) {
-      btn.style.color = 'var(--accent)';
-      btn.style.borderColor = 'var(--accent)';
-      icon.style.animation = 'refresh-spin 0.8s linear infinite';
-      btn.title = label || 'Rafraîchissement en cours...';
-    } else {
-      btn.style.color = 'var(--text-dim)';
-      btn.style.borderColor = 'var(--border)';
-      icon.style.animation = '';
-      btn.title = 'Rafraîchir maintenant';
-    }
-  }
-
-  async function pollStatus(runId, maxSec = 180) {
-    const start = Date.now();
-    while ((Date.now() - start) / 1000 < maxSec) {
-      try {
-        const r = await fetch(`/api/refresh-status?runId=${runId}`, { credentials: 'include' });
-        if (r.ok) {
-          const j = await r.json();
-          if (j.status === 'completed') return j.conclusion === 'success';
-        }
-      } catch (e) { /* on retente */ }
-      await new Promise(res => setTimeout(res, 4000));
-    }
-    return false;
-  }
-
-  btn.addEventListener('click', async () => {
-    if (btn.disabled) return;
-    setLoading(true, 'Déclenchement du run...');
-    try {
-      const resp = await fetch('/api/refresh', { method: 'POST', credentials: 'include' });
-      if (!resp.ok) {
-        const txt = await resp.text();
-        alert('Erreur déclenchement : ' + resp.status + '\n' + txt.slice(0, 200));
-        setLoading(false);
-        return;
-      }
-      const { runId } = await resp.json();
-      setLoading(true, 'Récupération Strava + Whoop...');
-      const ok = await pollStatus(runId);
-      if (ok) {
-        // Reload avec cache-bust pour forcer la nouvelle data.js
-        location.reload();
-      } else {
-        alert('Le run GitHub Actions a échoué ou pris trop de temps. Voir https://github.com/Yanisjaber/coach-ia/actions');
-        setLoading(false);
-      }
-    } catch (e) {
-      alert('Erreur réseau : ' + e.message);
-      setLoading(false);
-    }
-  });
-})();
-</script>
-</body>
-</html>
+  if (/blesse|blessé|blessee|douleur|mal au|mal a l
