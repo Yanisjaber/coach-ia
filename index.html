@@ -11197,4 +11197,512 @@ function generateCoachResponse(userText) {
   const ctxRec = rec != null ? ` Recovery Whoop du jour : ${rec}%.` : '';
 
   // Détection d'intentions (ordre de priorité)
-  if (/blesse|blessé|blessee|douleur|mal au|mal a l
+  if (/blesse|blessé|blessee|douleur|mal au|mal a la|tendinit|claqu|knee|genou|cheville|dos|épaule|coude|poignet/.test(t)) {
+    return {
+      message: `Important : ne t'entraîne pas avec une douleur. Repos complet jusqu'à disparition.\n\nSi ça persiste plus de 3-5 jours ou empire, consulte un kiné ou un médecin du sport — c'est non négociable.\n\nJe passe ton plan en mode repos forcé. Quand tu vas mieux, dis-moi pour reprendre progressivement.`,
+      prefs: { recoveryMode: true, blocked: true }
+    };
+  }
+  if (/fatig|crevé|crevee|épuis|epuis|nase|usé|usee|kacho|ko|naze/.test(t)) {
+    return {
+      message: `Compris, fatigue signalée.${ctxTSB}${ctxRec}\n\nJe vais alléger les séances :\n• Pas de blocs VO2max\n• Focus endurance Z2 et récupération active\n• Si la fatigue persiste 2-3 jours, on bascule en semaine de décharge\n\nDors bien, hydrate-toi, mange protéiné.`,
+      prefs: { recoveryMode: true, blocked: false }
+    };
+  }
+  if (/frais|en forme|reposé|reposee|pleine forme|envie de pousser|au top|peche|pêche/.test(t)) {
+    return {
+      message: `Top, tu es frais.${ctxTSB}${ctxRec} Bonne fenêtre pour pousser.\n\nJe peux densifier la semaine avec :\n• Un bloc de seuil supplémentaire\n• Ou un VO2max si ton TSB le permet\n\nTu veux travailler quoi en priorité ? Seuil, VO2max, endurance, force ?`,
+      prefs: { hardMode: true, recoveryMode: false, blocked: false }
+    };
+  }
+  if (/seuil|ftp|threshold/.test(t)) {
+    return {
+      message: `OK, focus sur le seuil.\n\nFormat type : 2 séances/sem de 3×12min ou 4×8min à 95-105% FTP, récup 3-5min.\n\nObjectif : pousser ton FTP dans 4-6 semaines. Re-test FTP dans 4 semaines pour mesurer.`,
+      prefs: { focusZone: 'seuil' }
+    };
+  }
+  if (/vo2|vmax|aerobie max|aérobie max/.test(t)) {
+    return {
+      message: `Compris, VO2max comme axe de travail.\n\nFormat type : 4×4min ou 6×3min à 110-115% FTP, récup 1:1.\nTrès exigeant → 1-2 fois/semaine max, jamais 2 jours de suite.\n\nLa phase Peak de ton plan se déclenche.`,
+      prefs: { focusZone: 'vo2' }
+    };
+  }
+  if (/endur|volume|sortie longue|fond|base aerobie|base aérobie/.test(t)) {
+    return {
+      message: `Bon choix, construire la base aérobie c'est la fondation.\n\nPlan : sorties Z2 longues le week-end (>2h), volume hebdo augmenté de 10% max/semaine. Reste sous 75% FTP, conversation aisée.\n\nC'est moins glamour mais c'est ce qui paie sur la durée.`,
+      prefs: { focusZone: 'endurance' }
+    };
+  }
+  if (/force|muscu|musculation|gainage|renfo/.test(t)) {
+    return {
+      message: `OK, focus force/musculation.\n\n2-3 séances/sem en complément du vélo, format : 4-5 exos polyarticulaires (squat, deadlift, presse, gainage), 3-4 séries de 5-8 reps lourdes.\n\nÉvite le jour avant une grosse séance vélo.`,
+      prefs: { focusZone: 'force' }
+    };
+  }
+  if (/sommeil|dormi mal|mal dormi|insomnie|nuit courte|fatigue chronique/.test(t)) {
+    return {
+      message: `Le sommeil c'est 50% de la récupération.\n\nSi tu dors mal 2+ nuits, j'allège auto le plan : pas plus que Z3 le lendemain.\n\nConseils : couche-toi 30min plus tôt, magnesium le soir, pas d'écran 30min avant. Si chronique, vérifie ton stress et ta charge globale.`,
+      prefs: { sleepConcern: true }
+    };
+  }
+  if (/stress|boulot|travail|charge mentale|presse|pressé|pressee/.test(t)) {
+    return {
+      message: `Stress non-sportif = fatigue cumulative pour le corps.\n\nJe réduis l'intensité cette semaine. Privilégie aussi des séances "plaisir" courtes (1h Z2) au lieu de tout planifier dur.\n\nLa séance dure quand tu es déjà stressé peut empirer les choses.`,
+      prefs: { stressMode: true }
+    };
+  }
+  if (/decharge|décharge|recup|récup|récupération|recuperation/.test(t)) {
+    return {
+      message: `OK, semaine de décharge.\n\nFormat : volume réduit de 30-50%, intensité conservée mais blocs courts. Format type : 3 sorties Z2 courtes + 1 séance modérée.\n\nL'objectif est de surcompenser pour repartir frais la semaine suivante.`,
+      prefs: { recoveryMode: true }
+    };
+  }
+  if (/competition|compétition|course|objectif|preparation|préparation/.test(t)) {
+    return {
+      message: `Pour structurer la prépa, ajoute ta compétition dans la section "Compétitions à venir" en haut de l'onglet.\n\nJe gère ensuite automatiquement les phases :\n• Build (>8 sem)\n• Peak (4-8 sem)\n• Taper (1-4 sem)\n• Race week (< 1 sem)`,
+      prefs: {}
+    };
+  }
+  if (/^(merci|ok|d'accord|compris|bien|super|nickel)/.test(t)) {
+    return {
+      message: `Pas de souci, je note. Si tu changes d'avis ou veux ajuster, dis-le moi à tout moment.`,
+      prefs: {}
+    };
+  }
+  if (/^(salut|bonjour|hello|coucou|hey|yo)/.test(t)) {
+    return {
+      message: `Salut ! Prêt à bosser. Dis-moi comment tu te sens aujourd'hui, ce que tu veux travailler, ou si tu as des douleurs/contraintes.${ctxRec}${ctxTSB}`,
+      prefs: {}
+    };
+  }
+  // Réponse par défaut
+  return {
+    message: `Noté. Je tiens compte pour la suite.\n\nDis-moi par exemple :\n• Ta sensation du jour (frais / fatigué / douleur)\n• Ce que tu veux travailler (seuil / VO2 / endurance / force)\n• Ton sommeil, ton stress, des contraintes spécifiques`,
+    prefs: {}
+  };
+}
+
+function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const messages = loadChatMessages();
+  const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  messages.push({ role: 'user', text, time });
+
+  const { message: response, prefs: newPrefs } = generateCoachResponse(text);
+  messages.push({ role: 'coach', text: response, time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) });
+
+  // Sauvegarder préférences extraites
+  if (newPrefs && Object.keys(newPrefs).length > 0) {
+    const cur = loadPrefs();
+    Object.assign(cur, newPrefs);
+    savePrefs(cur);
+  }
+
+  saveChatMessages(messages);
+  input.value = '';
+  renderChat();
+  // Re-render du calendrier pour appliquer les nouvelles préfs
+  if (typeof renderCalendar === 'function') renderCalendar();
+}
+
+// Chat handlers — défensifs car le UI chat a été retiré de PANEL 2 (Entraîneur)
+const _chatSendBtn = document.getElementById('chat-send');
+if (_chatSendBtn) _chatSendBtn.addEventListener('click', sendChatMessage);
+const _chatInputEl = document.getElementById('chat-input');
+if (_chatInputEl) _chatInputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage();
+  }
+});
+const _chatClearBtn = document.getElementById('chat-clear');
+if (_chatClearBtn) _chatClearBtn.addEventListener('click', async () => {
+  const ok = await appConfirm({
+    title: 'Effacer la conversation',
+    message: 'Effacer la conversation et les préférences enregistrées ?',
+    confirmLabel: 'Effacer',
+    danger: true,
+  });
+  if (!ok) return;
+  localStorage.removeItem(CHAT_KEY);
+  localStorage.removeItem(PREFS_KEY);
+  renderChat();
+  if (typeof renderCalendar === 'function') renderCalendar();
+});
+
+try { renderChat(); } catch (e) { console.warn('[renderChat]', e); }
+
+// ========= INTÉGRATION DES PRÉFÉRENCES DANS LE PLAN =========
+// Patch sur adjustForRecovery pour aussi appliquer les prefs du chat
+const _originalAdjustForRecovery = adjustForRecovery;
+adjustForRecovery = function(proposal, recovery) {
+  let p = _originalAdjustForRecovery(proposal, recovery);
+  const prefs = loadPrefs();
+  if (prefs.blocked && p.type !== 'rest') {
+    return { ...p, type: 'rest', name: 'Repos forcé (douleur signalée)', dur: 0, tss: 0, why: 'Repos demandé suite à signalement de douleur — reprendre quand ça va mieux' };
+  }
+  if (prefs.recoveryMode && (p.type === 'vo2' || p.type === 'seuil')) {
+    return { ...p, type: 'endurance', name: 'Endurance Z2 (mode récup activé)', dur: Math.round(p.dur * 0.7), tss: Math.round(p.tss * 0.55), why: 'Mode récup activé via chat — intensité allégée' };
+  }
+  if (prefs.hardMode && p.type === 'endurance' && p.tss < 80) {
+    return { ...p, name: p.name + ' (renforcé)', tss: Math.round(p.tss * 1.2), why: 'Mode pousser activé via chat — un peu plus de stimulation' };
+  }
+  if (prefs.focusZone === 'seuil' && p.type === 'endurance' && p.tss > 50) {
+    return { ...p, type: 'tempo', name: 'Sweet Spot (focus seuil)', tss: Math.round(p.tss * 1.15), why: 'Focus seuil via chat — endurance remplacée par sweet spot' };
+  }
+  return p;
+};
+
+// Init
+renderCompList();
+renderCalendar();
+
+// ========= PANEL 3: LONG TERME (robuste aux nulls Whoop) =========
+// Rolling average qui ignore les nulls (renvoie null si aucun point dans la fenêtre)
+const rolling = (arr, n) => arr.map((_, i, a) => {
+  const s = a.slice(Math.max(0, i-n+1), i+1).filter(v => v != null);
+  if (s.length === 0) return null;
+  return +(s.reduce((x,y)=>x+y,0)/s.length).toFixed(1);
+});
+const hrv7 = rolling(data.map(d=>d.hrv), 7);
+
+new Chart(document.getElementById('chart-hrv'), {
+  type: 'line',
+  data: { labels, datasets: [{ data: hrv7, borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.15)', tension: 0.3, pointRadius: 0, fill: true, spanGaps: false }] },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } }, y: { title: { display: true, text: 'ms' } } } }
+});
+
+// Sommeil : 30 derniers jours, nulls → barre vide
+const sleepSlice = data.slice(-30);
+new Chart(document.getElementById('chart-sleep'), {
+  type: 'bar',
+  data: {
+    labels: sleepSlice.map(d => fmtDate(d.date)),
+    datasets: [{
+      data: sleepSlice.map(d => d.sleepH),
+      backgroundColor: sleepSlice.map(d => d.sleepH == null ? '#2a3142' : d.sleepH < 6.5 ? '#f87171' : d.sleepH < 7 ? '#fbbf24' : '#4ade80'),
+      borderRadius: 2
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (ctx) => ctx.parsed.y == null ? 'Pas de donnée Whoop' : ctx.parsed.y + ' h' } }
+    },
+    scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } }, y: { title: { display: true, text: 'heures' }, min: 0 } }
+  }
+});
+
+const ratio = data.map(d => d.ctl > 0 ? +(d.atl / d.ctl).toFixed(2) : 1);
+new Chart(document.getElementById('chart-ratio'), {
+  type: 'line',
+  data: { labels, datasets: [
+    { data: ratio, borderColor: '#fbbf24', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0 },
+    { data: data.map(()=>1.3), borderColor: 'rgba(248,113,113,0.5)', borderDash: [3,3], pointRadius: 0 },
+    { data: data.map(()=>0.8), borderColor: 'rgba(74,222,128,0.5)', borderDash: [3,3], pointRadius: 0 }
+  ] },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } }, y: { title: { display: true, text: 'ATL/CTL' }, min: 0.5, max: 1.6 } } }
+});
+
+new Chart(document.getElementById('chart-ctl-trend'), {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [{ label: 'CTL', data: data.map(d=>d.ctl), borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.2)', tension: 0.3, pointRadius: 0, fill: true }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { ticks: { maxTicksLimit: 10 }, grid: { display: false } }, y: { title: { display: true, text: 'CTL (fitness)' } } }
+  }
+});
+
+// Alertes long-terme — calculées sur les vraies données
+const alerts = [];
+
+// 1. Évolution CTL sur 90j
+const last90 = data.slice(-90);
+if (last90.length >= 30) {
+  const ctlStart = last90[0].ctl;
+  const ctlEnd = last90[last90.length - 1].ctl;
+  const ctlPct = ctlStart > 0 ? Math.round((ctlEnd - ctlStart) / ctlStart * 100) : 0;
+  alerts.push({
+    class: ctlPct > 5 ? 'good' : ctlPct < -10 ? 'danger' : 'warn',
+    title: `Évolution de la forme : ${ctlPct >= 0 ? '+' : ''}${ctlPct}% sur 90 jours`,
+    body: `CTL passé de ${ctlStart.toFixed(0)} à ${ctlEnd.toFixed(0)}. ${ctlPct > 10 ? 'Progression saine.' : ctlPct < -10 ? 'Régression — vérifier la cause (blessure, pause, démotivation).' : ctlPct > 0 ? 'Progression légère.' : 'Forme stable.'}`
+  });
+}
+
+// 2. Ratio ATL/CTL : périodes à risque
+const riskDays = data.filter(d => d.ctl > 10 && d.atl / d.ctl > 1.3).length;
+if (riskDays > 0) {
+  alerts.push({
+    class: riskDays > 14 ? 'danger' : 'warn',
+    title: `Ratio ATL/CTL > 1.3 sur ${riskDays} jour${riskDays>1?'s':''}`,
+    body: riskDays > 14 ? 'Plusieurs périodes de surcharge — risque de blessure majoré. Bien intercaler des semaines de décharge.' : 'Période ponctuelle de surcharge bien gérée.'
+  });
+} else if (data.length > 30) {
+  alerts.push({
+    class: 'good',
+    title: 'Aucune surcharge aiguë détectée',
+    body: 'Ratio ATL/CTL toujours sous 1.3 → tu absorbes ta charge sans pic de risque.'
+  });
+}
+
+// 3. HRV — seulement si données réelles
+const realHrv = data.filter(d => d.whoopSource === 'real' && d.hrv != null);
+if (realHrv.length >= 3) {
+  const avgHrv = realHrv.reduce((s,d)=>s+d.hrv,0) / realHrv.length;
+  const stdHrv = Math.sqrt(realHrv.reduce((s,d)=>s+Math.pow(d.hrv-avgHrv,2),0) / realHrv.length);
+  alerts.push({
+    class: stdHrv < 8 ? 'good' : 'warn',
+    title: `HRV moyenne ${avgHrv.toFixed(0)} ms (σ ${stdHrv.toFixed(1)})`,
+    body: stdHrv < 8 ? 'Variabilité faible → état de récup stable.' : 'Variabilité élevée → état fluctuant. Surveiller les soirs avant séance dure.'
+  });
+} else {
+  alerts.push({
+    class: 'warn',
+    title: 'HRV : pas assez de données Whoop',
+    body: `Seulement ${realHrv.length} jour${realHrv.length>1?'s':''} de mesures HRV réelles. Les analyses long-terme demandent 14j+.`
+  });
+}
+
+// 4. Sommeil — seulement si données réelles
+const realSleep = data.filter(d => d.whoopSource === 'real' && d.sleepH != null);
+if (realSleep.length >= 3) {
+  const avgSleep = realSleep.reduce((s,d)=>s+d.sleepH,0) / realSleep.length;
+  const shortNights = realSleep.filter(d => d.sleepH < 7).length;
+  alerts.push({
+    class: avgSleep >= 7.5 && shortNights < realSleep.length * 0.3 ? 'good' : 'warn',
+    title: `Sommeil moyen ${avgSleep.toFixed(1)}h · ${shortNights}/${realSleep.length} nuit${realSleep.length>1?'s':''} < 7h`,
+    body: avgSleep >= 7.5 ? 'Volume correct. Les jours après une nuit courte sont à modérer en intensité.' : 'Volume insuffisant — priorité au sommeil pour récupérer.'
+  });
+}
+
+document.getElementById('alerts-list').innerHTML = alerts.map(a => `
+  <div class="insight ${a.class}">
+    <div class="insight-title">${a.title}</div>
+    <div class="insight-body">${a.body}</div>
+  </div>`).join('');
+
+// ========= PANEL 4: SESSIONS =========
+let sessions = [];
+function renderSessionsTable() {
+  sessions = data.filter(d => d.sessionType).slice(-12).reverse();
+  const tbody = document.getElementById('sessions-tbody');
+  tbody.innerHTML = sessions.map((s, i) => {
+    // Récup du sport Strava depuis la 1re activité du jour, sinon depuis la racine
+    const firstAct = (s.activities && s.activities.length) ? s.activities[0] : s;
+    const sportLabel = window.activitySportLabel ? window.activitySportLabel(firstAct) : (s.sport || '—');
+    const sportCat = window.activitySportColorKey ? window.activitySportColorKey(firstAct) : 'autre';
+    return `
+    <tr data-idx="${i}">
+      <td>${fmtDate(s.date)}</td>
+      <td>${s.sessionName}</td>
+      <td><span class="sport-pill" data-sport-cat="${sportCat}">${sportLabel}</span></td>
+      <td><span class="pill ${s.sessionType}">${s.sessionType}</span></td>
+      <td>${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')}</td>
+      <td>${s.tss}</td>
+      <td>${s.np}W (${s.ftpPct}%)</td>
+      <td>${s.hr} bpm</td>
+      <td>${s.compliance != null ? `<span style="color:${s.compliance>=95?'var(--accent)':s.compliance>=85?'var(--warn)':'var(--danger)'};">${s.compliance}%</span>` : '<span style="color:var(--text-mute);">—</span>'}</td>
+    </tr>
+    `;
+  }).join('');
+  // Auto-affichage de la 1ère séance ou message vide
+  const detailWrap = document.getElementById('session-detail-wrap');
+  if (sessions.length) {
+    tbody.querySelector('tr')?.classList.add('selected');
+    renderSessionDetail(sessions[0]);
+  } else {
+    detailWrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:13px;">Aucune séance pour le filtre sélectionné.</div>';
+  }
+}
+try { renderSessionsTable(); } catch (e) { console.error('[renderSessionsTable]', e); }
+
+function renderSessionDetail(s) {
+  const zoneColors = ['#bbf7d0','#86efac','#4ade80','#16a34a','#14532d'];
+  const zones = (s.zones && s.zones.length) ? s.zones : (s.zones_hr || s.zones_power || [0,0,0,0,0]);
+  const zonesHTML = zones.map((z, i) => `<div class="zone-seg" style="width:${z}%;background:${zoneColors[i]};">${z>8?z+'%':''}</div>`).join('');
+  const html = `
+  <div class="session-detail">
+    <div class="session-detail-header">
+      <div>
+        <h3>${s.sessionName} <span class="pill ${s.sessionType}" style="margin-left:8px;">${s.sessionType}</span></h3>
+        <div class="meta">${s.date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · ${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')} · ${s.tss} TSS</div>
+      </div>
+      <div style="text-align:right;font-size:12px;color:var(--text-dim);">Recovery avant : <strong style="color:var(--text);">${s.recovery != null ? s.recovery + '%' : '—'}</strong></div>
+    </div>
+    <div class="metric-row">
+      <div class="mini-metric"><div class="label">NP / Puissance norm.</div><div class="value">${s.np} W</div><div class="compare">${s.ftpPct}% FTP</div></div>
+      <div class="mini-metric"><div class="label">FC moyenne</div><div class="value">${s.hr} bpm</div><div class="compare">Max ${s.hr + randInt(15,30)} bpm</div></div>
+      <div class="mini-metric"><div class="label">TSS réalisé</div><div class="value">${s.tss}</div><div class="compare ${s.compliance>=95?'up':'down'}">${s.compliance}% du prévu</div></div>
+      <div class="mini-metric"><div class="label">Variabilité</div><div class="value">${(rand(1.02,1.18)).toFixed(2)}</div><div class="compare">IF ${(s.ftpPct/100).toFixed(2)}</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">Répartition du temps par zone de FC</div>
+    <div class="zone-bar">${zonesHTML}</div>
+    <div class="legend">
+      <span><span class="legend-dot" style="background:#4ade80;"></span>Z1 récup</span>
+      <span><span class="legend-dot" style="background:#60a5fa;"></span>Z2 endurance</span>
+      <span><span class="legend-dot" style="background:#a78bfa;"></span>Z3 tempo</span>
+      <span><span class="legend-dot" style="background:#fbbf24;"></span>Z4 seuil</span>
+      <span><span class="legend-dot" style="background:#f87171;"></span>Z5 VO2max</span>
+    </div>
+    <div style="margin-top:14px;padding:12px;background:var(--bg);border-radius:6px;font-size:13px;">
+      <strong style="color:var(--info);">Analyse Coach IA :</strong>
+      ${(() => {
+        const c = s.compliance;
+        const recTxt = s.recovery != null ? s.recovery + '%' : 'inconnue';
+        if (c == null) return `Pas de TSS planifié pour cette séance (mode libre). NP ${s.np}W sur ${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')}.`;
+        if (c >= 95) return `Séance conforme au plan. Exécution propre, ${s.ftpPct}% FTP atteint comme prévu.`;
+        if (c >= 85) return `Léger écart (${c}% du prévu). Probablement lié à la récupération de départ (${recTxt}). Pas d'inquiétude — adapter la prochaine séance similaire.`;
+        return `Écart significatif (${c}%). Possible signe de fatigue accumulée ou objectif trop ambitieux. Suggérer une décharge.`;
+      })()}
+    </div>
+  </div>`;
+  document.getElementById('session-detail-wrap').innerHTML = html;
+}
+
+document.getElementById('sessions-tbody').addEventListener('click', (e) => {
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+  const tbody = e.currentTarget;
+  tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+  tr.classList.add('selected');
+  renderSessionDetail(sessions[+tr.dataset.idx]);
+});
+
+// ========= TABS =========
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.panel).classList.add('active');
+  });
+});
+
+// ========= FILTRES SPORTS (boutons header) =========
+document.querySelectorAll('#sport-filter .sport-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const sport = btn.dataset.sport;
+    if (sport === 'tout') {
+      // Clic sur "Tout" : ne sélectionne QUE Tout
+      activeSports.clear();
+      activeSports.add('tout');
+    } else {
+      activeSports.delete('tout');
+      if (activeSports.has(sport)) {
+        activeSports.delete(sport);
+      } else {
+        activeSports.add(sport);
+      }
+      // Si plus rien de sélectionné, revenir sur Tout
+      if (activeSports.size === 0) activeSports.add('tout');
+      // Si TOUS les sports individuels sont sélectionnés → bascule sur Tout
+      const individuals = ['cyclisme', 'course', 'musculation', 'natation', 'autre'];
+      if (individuals.every(s => activeSports.has(s))) {
+        activeSports.clear();
+        activeSports.add('tout');
+      }
+    }
+    // MAJ visuelle des boutons
+    document.querySelectorAll('#sport-filter .sport-btn').forEach(b => {
+      b.classList.toggle('active', activeSports.has(b.dataset.sport));
+    });
+    applySportFilter();
+  });
+});
+
+})(); // fin IIFE async
+
+// ========= BOUTON REFRESH MANUEL =========
+// Déclenche workflow_dispatch GitHub Actions via le Worker Cloudflare,
+// poll jusqu'à la fin du run, puis recharge la page.
+(function setupRefreshButton() {
+  const btn = document.getElementById('refresh-btn');
+  const icon = document.getElementById('refresh-icon');
+  if (!btn || !icon) return;
+
+  // Injecte le @keyframes spin si absent
+  if (!document.getElementById('refresh-spin-style')) {
+    const style = document.createElement('style');
+    style.id = 'refresh-spin-style';
+    style.textContent = '@keyframes refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+    document.head.appendChild(style);
+  }
+
+  function setLoading(on, label) {
+    btn.disabled = on;
+    btn.classList.toggle('loading', on);
+    if (on) {
+      btn.style.color = 'var(--accent)';
+      btn.style.borderColor = 'var(--accent)';
+      icon.style.animation = 'refresh-spin 0.8s linear infinite';
+      btn.title = label || 'Rafraîchissement en cours...';
+    } else {
+      btn.style.color = 'var(--text-dim)';
+      btn.style.borderColor = 'var(--border)';
+      icon.style.animation = '';
+      btn.title = 'Rafraîchir maintenant';
+    }
+  }
+
+  async function pollStatus(runId, maxSec = 180) {
+    const start = Date.now();
+    while ((Date.now() - start) / 1000 < maxSec) {
+      try {
+        const r = await fetch(`/api/refresh-status?runId=${runId}`, { credentials: 'include' });
+        if (r.ok) {
+          const j = await r.json();
+          if (j.status === 'completed') return j.conclusion === 'success';
+        }
+      } catch (e) { /* on retente */ }
+      await new Promise(res => setTimeout(res, 4000));
+    }
+    return false;
+  }
+
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    setLoading(true, 'Déclenchement du run...');
+    try {
+      const resp = await fetch('/api/refresh', { method: 'POST', credentials: 'include' });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        await appAlert({
+          title: 'Erreur de déclenchement',
+          message: `HTTP ${resp.status}\n${txt.slice(0, 200)}`,
+        });
+        setLoading(false);
+        return;
+      }
+      const { runId } = await resp.json();
+      setLoading(true, 'Récupération Strava + Whoop...');
+      const ok = await pollStatus(runId);
+      if (ok) {
+        // Reload avec cache-bust pour forcer la nouvelle data.js
+        location.reload();
+      } else {
+        await appAlert({
+          title: 'Échec du run',
+          message: 'Le run GitHub Actions a échoué ou pris trop de temps. Voir https://github.com/Yanisjaber/coach-ia/actions',
+        });
+        setLoading(false);
+      }
+    } catch (e) {
+      await appAlert({
+        title: 'Erreur réseau',
+        message: e.message || String(e),
+      });
+      setLoading(false);
+    }
+  });
+})();
+</script>
+</body>
+</html>
