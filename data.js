@@ -1,5 +1,5 @@
 window.DASHBOARD_DATA = {
-  "generated_at": "2026-05-26T22:47:47.197267",
+  "generated_at": "2026-05-26T23:57:04.911179",
   "athlete": {
     "id": "25665243",
     "name": "Yanis Jaber",
