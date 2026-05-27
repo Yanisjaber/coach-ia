@@ -1,0 +1,283 @@
+/* ============================================================
+   wellness.css
+   Wellness manuel : carte CTA dans le Tableau de bord, modal de saisie,
+   chart dans Tendances long-terme.
+   ============================================================ */
+
+/* --- Carte CTA dans Tableau de bord --- */
+.wellness-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 22px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  transition: border-color 0.18s, background 0.18s;
+}
+.wellness-cta:hover {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+.wellness-cta-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.wellness-cta-icon {
+  width: 40px; height: 40px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--accent), var(--info));
+  color: #0b0e14;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.wellness-cta-icon svg { width: 20px; height: 20px; }
+.wellness-cta-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.wellness-cta-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.wellness-cta-btn {
+  background: rgba(74, 222, 128, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: all 0.16s;
+  white-space: nowrap;
+}
+.wellness-cta-btn:hover {
+  background: rgba(74, 222, 128, 0.2);
+  border-color: var(--accent);
+}
+
+/* --- Modal de saisie --- */
+.wellness-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 8000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: wellnessFadeIn 0.22s ease-out;
+}
+.wellness-backdrop.active { display: flex; }
+@keyframes wellnessFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.wellness-modal {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 540px;
+  padding: 26px 28px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  animation: wellnessSlideUp 0.28s cubic-bezier(0.4,0,0.2,1);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+@keyframes wellnessSlideUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.wellness-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+.wellness-header h2 {
+  font-size: 20px;
+  margin: 0;
+  color: var(--text);
+}
+.wellness-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  text-transform: capitalize;
+}
+.wellness-close {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 8px;
+  width: 32px; height: 32px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.wellness-close:hover {
+  color: var(--text);
+  border-color: var(--text-mute);
+}
+
+.wellness-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.wellness-field label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.wellness-val {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.wellness-weight-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wellness-weight-row input {
+  flex: 1;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.wellness-weight-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.wellness-unit {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.wellness-scale {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.wellness-scale button {
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 0;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.14s;
+  color: var(--text-dim);
+}
+.wellness-scale button:hover {
+  border-color: var(--text-mute);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+/* Active : couleur selon la direction (positif = vert, négatif = ambre) */
+.wellness-field[data-direction="positive"] .wellness-scale button.active {
+  background: linear-gradient(135deg, var(--accent), #16a34a);
+  border-color: var(--accent);
+  color: #0b0e14;
+  box-shadow: 0 2px 12px rgba(74, 222, 128, 0.3);
+  transform: translateY(-2px);
+}
+.wellness-field[data-direction="negative"] .wellness-scale button.active {
+  background: linear-gradient(135deg, var(--warn), #d97706);
+  border-color: var(--warn);
+  color: #0b0e14;
+  box-shadow: 0 2px 12px rgba(251, 191, 36, 0.3);
+  transform: translateY(-2px);
+}
+/* Fallback (sans data-direction) */
+.wellness-scale button.active {
+  background: linear-gradient(135deg, var(--accent), #16a34a);
+  border-color: var(--accent);
+  color: #0b0e14;
+  transform: translateY(-2px);
+}
+
+.wellness-notes-field textarea {
+  width: 100%;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 60px;
+}
+.wellness-notes-field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.wellness-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.wellness-delete {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: var(--danger);
+  border-radius: 8px;
+  width: 36px; height: 36px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.wellness-delete:hover {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: var(--danger);
+}
+
+/* --- Card "Tendances wellness" dans panel p3 --- */
+.wellness-trend-card .wellness-trend-summary {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.wellness-trend-card .wellness-trend-summary strong {
+  color: var(--text);
+}
+.wellness-trend-card .wellness-empty {
+  padding: 30px 20px;
+  text-align: center;
+  color: var(--text-mute);
+  font-size: 13px;
+}
+.wellness-trend-card .wellness-empty button {
+  margin-top: 10px;
+  background: rgba(74, 222, 128, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}

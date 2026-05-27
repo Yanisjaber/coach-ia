@@ -1,0 +1,791 @@
+/* ============================================================
+   forms-and-pickers.css
+   Formulaires : sélecteur période, Flatpickr (thème + dropdowns), état d'erreur, file picker, custom dropdown, time stepper
+   Extrait de dashboard.html (L1650-2066, L2236-2602)
+   ============================================================ */
+
+  /* === SÉLECTEUR PÉRIODE === */
+  .period-selector {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+  .period-btn {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .period-btn:hover { color: var(--text); }
+  .period-btn.active {
+    background: rgba(74, 222, 128, 0.15);
+    border-color: rgba(74, 222, 128, 0.4);
+    color: var(--accent);
+  }
+  .date-range {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+  }
+  .date-range input[type="date"] {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 12px;
+    color-scheme: dark;
+    cursor: pointer;
+  }
+  .date-range input[type="date"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .date-range .preset {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .date-range .preset:hover { color: var(--text); }
+  .date-range .preset.active {
+    background: rgba(74, 222, 128, 0.15);
+    border-color: rgba(74, 222, 128, 0.4);
+    color: var(--accent);
+  }
+  .date-range .sep { color: var(--text-mute); }
+
+  .zone-summary {
+    margin-top: 10px;
+    padding: 10px;
+    background: var(--bg-elev2);
+    border-radius: 6px;
+    font-size: 11px;
+  }
+  .zone-summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+  }
+  .zone-summary-row .zname { color: var(--text-dim); }
+  .zone-summary-row .zpct { color: var(--text); font-weight: 600; }
+
+  @media (max-width: 900px) {
+    .term-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 900px) {
+    .hero, .grid-2, .grid-3, .metric-row { grid-template-columns: 1fr; }
+    .container { padding: 16px; }
+  }
+
+  /* === FLATPICKR : thème custom dashboard === */
+  .flatpickr-calendar {
+    background: var(--bg-elev) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6) !important;
+    color: var(--text) !important;
+    font-family: inherit !important;
+    padding: 4px !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+  }
+  .flatpickr-calendar * { user-select: none !important; -webkit-user-select: none !important; }
+  /* Désactiver la sélection de texte + caret sur l'input alt (la version visible) */
+  input.flatpickr-input.fp-with-icon,
+  input.flatpickr-alt,
+  input[readonly].fp-with-icon {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    caret-color: transparent !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+  }
+  /* Pas de surlignage du tout (Firefox/Chrome) */
+  input.flatpickr-input.fp-with-icon::selection,
+  input.flatpickr-alt::selection,
+  input[readonly].fp-with-icon::selection {
+    background: transparent !important;
+    color: inherit !important;
+  }
+  input.flatpickr-input.fp-with-icon::-moz-selection,
+  input.flatpickr-alt::-moz-selection,
+  input[readonly].fp-with-icon::-moz-selection {
+    background: transparent !important;
+    color: inherit !important;
+  }
+  .flatpickr-calendar.arrowTop:before,
+  .flatpickr-calendar.arrowTop:after { border-bottom-color: var(--bg-elev) !important; }
+  .flatpickr-calendar.arrowBottom:before,
+  .flatpickr-calendar.arrowBottom:after { border-top-color: var(--bg-elev) !important; }
+  .flatpickr-months {
+    padding: 6px 0 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 6px;
+  }
+  .flatpickr-month {
+    color: var(--text) !important;
+    fill: var(--text) !important;
+    height: 38px !important;
+  }
+  .flatpickr-current-month {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    padding: 6px 0 !important;
+  }
+  .flatpickr-current-month .flatpickr-monthDropdown-months {
+    background: transparent !important;
+    color: var(--text) !important;
+    font-weight: 600 !important;
+    border-radius: 6px;
+    padding: 2px 4px !important;
+  }
+  .flatpickr-current-month .flatpickr-monthDropdown-months:hover {
+    background: var(--bg-elev2) !important;
+  }
+  .flatpickr-monthDropdown-month {
+    background: var(--bg-elev) !important;
+    color: var(--text) !important;
+  }
+  /* === FLATPICKR : custom dropdowns Mois + Année (même look que custom-select) === */
+  .flatpickr-current-month {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 0 !important;
+  }
+  .fp-cs-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    height: 32px !important;
+    padding: 0 12px !important;
+    background: var(--bg-elev2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
+    line-height: 1 !important;
+    font-weight: 600 !important;
+    color: var(--text) !important;
+    cursor: pointer;
+    user-select: none;
+    transition: border-color 0.15s, background 0.15s;
+    min-width: 110px;
+    position: relative;
+  }
+  .fp-year-btn { min-width: 80px; }
+  .fp-cs-btn:hover, .fp-cs-btn.open {
+    border-color: var(--accent) !important;
+    background: rgba(74, 222, 128, 0.06) !important;
+  }
+  .fp-cs-label {
+    flex: 1;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .fp-cs-arrow {
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--text-mute);
+    transition: transform 0.18s, border-top-color 0.15s;
+  }
+  .fp-cs-btn.open .fp-cs-arrow {
+    transform: rotate(180deg);
+    border-top-color: var(--accent);
+  }
+  .fp-cs-wrap {
+    position: relative;
+    display: inline-block;
+  }
+  /* Panels rendus en <body> pour échapper aux overflow:hidden et z-index parents */
+  .fp-cs-panel-body {
+    position: fixed;
+    background-color: #141821 !important;
+    background-image: linear-gradient(#141821, #141821) !important;
+    border: 1px solid #2d3548;
+    border-radius: 12px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.4), 0 18px 50px rgba(0,0,0,0.75);
+    padding: 6px;
+    z-index: 1000000;
+    min-width: 140px;
+    max-height: 280px;
+    overflow-y: auto;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    font-size: 13px;
+    line-height: 1.2;
+  }
+  .fp-cs-panel-body.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .fp-cs-panel-body::-webkit-scrollbar { width: 8px; }
+  .fp-cs-panel-body::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 8px; }
+  .fp-cs-panel-body::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #4ade80, #22c55e);
+    border-radius: 8px;
+  }
+  .fp-cs-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-6px) scale(0.98);
+    background-color: #141821 !important;
+    background-image: linear-gradient(#141821, #141821) !important;
+    border: 1px solid #2d3548 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.4), 0 18px 50px rgba(0,0,0,0.75) !important;
+    padding: 6px !important;
+    z-index: 99999;
+    min-width: 130px;
+    max-height: 240px;
+    overflow-y: auto;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s, transform 0.15s;
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+  }
+  .fp-cs-panel.open {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  .fp-cs-option {
+    padding: 7px 14px !important;
+    border-radius: 6px !important;
+    cursor: pointer;
+    font-size: 13px !important;
+    line-height: 1.3 !important;
+    height: auto !important;
+    color: var(--text) !important;
+    background: transparent !important;
+    border: none !important;
+    transition: background 0.1s, color 0.1s;
+    white-space: nowrap;
+    text-align: center;
+    font-weight: 500 !important;
+    margin: 0 !important;
+  }
+  .fp-cs-option:hover {
+    background: rgba(74, 222, 128, 0.14) !important;
+    color: var(--accent) !important;
+  }
+  .fp-cs-option.selected {
+    background: rgba(74, 222, 128, 0.22) !important;
+    color: var(--accent) !important;
+    font-weight: 700 !important;
+  }
+  .fp-cs-panel::-webkit-scrollbar { width: 8px; }
+  .fp-cs-panel::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    margin: 4px 0;
+  }
+  .fp-cs-panel::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
+    border-radius: 8px;
+  }
+  .fp-cs-panel { scrollbar-color: #4ade80 rgba(255,255,255,0.03); }
+  /* Le panel doit déborder du conteneur Flatpickr */
+  .flatpickr-months, .flatpickr-current-month {
+    overflow: visible !important;
+  }
+  .flatpickr-current-month input.cur-year {
+    color: var(--text) !important;
+    font-weight: 600 !important;
+  }
+  .flatpickr-prev-month, .flatpickr-next-month {
+    color: var(--text-dim) !important;
+    fill: var(--text-dim) !important;
+    padding: 8px !important;
+    border-radius: 6px !important;
+    transition: background 0.12s, color 0.12s !important;
+  }
+  .flatpickr-prev-month:hover, .flatpickr-next-month:hover {
+    background: var(--bg-elev2) !important;
+    color: var(--accent) !important;
+    fill: var(--accent) !important;
+  }
+  .flatpickr-prev-month svg, .flatpickr-next-month svg { fill: inherit !important; }
+  .flatpickr-weekdays {
+    background: transparent !important;
+    height: 26px !important;
+  }
+  .flatpickr-weekday {
+    color: var(--text-mute) !important;
+    background: transparent !important;
+    font-weight: 600 !important;
+    font-size: 11px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .flatpickr-days {
+    padding: 4px 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+  .flatpickr-rContainer { width: 100% !important; }
+  .dayContainer {
+    padding: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+  .flatpickr-day {
+    color: var(--text) !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 6px !important;
+    font-weight: 500 !important;
+    height: 38px !important;
+    line-height: 38px !important;
+    max-width: none !important;
+    width: 14.28% !important; /* 7 jours par ligne, équitable */
+    margin: 0;
+    transition: background 0.12s, color 0.12s !important;
+    flex-basis: 14.28% !important;
+  }
+  .flatpickr-day:hover {
+    background: rgba(74, 222, 128, 0.15) !important;
+    border-color: rgba(74, 222, 128, 0.3) !important;
+    color: var(--text) !important;
+  }
+  .flatpickr-day.today {
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    font-weight: 700 !important;
+  }
+  .flatpickr-day.today:hover { background: rgba(74, 222, 128, 0.2) !important; }
+  .flatpickr-day.selected,
+  .flatpickr-day.selected:hover,
+  .flatpickr-day.startRange,
+  .flatpickr-day.endRange {
+    background: var(--accent) !important;
+    border-color: var(--accent) !important;
+    color: #062017 !important;
+    font-weight: 700 !important;
+  }
+  .flatpickr-day.prevMonthDay,
+  .flatpickr-day.nextMonthDay {
+    color: var(--text-mute) !important;
+    opacity: 0.4;
+  }
+  .flatpickr-day.disabled {
+    color: var(--text-mute) !important;
+    opacity: 0.3;
+  }
+  .flatpickr-day.flatpickr-disabled { background: transparent !important; }
+  .numInputWrapper:hover, .numInputWrapper { background: transparent !important; }
+  .numInputWrapper span { border-color: var(--border) !important; }
+  .numInputWrapper span:hover { background: var(--bg-elev2) !important; }
+  .numInputWrapper span.arrowUp:after { border-bottom-color: var(--text-dim) !important; }
+  .numInputWrapper span.arrowDown:after { border-top-color: var(--text-dim) !important; }
+  /* Time picker (champ heure) */
+  .flatpickr-time {
+    background: var(--bg-elev) !important;
+    border-top: 1px solid var(--border) !important;
+  }
+  .flatpickr-time input {
+    color: var(--text) !important;
+    background: transparent !important;
+    font-weight: 600 !important;
+  }
+  .flatpickr-time input:hover, .flatpickr-time input:focus {
+    background: var(--bg-elev2) !important;
+  }
+  .flatpickr-time .flatpickr-time-separator,
+  .flatpickr-time .flatpickr-am-pm { color: var(--text-dim) !important; }
+
+
+  /* === ÉTAT D'ERREUR sur un champ requis (validation inline) === */
+  .field-error input,
+  .field-error select,
+  .field-error textarea,
+  .field-error .flatpickr-input,
+  .field-error .file-picker-btn,
+  .field-error .time-stepper,
+  .field-error .custom-select-btn {
+    border-color: var(--danger) !important;
+    box-shadow: 0 0 0 1px var(--danger);
+    animation: field-shake 0.4s ease-out;
+  }
+  .field-error-msg {
+    color: var(--danger);
+    font-size: 11px;
+    margin-top: 4px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .field-error-msg::before {
+    content: "⚠";
+    font-size: 12px;
+  }
+  @keyframes field-shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-4px); }
+    40%, 80% { transform: translateX(4px); }
+  }
+
+  /* === FILE PICKER CUSTOM (au lieu du bouton "Choisir un fichier" natif) === */
+  .file-picker {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    width: 100%;
+    min-width: 0; /* permet la troncature des enfants longs */
+    height: 39px;
+  }
+  .file-picker-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0; /* essentiel pour que text-overflow:ellipsis fonctionne dans un flex-child */
+    max-width: 100%;
+    height: 39px;
+    padding: 0 14px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    text-align: left;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .file-picker-btn:hover {
+    border-color: var(--accent);
+    background: rgba(74, 222, 128, 0.05);
+  }
+  .file-picker.has-file .file-picker-btn {
+    border-color: var(--accent);
+    background: rgba(74, 222, 128, 0.08);
+    color: var(--accent);
+  }
+  .file-picker-icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234ade80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48'/></svg>");
+  }
+  .file-picker.has-file .file-picker-icon {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234ade80' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>");
+  }
+  .file-picker-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .file-picker-clear {
+    width: 39px;
+    height: 39px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-mute);
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+  .file-picker-clear:hover {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: rgba(248, 113, 113, 0.08);
+  }
+
+  /* === CUSTOM DROPDOWN (remplace les <select> natifs avec un design rond et stylé) === */
+  .custom-select {
+    position: relative;
+    width: 100%;
+    cursor: pointer;
+    outline: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .custom-select-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    height: 39px;
+    padding: 0 14px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--text);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .custom-select:hover .custom-select-btn,
+  .custom-select.open .custom-select-btn,
+  .custom-select:focus .custom-select-btn {
+    border-color: var(--accent);
+    background: rgba(74, 222, 128, 0.05);
+  }
+  .custom-select-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+  .custom-select-arrow {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--text-mute);
+    transition: transform 0.18s, border-top-color 0.15s;
+  }
+  .custom-select.open .custom-select-arrow {
+    transform: rotate(180deg);
+    border-top-color: var(--accent);
+  }
+  .custom-select-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    max-height: 320px;
+    overflow-y: auto;
+    background-color: #141821; /* opaque, garanti */
+    background-image: linear-gradient(#141821, #141821);
+    border: 1px solid #2d3548;
+    border-radius: 12px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.4), 0 18px 50px rgba(0,0,0,0.75);
+    padding: 6px;
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    transform-origin: top center;
+    pointer-events: none;
+    transition: opacity 0.15s, transform 0.15s;
+    isolation: isolate; /* nouveau stacking context */
+  }
+  /* Le wrapper du select doit avoir un z-index élevé quand ouvert,
+     pour passer au-dessus des form-fields voisins */
+  .custom-select { z-index: 1; }
+  .custom-select.open { z-index: 9999; }
+  .custom-select.open .custom-select-panel {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  .cs-group {
+    padding: 8px 10px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .cs-option {
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+    transition: background 0.1s, color 0.1s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cs-option:hover {
+    background: rgba(74, 222, 128, 0.14);
+    color: var(--accent);
+  }
+  .cs-option.selected {
+    background: rgba(74, 222, 128, 0.22);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  /* Scrollbar bien visible dans le panel */
+  .custom-select-panel::-webkit-scrollbar { width: 8px; }
+  .custom-select-panel::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    margin: 4px 0;
+  }
+  .custom-select-panel::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+  }
+  .custom-select-panel::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #86efac 0%, #4ade80 100%);
+    background-clip: padding-box;
+  }
+  /* Firefox */
+  .custom-select-panel { scrollbar-color: #4ade80 rgba(255,255,255,0.03); }
+
+  /* === TIME STEPPER (heure avec flèches gauche/droite, même hauteur que les inputs) === */
+  .time-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 11px;
+    width: 100%;
+    height: 39px; /* aligné avec les inputs du form (padding 9px haut+bas + font 13px + border) */
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .time-stepper .time-part {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+    justify-content: center;
+  }
+  .time-stepper .time-val {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    min-width: 26px;
+    text-align: center;
+    line-height: 1;
+    padding: 0 4px;
+  }
+  .time-stepper .time-arrow {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    color: var(--text-mute) !important;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 4px;
+    transition: background-color 0.12s, color 0.12s;
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 24px;
+  }
+  /* Triangles dessinés en pure CSS (pas de police, pas d'emoji) */
+  .time-stepper .time-arrow::before {
+    content: "";
+    display: block;
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+  }
+  .time-stepper .ts-left::before {
+    border-right: 6px solid currentColor;
+    margin-right: 2px;
+  }
+  .time-stepper .ts-right::before {
+    border-left: 6px solid currentColor;
+    margin-left: 2px;
+  }
+  .time-stepper .time-arrow:focus,
+  .time-stepper .time-arrow:focus-visible,
+  .time-stepper .time-arrow:active {
+    outline: none !important;
+    box-shadow: none !important;
+    background-color: transparent !important;
+    color: var(--text-mute) !important;
+  }
+  .time-stepper .time-arrow:hover {
+    color: var(--accent) !important;
+    background-color: rgba(74, 222, 128, 0.14) !important;
+  }
+  .time-stepper .time-arrow:active {
+    transform: scale(0.88);
+  }
+  .time-stepper .time-sep {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-dim);
+  }
+
+  /* L'input lui-même : style cohérent avec le reste des form-field */
+  .form-field input.flatpickr-input,
+  .form-field input.flatpickr-mobile {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 11px;
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  /* Icône calendrier / horloge à gauche du champ + chevron à droite */
+  .fp-with-icon {
+    padding-left: 36px !important;
+    padding-right: 28px !important;
+    background-repeat: no-repeat !important;
+    background-position: 11px center, right 10px center !important;
+    background-size: 16px 16px, 12px 12px !important;
+  }
+  .fp-with-icon::placeholder {
+    color: var(--text-mute);
+    font-style: italic;
+  }
+  /* Chevron descendant (commun aux deux types) */
+  .fp-with-icon {
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234ade80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2' ry='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>"),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>") !important;
+  }
+  /* Icône horloge pour les inputs heure (override) */
+  .fp-icon-time {
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234ade80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><polyline points='12 6 12 12 16 14'/></svg>"),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>") !important;
+  }
+  .fp-with-icon:hover, .fp-with-icon:focus {
+    border-color: var(--accent) !important;
+    background-color: var(--bg-elev2) !important;
+  }
+

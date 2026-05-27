@@ -1,0 +1,215 @@
+/* ============================================================
+   mode-ia.css
+   Mode IA / Manuel : toggle, badges IA, stubs IA, modal de bienvenue
+   Extrait de dashboard.html (L2935-3143)
+   ============================================================ */
+
+  /* ============================================================ */
+  /* === MODE IA / MANUEL =====================================  */
+  /* ============================================================ */
+  /* Tous les éléments .ia-only sont masqués quand body.mode-manual.
+     Les éléments .manual-only sont masqués quand body.mode-ia.
+     Convention : par défaut tout est visible. On cache via le body. */
+  body.mode-manual .ia-only { display: none !important; }
+  body.mode-ia      .manual-only { display: none !important; }
+
+  /* --- Toggle dans le header --- */
+  .mode-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.18s;
+  }
+  .mode-toggle:hover { border-color: var(--text-mute); }
+  .mode-toggle .mode-opt {
+    position: relative;
+    z-index: 2;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-mute);
+    transition: color 0.18s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .mode-toggle .mode-opt svg { width: 12px; height: 12px; }
+  .mode-toggle .mode-slider {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--accent) 0%, #16a34a 100%);
+    box-shadow: 0 2px 8px rgba(74, 222, 128, 0.25);
+    transition: all 0.28s cubic-bezier(0.4, 0.0, 0.2, 1);
+    z-index: 1;
+  }
+  /* En mode manuel : slider sur l'option de gauche, dégradé bleu/gris plus sobre */
+  body.mode-manual .mode-toggle .mode-slider {
+    background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  body.mode-manual .mode-toggle .mode-opt.opt-manual { color: var(--text); }
+  body.mode-ia     .mode-toggle .mode-opt.opt-ia     { color: #0b0e14; }
+
+  /* --- Badge "IA" subtil sur les sections IA actives --- */
+  .ia-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(74, 222, 128, 0.12);
+    color: var(--accent);
+    border: 1px solid rgba(74, 222, 128, 0.25);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+  .ia-badge svg { width: 10px; height: 10px; }
+
+  /* --- Stub IA générique : carte qui dit "à venir" --- */
+  .ia-stub {
+    border: 1px dashed rgba(74, 222, 128, 0.3);
+    background: rgba(74, 222, 128, 0.04);
+    border-radius: 12px;
+    padding: 18px;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.55;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .ia-stub .ia-stub-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--info));
+    display: flex; align-items: center; justify-content: center;
+    color: #0b0e14;
+    flex-shrink: 0;
+  }
+  .ia-stub .ia-stub-icon svg { width: 18px; height: 18px; }
+  .ia-stub .ia-stub-body strong { color: var(--text); display: block; margin-bottom: 4px; font-size: 14px; }
+
+  /* ============================================================ */
+  /* === MODAL DE BIENVENUE (1ere visite) ====================== */
+  /* ============================================================ */
+  .welcome-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: welcomeFadeIn 0.3s ease-out;
+  }
+  .welcome-backdrop.active { display: flex; }
+  @keyframes welcomeFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .welcome-modal {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    max-width: 720px;
+    width: 100%;
+    padding: 36px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: welcomeSlideUp 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+  @keyframes welcomeSlideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .welcome-modal h2 {
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+  .welcome-modal .welcome-sub {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+  .welcome-modes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .welcome-card {
+    background: var(--bg-elev2);
+    border: 2px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    cursor: pointer;
+    transition: all 0.22s;
+    text-align: left;
+    color: var(--text);
+    font: inherit;
+  }
+  .welcome-card:hover {
+    border-color: var(--accent);
+    background: rgba(74, 222, 128, 0.04);
+    transform: translateY(-2px);
+  }
+  .welcome-card .welcome-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 14px;
+  }
+  .welcome-card .welcome-icon svg { width: 22px; height: 22px; }
+  .welcome-card.card-ia .welcome-icon {
+    background: linear-gradient(135deg, var(--accent), var(--info));
+    color: #0b0e14;
+  }
+  .welcome-card.card-manual .welcome-icon {
+    background: linear-gradient(135deg, #4b5563, #374151);
+    color: var(--text);
+  }
+  .welcome-card h3 { font-size: 16px; margin-bottom: 6px; color: var(--text); }
+  .welcome-card .welcome-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+  .welcome-card .welcome-features {
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--text-mute);
+    list-style: none;
+    padding: 0;
+  }
+  .welcome-card .welcome-features li {
+    padding: 3px 0;
+    padding-left: 16px;
+    position: relative;
+  }
+  .welcome-card .welcome-features li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: bold;
+  }
+  .welcome-footnote {
+    margin-top: 22px;
+    color: var(--text-mute);
+    font-size: 11px;
+    text-align: center;
+  }
+  @media (max-width: 600px) {
+    .welcome-modes { grid-template-columns: 1fr; }
+    .welcome-modal { padding: 24px; }
+  }

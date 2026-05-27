@@ -1,0 +1,161 @@
+/* ============================================================
+   base.css
+   Base : variables CSS (:root), reset, scrollbars custom, body, container, header, logo, sport-filter, header-info
+   Extrait de dashboard.html (L20-174)
+   ============================================================ */
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* === SCROLLBARS CUSTOM (page + dropdowns + tous les scrolls) === */
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2d3548 transparent;
+  }
+  /* WebKit (Chrome, Edge, Safari, Opera) */
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 6px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #2d3548 0%, #232a3a 100%);
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background 0.18s;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+  }
+  *::-webkit-scrollbar-corner { background: transparent; }
+  /* Scrollbars dans les selects natifs : impossible à styler universellement,
+     mais on peut au moins forcer le color-scheme pour avoir un dark mode */
+  select, html, body {
+    color-scheme: dark;
+  }
+  /* Désactive globalement la sélection de texte (sauf inputs texte et textareas) */
+  html, body {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+  }
+  /* Ré-active la sélection uniquement là où on tape du texte */
+  input[type="text"], input[type="number"], input[type="email"],
+  input[type="search"], input[type="url"], input[type="password"],
+  textarea, .selectable {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+  }
+  /* Et le surlignage bleu disparaît partout sauf dans ces inputs texte */
+  *::selection { background: transparent; color: inherit; }
+  *::-moz-selection { background: transparent; color: inherit; }
+  input[type="text"]::selection, input[type="number"]::selection,
+  input[type="email"]::selection, input[type="search"]::selection,
+  textarea::selection, .selectable::selection {
+    background: rgba(74, 222, 128, 0.3);
+    color: inherit;
+  }
+  input[type="text"]::-moz-selection, input[type="number"]::-moz-selection,
+  textarea::-moz-selection, .selectable::-moz-selection {
+    background: rgba(74, 222, 128, 0.3);
+    color: inherit;
+  }
+  :root {
+    --bg: #0b0e14;
+    --bg-elev: #141821;
+    --bg-elev2: #1c2230;
+    --border: #232a3a;
+    --text: #e6e9ef;
+    --text-dim: #8b94a8;
+    --text-mute: #5a6378;
+    --accent: #4ade80;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --info: #60a5fa;
+    --purple: #a78bfa;
+    --pink: #f472b6;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+  header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    margin-bottom: 0;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  header .logo { justify-self: start; }
+  header .sport-filter { justify-self: center; margin: 0; }
+  header .header-info { justify-self: end; }
+  .badge-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--info));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 18px; color: #0b0e14;
+  }
+  .logo-text h1 { font-size: 20px; font-weight: 600; }
+  .logo-text p { font-size: 12px; color: var(--text-dim); }
+  .sport-filter {
+    display: flex;
+    gap: 4px;
+    margin: 0 auto;
+    padding: 4px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .sport-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .sport-btn:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .sport-btn.active {
+    background: rgba(74, 222, 128, 0.15);
+    border-color: rgba(74, 222, 128, 0.35);
+    color: var(--accent);
+  }
+  .header-info { display: flex; gap: 20px; align-items: center; font-size: 13px; line-height: 1; }
+  .header-info > span { display: inline-flex; align-items: center; gap: 6px; }
+  .header-info .date { color: var(--text-dim); }
+  .badge {
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: var(--warn);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+

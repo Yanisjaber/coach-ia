@@ -1,0 +1,326 @@
+/* ============================================================
+   bilan.css — Page Bilan annuel (records, objectifs, KPIs)
+   ============================================================ */
+
+/* === KPIs annuels (réutilise .hero existant + .bilan-kpi spécifique) === */
+.bilan-hero { margin-bottom: 18px; }
+.bilan-kpi .bilan-year-label {
+  font-size: 10px;
+  color: var(--text-mute);
+  font-weight: 400;
+  margin-left: 4px;
+}
+.bilan-diff {
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.bilan-diff.up { color: var(--accent); }
+.bilan-diff.down { color: var(--danger); }
+.bilan-sub {
+  font-size: 11px;
+  color: var(--text-mute);
+  margin-top: 6px;
+}
+
+/* === Objectifs annuels (nouvelle version par templates) === */
+.bilan-goals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+.bilan-goals-collapse-btn {
+  background: var(--bg-elev2);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.bilan-goals-collapse-btn:hover {
+  color: var(--text);
+  border-color: var(--text-mute);
+}
+
+/* Mode replié (filter = Tout) : on cache le body sauf si .is-expanded */
+.bilan-goals-card.is-collapsible:not(.is-expanded) .bilan-goals-body {
+  display: none;
+}
+
+/* Liste des objectifs */
+.bilan-goals {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.bilan-goal-row {
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  transition: border-color 0.15s;
+}
+.bilan-goal-row:hover {
+  border-color: var(--text-mute);
+}
+.bilan-goal-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.bilan-goal-sport-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.bilan-goal-sport-badge[data-sport-cat="cyclisme"] { color: #60a5fa; border-color: rgba(96,165,250,0.35); }
+.bilan-goal-sport-badge[data-sport-cat="course"] { color: #4ade80; border-color: rgba(74,222,128,0.35); }
+.bilan-goal-sport-badge[data-sport-cat="natation"] { color: #22d3ee; border-color: rgba(34,211,238,0.35); }
+.bilan-goal-sport-badge[data-sport-cat="musculation"] { color: #fbbf24; border-color: rgba(251,191,36,0.35); }
+.bilan-goal-sport-badge[data-sport-cat="autre"] { color: #a78bfa; border-color: rgba(167,139,250,0.35); }
+.bilan-goal-sport-badge.bilan-goal-sport-tous { color: var(--text-dim); }
+.bilan-goal-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.bilan-goal-meta-inline {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bilan-goal-meta-inline strong { color: var(--text); font-weight: 700; }
+.bilan-goal-pct { color: var(--text-mute); font-size: 11px; }
+.bilan-goal-row-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 6px;
+}
+.bilan-goal-edit, .bilan-goal-del {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-mute);
+  border-radius: 5px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.14s;
+  font-family: inherit;
+}
+.bilan-goal-edit:hover { color: var(--accent); border-color: rgba(74,222,128,0.3); }
+.bilan-goal-del:hover { color: var(--danger); border-color: rgba(248,113,113,0.3); }
+
+.bilan-goal-bar {
+  position: relative;
+  height: 8px;
+  background: var(--bg-elev);
+  border-radius: 6px;
+  overflow: visible;
+}
+.bilan-goal-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 6px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.bilan-goal-fill.on-track {
+  background: linear-gradient(90deg, var(--accent), #16a34a);
+}
+.bilan-goal-fill.behind {
+  background: linear-gradient(90deg, var(--warn), #d97706);
+}
+.bilan-goal-mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 1px;
+  cursor: help;
+}
+
+.bilan-goal-empty-state {
+  text-align: center;
+  padding: 24px 12px;
+  color: var(--text-mute);
+  font-size: 13px;
+  font-style: italic;
+  background: var(--bg-elev2);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+/* Zone "Ajouter un objectif" */
+.bilan-goals-add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.bilan-goals-add-label {
+  font-size: 11px;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.bilan-goals-add-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bilan-goal-add-btn {
+  background: rgba(74, 222, 128, 0.08);
+  color: var(--accent);
+  border: 1px dashed rgba(74, 222, 128, 0.35);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s;
+  font-family: inherit;
+}
+.bilan-goal-add-btn:hover {
+  background: rgba(74, 222, 128, 0.18);
+  border-color: var(--accent);
+}
+
+/* Grille de templates dans la modal "Ajouter un objectif" */
+.bilan-tpl-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+@media (max-width: 540px) { .bilan-tpl-grid { grid-template-columns: 1fr; } }
+.bilan-tpl-pick {
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--text);
+  font-family: inherit;
+  transition: all 0.14s;
+}
+.bilan-tpl-pick:hover {
+  border-color: var(--accent);
+  background: rgba(74, 222, 128, 0.05);
+  transform: translateY(-1px);
+}
+.bilan-tpl-pick strong { font-size: 13px; }
+.bilan-tpl-unit { font-size: 11px; color: var(--text-mute); }
+
+/* Modal édition objectif (target + currentManual) */
+.bilan-edit-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+.bilan-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+.bilan-edit-field span {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+.bilan-edit-field input {
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.bilan-edit-field input:focus { outline: none; border-color: var(--accent); }
+.bilan-edit-help {
+  font-size: 11px;
+  color: var(--text-mute);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* === Records (volume + sport) === */
+.bilan-records {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bilan-record {
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.bilan-record-label {
+  font-size: 10px;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.bilan-record-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.bilan-record-sub {
+  font-size: 12px;
+  color: var(--text);
+  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bilan-record-date {
+  font-size: 11px;
+  color: var(--text-mute);
+  margin-top: 2px;
+}
+.bilan-empty {
+  text-align: center;
+  color: var(--text-mute);
+  padding: 30px 10px;
+  font-size: 13px;
+  font-style: italic;
+}

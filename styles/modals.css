@@ -1,0 +1,765 @@
+/* ============================================================
+   modals.css
+   Modales : détail séance, confirmation custom, ajout (compétition/entraînement)
+   Extrait de dashboard.html (L962-1599, L2738-2857)
+   ============================================================ */
+
+  /* === MODAL DÉTAIL SÉANCE === */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 1000;
+    padding: 40px 20px;
+    overflow-y: auto;
+  }
+  .modal-overlay.active { display: flex; }
+  /* === Modal de confirmation custom (utilisée par appConfirm, appAlert, appPrompt) === */
+  .confirm-modal-overlay {
+    align-items: center;
+    padding: 20px;
+    z-index: 9500; /* au-dessus de TOUTES les autres modals (incluant day-modal à 8500 et popover à 9000) */
+  }
+  .confirm-modal {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+    width: 100%;
+    max-width: 440px;
+    padding: 24px 26px 20px;
+    animation: confirmModalIn 0.16s ease-out;
+  }
+  @keyframes confirmModalIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .confirm-modal-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .confirm-modal-message {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin-bottom: 22px;
+    white-space: pre-wrap;
+  }
+  .confirm-modal-message strong { color: var(--text); font-weight: 600; }
+  .confirm-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .confirm-modal-actions .btn-secondary,
+  .confirm-modal-actions .btn-primary {
+    padding: 9px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .confirm-modal-actions .btn-secondary {
+    background: transparent;
+    color: var(--text-dim);
+  }
+  .confirm-modal-actions .btn-secondary:hover {
+    background: var(--bg-elev2);
+    color: var(--text);
+  }
+  .confirm-modal-actions .btn-primary {
+    background: var(--accent);
+    color: #0b1410;
+    border-color: var(--accent);
+  }
+  .confirm-modal-actions .btn-primary:hover {
+    filter: brightness(1.08);
+  }
+  /* Variante danger (suppression) */
+  .confirm-modal.is-danger .confirm-modal-actions .btn-primary {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #fff;
+  }
+  /* Input dans le prompt modal */
+  .prompt-modal-input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    margin-bottom: 18px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .prompt-modal-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
+  }
+  .modal {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    max-width: 900px;
+    width: 100%;
+    padding: 24px 28px;
+    margin: auto 0;
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    gap: 16px;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-title { flex: 1; }
+  .modal-title h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .modal-meta { font-size: 13px; color: var(--text-dim); }
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-mute);
+    cursor: pointer;
+    font-size: 26px;
+    line-height: 1;
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+  .modal-close:hover { color: var(--danger); background: var(--bg-elev2); }
+  .modal-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .modal-action-btn {
+    background: none;
+    border: none;
+    color: var(--text-mute);
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: inherit;
+    transition: color 0.12s, background 0.12s;
+  }
+  .modal-action-btn:hover { color: var(--accent); background: var(--bg-elev2); }
+  .modal-action-btn[hidden] { display: none !important; }
+  .modal-action-btn .dots {
+    display: inline-block;
+    transform: translateY(-3px);
+    font-weight: 700;
+  }
+  .modal-action-btn.modal-action-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+  }
+  .modal-action-btn.modal-action-danger[hidden] { display: none !important; }
+  .modal-action-btn.modal-action-danger:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+  .modal-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  /* État "jour de repos" : modal épurée */
+  .modal-rest-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 20px 18px;
+    text-align: center;
+  }
+  .modal-rest-icon {
+    color: var(--accent);
+    margin-bottom: 14px;
+    opacity: 0.9;
+  }
+  .modal-rest-text {
+    color: var(--text);
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .modal-rest-hint {
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+  .modal-rest-hint strong {
+    color: var(--text);
+    font-weight: 700;
+  }
+  .modal-metric {
+    background: var(--bg-elev2);
+    padding: 12px 14px;
+    border-radius: 8px;
+  }
+  .modal-metric .m-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .modal-metric .m-value {
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 4px;
+    line-height: 1.1;
+  }
+  .modal-metric .m-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+  .modal-section { margin-bottom: 18px; }
+  .modal-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+  .modal-info-box {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+  }
+  .modal-info-box strong { color: var(--accent); }
+  /* Métriques "importantes" : Sport, Allure → mises en valeur */
+  .modal-metric.accent {
+    background: linear-gradient(135deg, rgba(74,222,128,0.10), rgba(34,197,94,0.06));
+    border: 1px solid rgba(74,222,128,0.3);
+  }
+  .modal-metric.accent .m-value { color: var(--accent); }
+  /* Carte trace GPX */
+  .gpx-map-wrap {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    overflow: hidden;
+  }
+  .gpx-svg {
+    display: block;
+    width: 100%;
+    height: 350px;
+    border-radius: 6px;
+  }
+  .gpx-leaflet {
+    width: 100%;
+    height: 400px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #1c2230;
+  }
+  .gpx-leaflet .leaflet-control-attribution {
+    background: rgba(20,24,33,0.85) !important;
+    color: var(--text-mute) !important;
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+  }
+  .gpx-leaflet .leaflet-control-attribution a { color: var(--text-dim) !important; }
+  .gpx-leaflet .leaflet-bar {
+    background: var(--bg-elev) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .gpx-leaflet .leaflet-bar a {
+    background: var(--bg-elev) !important;
+    color: var(--text) !important;
+    border-bottom-color: var(--border) !important;
+  }
+  .gpx-leaflet .leaflet-bar a:hover {
+    background: var(--bg-elev2) !important;
+    color: var(--accent) !important;
+  }
+  /* Flèches directionnelles sur la trace GPX (vraie flèche tige + tête) */
+  .gpx-arrow {
+    pointer-events: none;
+  }
+  .gpx-arrow-wrap {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.9));
+  }
+  .gpx-arrow-wrap svg {
+    display: block;
+  }
+  /* Marker mobile "bike" qui suit le curseur du profil d'altitude */
+  .gpx-bike-marker { transition: opacity 0.15s; }
+  .gpx-bike-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ef4444;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.85), 0 0 12px rgba(239, 68, 68, 0.8);
+    animation: gpx-pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes gpx-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(0,0,0,0.85), 0 0 12px rgba(239, 68, 68, 0.8); }
+    50% { box-shadow: 0 0 0 2px rgba(0,0,0,0.85), 0 0 22px rgba(239, 68, 68, 1); }
+  }
+
+  /* Markers GPX custom (départ / arrivée) style Tour de France */
+  .gpx-marker { position: relative; }
+  .gpx-marker-dot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.85), 0 3px 10px rgba(0,0,0,0.5);
+  }
+  .gpx-marker-label {
+    position: absolute;
+    left: 24px;
+    top: -3px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    background: rgba(0,0,0,0.85);
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .gpx-elev-wrap {
+    position: relative;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    overflow: hidden;
+    height: 200px;
+  }
+  /* Stats du profil (Distance, D+, D-, pentes...) au-dessus du chart */
+  .gpx-stats-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .gpx-stat {
+    flex: 1;
+    min-width: 90px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    text-align: center;
+  }
+  .gpx-stat .g-l {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .gpx-stat .g-v {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  /* Bouton "Ajouter segment" affiché quand un range est sélectionné */
+  .add-segment-btn {
+    flex: 1;
+    min-width: 140px;
+    background: rgba(74, 222, 128, 0.14);
+    border: 1px dashed rgba(74, 222, 128, 0.6);
+    color: var(--accent);
+    border-radius: 8px;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .add-segment-btn:hover {
+    background: rgba(74, 222, 128, 0.22);
+    border-color: var(--accent);
+    border-style: solid;
+  }
+  /* Croix de suppression d'un segment */
+  .seg-del-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-mute);
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: inherit;
+    transition: color 0.12s, background 0.12s;
+  }
+  .seg-del-btn:hover {
+    color: var(--danger);
+    background: rgba(248, 113, 113, 0.12);
+  }
+  .gpx-elev-wrap canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  .gpx-elev-line {
+    position: absolute;
+    width: 1px;
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.5) 50%, transparent 50%);
+    background-size: 1px 6px;
+    pointer-events: none;
+    z-index: 10;
+    display: none;
+  }
+  .gpx-elev-dot {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #4ade80;
+    border: 2px solid #062017;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.3);
+    pointer-events: none;
+    z-index: 11;
+    display: none;
+  }
+  /* Liste des montées significatives détectées dans le GPX */
+  .climbs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .climb-item {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    overflow: hidden;
+  }
+  .climb-item:hover { border-color: var(--accent); }
+  .climb-item.expanded { border-color: var(--accent); }
+  .climb-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+  }
+  .climb-row:hover { background: rgba(74, 222, 128, 0.06); }
+  .climb-chevron {
+    color: var(--text-mute);
+    font-size: 10px;
+    transition: transform 0.18s;
+    margin-left: 6px;
+  }
+  /* Bloc détail expandable d'une bosse */
+  .climb-detail {
+    border-top: 1px solid var(--border);
+    padding: 12px 14px 14px;
+    background: rgba(0,0,0,0.2);
+  }
+  .climb-detail-inner { display: flex; flex-direction: column; gap: 10px; }
+  .climb-svg {
+    width: 100%;
+    height: 220px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.3);
+  }
+  .climb-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .climb-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .climb-legend .dot,
+  .climb-steep-item .dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+  }
+  .climb-steep-list { margin-top: 4px; }
+  .climb-steep-title {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .climb-steep-item {
+    display: grid;
+    grid-template-columns: 16px 1fr 60px 70px;
+    gap: 10px;
+    align-items: center;
+    font-size: 12px;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .climb-steep-item:last-child { border-bottom: none; }
+  .climb-steep-item .ss-range { color: var(--text-dim); }
+  .climb-steep-item .ss-slope { font-weight: 700; color: var(--text); text-align: right; }
+  .climb-steep-item .ss-gain { color: var(--text-mute); text-align: right; }
+  .climb-cat {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    flex-shrink: 0;
+    color: #062017;
+  }
+  .climb-cat.cat-HC { background: #ef4444; color: white; }
+  .climb-cat.cat-1  { background: #f97316; }
+  .climb-cat.cat-2  { background: #fbbf24; }
+  .climb-cat.cat-3  { background: #84cc16; }
+  .climb-cat.cat-4  { background: #4ade80; }
+  .climb-info { flex: 1; min-width: 0; }
+  .climb-range {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .climb-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .gpx-elev-tooltip {
+    position: absolute;
+    background: rgba(20, 24, 33, 0.96);
+    border: 1px solid #4ade80;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text);
+    pointer-events: none;
+    z-index: 11;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.7);
+    line-height: 1.45;
+    min-width: 150px;
+  }
+  .gpx-elev-tooltip .t-km {
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .gpx-elev-tooltip .t-ele {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .gpx-elev-dplus-badge {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: rgba(74,222,128,0.18);
+    color: var(--accent);
+    border: 1px solid rgba(74,222,128,0.4);
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .modal-placeholder {
+    background: var(--bg-elev2);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 18px;
+    text-align: center;
+    color: var(--text-mute);
+    font-size: 12px;
+    line-height: 1.6;
+    font-style: italic;
+  }
+  .modal-activity-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 16px;
+    padding: 4px;
+    background: var(--bg-elev2);
+    border-radius: 6px;
+    width: fit-content;
+  }
+  .modal-activity-switch button {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .modal-activity-switch button.active {
+    background: rgba(74, 222, 128, 0.15);
+    color: var(--accent);
+  }
+  .day-card { cursor: pointer; }
+  .day-card.empty-past { cursor: default; }
+
+
+  /* === MODAL D'AJOUT (compé + entraînement) === */
+  .modal-overlay.add-modal {
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.92);
+    padding: 24px;
+  }
+  .add-modal-content {
+    max-width: 720px;
+    width: 100%;
+    margin: 0;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  /* On rétablit la sélection uniquement sur les champs où c'est utile (textes libres) */
+  .add-modal-content input[type="text"],
+  .add-modal-content input[type="number"],
+  .add-modal-content textarea {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  .add-form-grid {
+    display: grid;
+    /* minmax(0, 1fr) au lieu de 1fr → permet aux enfants de shrink sous leur taille de contenu
+       (1fr defaults to minmax(auto, 1fr) qui peut être poussé par un nom de fichier long) */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px 16px;
+    margin-bottom: 20px;
+  }
+  .form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0; /* permet la troncature dans les flex-children comme le file-picker */
+  }
+  .form-field.form-col-2 { grid-column: 1 / -1; }
+  .form-field > span {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+  }
+  .form-field input,
+  .form-field select,
+  .form-field textarea {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 14px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    height: 39px;
+    box-sizing: border-box;
+  }
+  .form-field textarea { height: auto; min-height: 70px; }
+  .form-field input:focus,
+  .form-field select:focus,
+  .form-field textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .form-field textarea { resize: vertical; min-height: 70px; }
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .btn-primary, .btn-secondary {
+    padding: 9px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    color: #062017;
+  }
+  .btn-primary:hover { background: #5fe898; }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .btn-secondary:hover { color: var(--text); border-color: var(--text-mute); }
+  /* Bouton poubelle : visible uniquement en mode édition */
+  .btn-trash[hidden] { display: none !important; }
+  .btn-trash:not([hidden]) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-mute);
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+    font-family: inherit;
+    padding: 0;
+  }
+  .btn-trash:hover {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: rgba(248, 113, 113, 0.10);
+  }
+  .btn-trash svg { display: block; }
+  @media (max-width: 700px) {
+    .add-form-grid { grid-template-columns: 1fr; }
+    .form-field.form-col-2 { grid-column: 1; }
+  }
+

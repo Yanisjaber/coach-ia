@@ -1,0 +1,72 @@
+/* ============================================================
+   cards.css
+   Hero KPI cards : .coach-card, .ring, .kpi-*
+   Extrait de dashboard.html (L175-240)
+   ============================================================ */
+
+  /* === HERO KPI === */
+  .hero {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .hero .card {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .hero .ring-container { justify-content: center; }
+  .hero .coach-header { justify-content: center; }
+  .hero .kpi-label { text-align: center; }
+  .hero .kpi-trend { text-align: center; }
+  .hero .ls-metric { align-items: center; }
+  #last-session-metrics { justify-content: center; }
+  .card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .kpi-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .kpi-value { font-size: 36px; font-weight: 700; line-height: 1; }
+  .kpi-unit { font-size: 14px; color: var(--text-dim); margin-left: 4px; }
+  .kpi-trend { font-size: 12px; margin-top: 6px; color: var(--text-dim); }
+  .kpi-trend.up { color: var(--accent); }
+  .kpi-trend.down { color: var(--danger); }
+
+  .coach-card {
+    background: var(--bg-elev);
+    border-color: var(--border);
+  }
+  .coach-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .coach-pill {
+    background: rgba(74, 222, 128, 0.15);
+    color: var(--accent);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .coach-recommendation { font-size: 14px; line-height: 1.5; color: var(--text); }
+  .coach-recommendation strong { color: var(--accent); }
+  .ls-metric { display: flex; flex-direction: column; }
+  .ls-val { font-size: 20px; font-weight: 700; line-height: 1.1; }
+  .ls-lbl { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+  .ls-empty { font-size: 13px; color: var(--text-dim); font-style: italic; }
+
+  .ring-container { display: flex; align-items: center; gap: 16px; }
+  .ring {
+    width: 80px; height: 80px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .ring svg { transform: rotate(-90deg); }
+  .ring-text {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 22px; font-weight: 700;
+  }
+

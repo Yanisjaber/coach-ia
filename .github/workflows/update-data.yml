@@ -55,7 +55,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f data.js data.json streams.js .whoop_tokens.json .strava_tokens.json index.html 2>/dev/null || true
+          git add -f data.js data.json streams.js power_profile_cache.json .whoop_tokens.json .strava_tokens.json index.html 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "Pas de changement, rien à committer."
           else

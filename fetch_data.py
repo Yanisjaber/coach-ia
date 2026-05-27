@@ -30,6 +30,9 @@ except ImportError:
 # Strava : source PRINCIPALE des activités depuis la migration
 import strava as strava_client
 
+# Power Profile : calcul MMP (Mean Maximal Power) + cache cumulé
+import power_profile as pp_module
+
 
 # ============ HELPERS COMPUTE (TSS, NP, CTL, ATL) ============
 def compute_tss(activity, ftp, lthr):
@@ -665,6 +668,9 @@ def main():
     )[:PREFETCH_STREAMS_COUNT]
     streams_cache = {}
     streams_max = {}
+    # Cache Power Profile (persistant entre runs) : { activity_id: {date, sport, pp} }
+    pp_cache = pp_module.load_cache()
+    pp_initial_size = len(pp_cache)
     for i, a in enumerate(recent_acts):
         aid = a.get("id")
         try:
@@ -675,6 +681,13 @@ def main():
                 for k, v in (strava_streams or {}).items()
             ] if isinstance(strava_streams, dict) else []
             streams_cache[str(aid)] = s
+            # === POWER PROFILE : calcul MMP pour cette activité ===
+            # On extrait le PP de chaque activité avec watts et on l'ajoute au cache
+            # cumulé power_profile_cache.json (commit dans le repo, persiste entre runs).
+            try:
+                pp_module.update_cache_with_activity(pp_cache, a, s)
+            except Exception as e:
+                print(f"  [!] Erreur PP pour {aid} : {e}", file=sys.stderr)
             maxes = {}
             dist_stream = None
             for stream in s or []:
@@ -738,6 +751,16 @@ def main():
             a["max_speed_smooth"] = m["max_speed_smooth"]
     print(f"  [OK] {patched} max_watts ajoutés depuis les streams")
 
+    # ====== POWER PROFILE : sauve le cache + construit les agrégats ======
+    try:
+        pp_module.save_cache(pp_cache)
+        pp_added = len(pp_cache) - pp_initial_size
+        print(f"  [OK] Power Profile : {pp_added} nouvelle(s) activité(s) en cache (total {len(pp_cache)})")
+        power_profile = pp_module.build_alltime_and_90d(pp_cache, today=today)
+    except Exception as e:
+        print(f"  [!] Erreur sauvegarde Power Profile : {e}", file=sys.stderr)
+        power_profile = None
+
     # Construction
     day_index = build_day_index(activities, wellness, ftp)
 
@@ -784,6 +807,7 @@ def main():
         },
         "days": rows,
         "plan": plan,
+        "power_profile": power_profile,  # {alltime: {dur: W}, last_90d: {dur: W}, durations: [...]}
     }
 
     # Écrit data.json (lisible) et data.js (chargeable depuis HTML en file://)

@@ -3,6 +3,12 @@
 
 # Logs locaux
 update.log
+serve.log
+
+# Fichiers locaux non versionnés
+dashboard.html.backup
+fr.coachia.localserver.plist
+outputs/
 
 # Python
 __pycache__/
