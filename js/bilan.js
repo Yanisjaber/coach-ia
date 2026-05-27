@@ -558,18 +558,30 @@ function openGoalEditor(id, presetSport, presetTpl) {
     const currentManualInp = document.getElementById('_goal-current');
     const currentManual = isManual && currentManualInp && currentManualInp.value !== ''
       ? parseFloat(currentManualInp.value) : undefined;
+    let savedGoal;
     if (goal) {
       goal.target = target;
       if (currentManual !== undefined) goal.currentManual = currentManual;
       else delete goal.currentManual;
+      savedGoal = goal;
     } else {
-      goals.push({
+      savedGoal = {
         id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
         sport, template: tpl.id, target,
         ...(currentManual !== undefined ? { currentManual } : {}),
-      });
+      };
+      goals.push(savedGoal);
     }
     saveGoalsForYear(year, goals);
+    // Mirror cloud (fire-and-forget)
+    if (window.cloudSync) {
+      window.cloudSync.pushGoal(year, savedGoal).then(sbId => {
+        if (sbId && !savedGoal._sbId) {
+          savedGoal._sbId = sbId;
+          saveGoalsForYear(year, goals); // re-save avec _sbId pour pouvoir update plus tard
+        }
+      });
+    }
     overlay.remove();
     renderBilan();
   });
@@ -581,6 +593,7 @@ function openGoalEditor(id, presetSport, presetTpl) {
     if (!ok) return;
     const remaining = goals.filter(g => g.id !== goal.id);
     saveGoalsForYear(year, remaining);
+    if (window.cloudSync) window.cloudSync.deleteGoal(goal);
     overlay.remove();
     renderBilan();
   });
@@ -592,8 +605,11 @@ async function confirmAndDelete(id) {
   }) : Promise.resolve(window.confirm('Supprimer cet objectif ?')));
   if (!ok) return;
   const year = new Date().getFullYear();
-  const remaining = loadGoalsForYear(year).filter(g => g.id !== id);
+  const all = loadGoalsForYear(year);
+  const goalToDelete = all.find(g => g.id === id);
+  const remaining = all.filter(g => g.id !== id);
   saveGoalsForYear(year, remaining);
+  if (window.cloudSync && goalToDelete) window.cloudSync.deleteGoal(goalToDelete);
   renderBilan();
 }
 

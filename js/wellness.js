@@ -46,6 +46,8 @@ export function saveWellnessDay(isoDate, data) {
   } catch (e) {
     console.warn('[wellness] Erreur sauvegarde :', e.message);
   }
+  // Mirror cloud (fire-and-forget si connecté)
+  if (window.cloudSync) window.cloudSync.pushWellness(isoDate, merged);
   // Broadcast pour que les vues qui en dépendent puissent re-render
   window.dispatchEvent(new CustomEvent('wellnessChange', { detail: { date: isoDate, data: merged } }));
   return merged;
@@ -61,6 +63,7 @@ export function deleteWellnessDay(isoDate) {
   try {
     localStorage.setItem(WELLNESS_KEY, JSON.stringify(all));
   } catch (e) { /* ignore */ }
+  if (window.cloudSync) window.cloudSync.deleteWellness(isoDate);
   window.dispatchEvent(new CustomEvent('wellnessChange', { detail: { date: isoDate, data: null } }));
 }
 

@@ -30,6 +30,8 @@ export function saveNote(iso, text) {
   if (text && text.trim()) all[iso] = text.trim();
   else delete all[iso];
   localStorage.setItem(NOTES_KEY, JSON.stringify(all));
+  // Mirror cloud
+  if (window.cloudSync) window.cloudSync.pushNote(iso, text);
   triggerCalendarRefresh();
 }
 export function getNote(iso) { return loadNotes()[iso] || ''; }
@@ -45,11 +47,24 @@ export function savePhases(arr) {
 export function addPhase(phase) {
   // phase : {from, to, phase: 'base'|'build'|'peak'|'taper'|'recup', name?}
   const arr = loadPhases();
-  arr.push({ ...phase, id: Date.now().toString() });
+  const newPhase = { ...phase, id: Date.now().toString() };
+  arr.push(newPhase);
   savePhases(arr);
+  // Mirror cloud, et stocker le _sbId retourné
+  if (window.cloudSync) {
+    window.cloudSync.pushPhase(newPhase).then(sbId => {
+      if (sbId) {
+        newPhase._sbId = sbId;
+        savePhases(loadPhases().map(p => p.id === newPhase.id ? newPhase : p));
+      }
+    });
+  }
 }
 export function removePhase(id) {
-  savePhases(loadPhases().filter(p => p.id !== id));
+  const all = loadPhases();
+  const toDelete = all.find(p => p.id === id);
+  savePhases(all.filter(p => p.id !== id));
+  if (window.cloudSync && toDelete) window.cloudSync.deletePhase(toDelete);
 }
 export function getPhaseForDate(iso) {
   return loadPhases().find(p => iso >= p.from && iso <= p.to) || null;
@@ -501,8 +516,11 @@ function openPhaseModal(iso, mode) {
       // IMPORTANT : on retire la modal AVANT de trigger le re-render du calendrier
       overlay.remove();
       if (existing) {
-        const arr = loadPhases().map(p => p.id === existing.id ? { ...p, phase: selectedPhase, from, to, name: name || undefined } : p);
+        const updated = { ...existing, phase: selectedPhase, from, to, name: name || undefined };
+        const arr = loadPhases().map(p => p.id === existing.id ? updated : p);
         savePhases(arr);
+        // Mirror cloud
+        if (window.cloudSync) window.cloudSync.pushPhase(updated);
       } else {
         addPhase({ phase: selectedPhase, from, to, name: name || undefined });
       }

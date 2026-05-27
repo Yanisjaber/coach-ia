@@ -25,3 +25,4 @@ Thumbs.db
 # et GitHub Pages doit pouvoir les servir.
 # Les tokens Whoop sont publics — révocables via le portail dev Whoop si compromis.
 # Les clés API intervals.icu et Whoop client_secret restent dans les Secrets Actions.
+supabase/.temp/
