@@ -25,13 +25,41 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const STRAVA_CLIENT_ID = Deno.env.get("STRAVA_CLIENT_ID")!;
 const STRAVA_CLIENT_SECRET = Deno.env.get("STRAVA_CLIENT_SECRET")!;
-const APP_REDIRECT_URL = Deno.env.get("APP_REDIRECT_URL") || "https://yanisjaber.github.io/coach-ia/";
+// URLs autorisées vers lesquelles on peut rediriger après l'OAuth.
+// Whitelist pour éviter l'open redirect attack.
+const ALLOWED_RETURN_URLS = [
+  "http://localhost:8000/dashboard.html",
+  "http://localhost:8000/index.html",
+  "http://localhost:8000/",
+  "https://yanisjaber.github.io/coach-ia/",
+  "https://yanisjaber.github.io/coach-ia/dashboard.html",
+  "https://coachia.fr/",
+  "https://coachia.fr/dashboard.html",
+];
+const FALLBACK_REDIRECT = Deno.env.get("APP_REDIRECT_URL") || "https://yanisjaber.github.io/coach-ia/";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+function decodeState(stateRaw: string): { jwt: string; returnUrl: string } | null {
+  // 1) Nouveau format : base64(JSON {jwt, returnUrl})
+  try {
+    const decoded = JSON.parse(atob(stateRaw));
+    if (decoded && decoded.jwt) return { jwt: decoded.jwt, returnUrl: decoded.returnUrl || FALLBACK_REDIRECT };
+  } catch (_) { /* fallback */ }
+  // 2) Ancien format : state = JWT brut (compat)
+  return { jwt: stateRaw, returnUrl: FALLBACK_REDIRECT };
+}
+
+function pickSafeReturnUrl(requested: string): string {
+  if (ALLOWED_RETURN_URLS.includes(requested)) return requested;
+  // Sinon fallback
+  return FALLBACK_REDIRECT;
+}
+
 Deno.serve(async (req) => {
+  let returnUrl = FALLBACK_REDIRECT;
   try {
     const url = new URL(req.url);
     const code = url.searchParams.get("code");
@@ -39,17 +67,23 @@ Deno.serve(async (req) => {
     const error = url.searchParams.get("error");
 
     if (error) {
-      return redirectToApp({ strava_error: error });
+      return redirectToApp(returnUrl, { strava_error: error });
     }
     if (!code || !state) {
-      return redirectToApp({ strava_error: "missing_code_or_state" });
+      return redirectToApp(returnUrl, { strava_error: "missing_code_or_state" });
     }
 
-    // ===== 1) Vérifier le JWT state pour identifier l'utilisateur Supabase =====
+    // Décoder le state pour récupérer JWT + returnUrl
+    const decoded = decodeState(state);
+    if (!decoded) return redirectToApp(returnUrl, { strava_error: "invalid_state" });
+    returnUrl = pickSafeReturnUrl(decoded.returnUrl);
+    const jwt = decoded.jwt;
+
+    // ===== 1) Vérifier le JWT pour identifier l'utilisateur Supabase =====
     const sbAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const { data: { user }, error: userErr } = await sbAuth.auth.getUser(state);
+    const { data: { user }, error: userErr } = await sbAuth.auth.getUser(jwt);
     if (userErr || !user) {
-      return redirectToApp({ strava_error: "invalid_state_jwt" });
+      return redirectToApp(returnUrl, { strava_error: "invalid_state_jwt" });
     }
 
     // ===== 2) Échanger le code Strava contre les tokens =====
@@ -67,12 +101,12 @@ Deno.serve(async (req) => {
     if (!tokenRes.ok) {
       const txt = await tokenRes.text();
       console.error("Strava token exchange failed:", tokenRes.status, txt);
-      return redirectToApp({ strava_error: `token_exchange_${tokenRes.status}` });
+      return redirectToApp(returnUrl, { strava_error: `token_exchange_${tokenRes.status}` });
     }
 
     const tokens: any = await tokenRes.json();
     if (!tokens.access_token) {
-      return redirectToApp({ strava_error: "no_access_token" });
+      return redirectToApp(returnUrl, { strava_error: "no_access_token" });
     }
 
     // ===== 3) Stocker dans strava_connections (utilise service_role pour bypass RLS) =====
@@ -96,7 +130,7 @@ Deno.serve(async (req) => {
 
     if (insertErr) {
       console.error("Insert strava_connections failed:", insertErr);
-      return redirectToApp({ strava_error: "db_insert_failed" });
+      return redirectToApp(returnUrl, { strava_error: "db_insert_failed" });
     }
 
     // ===== 4) Mettre à jour aussi user_profiles avec FTP / weight / strava_athlete_id =====
@@ -111,15 +145,15 @@ Deno.serve(async (req) => {
       }, { onConflict: "user_id" });
 
     // ===== 5) Redirection vers l'app avec flag de succès =====
-    return redirectToApp({ strava_connected: "1" });
+    return redirectToApp(returnUrl, { strava_connected: "1" });
   } catch (e) {
     console.error("Unhandled error:", e);
-    return redirectToApp({ strava_error: "unexpected" });
+    return redirectToApp(returnUrl, { strava_error: "unexpected" });
   }
 });
 
-function redirectToApp(params: Record<string, string>): Response {
-  const url = new URL(APP_REDIRECT_URL);
+function redirectToApp(baseUrl: string, params: Record<string, string>): Response {
+  const url = new URL(baseUrl);
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }

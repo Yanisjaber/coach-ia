@@ -35,14 +35,17 @@ export async function startStravaOAuth() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { alert('Tu dois être connecté à ton compte Coach IA.'); return; }
 
-  const stateJwt = session.access_token;
+  // Le state contient le JWT + l'URL de retour (encodés en base64 JSON)
+  // L'Edge Function va décoder ça pour rediriger vers la BONNE app (localhost / GitHub Pages / domaine custom)
+  const returnUrl = window.location.origin + window.location.pathname;
+  const stateData = btoa(JSON.stringify({ jwt: session.access_token, returnUrl }));
   const params = new URLSearchParams({
     client_id: cfg.client_id,
     response_type: 'code',
     redirect_uri: cfg.redirect_uri,
     approval_prompt: 'auto',
     scope: SCOPES,
-    state: stateJwt,
+    state: stateData,
   });
   window.location.href = `${STRAVA_AUTH_URL}?${params.toString()}`;
 }
