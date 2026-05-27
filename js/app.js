@@ -19,11 +19,14 @@
 // Sortis dans js/utils.js — importés ici pour rester disponibles dans tout le module.
 import { rand, randInt, clamp, fmtDate } from './utils.js';
 
-// ========= SUPABASE (client + auth + storage adapter) =========
+// ========= SUPABASE (client + auth + storage adapter + cloud sync + data loader + Strava OAuth) =========
 // Doit être chargé EN PREMIER pour que les autres modules aient accès à window.sb.
 import './supabase-client.js';
 import './auth.js';
 import './storage-adapter.js';
+import './cloud-sync.js';
+import './supabase-data-loader.js';
+import './strava-oauth.js';
 
 // ========= MODE IA / MANUEL =========
 // Sorti dans js/app-mode.js. Auto-bootstrap au DOMContentLoaded à l'import.
@@ -59,7 +62,7 @@ import { loadData } from './data-loader.js';
 
 // ========= MAIN (IIFE async) =========
 (async () => {
-const _allData = await loadData();
+let _allData = await loadData();
 let data = _allData;
 let todayData = _allData[_allData.length - 1];
 // today = vraie date du jour (système), à minuit local. Réassignable pour refresh à minuit.
@@ -98,6 +101,23 @@ scheduleMidnightRefresh();
 // L'event 'appModeChange' est dispatché par js/app-mode.js à chaque applyAppMode().
 window.addEventListener('appModeChange', () => {
   if (typeof renderCalendar === 'function') renderCalendar();
+});
+
+// Re-render complet quand le data loader Supabase remplace window.DASHBOARD_DATA
+// (après login + chargement depuis BDD)
+window.addEventListener('dashboardDataReplaced', () => {
+  try {
+    // Re-charger toute la pipeline avec les nouvelles données
+    _allData = window.DASHBOARD_DATA.days.map(d => ({ ...d, date: new Date(d.date + 'T12:00:00') }));
+    data = _allData;
+    todayData = _allData[_allData.length - 1];
+    if (typeof renderHeroKpi === 'function') renderHeroKpi();
+    if (typeof rerenderFilteredCharts === 'function') rerenderFilteredCharts();
+    if (typeof renderCalendar === 'function') renderCalendar();
+    console.log('[main] Vues re-rendues avec données Supabase');
+  } catch (e) {
+    console.error('[main] Erreur re-render après load Supabase:', e);
+  }
 });
 
 // Sécurité : si la machine sort de veille / change de timezone, re-vérifier au focus
@@ -976,7 +996,34 @@ function loadCompetitionsExpanded() {
 }
 
 function saveCompetitions(comps) {
+  // Diff avec l'ancien array pour détecter les suppressions
+  let previous = [];
+  try { previous = JSON.parse(localStorage.getItem(COMP_KEY) || '[]'); } catch {}
+  const currentIds = new Set(comps.map(c => c.id));
+  const deleted = previous.filter(p => !currentIds.has(p.id));
+
   localStorage.setItem(COMP_KEY, JSON.stringify(comps));
+
+  // Mirror cloud
+  if (window.cloudSync) {
+    // Push (upsert) chaque compé courante
+    for (const c of comps) {
+      window.cloudSync.pushCompetition(c).then(sbId => {
+        if (sbId && !c._sbId) {
+          c._sbId = sbId;
+          // Re-save silencieux pour persister le _sbId
+          try {
+            const cur = JSON.parse(localStorage.getItem(COMP_KEY) || '[]');
+            const idx = cur.findIndex(x => x.id === c.id);
+            if (idx >= 0) { cur[idx]._sbId = sbId; localStorage.setItem(COMP_KEY, JSON.stringify(cur)); }
+          } catch {}
+        }
+      });
+    }
+    // Delete les supprimées
+    for (const d of deleted) window.cloudSync.deleteCompetition(d);
+  }
+
   // Re-render automatique : "Compétitions à venir" + calendrier
   if (typeof renderCompList === 'function') renderCompList();
   if (typeof renderCalendar === 'function') renderCalendar();
@@ -1011,6 +1058,8 @@ function savePlanSnapshot(iso, proposal, allowOverwrite) {
   try {
     localStorage.setItem(PLAN_SNAPSHOT_KEY, JSON.stringify(all));
   } catch (e) { console.warn('[plan snapshot] localStorage plein ?', e); }
+  // Mirror cloud
+  if (window.cloudSync) window.cloudSync.pushPlanSnapshot(iso, all[iso]);
 }
 
 function renderCompList() {
@@ -2136,7 +2185,26 @@ function loadTrainings() {
   } catch (e) { return []; }
 }
 function saveTrainings(arr) {
+  let prev = [];
+  try { prev = JSON.parse(localStorage.getItem(TRAIN_KEY) || '[]'); } catch {}
+  const ids = new Set(arr.map(t => t.id));
+  const deleted = prev.filter(p => !ids.has(p.id));
   localStorage.setItem(TRAIN_KEY, JSON.stringify(arr));
+  if (window.cloudSync) {
+    for (const t of arr) {
+      window.cloudSync.pushTraining(t, 'prevu').then(sbId => {
+        if (sbId && !t._sbId) {
+          t._sbId = sbId;
+          try {
+            const cur = JSON.parse(localStorage.getItem(TRAIN_KEY) || '[]');
+            const idx = cur.findIndex(x => x.id === t.id);
+            if (idx >= 0) { cur[idx]._sbId = sbId; localStorage.setItem(TRAIN_KEY, JSON.stringify(cur)); }
+          } catch {}
+        }
+      });
+    }
+    for (const d of deleted) window.cloudSync.deleteTraining(d);
+  }
 }
 
 // État local : mode d'ouverture de la modal entraînement ('prevu' ou 'realise')
@@ -2150,7 +2218,26 @@ function loadRealisedTrainings() {
   } catch (e) { return []; }
 }
 function saveRealisedTrainings(arr) {
+  let prev = [];
+  try { prev = JSON.parse(localStorage.getItem(TRAIN_REALISE_KEY) || '[]'); } catch {}
+  const ids = new Set(arr.map(t => t.id));
+  const deleted = prev.filter(p => !ids.has(p.id));
   localStorage.setItem(TRAIN_REALISE_KEY, JSON.stringify(arr));
+  if (window.cloudSync) {
+    for (const t of arr) {
+      window.cloudSync.pushTraining(t, 'realise').then(sbId => {
+        if (sbId && !t._sbId) {
+          t._sbId = sbId;
+          try {
+            const cur = JSON.parse(localStorage.getItem(TRAIN_REALISE_KEY) || '[]');
+            const idx = cur.findIndex(x => x.id === t.id);
+            if (idx >= 0) { cur[idx]._sbId = sbId; localStorage.setItem(TRAIN_REALISE_KEY, JSON.stringify(cur)); }
+          } catch {}
+        }
+      });
+    }
+    for (const d of deleted) window.cloudSync.deleteTraining(d);
+  }
 }
 
 function openTrainModal(mode) {
@@ -7073,6 +7160,7 @@ function addStravaIgnored(id) {
   const arr = loadStravaIgnored();
   if (!arr.includes(String(id))) arr.push(String(id));
   localStorage.setItem(STRAVA_IGNORE_KEY, JSON.stringify(arr));
+  if (window.cloudSync) window.cloudSync.pushStravaIgnored(id, true);
 }
 
 // ========= TEMPLATE IA OVERRIDES (marquer un jour en repos / personnalisation) =========
@@ -7086,10 +7174,12 @@ function addTemplateRestDay(iso) {
   const arr = loadTemplateRestDays();
   if (!arr.includes(iso)) arr.push(iso);
   localStorage.setItem(TEMPLATE_REST_KEY, JSON.stringify(arr));
+  if (window.cloudSync) window.cloudSync.pushRestDay(iso, true);
 }
 function removeTemplateRestDay(iso) {
   const arr = loadTemplateRestDays().filter(d => d !== iso);
   localStorage.setItem(TEMPLATE_REST_KEY, JSON.stringify(arr));
+  if (window.cloudSync) window.cloudSync.pushRestDay(iso, false);
 }
 function toggleTemplateRestDay(iso) {
   if (isTemplateRestDay(iso)) removeTemplateRestDay(iso);
