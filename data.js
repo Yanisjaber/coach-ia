@@ -1,5 +1,5 @@
 window.DASHBOARD_DATA = {
-  "generated_at": "2026-05-27T20:06:55.549868",
+  "generated_at": "2026-05-27T20:14:11.727660",
   "athlete": {
     "id": "25665243",
     "name": "Yanis Jaber",
@@ -140693,6 +140693,6 @@ window.DASHBOARD_DATA = {
       "7200"
     ],
     "cache_size": 18,
-    "last_updated": "2026-05-27T20:06:55.192265"
+    "last_updated": "2026-05-27T20:14:11.427039"
   }
 };
