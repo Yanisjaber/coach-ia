@@ -39,9 +39,32 @@
 <link rel="stylesheet" href="styles/day-extras.css">
 <link rel="stylesheet" href="styles/bilan.css">
 <link rel="stylesheet" href="styles/auth.css">
+<link rel="stylesheet" href="styles/profile-modal.css">
 
+<!-- Loading overlay PRÉ-AFFICHÉ : visible dès le DOM rendu pour cacher le flash de
+     data.js statique avant que Supabase ait fini de charger les vraies données.
+     Géré par js/auth.js + supabase-data-loader.js qui le retirent au bon moment. -->
+<style>
+  html.sb-booting body > div.container { visibility: hidden; }
+  #boot-overlay {
+    position: fixed; inset: 0; background: #0b0e14;
+    z-index: 99500; display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.3s ease-out;
+  }
+  #boot-overlay.hidden { opacity: 0; pointer-events: none; }
+  #boot-overlay .spinner {
+    width: 44px; height: 44px;
+    border: 3px solid #1c2230;
+    border-top-color: #4ade80;
+    border-radius: 50%;
+    animation: boot-spin 0.7s linear infinite;
+  }
+  @keyframes boot-spin { to { transform: rotate(360deg); } }
+</style>
+<script>document.documentElement.classList.add('sb-booting');</script>
 </head>
 <body>
+<div id="boot-overlay"><div class="spinner"></div></div>
 <div class="container">
 
 <header>
@@ -49,7 +72,6 @@
     <div class="logo-icon">CI</div>
     <div class="logo-text">
       <h1>Coach IA</h1>
-      <p>Entraînement intelligent · Strava × Whoop</p>
     </div>
   </div>
   <div class="sport-filter" id="sport-filter">
@@ -80,7 +102,8 @@
         IA
       </span>
     </div>
-    <span class="date" id="today-date">—</span>
+    <!-- Date supprimée (info redondante avec le calendrier) -->
+    <span class="date" id="today-date" style="display:none;">—</span>
   </div>
 </header>
 

@@ -13,12 +13,14 @@ export async function loadData() {
     if (!json) throw new Error('window.DASHBOARD_DATA absent (data.js non chargé)');
     if (!json.days || !json.days.length) throw new Error('data.js vide');
 
-    // Mise à jour de l'en-tête avec l'athlète réel
+    // Mise à jour de l'en-tête avec l'athlète réel (le <p> a peut-être été supprimé du DOM)
     if (json.athlete) {
       const a = json.athlete;
       const sub = document.querySelector('.logo-text p');
-      const ftpStr = a.ftp ? ` · FTP ${a.ftp}W` : '';
-      sub.textContent = `${a.name}${ftpStr}`;
+      if (sub) {
+        const ftpStr = a.ftp ? ` · FTP ${a.ftp}W` : '';
+        sub.textContent = `${a.name}${ftpStr}`;
+      }
     }
     // Badge : nombre de jours réels Whoop disponibles
     const badge = document.querySelector('header .badge');

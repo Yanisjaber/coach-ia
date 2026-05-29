@@ -23,6 +23,7 @@ import { rand, randInt, clamp, fmtDate } from './utils.js';
 // Doit être chargé EN PREMIER pour que les autres modules aient accès à window.sb.
 import './supabase-client.js';
 import './auth.js';
+import './profile-modal.js';
 import './storage-adapter.js';
 import './cloud-sync.js';
 import './supabase-data-loader.js';
@@ -136,7 +137,10 @@ document.addEventListener('visibilitychange', () => {
 // Sorti dans js/data-generation.js. Importer { generateData } depuis là si besoin.
 
 // ========= HERO KPI =========
-document.getElementById('today-date').textContent = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+{
+  const _dateEl = document.getElementById('today-date');
+  if (_dateEl) _dateEl.textContent = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
 
 function renderHeroKpi() {
 const hasRecovery = todayData.recovery != null;

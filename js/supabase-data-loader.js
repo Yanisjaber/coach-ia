@@ -19,10 +19,69 @@ let _loadInProgress = false;
 window.addEventListener('coach-ia-auth', async (e) => {
   _currentUser = e.detail.user || null;
   if (_currentUser) {
-    // Laisse le temps au cloud-sync de finir le pull localStorage avant
-    setTimeout(() => loadFromSupabase().catch(err => console.error('[sb-data]', err)), 600);
+    // Le boot overlay (mis en place dans dashboard.html) est encore actif :
+    // il masque visuellement le flash de data.js pendant qu'on charge la BDD.
+    // On charge, puis on le retire.
+    try {
+      await loadFromSupabase();
+    } catch (err) {
+      console.error('[sb-data]', err);
+    } finally {
+      if (window.hideBootOverlay) window.hideBootOverlay();
+    }
   }
 });
+
+// ============ OVERLAY DE CHARGEMENT ============
+function showLoadingOverlay() {
+  let el = document.getElementById('sb-loading-overlay');
+  if (el) { el.classList.add('active'); return; }
+  el = document.createElement('div');
+  el.id = 'sb-loading-overlay';
+  el.className = 'sb-loading-overlay active';
+  el.innerHTML = `
+    <div class="sb-loading-inner">
+      <div class="sb-loading-spinner"></div>
+      <div class="sb-loading-text">Chargement de tes données…</div>
+    </div>
+  `;
+  document.body.appendChild(el);
+  if (!document.getElementById('sb-loading-style')) {
+    const s = document.createElement('style');
+    s.id = 'sb-loading-style';
+    s.textContent = `
+      .sb-loading-overlay {
+        position: fixed; inset: 0; background: var(--bg);
+        z-index: 95000;
+        display: none; align-items: center; justify-content: center;
+        animation: sbFade 0.15s ease-out;
+      }
+      .sb-loading-overlay.active { display: flex; }
+      @keyframes sbFade { from { opacity: 0; } to { opacity: 1; } }
+      .sb-loading-inner {
+        display: flex; flex-direction: column; align-items: center; gap: 16px;
+      }
+      .sb-loading-spinner {
+        width: 42px; height: 42px;
+        border: 3px solid var(--bg-elev2);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: sbSpin 0.7s linear infinite;
+      }
+      @keyframes sbSpin { to { transform: rotate(360deg); } }
+      .sb-loading-text {
+        color: var(--text-dim);
+        font-size: 13px;
+        font-weight: 500;
+      }
+    `;
+    document.head.appendChild(s);
+  }
+}
+function hideLoadingOverlay() {
+  const el = document.getElementById('sb-loading-overlay');
+  if (el) el.classList.remove('active');
+}
 
 // Fetch paginé : Supabase limite à 1000 lignes par requête, on boucle si besoin.
 async function fetchAllPaged(table, userId, orderCol) {
