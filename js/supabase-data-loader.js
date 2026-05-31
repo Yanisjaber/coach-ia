@@ -451,4 +451,59 @@ function injectOnboardingStyles() {
       padding: 10px 18px;
       font-size: 13px;
       font-weight: 700;
-      cu
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      box-shadow: 0 2px 8px rgba(252, 76, 2, 0.25);
+      flex-shrink: 0;
+    }
+    .onboarding-strava-btn:hover {
+      background: #e34302;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(252, 76, 2, 0.35);
+    }
+    .onboarding-strava-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .onboarding-whoop-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #0bbfa6;
+      color: #04211d;
+      border: none; border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      font-family: inherit; transition: all 0.15s;
+      box-shadow: 0 2px 8px rgba(11, 191, 166, 0.25);
+      flex-shrink: 0;
+    }
+    .onboarding-whoop-btn:hover { background: #0aa991; transform: translateY(-1px); }
+    .onboarding-whoop-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  `;
+  document.head.appendChild(s);
+}
+
+// ============ TRIGGER RE-RENDER ============
+function triggerFullReload() {
+  // Met à jour l'en-tête (athlète)
+  const data = window.DASHBOARD_DATA;
+  if (data && data.athlete) {
+    const sub = document.querySelector('.logo-text p');
+    if (sub) {
+      const ftpStr = data.athlete.ftp ? ` · FTP ${data.athlete.ftp}W` : '';
+      sub.textContent = `${data.athlete.name}${ftpStr}`;
+    }
+  }
+  // Re-rend les vues qui peuvent l'être facilement
+  setTimeout(() => {
+    if (window.renderBilan) window.renderBilan();
+    if (window.renderPowerProfile) window.renderPowerProfile();
+    if (window.renderWellnessTrend) window.renderWellnessTrend();
+    if (window.renderCalendar) window.renderCalendar();
+    if (window.renderCompList) window.renderCompList();
+  }, 100);
+  // Pour les KPI hero + charts du tableau de bord (qui sont dans le MAIN closure
+  // et difficiles à re-trigger depuis l'extérieur), on émet un event que d'autres
+  // modules peuvent écouter.
+  window.dispatchEvent(new CustomEvent('dashboardDataReplaced', { detail: { data } }));
+}
+
+// Expose pour debug
+window.reloadDataFromSupabase = loadFromSupabase;

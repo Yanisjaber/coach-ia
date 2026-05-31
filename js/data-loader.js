@@ -92,4 +92,15 @@ export async function loadData() {
     console.error('⚠️ Chargement data.json impossible :', e.message);
     const badge = document.querySelector('header .badge');
     if (badge) {
-      badge.te
+      badge.textContent = '⚠ data.js absent — relancer fetch_data.py';
+      badge.style.background = 'rgba(248, 113, 113, 0.15)';
+      badge.style.borderColor = 'rgba(248, 113, 113, 0.4)';
+      badge.style.color = 'var(--danger)';
+    }
+    // En mode Supabase-only, on ne bloque pas : on boote sur un dataset vide
+    // et on laisse le login + supabase-data-loader injecter les vraies données.
+    window._planFromAPI = [];
+    window._athleteMeta = null;
+    return emptyBootDays();
+  }
+}

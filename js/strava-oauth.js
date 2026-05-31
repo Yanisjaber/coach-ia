@@ -219,4 +219,57 @@ function showIngestToast(message, type = 'loading') {
     ? '<div style="width:16px;height:16px;border:2px solid var(--text-mute);border-top-color:var(--info);border-radius:50%;animation:spin 0.8s linear infinite;"></div>'
     : (type === 'success'
       ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'
-      : '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></sv
+      : '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>');
+  toast.innerHTML = `${icon}<span>${message}</span>`;
+  if (!document.getElementById('ingest-toast-spin')) {
+    const s = document.createElement('style');
+    s.id = 'ingest-toast-spin';
+    s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+    document.head.appendChild(s);
+  }
+  document.body.appendChild(toast);
+  // Auto-hide après 8s sauf si loading
+  if (type !== 'loading') {
+    setTimeout(() => { toast.remove(); if (_ingestToast === toast) _ingestToast = null; }, 8000);
+  }
+}
+
+window.startStravaIngest = startStravaIngest;
+
+function showStravaConnectedToast() {
+  const toast = document.createElement('div');
+  toast.className = 'strava-toast';
+  toast.innerHTML = `
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="#FC4C02">
+      <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+    </svg>
+    <span>Strava connecté avec succès. Import des activités en cours…</span>
+  `;
+  toast.style.cssText = `
+    position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+    background: var(--bg-elev); border: 1px solid var(--accent);
+    color: var(--text); padding: 14px 22px; border-radius: 12px;
+    display: flex; align-items: center; gap: 12px;
+    z-index: 9999; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    font-size: 13px; font-weight: 600;
+    animation: stravaToastIn 0.3s ease-out;
+  `;
+  if (!document.getElementById('strava-toast-style')) {
+    const st = document.createElement('style');
+    st.id = 'strava-toast-style';
+    st.textContent = '@keyframes stravaToastIn { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }';
+    document.head.appendChild(st);
+  }
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 5000);
+}
+
+// Expose globalement
+window.startStravaOAuth = startStravaOAuth;
+
+// Auto-check au chargement
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', checkOAuthReturn);
+} else {
+  checkOAuthReturn();
+}

@@ -8055,4 +8055,47 @@ document.querySelectorAll('#sport-filter .sport-btn').forEach(btn => {
         const r = await fetch(`/api/refresh-status?runId=${runId}`, { credentials: 'include' });
         if (r.ok) {
           const j = await r.json();
-         
+          if (j.status === 'completed') return j.conclusion === 'success';
+        }
+      } catch (e) { /* on retente */ }
+      await new Promise(res => setTimeout(res, 4000));
+    }
+    return false;
+  }
+
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    setLoading(true, 'Déclenchement du run...');
+    try {
+      const resp = await fetch('/api/refresh', { method: 'POST', credentials: 'include' });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        await appAlert({
+          title: 'Erreur de déclenchement',
+          message: `HTTP ${resp.status}\n${txt.slice(0, 200)}`,
+        });
+        setLoading(false);
+        return;
+      }
+      const { runId } = await resp.json();
+      setLoading(true, 'Récupération Strava + Whoop...');
+      const ok = await pollStatus(runId);
+      if (ok) {
+        // Reload avec cache-bust pour forcer la nouvelle data.js
+        location.reload();
+      } else {
+        await appAlert({
+          title: 'Échec du run',
+          message: 'Le run GitHub Actions a échoué ou pris trop de temps. Voir https://github.com/Yanisjaber/coach-ia/actions',
+        });
+        setLoading(false);
+      }
+    } catch (e) {
+      await appAlert({
+        title: 'Erreur réseau',
+        message: e.message || String(e),
+      });
+      setLoading(false);
+    }
+  });
+})();
