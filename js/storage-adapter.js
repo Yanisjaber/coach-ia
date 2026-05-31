@@ -27,11 +27,12 @@ let _migrationDone = false;
 
 window.addEventListener('coach-ia-auth', (e) => {
   _currentUser = e.detail.user || null;
-  if (_currentUser && !_migrationDone) {
-    _migrationDone = true;
-    // Lance la migration en arrière-plan
-    migrateLocalToCloud().catch(err => console.error('[migrate]', err));
-  }
+  // NOTE : on NE lance PLUS migrateLocalToCloud() au login.
+  // Ce push de masse localStorage → cloud datait de l'ancienne époque (localStorage-only).
+  // Désormais le cloud (Supabase) est la source de vérité : le pull au login écrase le
+  // localStorage, et chaque modification est poussée individuellement (saveCompetitions, etc.).
+  // Le relancer à chaque login RESSUSCITAIT les éléments supprimés sur un autre appareil.
+  // (migrateLocalToCloud reste disponible via window.storageAdapter pour un usage manuel ponctuel.)
 });
 
 function isAuthed() { return !!_currentUser && !!window.sb; }
