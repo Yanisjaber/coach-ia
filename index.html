@@ -131,7 +131,7 @@
       <div id="last-session-metrics" style="display:flex;gap:18px;flex-wrap:wrap;"></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="whoop-card">
       <div class="kpi-label">Récupération Whoop</div>
       <div class="ring-container">
         <div class="ring">
@@ -169,7 +169,7 @@
   </section>
 
   <!-- WELLNESS : saisie subjective quotidienne -->
-  <div class="wellness-cta card" id="wellness-cta">
+  <div class="wellness-cta card" id="wellness-cta" style="display:none;">
     <div class="wellness-cta-left">
       <div class="wellness-cta-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -270,8 +270,8 @@
         </div>
       </div>
       <div class="date-range" id="zones-range">
-        <button class="preset active" data-days="7">7j</button>
-        <button class="preset" data-days="30">30j</button>
+        <button class="preset" data-days="7">7j</button>
+        <button class="preset active" data-days="30">30j</button>
         <button class="preset" data-days="90">90j</button>
         <span class="sep">·</span>
         <input type="date" id="zones-from">
@@ -311,8 +311,8 @@
   <!-- Plan / Calendrier -->
   <div class="grid-1 card">
     <div class="subtabs" id="calendar-subtabs">
-      <button class="subtab active" data-mode="prevu">Prévu</button>
-      <button class="subtab" data-mode="realise">Réalisé</button>
+      <button class="subtab active" data-mode="realise">Réalisé</button>
+      <button class="subtab" data-mode="prevu">Prévu</button>
     </div>
 
     <div class="month-filter" id="month-filter" style="display:none;">
@@ -446,7 +446,7 @@
   </div>
 
   <!-- 6. Tendances wellness (conservé : c'est un bilan subjectif) -->
-  <div class="grid-1 card wellness-trend-card">
+  <div class="grid-1 card wellness-trend-card" style="display:none;">
     <div class="section-title">Tendances wellness (saisies manuelles)</div>
     <div class="section-subtitle">Poids, humeur, fatigue, courbatures, motivation sur tes 60 derniers jours saisis</div>
     <div class="wellness-trend-summary" id="wellness-trend-summary"></div>

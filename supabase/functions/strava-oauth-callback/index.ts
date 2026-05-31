@@ -35,6 +35,9 @@ const ALLOWED_RETURN_URLS = [
   "https://yanisjaber.github.io/coach-ia/dashboard.html",
   "https://coachia.fr/",
   "https://coachia.fr/dashboard.html",
+  "https://jaberautomations.fr/",
+  "https://jaberautomations.fr/index.html",
+  "https://jaberautomations.fr/dashboard.html",
 ];
 const FALLBACK_REDIRECT = Deno.env.get("APP_REDIRECT_URL") || "https://yanisjaber.github.io/coach-ia/";
 

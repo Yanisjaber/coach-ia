@@ -22,7 +22,7 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  margin-bottom: 22px;
+  margin-bottom: 8px;
 }
 .profile-back-btn {
   align-self: flex-start;
@@ -46,12 +46,46 @@
   border-color: var(--text-mute);
   transform: translateX(-2px);
 }
-.profile-page-title-wrap {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 18px;
+.profile-header-row {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 18px;
 }
+.profile-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.profile-brand-badge {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), var(--info));
+  color: #0b0e14;
+  font-weight: 800; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+}
+.profile-brand-name {
+  font-size: 19px; font-weight: 800; color: var(--text);
+}
+.profile-page-title-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  text-align: right;
+}
+/* Titre profil injecté à droite du vrai header (le logo reste à sa place) */
+.profile-header-title {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: right;
+}
+.profile-header-title h2 { font-size: 20px; margin: 0 0 2px; font-weight: 700; color: var(--text); }
+.profile-header-title p { margin: 0; font-size: 12px; color: var(--text-dim); max-width: 420px; }
 .profile-page-icon {
   width: 50px;
   height: 50px;

@@ -139,16 +139,11 @@
 
   /* === Liste compétitions === */
   .comp-empty {
-    padding: 16px;
+    padding: 12px 16px;
     text-align: center;
     color: var(--text-mute);
     font-size: 13px;
     font-style: italic;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    min-height: 180px;
   }
   .comp-item {
     display: grid;

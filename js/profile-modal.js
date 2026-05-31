@@ -78,24 +78,6 @@ function buildPanel() {
         </svg>
         Retour
       </button>
-      <div class="profile-page-title-wrap">
-        <div class="profile-page-icon">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        </div>
-        <div class="profile-page-title-text">
-          <h2>Mon profil athlète</h2>
-          <p>Plus ton profil est complet, plus les calculs et recommandations sont précis.</p>
-        </div>
-        <div class="profile-completion">
-          <div class="profile-completion-label">
-            <span id="profile-completion-pct">0%</span>
-            <span>complété</span>
-          </div>
-          <div class="profile-completion-bar">
-            <div class="profile-completion-bar-fill" id="profile-completion-fill"></div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Body : sidebar nav + content -->
@@ -175,7 +157,6 @@ function renderIdentity() {
   return `
     <header class="profile-section-header">
       <h3>Identité</h3>
-      <p>Comment tu apparais dans Coach IA, et tes mensurations de base.</p>
     </header>
 
     <div class="profile-card">
@@ -1484,6 +1465,28 @@ function ensurePanel() {
   return _panel;
 }
 
+// Injecte "Mon profil athlète" à droite du header principal (le logo reste le vrai).
+function showProfileHeaderTitle() {
+  const header = document.querySelector('header');
+  if (!header) return;
+  let el = document.getElementById('profile-header-title');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'profile-header-title';
+    el.className = 'profile-header-title';
+    el.innerHTML = `
+      <div class="profile-page-title-text">
+        <h2>Mon profil athlète</h2>
+        <p>Plus ton profil est complet, plus les calculs et recommandations sont précis.</p>
+      </div>
+      <div class="profile-page-icon">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>`;
+    header.appendChild(el);
+  }
+  el.style.display = '';
+}
+
 async function openProfilePage(skipHash = false) {
   ensurePanel();
 
@@ -1496,6 +1499,19 @@ async function openProfilePage(skipHash = false) {
   _panel.classList.add('active');
   const tabsBar = document.querySelector('.tabs');
   if (tabsBar) tabsBar.classList.add('profile-hidden');
+  // Masquer le header principal (logo, filtre sports, toggle Manuel/IA, menu) + le
+  // bandeau, pour que le bouton Retour de la page profil soit tout en haut.
+  // On GARDE le vrai logo du header en place (pixel-perfect, aucun décalage au retour) :
+  // on masque seulement les autres éléments et on injecte le titre profil à droite.
+  document.getElementById('sport-filter')?.style.setProperty('display', 'none');
+  document.getElementById('mode-toggle')?.style.setProperty('display', 'none');
+  const _hInfo = document.querySelector('.header-info');
+  if (_hInfo) _hInfo.style.display = 'none';
+  showProfileHeaderTitle();
+  const _mainFooter = document.querySelector('footer');
+  if (_mainFooter) _mainFooter.style.display = 'none';
+  const _obBanner = document.getElementById('onboarding-banner');
+  if (_obBanner) _obBanner.style.display = 'none';
 
   if (!skipHash && window.location.hash !== ROUTE_HASH) {
     history.pushState(null, '', ROUTE_HASH);
@@ -1518,6 +1534,17 @@ function closeProfilePage() {
   if (_panel) _panel.classList.remove('active');
   const tabsBar = document.querySelector('.tabs');
   if (tabsBar) tabsBar.classList.remove('profile-hidden');
+  // Restaurer le header principal + le bandeau.
+  document.getElementById('sport-filter')?.style.setProperty('display', '');
+  document.getElementById('mode-toggle')?.style.setProperty('display', '');
+  const _hInfo = document.querySelector('.header-info');
+  if (_hInfo) _hInfo.style.display = '';
+  const _pht = document.getElementById('profile-header-title');
+  if (_pht) _pht.style.display = 'none';
+  const _mainFooter = document.querySelector('footer');
+  if (_mainFooter) _mainFooter.style.display = '';
+  const _obBanner = document.getElementById('onboarding-banner');
+  if (_obBanner) _obBanner.style.display = '';
 
   const target = _previousTabBtn && document.body.contains(_previousTabBtn)
     ? _previousTabBtn

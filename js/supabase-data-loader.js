@@ -15,22 +15,30 @@
 
 let _currentUser = null;
 let _loadInProgress = false;
+let _loadedUserId = null;
 
 window.addEventListener('coach-ia-auth', async (e) => {
   _currentUser = e.detail.user || null;
-  if (_currentUser) {
-    // On masque TOUT le dashboard pendant le chargement des données pour ne pas
-    // laisser voir des zéros/tirets : le boot overlay (au démarrage) OU le
-    // loading overlay (transition après login) reste affiché jusqu'à la fin.
-    showLoadingOverlay();
-    try {
-      await loadFromSupabase();
-    } catch (err) {
-      console.error('[sb-data]', err);
-    } finally {
-      hideLoadingOverlay();
-      if (window.hideBootOverlay) window.hideBootOverlay();
-    }
+  if (!_currentUser) { _loadedUserId = null; return; }
+
+  // Déjà chargé pour cet utilisateur (ex : rafraîchissement de jeton au retour
+  // d'onglet) → on ne recharge PAS et on n'affiche pas le voile (évite le flash).
+  if (_currentUser.id === _loadedUserId) {
+    if (window.hideBootOverlay) window.hideBootOverlay();
+    return;
+  }
+  _loadedUserId = _currentUser.id;
+
+  // Premier chargement (ou nouvel utilisateur) : on masque le dashboard pendant
+  // le chargement pour ne pas laisser voir des zéros, puis on révèle.
+  showLoadingOverlay();
+  try {
+    await loadFromSupabase();
+  } catch (err) {
+    console.error('[sb-data]', err);
+  } finally {
+    hideLoadingOverlay();
+    if (window.hideBootOverlay) window.hideBootOverlay();
   }
 });
 
@@ -186,6 +194,10 @@ async function loadFromSupabase() {
 
     // Re-render complet de l'app
     triggerFullReload();
+
+    // Carte Récupération Whoop : si pas de compte Whoop connecté, on affiche
+    // "Aucune donnée Whoop" au lieu des "—".
+    setTimeout(() => setWhoopCardEmpty(!whoopConnection), 250);
 
     // Reprise automatique du power profile : si des activités n'ont pas encore de
     // streams (ex : import interrompu par un rechargement), on relance la boucle
@@ -573,6 +585,23 @@ function setEmptyDataOverlays(on) {
       <div class="ed-sub">Connecte Strava ou Whoop</div>`;
     card.appendChild(o);
   });
+}
+
+// Overlay "Aucune donnée Whoop" sur la carte Récupération Whoop quand Whoop n'est
+// pas connecté (le reste du dashboard a des données Strava).
+function setWhoopCardEmpty(on) {
+  const card = document.getElementById('whoop-card');
+  if (!card) return;
+  card.querySelector('.empty-data-overlay')?.remove();
+  if (!on) { if (card.getAttribute('data-ed-pos')) { card.style.position = ''; card.removeAttribute('data-ed-pos'); } return; }
+  injectEmptyOverlayStyles();
+  if (getComputedStyle(card).position === 'static') { card.style.position = 'relative'; card.setAttribute('data-ed-pos', '1'); }
+  const o = document.createElement('div');
+  o.className = 'empty-data-overlay';
+  o.innerHTML = `
+    <div class="ed-title">Aucune donnée Whoop</div>
+    <div class="ed-sub">Connecte Whoop dans la page Connexions</div>`;
+  card.appendChild(o);
 }
 
 function injectEmptyOverlayStyles() {

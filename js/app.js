@@ -30,6 +30,7 @@ import './supabase-data-loader.js';
 import './strava-oauth.js';
 import './whoop-oauth.js';
 import './connections-modal.js';
+import './settings-modal.js';
 
 // ========= MODE IA / MANUEL =========
 // Sorti dans js/app-mode.js. Auto-bootstrap au DOMContentLoaded à l'import.
@@ -889,7 +890,17 @@ const zonesChart = new Chart(document.getElementById('chart-zones'), {
 
 function renderZones(fromIso, toIso) {
   const { pct, totalMin, sessions } = computeZonesByDate(fromIso, toIso);
-  zonesChart.data.datasets[0].data = pct;
+  const total = pct.reduce((a, b) => a + (b || 0), 0);
+  if (total === 0) {
+    // Aucune donnée : on affiche un anneau gris plein (sinon le camembert est invisible).
+    zonesChart.data.labels = ['Aucune donnée'];
+    zonesChart.data.datasets[0].data = [1];
+    zonesChart.data.datasets[0].backgroundColor = ['rgba(255,255,255,0.07)'];
+  } else {
+    zonesChart.data.labels = zoneLabels;
+    zonesChart.data.datasets[0].data = pct;
+    zonesChart.data.datasets[0].backgroundColor = zoneColors;
+  }
   zonesChart.update();
   const hours = Math.floor(totalMin / 60);
   const mins = totalMin % 60;
@@ -904,11 +915,11 @@ function renderZones(fromIso, toIso) {
   `;
 }
 
-// Init avec 7 derniers jours par défaut
+// Init avec 30 derniers jours par défaut
 {
   const end = new Date(today);
   const start = new Date(today);
-  start.setDate(end.getDate() - 6);
+  start.setDate(end.getDate() - 29);
   setInputDate('zones-from', start);
   setInputDate('zones-to', end);
   document.getElementById('zones-from').min = toIsoDate(data[0].date);
@@ -1600,7 +1611,8 @@ function initFlatpickrAll() {
     flatpickr(el, {
       dateFormat: 'Y-m-d',
       altInput: true,
-      altFormat: 'l j F Y', // ex: "jeudi 21 mai 2026"
+      // "Forme & fatigue" (pleine largeur) en lettres ; les colonnes étroites en chiffres (compact, 1 ligne).
+      altFormat: (el.id === 'load-from' || el.id === 'load-to') ? 'j F Y' : 'd/m/Y',
       allowInput: false,
       disableMobile: true,
       clickOpens: true,
@@ -2852,7 +2864,11 @@ function renderWeekPlan() {
 }
 
 // ========= MODE PRÉVU vs RÉALISÉ =========
-let calendarMode = 'prevu';
+let calendarMode = (window.coachPrefs && window.coachPrefs.default_tab) || 'realise';
+// Synchroniser l'onglet calendrier actif avec la préférence (Paramètres → Affichage).
+document.querySelectorAll('#calendar-subtabs .subtab').forEach(b => {
+  b.classList.toggle('active', b.dataset.mode === calendarMode);
+});
 let selectedMonth = null; // null = 4 dernières semaines, sinon Date 1er du mois sélectionné
 // Index de l'activité affichée par jour (pour les jours multi-activités). Clé = ISO date.
 const dayActivityIndex = {};
@@ -7974,14 +7990,40 @@ document.getElementById('sessions-tbody').addEventListener('click', (e) => {
 });
 
 // ========= TABS =========
+// ========= ONGLETS + routage par ancre (#entraineur, #bilan, #termes) =========
+// p1 (Tableau de bord) = pas de hash. #profil est géré par profile-modal.js.
+const PANEL_HASH = { p2: '#calendrier', p3: '#bilan', p5: '#termes' };
+const HASH_PANEL = { '#calendrier': 'p2', '#bilan': 'p3', '#termes': 'p5' };
+
+function activatePanel(panelId, updateHash = true) {
+  const panelEl = document.getElementById(panelId);
+  const btn = document.querySelector(`.tab[data-panel="${panelId}"]`);
+  if (!panelEl || !btn) return;
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  panelEl.classList.add('active');
+  if (updateHash) {
+    const h = PANEL_HASH[panelId] || '';
+    if (h) {
+      if (window.location.hash !== h) history.replaceState(null, '', h);
+    } else if (window.location.hash) {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }
+}
+
 document.querySelectorAll('.tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(btn.dataset.panel).classList.add('active');
-  });
+  btn.addEventListener('click', () => activatePanel(btn.dataset.panel, true));
 });
+
+// Active le bon onglet selon l'ancre (chargement initial + back/forward + lien partagé).
+function syncTabFromHash() {
+  const panelId = HASH_PANEL[window.location.hash];
+  if (panelId) activatePanel(panelId, false); // ancres inconnues / vide / #profil → on ne force rien
+}
+window.addEventListener('hashchange', syncTabFromHash);
+syncTabFromHash();
 
 // ========= FILTRES SPORTS (boutons header) =========
 document.querySelectorAll('#sport-filter .sport-btn').forEach(btn => {
