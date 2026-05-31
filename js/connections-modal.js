@@ -23,15 +23,16 @@ async function fetchConnections() {
   const sb = window.sb;
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { user: null };
-  const [{ data: strava }, { data: whoop }] = await Promise.all([
+  const [{ data: strava }, { data: whoop }, { count: whoopDays }] = await Promise.all([
     sb.from('strava_connections')
       .select('strava_athlete_id, athlete_name, last_sync_at, last_sync_status, total_activities_synced, first_connected_at')
       .eq('user_id', user.id).maybeSingle(),
     sb.from('whoop_connections')
-      .select('whoop_user_id, last_sync_at, last_sync_status, first_connected_at')
+      .select('whoop_user_id, athlete_name, last_sync_at, last_sync_status, first_connected_at')
       .eq('user_id', user.id).maybeSingle(),
+    sb.from('whoop_data').select('iso_date', { count: 'exact', head: true }).eq('user_id', user.id),
   ]);
-  return { user, strava, whoop };
+  return { user, strava, whoop, whoopDays: whoopDays || 0 };
 }
 
 export async function openConnectionsModal() {
@@ -80,7 +81,7 @@ async function render(body) {
 
   body.innerHTML = `
     ${cardStrava(data.strava)}
-    ${cardWhoop(data.whoop)}
+    ${cardWhoop(data.whoop, data.whoopDays)}
     <p class="cnx-foot">Tes jetons d'accès restent stockés côté serveur (Supabase) et ne sont jamais exposés ici.</p>
   `;
   wire(body);
@@ -111,17 +112,17 @@ function cardStrava(c) {
       <div class="cnx-actions">
         ${c
           ? `<button class="cnx-btn primary" data-act="strava-sync">Re-synchroniser</button>
-             <button class="cnx-btn ghost" data-act="strava-connect">Reconnecter</button>
+             ${c.last_sync_status === 'error' ? `<button class="cnx-btn ghost" data-act="strava-connect">Reconnecter</button>` : ''}
              <button class="cnx-btn danger" data-act="strava-disconnect">Déconnecter</button>`
           : `<button class="cnx-btn primary" data-act="strava-connect">Connecter Strava</button>`}
       </div>
     </div>`;
 }
 
-function cardWhoop(c) {
+function cardWhoop(c, days = 0) {
   const last = fmtDate(c?.last_sync_at);
   const sub = c
-    ? `Connecté${last ? ' · sync ' + last : ''}`
+    ? `${c.athlete_name ? c.athlete_name + ' · ' : ''}${days} jour${days > 1 ? 's' : ''} de données${last ? ' · sync ' + last : ''}`
     : 'Importe ta récupération, ton sommeil et ton strain.';
   return `
     <div class="cnx-card whoop">
@@ -133,7 +134,7 @@ function cardWhoop(c) {
       <div class="cnx-actions">
         ${c
           ? `<button class="cnx-btn primary" data-act="whoop-sync">Re-synchroniser</button>
-             <button class="cnx-btn ghost" data-act="whoop-connect">Reconnecter</button>
+             ${c.last_sync_status === 'error' ? `<button class="cnx-btn ghost" data-act="whoop-connect">Reconnecter</button>` : ''}
              <button class="cnx-btn danger" data-act="whoop-disconnect">Déconnecter</button>`
           : `<button class="cnx-btn primary" data-act="whoop-connect">Connecter Whoop</button>`}
       </div>
@@ -148,8 +149,7 @@ function wire(body) {
       if (act === 'whoop-connect') return window.startWhoopOAuth?.();
       if (act === 'strava-sync') {
         closeOverlay();
-        await window.startStravaIngest?.();
-        window.startStravaStreams?.();
+        await window.startStravaIngest?.(); // enchaîne aussi le power profile
         return;
       }
       if (act === 'whoop-sync') {
@@ -216,28 +216,69 @@ async function doDisconnect(provider, label, wipe, body) {
     return;
   }
   const cfg = window.SUPABASE_CONFIG;
+  const url = `${cfg.url}/functions/v1/disconnect-integration`;
+
+  // Étapes (tables à traiter) — chacune fait avancer la barre de progression.
+  const steps = wipe
+    ? (provider === 'strava'
+        ? [['power_profile', 'Power profile'], ['daily_metrics', 'Charge (CTL/ATL/TSB)'],
+           ['activities', 'Activités'], ['strava_connections', 'Connexion'], ['user_profiles_reset', 'Profil athlète']]
+        : [['whoop_data', 'Données Whoop'], ['whoop_connections', 'Connexion']])
+    : [[provider === 'strava' ? 'strava_connections' : 'whoop_connections', 'Connexion']];
+
+  const prog = showProgress(wipe ? `Suppression des données ${label}…` : `Déconnexion de ${label}…`);
   try {
-    const res = await fetch(`${cfg.url}/functions/v1/disconnect-integration`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, wipe }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      window.appAlert?.({ title: 'Déconnexion impossible', message: `${data.error || res.status}${data.detail ? '\n' + data.detail : ''}` });
-      if (!wipe) await render(body);
-      return;
+    for (let i = 0; i < steps.length; i++) {
+      const [table, lbl] = steps[i];
+      prog.update(Math.round((i / steps.length) * 100), lbl);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, wipe, only: table }),
+      });
+      const data = await res.json();
+      if (!res.ok) { prog.fail(`${data.error || res.status}`); return; }
     }
-    if (wipe) {
-      // Données effacées + fenêtre déjà fermée → on recharge le dashboard.
-      if (window.reloadDataFromSupabase) window.reloadDataFromSupabase();
-      window.appAlert?.({ title: `${label} déconnecté`, message: `Tes données ${label} ont été supprimées.` });
-    } else {
-      await render(body); // déconnexion seule → on rafraîchit le statut dans la fenêtre
-    }
+    prog.update(100, 'Terminé');
+    setTimeout(() => {
+      prog.close();
+      if (wipe && window.reloadDataFromSupabase) window.reloadDataFromSupabase();
+      openConnectionsModal(); // rouvre la page Connexions avec le statut à jour
+    }, 650);
   } catch (e) {
-    window.appAlert?.({ title: 'Erreur réseau', message: e.message || String(e) });
+    prog.fail(e.message || String(e));
   }
+}
+
+// ====== Overlay de progression (barre + pourcentage) ======
+function showProgress(title, opts = {}) {
+  injectStyles();
+  document.getElementById('cnx-progress')?.remove();
+  const el = document.createElement('div');
+  el.id = 'cnx-progress';
+  el.className = 'cnx-overlay';
+  el.innerHTML = `
+    <div class="cnx-prog">
+      <h3 class="cnx-prog-title">${title}</h3>
+      <div class="cnx-prog-step" id="cnx-prog-step">Préparation…</div>
+      <div class="cnx-prog-bar"><div class="cnx-prog-fill" id="cnx-prog-fill" style="width:0%"></div></div>
+      <div class="cnx-prog-pct" id="cnx-prog-pct">0 %</div>
+      ${opts.onCancel ? `<div class="cnx-prog-actions"><button type="button" class="cnx-prog-cancel" id="cnx-prog-cancel">Annuler</button></div>` : ''}
+    </div>`;
+  document.body.appendChild(el);
+  const fill = el.querySelector('#cnx-prog-fill');
+  const pct = el.querySelector('#cnx-prog-pct');
+  const step = el.querySelector('#cnx-prog-step');
+  if (opts.onCancel) {
+    el.querySelector('#cnx-prog-cancel').addEventListener('click', () => {
+      try { opts.onCancel(); } finally { el.remove(); }
+    });
+  }
+  return {
+    update(p, label) { fill.style.width = p + '%'; pct.textContent = p + ' %'; if (label) step.textContent = label; },
+    fail(msg) { step.textContent = 'Échec : ' + msg; step.style.color = 'var(--danger, #f87171)'; setTimeout(() => el.remove(), 2800); },
+    close() { el.remove(); },
+  };
 }
 
 function injectStyles() {
@@ -305,8 +346,64 @@ function injectStyles() {
     .cnx-choice-opt-title { color: var(--text, #e8edf5); font-size: 14px; font-weight: 700; }
     .cnx-choice-opt.danger .cnx-choice-opt-title { color: var(--danger, #f87171); }
     .cnx-choice-opt-desc { color: var(--text-dim, #8b94a8); font-size: 12px; line-height: 1.5; }
+
+    /* Barre de progression */
+    .cnx-prog { width: 100%; max-width: 420px; background: var(--bg-elev, #161b26);
+      border: 1px solid var(--border, #2a3242); border-radius: 16px; padding: 24px 26px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+    .cnx-prog-title { color: var(--text, #e8edf5); font-size: 15px; font-weight: 700; margin: 0 0 14px; }
+    .cnx-prog-step { color: var(--text-dim, #8b94a8); font-size: 13px; margin-bottom: 10px; min-height: 18px; }
+    .cnx-prog-bar { height: 10px; background: var(--bg, #0b0e14); border-radius: 99px; overflow: hidden;
+      border: 1px solid var(--border, #2a3242); }
+    .cnx-prog-fill { height: 100%; background: linear-gradient(90deg, #4ade80, #22c55e);
+      border-radius: 99px; transition: width .35s ease; }
+    .cnx-prog-pct { text-align: right; color: var(--accent, #4ade80); font-size: 12px; font-weight: 700; margin-top: 8px; }
+    .cnx-prog-actions { display: flex; justify-content: center; margin-top: 16px; }
+    .cnx-prog-cancel { background: var(--bg-elev2, #232a38); color: var(--text, #e8edf5); border: 1px solid var(--border, #2a3242);
+      border-radius: 8px; padding: 9px 22px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; transition: filter .15s; }
+    .cnx-prog-cancel:hover { filter: brightness(1.2); }
+
+    /* Barre non-bloquante (coin bas-droit) */
+    .cnx-bg { position: fixed; right: 20px; bottom: 20px; width: 300px; z-index: 9400;
+      background: var(--bg-elev, #161b26); border: 1px solid var(--border, #2a3242);
+      border-radius: 12px; padding: 14px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+      animation: cnxFade .2s ease-out; }
+    .cnx-bg-row { display: flex; justify-content: space-between; align-items: baseline; }
+    .cnx-bg-title { color: var(--text, #e8edf5); font-size: 12.5px; font-weight: 700; }
+    .cnx-bg-pct { color: var(--accent, #4ade80); font-size: 12px; font-weight: 700; }
+    .cnx-bg-bar { height: 7px; background: var(--bg, #0b0e14); border-radius: 99px; overflow: hidden;
+      border: 1px solid var(--border, #2a3242); margin: 8px 0 6px; }
+    .cnx-bg-fill { height: 100%; background: linear-gradient(90deg, #4ade80, #22c55e); border-radius: 99px; transition: width .35s ease; }
+    .cnx-bg-step { color: var(--text-dim, #8b94a8); font-size: 11px; line-height: 1.4; }
   `;
   document.head.appendChild(s);
 }
 
+// ====== Barre de progression NON-bloquante (coin bas-droit) ======
+// Pour les tâches longues en arrière-plan (ex : analyse du power profile),
+// l'utilisateur peut continuer à utiliser l'app pendant qu'elle tourne.
+function showBgProgress(title) {
+  injectStyles();
+  document.getElementById('cnx-bg')?.remove();
+  const el = document.createElement('div');
+  el.id = 'cnx-bg';
+  el.className = 'cnx-bg';
+  el.innerHTML = `
+    <div class="cnx-bg-row"><span class="cnx-bg-title">${title}</span><span class="cnx-bg-pct" id="cnx-bg-pct">0 %</span></div>
+    <div class="cnx-bg-bar"><div class="cnx-bg-fill" id="cnx-bg-fill" style="width:0%"></div></div>
+    <div class="cnx-bg-step" id="cnx-bg-step"></div>`;
+  document.body.appendChild(el);
+  const fill = el.querySelector('#cnx-bg-fill');
+  const pct = el.querySelector('#cnx-bg-pct');
+  const step = el.querySelector('#cnx-bg-step');
+  return {
+    update(p, label) { fill.style.width = p + '%'; pct.textContent = p + ' %'; if (label) step.textContent = label; },
+    done(label) { fill.style.width = '100%'; pct.textContent = '100 %'; if (label) step.textContent = label; setTimeout(() => el.remove(), 3000); },
+    close() { el.remove(); },
+  };
+}
+
 window.openConnectionsModal = openConnectionsModal;
+// Barres de progression réutilisables par les autres modules (import Strava/Whoop).
+window.coachProgress = showProgress;       // bloquante (centrée)
+window.coachBgProgress = showBgProgress;   // non-bloquante (coin)

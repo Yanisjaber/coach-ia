@@ -88,8 +88,9 @@ Deno.serve(async (req) => {
 
     const expiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000 - 60_000).toISOString();
 
-    // ===== 3) Récupérer le profil Whoop (id user) =====
+    // ===== 3) Récupérer le profil Whoop (id + nom) =====
     let whoopUserId: string | null = null;
+    let athleteName: string | null = null;
     try {
       const profRes = await fetch(`${WHOOP_API}/user/profile/basic`, {
         headers: { Authorization: `Bearer ${tokens.access_token}` },
@@ -97,6 +98,7 @@ Deno.serve(async (req) => {
       if (profRes.ok) {
         const prof = await profRes.json();
         whoopUserId = prof?.user_id != null ? String(prof.user_id) : null;
+        athleteName = `${prof?.first_name || ""} ${prof?.last_name || ""}`.trim() || null;
       }
     } catch (_) { /* non bloquant */ }
 
@@ -105,6 +107,7 @@ Deno.serve(async (req) => {
     const { error: upErr } = await sbAdmin.from("whoop_connections").upsert({
       user_id: user.id,
       whoop_user_id: whoopUserId,
+      athlete_name: athleteName,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       expires_at: expiresAt,

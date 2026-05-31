@@ -400,7 +400,11 @@ function showOnboardingBanner() {
     if (window.startWhoopOAuth) window.startWhoopOAuth();
     else alert('Module Whoop OAuth non chargé');
   });
-  document.body.appendChild(banner);
+  // Insérer dans le flux normal, juste avant les onglets → ne recouvre PAS le header
+  // (menu profil + navigation restent accessibles).
+  const tabs = document.querySelector('.tabs');
+  if (tabs && tabs.parentNode) tabs.parentNode.insertBefore(banner, tabs);
+  else document.body.appendChild(banner);
   injectOnboardingStyles();
 }
 function hideOnboardingBanner() {
@@ -413,21 +417,19 @@ function injectOnboardingStyles() {
   s.id = 'onboarding-banner-styles';
   s.textContent = `
     .onboarding-banner {
-      position: fixed; top: 0; left: 0; right: 0;
       background: linear-gradient(135deg, rgba(96, 165, 250, 0.18), rgba(74, 222, 128, 0.12));
-      border-bottom: 1px solid rgba(96, 165, 250, 0.35);
+      border: 1px solid rgba(96, 165, 250, 0.35);
+      border-radius: 12px;
       color: var(--text);
-      z-index: 8800;
       display: none;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      max-width: 1200px;
+      margin: 14px auto 0;
     }
-    .onboarding-banner.active { display: block; animation: ob-slide 0.3s ease-out; }
-    @keyframes ob-slide { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+    .onboarding-banner.active { display: block; animation: ob-fade 0.3s ease-out; }
+    @keyframes ob-fade { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
     .onboarding-banner-inner {
-      max-width: 1200px; margin: 0 auto;
       display: flex; gap: 14px; align-items: center;
-      padding: 12px 24px;
+      padding: 12px 20px;
     }
     .onboarding-banner-icon {
       flex-shrink: 0;

@@ -47,6 +47,7 @@ Deno.serve(async (req) => {
     const body = await safeJson(req);
     const provider = String(body?.provider || "").toLowerCase();
     const wipe = body?.wipe === true; // false/absent = déconnexion seule
+    const only = body?.only ? String(body.only) : null; // traiter UNE seule étape (barre de progression)
     if (provider !== "strava" && provider !== "whoop") {
       return json({ error: "invalid_provider" }, 400);
     }
@@ -54,6 +55,19 @@ Deno.serve(async (req) => {
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const uid = user.id;
     const deleted: Record<string, boolean> = {};
+
+    // ===== Mode "une étape" : le front pilote la progression table par table =====
+    if (only) {
+      if (only === "user_profiles_reset") {
+        if (provider === "strava") {
+          await sb.from("user_profiles").update({ strava_athlete_id: null, ftp: null, weight: null }).eq("user_id", uid);
+        }
+        return json({ ok: true, step: only });
+      }
+      const { error } = await sb.from(only).delete().eq("user_id", uid);
+      if (error) { console.error(`delete ${only}:`, error.message); return json({ error: `delete_${only}_failed`, detail: error.message }, 500); }
+      return json({ ok: true, step: only });
+    }
 
     // Tables à vider selon le mode. La connexion est toujours supprimée en dernier.
     let tables: string[];

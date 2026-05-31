@@ -70,6 +70,22 @@ async function checkOAuthReturn() {
   }
 }
 
+// ============ IMPORT (écran bloquant avec barre + bouton Annuler) ============
+// État partagé d'annulation pour stopper l'import en cours.
+let _importCancelled = false;
+let _importAbort = null;
+
+function beginImport(title) {
+  _importCancelled = false;
+  _importAbort = new AbortController();
+  const prog = window.coachProgress
+    ? window.coachProgress(title, {
+        onCancel: () => { _importCancelled = true; try { _importAbort.abort(); } catch (_) {} },
+      })
+    : null;
+  return prog;
+}
+
 // ============ INGESTION : appel à l'Edge Function strava-ingest ============
 export async function startStravaIngest() {
   const sb = window.sb;
@@ -77,120 +93,123 @@ export async function startStravaIngest() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { showIngestToast('Tu dois être connecté', 'error'); return; }
 
-  // Masquer le bandeau "compte vide" pendant l'import (il va se remplir)
   const banner = document.getElementById('onboarding-banner');
   if (banner) banner.classList.remove('active');
 
-  showIngestToast('Import Strava en cours… (peut prendre 30-60s pour de gros historiques)', 'loading');
+  const prog = beginImport('Import Strava');
+  // Animation pendant l'appel ingest (1 seule requête → pas de % réel, on monte jusqu'à 25%).
+  let fake = 5;
+  prog?.update(fake, 'Import des activités…');
+  const timer = prog ? setInterval(() => { fake = Math.min(25, fake + 3); prog.update(fake, 'Import des activités…'); }, 600) : null;
 
   try {
     const cfg = window.SUPABASE_CONFIG;
-    const url = `${cfg.url}/functions/v1/strava-ingest`;
-    const res = await fetch(url, {
+    const res = await fetch(`${cfg.url}/functions/v1/strava-ingest`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      signal: _importAbort?.signal,
     });
+    clearInterval(timer);
     const data = await res.json();
+
     if (!res.ok) {
-      // Cas spécial : aucun compte Strava lié → proposer de le connecter
       if (data.error === 'no_strava_connection') {
-        showIngestToast('Aucun compte Strava connecté à ce compte', 'error');
-        setTimeout(async () => {
-          const ok = window.appConfirm
-            ? await window.appConfirm({
-                title: 'Connecter Strava',
-                message: "Aucun compte Strava n'est lié à ce compte Coach IA. Veux-tu en connecter un maintenant ?",
-                confirmLabel: 'Connecter Strava',
-                cancelLabel: 'Plus tard',
-              })
-            : confirm("Aucun compte Strava lié. En connecter un maintenant ?");
-          if (ok) startStravaOAuth();
-        }, 800);
+        prog?.close();
+        const ok = window.appConfirm
+          ? await window.appConfirm({
+              title: 'Connecter Strava',
+              message: "Aucun compte Strava n'est lié à ce compte Coach IA. Veux-tu en connecter un maintenant ?",
+              confirmLabel: 'Connecter Strava', cancelLabel: 'Plus tard',
+            })
+          : confirm("Aucun compte Strava lié. En connecter un maintenant ?");
+        if (ok) startStravaOAuth();
         if (banner) banner.classList.add('active');
         return;
       }
-      showIngestToast(`Erreur import : ${data.error || res.status}`, 'error');
-      // En cas d'erreur, ré-affiche la bannière pour que l'user puisse retenter
+      prog?.fail(`${data.error || res.status}`);
       if (banner) banner.classList.add('active');
       return;
     }
-    let msg, toastType;
     if (data.activities_inserted === 0 && data.activities_errored > 0) {
-      // Toutes les insertions ont échoué — afficher l'erreur
-      msg = `Import échoué : 0 sur ${data.activities_received} insérées. Erreur : ${data.first_error || 'inconnue'}`;
-      toastType = 'error';
       console.error('[strava-ingest] First error sample:', data.first_error_sample);
-      showIngestToast(msg, toastType);
+      prog?.fail(`0/${data.activities_received} insérées (${data.first_error || 'inconnue'})`);
       if (banner) banner.classList.add('active');
       return;
     }
 
-    msg = `Import terminé : ${data.activities_inserted || 0} activités, ${data.daily_metrics_computed || 0} jours calculés`;
-    if (data.activities_errored > 0) {
-      msg += ` (${data.activities_errored} erreurs)`;
-    }
-    showIngestToast(msg, 'success');
-    // Re-render in-place sans reload de page : on relance le data loader Supabase
-    // qui va refetch les activités fraîchement insérées et reconstruire window.DASHBOARD_DATA.
-    if (window.reloadDataFromSupabase) {
-      setTimeout(() => window.reloadDataFromSupabase(), 600);
-    }
-    // Puis on lance en arrière-plan le backfill des streams + power profile.
-    setTimeout(() => startStravaStreams(), 1500);
+    prog?.update(28, `${data.activities_inserted || 0} activités importées`);
+    if (window.reloadDataFromSupabase) setTimeout(() => window.reloadDataFromSupabase(), 600);
+
+    // Phase 2 : power profile dans LE MÊME écran (28 → 100 %), annulable.
+    await streamsPhase(session, prog, 28);
   } catch (e) {
-    showIngestToast('Erreur réseau : ' + (e.message || e), 'error');
+    clearInterval(timer);
+    if (e.name === 'AbortError' || _importCancelled) return; // annulé par l'utilisateur
+    prog?.fail(e.message || String(e));
     console.error('[strava-ingest]', e);
     if (banner) banner.classList.add('active');
   }
 }
 
-// ============ BACKFILL STREAMS + POWER PROFILE (edge function strava-streams) ============
-// Appelle strava-streams en boucle : chaque appel traite un lot d'activités.
-// S'arrête quand tout est traité (remaining=0) ou sur rate-limit Strava
-// (auquel cas il faudra relancer ~15 min plus tard).
-export async function startStravaStreams({ silent = false } = {}) {
+// ============ BACKFILL STREAMS + POWER PROFILE ============
+// Boucle d'appels à strava-streams (40 activités/lot). Reporte dans la barre `prog`
+// (de `base` % à 100 %). S'arrête si l'utilisateur annule, sur rate-limit, ou quand fini.
+async function streamsPhase(session, prog, base = 0) {
   const sb = window.sb;
-  if (!sb) return;
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) return;
   const cfg = window.SUPABASE_CONFIG;
   const url = `${cfg.url}/functions/v1/strava-streams`;
+  const span = 100 - base;
 
-  let totalSynced = 0;
-  for (let pass = 0; pass < 60; pass++) { // garde-fou : 60 lots max par session
+  let total = 0;
+  try {
+    const { count } = await sb.from('activities').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id);
+    total = count || 0;
+  } catch (_) { /* total inconnu */ }
+
+  for (let pass = 0; pass < 300; pass++) {
+    if (_importCancelled) { prog?.close(); return; }
     let data;
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ limit: 40 }),
+        signal: _importAbort?.signal,
       });
       data = await res.json();
-      if (!res.ok) {
-        console.warn('[strava-streams]', data.error || res.status);
-        break;
-      }
+      if (!res.ok) { prog?.fail(`${data.error || res.status}`); return; }
     } catch (e) {
-      console.warn('[strava-streams] réseau', e);
-      break;
+      if (e.name === 'AbortError' || _importCancelled) { prog?.close(); return; }
+      prog?.fail(e.message || String(e)); return;
     }
-    totalSynced += data.streams_synced || 0;
-    if (!silent && data.streams_synced > 0) {
-      showIngestToast(`Power profile : ${totalSynced} activités analysées${data.remaining ? `, ${data.remaining} restantes…` : ''}`, 'loading');
-    }
+
+    const remaining = data.remaining || 0;
+    const processed = total ? Math.max(0, total - remaining) : 0;
+    const pct = total ? Math.min(99, base + Math.round((processed / total) * span)) : base;
+    prog?.update(pct, `Power profile : ${processed}${total ? ' / ' + total : ''} activités`);
+
     if (data.rate_limited) {
-      if (!silent) showIngestToast(`Power profile : limite Strava atteinte, ${data.remaining} activités restantes. Reprise auto au prochain chargement.`, 'success');
-      break;
+      prog?.update(pct, `Limite Strava atteinte — ${remaining} restantes, reprise plus tard.`);
+      setTimeout(() => prog?.close(), 4000);
+      return;
     }
-    if (!data.remaining) {
-      if (!silent && totalSynced > 0) showIngestToast(`Power profile à jour (${totalSynced} activités analysées)`, 'success');
+    if (!remaining) {
+      prog?.update(100, 'Terminé ✓');
+      setTimeout(() => prog?.close(), 900);
       if (window.reloadDataFromSupabase) setTimeout(() => window.reloadDataFromSupabase(), 600);
-      break;
+      return;
     }
   }
+}
+
+// Lancement autonome (ex : bouton « Re-synchroniser ») → écran bloquant avec Annuler.
+export async function startStravaStreams() {
+  const sb = window.sb;
+  if (!sb) return;
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return;
+  const prog = beginImport('Analyse du Power Profile');
+  await streamsPhase(session, prog, 0);
 }
 window.startStravaStreams = startStravaStreams;
 
