@@ -14,12 +14,15 @@
 <!-- Leaflet : cartes pour tracer les parcours GPX -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="data.js" onerror="window._dataJsMissing=true"></script>
-<script src="streams.js" onerror="window._streamsJsMissing=true"></script>
+<!-- Mode Supabase-only : data.js / streams.js statiques supprimés.
+     Toutes les données (activités, streams, power profile, whoop) sont
+     chargées depuis Supabase au login (voir js/supabase-data-loader.js). -->
 <!-- Config Supabase (clé publique, voir supabase/SETUP_SUPABASE.md) -->
 <script src="supabase-config.js" onerror="console.warn('supabase-config.js absent')"></script>
 <!-- Config Strava OAuth (client_id public + URL Edge Function) -->
 <script src="strava-config.js" onerror="console.warn('strava-config.js absent')"></script>
+<!-- Config Whoop OAuth (client_id public + URL Edge Function) -->
+<script src="whoop-config.js" onerror="console.warn('whoop-config.js absent')"></script>
 <!-- ============================================================ -->
 <!-- Styles externalisés (refactoring Phase 1) -->
 <!-- L'ordre est important : base/cards/tabs en premier, mode-ia en dernier. -->
@@ -1133,9 +1136,4 @@
 </div>
 
 <!-- ============================================================ -->
-<!-- JS externalisé (refactoring Phase 2) -->
-<!-- Module ES6 — defer automatique, exécuté après le DOM ready. -->
-<!-- ============================================================ -->
-<script type="module" src="js/app.js"></script>
-</body>
-</html>
+<!-- JS externalisé 

@@ -83,14 +83,34 @@ function hideLoadingOverlay() {
   if (el) el.classList.remove('active');
 }
 
+// Colonnes "légères" des activités pour le chargement de masse.
+// On EXCLUT volontairement streams_gz / streams_blob / gpx_blob / power_curve :
+// ces blobs sont lourds (Mo par activité) et chargés à la demande seulement
+// (voir loadStreams dans app.js). Charger tout d'un coup ferait des dizaines de Mo.
+const ACTIVITY_LIGHT_COLS = [
+  'strava_id', 'name', 'type', 'sport', 'sport_raw', 'tss',
+  'moving_time', 'elapsed_time', 'start_date_local',
+  'distance_km', 'total_elevation_gain', 'total_elevation_loss',
+  'avg_speed_kmh', 'max_speed_kmh', 'max_speed_smooth_kmh',
+  'np', 'avg_watts', 'max_watts', 'avg_heartrate', 'max_heartrate',
+  'avg_cadence', 'max_cadence', 'kj', 'calories',
+  'intensity', 'variability_index', 'zones_hr', 'zones_power',
+].join(',');
+
+// Colonnes "safe" de strava_connections : SURTOUT PAS les tokens.
+// La migration SQL révoque l'accès aux colonnes access_token/refresh_token
+// pour le rôle authenticated → un select('*') renverrait une erreur 403.
+const STRAVA_CONN_SAFE_COLS =
+  'user_id, strava_athlete_id, athlete_name, scope, first_connected_at, last_sync_at, last_sync_status, last_sync_error, total_activities_synced';
+
 // Fetch paginé : Supabase limite à 1000 lignes par requête, on boucle si besoin.
-async function fetchAllPaged(table, userId, orderCol) {
+async function fetchAllPaged(table, userId, orderCol, columns = '*') {
   const PAGE = 1000;
   const sb = window.sb;
   const out = [];
   let from = 0;
   while (true) {
-    let q = sb.from(table).select('*').eq('user_id', userId).range(from, from + PAGE - 1);
+    let q = sb.from(table).select(columns).eq('user_id', userId).range(from, from + PAGE - 1);
     if (orderCol) q = q.order(orderCol, { ascending: true });
     const { data, error } = await q;
     if (error) throw error;
@@ -120,11 +140,11 @@ async function loadFromSupabase() {
       { data: stravaConnection },
     ] = await Promise.all([
       sb.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
-      fetchAllPaged('activities', userId, 'start_date_local'),
+      fetchAllPaged('activities', userId, 'start_date_local', ACTIVITY_LIGHT_COLS),
       fetchAllPaged('daily_metrics', userId, 'iso_date'),
       fetchAllPaged('power_profile', userId, 'duration_s'),
       fetchAllPaged('whoop_data', userId, 'iso_date'),
-      sb.from('strava_connections').select('*').eq('user_id', userId).maybeSingle(),
+      sb.from('strava_connections').select(STRAVA_CONN_SAFE_COLS).eq('user_id', userId).maybeSingle(),
     ]);
 
     // Si la BDD est vide pour cet user, on REMPLACE DASHBOARD_DATA par un dataset
@@ -364,12 +384,19 @@ function showOnboardingBanner() {
         </svg>
         <span>Connecter Strava</span>
       </button>
+      <button class="onboarding-whoop-btn" id="onboarding-connect-whoop" type="button">
+        <span>Connecter Whoop</span>
+      </button>
     </div>
   `;
-  // Wire le bouton
+  // Wire les boutons
   banner.querySelector('#onboarding-connect-strava').addEventListener('click', () => {
     if (window.startStravaOAuth) window.startStravaOAuth();
     else alert('Module Strava OAuth non chargé');
+  });
+  banner.querySelector('#onboarding-connect-whoop').addEventListener('click', () => {
+    if (window.startWhoopOAuth) window.startWhoopOAuth();
+    else alert('Module Whoop OAuth non chargé');
   });
   document.body.appendChild(banner);
   injectOnboardingStyles();
@@ -424,46 +451,4 @@ function injectOnboardingStyles() {
       padding: 10px 18px;
       font-size: 13px;
       font-weight: 700;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.15s;
-      box-shadow: 0 2px 8px rgba(252, 76, 2, 0.25);
-      flex-shrink: 0;
-    }
-    .onboarding-strava-btn:hover {
-      background: #e34302;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(252, 76, 2, 0.35);
-    }
-    .onboarding-strava-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-  `;
-  document.head.appendChild(s);
-}
-
-// ============ TRIGGER RE-RENDER ============
-function triggerFullReload() {
-  // Met à jour l'en-tête (athlète)
-  const data = window.DASHBOARD_DATA;
-  if (data && data.athlete) {
-    const sub = document.querySelector('.logo-text p');
-    if (sub) {
-      const ftpStr = data.athlete.ftp ? ` · FTP ${data.athlete.ftp}W` : '';
-      sub.textContent = `${data.athlete.name}${ftpStr}`;
-    }
-  }
-  // Re-rend les vues qui peuvent l'être facilement
-  setTimeout(() => {
-    if (window.renderBilan) window.renderBilan();
-    if (window.renderPowerProfile) window.renderPowerProfile();
-    if (window.renderWellnessTrend) window.renderWellnessTrend();
-    if (window.renderCalendar) window.renderCalendar();
-    if (window.renderCompList) window.renderCompList();
-  }, 100);
-  // Pour les KPI hero + charts du tableau de bord (qui sont dans le MAIN closure
-  // et difficiles à re-trigger depuis l'extérieur), on émet un event que d'autres
-  // modules peuvent écouter.
-  window.dispatchEvent(new CustomEvent('dashboardDataReplaced', { detail: { data } }));
-}
-
-// Expose pour debug
-window.reloadDataFromSupabase = loadFromSupabase;
+      cu

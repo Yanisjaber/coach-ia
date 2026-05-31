@@ -7,11 +7,39 @@
    et retourne la liste des jours convertie (date string → Date).
    ============================================================ */
 
+// Dataset de secours au boot : 90 jours vides (Date objects) pour que les
+// vues ne crashent pas AVANT que Supabase n'injecte les vraies données au login.
+// Permet de supprimer data.js (mode Supabase-only) sans casser le démarrage.
+function emptyBootDays() {
+  const days = [];
+  const today = new Date();
+  for (let i = 89; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    d.setHours(12, 0, 0, 0);
+    days.push({
+      date: d, tss: 0, ctl: 0, atl: 0, tsb: 0, duration: 0,
+      sessionName: null, sessionType: null, sport: null,
+      np: 0, avgW: 0, hr: 0, ftpPct: 0, intensity: 0,
+      compliance: null, zones: null, zones_hr: null, zones_power: null,
+      activities: [],
+      recovery: null, hrv: null, sleepH: null, sleepQ: null, whoopSource: null,
+      rhr: null, strain: null, deepH: null, remH: null,
+    });
+  }
+  return days;
+}
+
 export async function loadData() {
   try {
     const json = window.DASHBOARD_DATA;
-    if (!json) throw new Error('window.DASHBOARD_DATA absent (data.js non chargé)');
-    if (!json.days || !json.days.length) throw new Error('data.js vide');
+    // Mode Supabase-only : pas de data.js statique. On boote sur un dataset vide ;
+    // supabase-data-loader.js remplacera DASHBOARD_DATA dès le login.
+    if (!json || !json.days || !json.days.length) {
+      window._planFromAPI = [];
+      window._athleteMeta = null;
+      return emptyBootDays();
+    }
 
     // Mise à jour de l'en-tête avec l'athlète réel (le <p> a peut-être été supprimé du DOM)
     if (json.athlete) {
@@ -64,20 +92,4 @@ export async function loadData() {
     console.error('⚠️ Chargement data.json impossible :', e.message);
     const badge = document.querySelector('header .badge');
     if (badge) {
-      badge.textContent = '⚠ data.js absent — relancer fetch_data.py';
-      badge.style.background = 'rgba(248, 113, 113, 0.15)';
-      badge.style.borderColor = 'rgba(248, 113, 113, 0.4)';
-      badge.style.color = 'var(--danger)';
-    }
-    // Afficher message d'aide dans le corps
-    document.querySelector('.container').insertAdjacentHTML('beforeend',
-      `<div style="background:#1c2230;border:1px solid #f87171;border-radius:10px;padding:20px;margin-top:20px;">
-        <h3 style="color:#f87171;margin-bottom:8px;">data.js introuvable</h3>
-        <p style="color:#8b94a8;font-size:13px;">Le dashboard a besoin du fichier <code>data.js</code> dans le même dossier. Pour le générer :</p>
-        <pre style="background:#0b0e14;padding:12px;border-radius:6px;margin-top:10px;font-size:12px;overflow-x:auto;">cd "C:\\Users\\Cybertek\\Documents\\Claude\\Projects\\Coach IA"
-python fetch_data.py</pre>
-        <p style="color:#8b94a8;font-size:12px;margin-top:8px;">Puis rafraîchir cette page (F5).</p>
-       </div>`);
-    throw e;
-  }
-}
+      badge.te

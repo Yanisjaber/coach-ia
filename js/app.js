@@ -28,6 +28,7 @@ import './storage-adapter.js';
 import './cloud-sync.js';
 import './supabase-data-loader.js';
 import './strava-oauth.js';
+import './whoop-oauth.js';
 
 // ========= MODE IA / MANUEL =========
 // Sorti dans js/app-mode.js. Auto-bootstrap au DOMContentLoaded à l'import.
@@ -3257,17 +3258,50 @@ async function loadStreams(activityId) {
     streamsCache[activityId] = cached;
     return cached;
   }
-  // 3. Fetch live via le proxy
+  // 3. Supabase : streams stockés compressés (gzip+base64) dans activities.streams_gz.
+  //    On les récupère à la demande pour CETTE activité uniquement.
   try {
-    const data = await apiFetch(`/activity/${activityId}/streams?types=watts,heartrate,cadence,distance,altitude`);
-    streamsCache[activityId] = data;
-    saveStreamsToLS(activityId, data);
-    return data;
+    const data = await loadStreamsFromSupabase(activityId);
+    if (data) {
+      streamsCache[activityId] = data;
+      saveStreamsToLS(activityId, data);
+      return data;
+    }
   } catch (e) {
-    console.error('loadStreams:', e);
-    streamsCache[activityId] = null;
-    return null;
+    console.error('loadStreams (supabase):', e);
   }
+  // 4. Pas de streams disponibles (activité sans capteur, ou pas encore syncée)
+  streamsCache[activityId] = null;
+  return null;
+}
+
+// Récupère et décompresse les streams d'une activité depuis Supabase.
+// activityId = strava_id (tel que stocké dans DASHBOARD_DATA).
+async function loadStreamsFromSupabase(activityId) {
+  const sb = window.sb;
+  const user = window._coachIaUser || (sb && (await sb.auth.getUser()).data.user);
+  if (!sb || !user) return null;
+  const { data, error } = await sb
+    .from('activities')
+    .select('streams_gz, streams_format')
+    .eq('user_id', user.id)
+    .eq('strava_id', activityId)
+    .maybeSingle();
+  if (error || !data || !data.streams_gz || data.streams_format === 'none') return null;
+  return await gunzipBase64ToJson(data.streams_gz);
+}
+
+// Décompresse une string base64(gzip(JSON)) → objet JS (via DecompressionStream).
+async function gunzipBase64ToJson(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const ds = new DecompressionStream('gzip');
+  const writer = ds.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const text = await new Response(ds.readable).text();
+  return JSON.parse(text);
 }
 
 async function loadActivityFull(activityId) {
@@ -8021,47 +8055,4 @@ document.querySelectorAll('#sport-filter .sport-btn').forEach(btn => {
         const r = await fetch(`/api/refresh-status?runId=${runId}`, { credentials: 'include' });
         if (r.ok) {
           const j = await r.json();
-          if (j.status === 'completed') return j.conclusion === 'success';
-        }
-      } catch (e) { /* on retente */ }
-      await new Promise(res => setTimeout(res, 4000));
-    }
-    return false;
-  }
-
-  btn.addEventListener('click', async () => {
-    if (btn.disabled) return;
-    setLoading(true, 'Déclenchement du run...');
-    try {
-      const resp = await fetch('/api/refresh', { method: 'POST', credentials: 'include' });
-      if (!resp.ok) {
-        const txt = await resp.text();
-        await appAlert({
-          title: 'Erreur de déclenchement',
-          message: `HTTP ${resp.status}\n${txt.slice(0, 200)}`,
-        });
-        setLoading(false);
-        return;
-      }
-      const { runId } = await resp.json();
-      setLoading(true, 'Récupération Strava + Whoop...');
-      const ok = await pollStatus(runId);
-      if (ok) {
-        // Reload avec cache-bust pour forcer la nouvelle data.js
-        location.reload();
-      } else {
-        await appAlert({
-          title: 'Échec du run',
-          message: 'Le run GitHub Actions a échoué ou pris trop de temps. Voir https://github.com/Yanisjaber/coach-ia/actions',
-        });
-        setLoading(false);
-      }
-    } catch (e) {
-      await appAlert({
-        title: 'Erreur réseau',
-        message: e.message || String(e),
-      });
-      setLoading(false);
-    }
-  });
-})();
+         
