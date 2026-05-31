@@ -126,6 +126,18 @@ function showLoginModal() {
     // Wire form
     _modal.querySelector('#auth-form').addEventListener('submit', handleSubmit);
   }
+  // Vider les champs pour ne pas pré-remplir le compte précédemment connecté
+  const emailInput = _modal.querySelector('#auth-email');
+  const pwdInput = _modal.querySelector('#auth-password');
+  if (emailInput) emailInput.value = '';
+  if (pwdInput) pwdInput.value = '';
+  const errEl = _modal.querySelector('#auth-error');
+  if (errEl) errEl.textContent = '';
+  // Réinitialiser le bouton (sinon il reste bloqué sur "Connexion..." désactivé
+  // après une connexion réussie → reconnexion impossible sans rafraîchir).
+  setMode('login');
+  const submitBtn = _modal.querySelector('#auth-submit');
+  if (submitBtn) submitBtn.disabled = false;
   _modal.classList.add('active');
 }
 

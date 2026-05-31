@@ -43,7 +43,7 @@ export async function startStravaOAuth() {
     client_id: cfg.client_id,
     response_type: 'code',
     redirect_uri: cfg.redirect_uri,
-    approval_prompt: 'auto',
+    approval_prompt: 'force', // redemande l'écran d'autorisation à chaque connexion (comme Whoop)
     scope: SCOPES,
     state: stateData,
   });
@@ -57,10 +57,22 @@ async function checkOAuthReturn() {
     // Nettoyer l'URL
     url.searchParams.delete('strava_connected');
     window.history.replaceState({}, '', url.toString());
-    // Afficher une notif et déclencher l'ingestion
-    showStravaConnectedToast();
-    // Démarrer l'ingestion dès que le SDK Supabase est prêt
-    setTimeout(() => startStravaIngest(), 1000);
+    // Reconnexion : si des activités sont DÉJÀ en base (déconnexion douce précédente),
+    // on ne re-télécharge pas tout — on réaffiche simplement l'existant.
+    // Sinon (première connexion / compte vide), on lance l'import complet.
+    setTimeout(async () => {
+      try {
+        const sb = window.sb;
+        const { data: { user } } = await sb.auth.getUser();
+        const { count } = await sb.from('activities').select('id', { count: 'exact', head: true }).eq('user_id', user.id);
+        if ((count || 0) > 0) {
+          showIngestToast('Strava reconnecté — données déjà présentes', 'success');
+          if (window.reloadDataFromSupabase) window.reloadDataFromSupabase();
+          return;
+        }
+      } catch (_) { /* en cas de doute, on importe */ }
+      startStravaIngest();
+    }, 1000);
   }
   if (url.searchParams.get('strava_error')) {
     const err = url.searchParams.get('strava_error');
@@ -71,23 +83,34 @@ async function checkOAuthReturn() {
 }
 
 // ============ IMPORT (écran bloquant avec barre + bouton Annuler) ============
-// État partagé d'annulation pour stopper l'import en cours.
+// Annuler = ARRÊTER l'import. La connexion reste (pour la retirer : bouton Déconnecter).
+// On ne touche pas à la connexion ici → aucun état incohérent possible, même après
+// un rechargement de page (une fonction serverless ne s'arrête pas de toute façon).
 let _importCancelled = false;
-let _importAbort = null;
+
+// État global de synchro Strava : permet à la page Connexions d'afficher la barre
+// même si la synchro a été lancée ailleurs (ex : depuis la bannière / après connexion).
+function setStravaSync(active, pct, label) {
+  window.coachSyncState = window.coachSyncState || {};
+  window.coachSyncState.strava = { active, pct: pct || 0, label: label || '' };
+  window.dispatchEvent(new CustomEvent('strava-sync-progress', { detail: window.coachSyncState.strava }));
+}
 
 function beginImport(title) {
   _importCancelled = false;
-  _importAbort = new AbortController();
-  const prog = window.coachProgress
-    ? window.coachProgress(title, {
-        onCancel: () => { _importCancelled = true; try { _importAbort.abort(); } catch (_) {} },
-      })
-    : null;
-  return prog;
+  // Barre NON-bloquante (encart en bas à droite) — pas d'arrêt possible.
+  const bg = window.coachBgProgress ? window.coachBgProgress(title) : null;
+  setStravaSync(true, 0, 'Démarrage…');
+  return {
+    update(p, label) { bg?.update(p, label); setStravaSync(true, p, label); },
+    fail(msg) { bg?.fail?.(msg); setStravaSync(false, 0, ''); },
+    done(label) { bg?.done?.(label); setStravaSync(false, 100, label); },
+    close() { bg?.close?.(); setStravaSync(false, 0, ''); },
+  };
 }
 
 // ============ INGESTION : appel à l'Edge Function strava-ingest ============
-export async function startStravaIngest() {
+export async function startStravaIngest(opts = {}) {
   const sb = window.sb;
   if (!sb) { showIngestToast('Supabase non initialisé', 'error'); return; }
   const { data: { session } } = await sb.auth.getSession();
@@ -96,21 +119,36 @@ export async function startStravaIngest() {
   const banner = document.getElementById('onboarding-banner');
   if (banner) banner.classList.remove('active');
 
-  const prog = beginImport('Import Strava');
-  // Animation pendant l'appel ingest (1 seule requête → pas de % réel, on monte jusqu'à 25%).
-  let fake = 5;
-  prog?.update(fake, 'Import des activités…');
-  const timer = prog ? setInterval(() => { fake = Math.min(25, fake + 3); prog.update(fake, 'Import des activités…'); }, 600) : null;
+  // opts.prog : barre fournie (ex : intégrée dans la carte Connexions) ; sinon encart.
+  const prog = opts.prog || beginImport('Import Strava');
+  // L'ingest est UN seul appel (~30s) sans avancement intermédiaire → on affiche une
+  // progression LINÉAIRE (vitesse constante) basée sur le temps écoulé, plafonnée à 25%.
+  // Elle saute à 28% dès que l'appel répond (puis le power profile prend le relais).
+  const ingestStart = Date.now();
+  const INGEST_EXPECTED_MS = 30000; // durée estimée de l'import des activités
+  const INGEST_CEIL = 25;
+  const timer = prog ? setInterval(() => {
+    const p = Math.min(INGEST_CEIL, (Date.now() - ingestStart) / INGEST_EXPECTED_MS * INGEST_CEIL);
+    prog.update(Math.round(p), 'Import des activités…');
+  }, 300) : null;
 
   try {
     const cfg = window.SUPABASE_CONFIG;
     const res = await fetch(`${cfg.url}/functions/v1/strava-ingest`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-      signal: _importAbort?.signal,
     });
     clearInterval(timer);
     const data = await res.json();
+
+    // L'utilisateur a annulé pendant l'import des activités : l'appel serveur est
+    // maintenant retombé, on peut rollback proprement (première connexion) puis sortir.
+    if (_importCancelled) {
+      prog?.close();
+      showIngestToast('Import annulé', 'success');
+      if (window.reloadDataFromSupabase) setTimeout(() => window.reloadDataFromSupabase(), 400);
+      return;
+    }
 
     if (!res.ok) {
       if (data.error === 'no_strava_connection') {
@@ -166,40 +204,72 @@ async function streamsPhase(session, prog, base = 0) {
     total = count || 0;
   } catch (_) { /* total inconnu */ }
 
+  // Point de reprise : activités déjà traitées (streams_synced_at non null) →
+  // la barre démarre à ce niveau au lieu de repartir de 0.
+  let startProcessed = 0;
+  try {
+    const { count } = await sb.from('activities').select('id', { count: 'exact', head: true })
+      .eq('user_id', session.user.id).is('streams_synced_at', null);
+    startProcessed = total ? Math.max(0, total - (count || 0)) : 0;
+  } catch (_) { /* ignore */ }
+
+  // Le serveur renvoie l'avancement par paquets de 40 → on anime le compteur affiché
+  // pour qu'il monte 1 par 1 (interpolation continue vers la vraie valeur `target`).
+  let displayed = startProcessed;
+  let target = startProcessed;
+  const paint = () => {
+    const pct = total ? Math.min(99, base + Math.round((displayed / total) * span)) : base;
+    prog?.update(pct, `Power profile : ${displayed}${total ? ' / ' + total : ''} activités`);
+  };
+  paint(); // affichage initial au point de reprise
+  const tween = prog ? setInterval(() => {
+    if (displayed < target) {
+      displayed = Math.min(target, displayed + Math.max(1, Math.round((target - displayed) / 15)));
+      paint();
+    }
+  }, 40) : null;
+  const stopTween = () => { if (tween) clearInterval(tween); };
+
   for (let pass = 0; pass < 300; pass++) {
-    if (_importCancelled) { prog?.close(); return; }
+    // Annulation : le lot serveur précédent est retombé → rollback sûr si 1ʳᵉ connexion.
+    if (_importCancelled) {
+      stopTween();
+      prog?.close();
+      showIngestToast('Import annulé', 'success');
+      return;
+    }
     let data;
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ limit: 40 }),
-        signal: _importAbort?.signal,
       });
       data = await res.json();
-      if (!res.ok) { prog?.fail(`${data.error || res.status}`); return; }
+      if (!res.ok) { stopTween(); prog?.fail(`${data.error || res.status}`); return; }
     } catch (e) {
-      if (e.name === 'AbortError' || _importCancelled) { prog?.close(); return; }
+      stopTween();
+      if (_importCancelled) { prog?.close(); return; }
       prog?.fail(e.message || String(e)); return;
     }
 
     const remaining = data.remaining || 0;
-    const processed = total ? Math.max(0, total - remaining) : 0;
-    const pct = total ? Math.min(99, base + Math.round((processed / total) * span)) : base;
-    prog?.update(pct, `Power profile : ${processed}${total ? ' / ' + total : ''} activités`);
+    target = total ? Math.max(0, total - remaining) : (target + (data.streams_synced || 0));
 
     if (data.rate_limited) {
-      prog?.update(pct, `Limite Strava atteinte — ${remaining} restantes, reprise plus tard.`);
-      setTimeout(() => prog?.close(), 4000);
+      // on laisse le compteur rattraper la cible, puis message
+      const pct = total ? Math.min(99, base + Math.round((target / total) * span)) : base;
+      setTimeout(() => { stopTween(); prog?.update(pct, `Limite Strava atteinte — ${remaining} restantes, reprise plus tard.`); setTimeout(() => prog?.close(), 4000); }, 700);
       return;
     }
     if (!remaining) {
-      prog?.update(100, 'Terminé ✓');
-      setTimeout(() => prog?.close(), 900);
-      if (window.reloadDataFromSupabase) setTimeout(() => window.reloadDataFromSupabase(), 600);
+      // laisser le tween finir de compter jusqu'au total avant de clore
+      setTimeout(() => { stopTween(); displayed = target; prog?.update(100, 'Terminé ✓'); setTimeout(() => prog?.close(), 900); }, 700);
+      if (window.reloadDataFromSupabase) setTimeout(() => window.reloadDataFromSupabase(), 1200);
       return;
     }
   }
+  stopTween();
 }
 
 // Lancement autonome (ex : bouton « Re-synchroniser ») → écran bloquant avec Annuler.
@@ -249,7 +319,7 @@ function showIngestToast(message, type = 'loading') {
   document.body.appendChild(toast);
   // Auto-hide après 8s sauf si loading
   if (type !== 'loading') {
-    setTimeout(() => { toast.remove(); if (_ingestToast === toast) _ingestToast = null; }, 8000);
+    setTimeout(() => { toast.remove(); if (_ingestToast === toast) _ingestToast = null; }, 4000);
   }
 }
 

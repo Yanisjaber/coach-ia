@@ -23,7 +23,7 @@ async function fetchConnections() {
   const sb = window.sb;
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { user: null };
-  const [{ data: strava }, { data: whoop }, { count: whoopDays }] = await Promise.all([
+  const [{ data: strava }, { data: whoop }, { count: whoopDays }, { count: stravaActs }] = await Promise.all([
     sb.from('strava_connections')
       .select('strava_athlete_id, athlete_name, last_sync_at, last_sync_status, total_activities_synced, first_connected_at')
       .eq('user_id', user.id).maybeSingle(),
@@ -31,8 +31,9 @@ async function fetchConnections() {
       .select('whoop_user_id, athlete_name, last_sync_at, last_sync_status, first_connected_at')
       .eq('user_id', user.id).maybeSingle(),
     sb.from('whoop_data').select('iso_date', { count: 'exact', head: true }).eq('user_id', user.id),
+    sb.from('activities').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
   ]);
-  return { user, strava, whoop, whoopDays: whoopDays || 0 };
+  return { user, strava, whoop, whoopDays: whoopDays || 0, stravaActs: stravaActs || 0 };
 }
 
 export async function openConnectionsModal() {
@@ -79,9 +80,12 @@ async function render(body) {
     return;
   }
 
+  // Données orphelines : pas de compte Strava connecté mais des activités restent en base.
+  const orphanStrava = !data.strava && data.stravaActs > 0;
   body.innerHTML = `
-    ${cardStrava(data.strava)}
+    ${cardStrava(data.strava, data.stravaActs)}
     ${cardWhoop(data.whoop, data.whoopDays)}
+    ${orphanStrava ? `<button class="cnx-purge" data-act="purge-strava" type="button">Vider les activités restantes (${data.stravaActs})</button>` : ''}
     <p class="cnx-foot">Tes jetons d'accès restent stockés côté serveur (Supabase) et ne sont jamais exposés ici.</p>
   `;
   wire(body);
@@ -89,16 +93,17 @@ async function render(body) {
 
 function statusPill(conn) {
   if (!conn) return `<span class="cnx-pill off">Non connecté</span>`;
-  const s = conn.last_sync_status;
-  if (s === 'error') return `<span class="cnx-pill err">Erreur de sync</span>`;
-  if (s === 'running') return `<span class="cnx-pill run">Sync en cours…</span>`;
+  if (conn.last_sync_status === 'error') return `<span class="cnx-pill err">Erreur de sync</span>`;
+  // On n'affiche plus "Sync en cours" (statut interne, source de confusion) :
+  // si le lien existe, c'est "Connecté". La progression d'un import actif est
+  // déjà montrée par la barre de progression dédiée.
   return `<span class="cnx-pill on">Connecté</span>`;
 }
 
-function cardStrava(c) {
+function cardStrava(c, acts = 0) {
   const last = fmtDate(c?.last_sync_at);
   const sub = c
-    ? `${c.athlete_name ? c.athlete_name + ' · ' : ''}${c.total_activities_synced || 0} activités${last ? ' · sync ' + last : ''}`
+    ? `${c.athlete_name ? c.athlete_name + ' · ' : ''}${acts} activités${last ? ' · sync ' + last : ''}`
     : 'Importe automatiquement tes activités, puissances et streams.';
   return `
     <div class="cnx-card strava">
@@ -109,13 +114,30 @@ function cardStrava(c) {
         <div class="cnx-card-title"><strong>Strava</strong>${statusPill(c)}</div>
       </div>
       <p class="cnx-card-sub">${sub}</p>
-      <div class="cnx-actions">
-        ${c
-          ? `<button class="cnx-btn primary" data-act="strava-sync">Re-synchroniser</button>
-             ${c.last_sync_status === 'error' ? `<button class="cnx-btn ghost" data-act="strava-connect">Reconnecter</button>` : ''}
-             <button class="cnx-btn danger" data-act="strava-disconnect">Déconnecter</button>`
-          : `<button class="cnx-btn primary" data-act="strava-connect">Connecter Strava</button>`}
-      </div>
+      ${stravaSyncBarOrActions(c)}
+    </div>`;
+}
+
+// Affiche la barre de synchro (si une synchro Strava est en cours) OU les boutons.
+function stravaSyncBarOrActions(c) {
+  const st = window.coachSyncState && window.coachSyncState.strava;
+  if (st && st.active) {
+    return `
+      <div class="cnx-cardprog" data-sync="strava">
+        <div class="cnx-cardprog-row">
+          <span class="cnx-cardprog-step" data-ccp="step">${st.label || 'Synchronisation…'}</span>
+          <span class="cnx-cardprog-pct" data-ccp="pct">${st.pct || 0} %</span>
+        </div>
+        <div class="cnx-cardprog-bar"><div class="cnx-cardprog-fill" data-ccp="fill" style="width:${st.pct || 0}%"></div></div>
+      </div>`;
+  }
+  return `
+    <div class="cnx-actions">
+      ${c
+        ? `<button class="cnx-btn primary" data-act="strava-sync">Re-synchroniser</button>
+           ${c.last_sync_status === 'error' ? `<button class="cnx-btn ghost" data-act="strava-connect">Reconnecter</button>` : ''}
+           <button class="cnx-btn danger" data-act="strava-disconnect">Déconnecter</button>`
+        : `<button class="cnx-btn primary" data-act="strava-connect">Connecter Strava</button>`}
     </div>`;
 }
 
@@ -148,8 +170,10 @@ function wire(body) {
       if (act === 'strava-connect') return window.startStravaOAuth?.();
       if (act === 'whoop-connect') return window.startWhoopOAuth?.();
       if (act === 'strava-sync') {
-        closeOverlay();
-        await window.startStravaIngest?.(); // enchaîne aussi le power profile
+        // Barre DANS la carte ; les boutons réapparaissent à la fin (onFinish → render).
+        const card = btn.closest('.cnx-card');
+        const prog = inCardProgress(card, 'Synchronisation Strava', () => render(body));
+        window.startStravaIngest?.({ prog }); // enchaîne aussi le power profile
         return;
       }
       if (act === 'whoop-sync') {
@@ -159,6 +183,7 @@ function wire(body) {
       }
       if (act === 'strava-disconnect') return showDisconnectChoice('strava', 'Strava', body);
       if (act === 'whoop-disconnect') return showDisconnectChoice('whoop', 'Whoop', body);
+      if (act === 'purge-strava') return doDisconnect('strava', 'Strava', true, body); // efface les activités orphelines
     });
   });
 }
@@ -218,36 +243,66 @@ async function doDisconnect(provider, label, wipe, body) {
   const cfg = window.SUPABASE_CONFIG;
   const url = `${cfg.url}/functions/v1/disconnect-integration`;
 
-  // Étapes (tables à traiter) — chacune fait avancer la barre de progression.
-  const steps = wipe
-    ? (provider === 'strava'
-        ? [['power_profile', 'Power profile'], ['daily_metrics', 'Charge (CTL/ATL/TSB)'],
-           ['activities', 'Activités'], ['strava_connections', 'Connexion'], ['user_profiles_reset', 'Profil athlète']]
-        : [['whoop_data', 'Données Whoop'], ['whoop_connections', 'Connexion']])
-    : [[provider === 'strava' ? 'strava_connections' : 'whoop_connections', 'Connexion']];
-
+  // Suppression ATOMIQUE : un seul appel serveur efface tout d'un coup (pas d'étapes).
+  // → un rechargement ne peut plus laisser d'état partiel (la fonction serverless va
+  //   au bout de son exécution côté serveur de toute façon).
   const prog = showProgress(wipe ? `Suppression des données ${label}…` : `Déconnexion de ${label}…`);
+  // Barre animée (vitesse constante, un seul appel → pas d'avancement réel).
+  const start = Date.now();
+  const EXPECTED = wipe ? 8000 : 2500;
+  const timer = setInterval(() => {
+    const p = Math.min(92, (Date.now() - start) / EXPECTED * 92);
+    prog.update(Math.round(p), wipe ? 'Suppression en cours…' : 'Déconnexion…');
+  }, 200);
   try {
-    for (let i = 0; i < steps.length; i++) {
-      const [table, lbl] = steps[i];
-      prog.update(Math.round((i / steps.length) * 100), lbl);
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, wipe, only: table }),
-      });
-      const data = await res.json();
-      if (!res.ok) { prog.fail(`${data.error || res.status}`); return; }
-    }
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, wipe }), // pas de "only" → mode tout-en-un (atomique)
+    });
+    const data = await res.json();
+    clearInterval(timer);
+    if (!res.ok) { prog.fail(`${data.error || res.status}${data.detail ? ' — ' + data.detail : ''}`); return; }
     prog.update(100, 'Terminé');
     setTimeout(() => {
       prog.close();
-      if (wipe && window.reloadDataFromSupabase) window.reloadDataFromSupabase();
+      if (window.reloadDataFromSupabase) window.reloadDataFromSupabase();
       openConnectionsModal(); // rouvre la page Connexions avec le statut à jour
     }, 650);
   } catch (e) {
+    clearInterval(timer);
     prog.fail(e.message || String(e));
   }
+}
+
+// ====== Barre de progression INTÉGRÉE dans une carte de connexion ======
+// Masque les boutons de la carte et affiche une barre à la place pendant la sync.
+// onFinish est appelé à la fin (pour re-rendre la carte → boutons + compte à jour).
+function inCardProgress(card, title, onFinish) {
+  injectStyles();
+  const actions = card.querySelector('.cnx-actions');
+  if (actions) actions.style.display = 'none';
+  card.querySelector('.cnx-cardprog')?.remove();
+  const wrap = document.createElement('div');
+  wrap.className = 'cnx-cardprog';
+  wrap.innerHTML = `
+    <div class="cnx-cardprog-row">
+      <span class="cnx-cardprog-step" id="ccp-step">${title}…</span>
+      <span class="cnx-cardprog-pct" id="ccp-pct">0 %</span>
+    </div>
+    <div class="cnx-cardprog-bar"><div class="cnx-cardprog-fill" id="ccp-fill" style="width:0%"></div></div>`;
+  card.appendChild(wrap);
+  const fill = wrap.querySelector('#ccp-fill');
+  const pct = wrap.querySelector('#ccp-pct');
+  const step = wrap.querySelector('#ccp-step');
+  let finished = false;
+  const finish = () => { if (finished) return; finished = true; onFinish?.(); };
+  return {
+    update(p, label) { fill.style.width = p + '%'; pct.textContent = p + ' %'; if (label) step.textContent = label; },
+    fail(msg) { step.textContent = 'Erreur : ' + msg; step.style.color = 'var(--danger, #f87171)'; setTimeout(finish, 2500); },
+    done(label) { fill.style.width = '100%'; pct.textContent = '100 %'; if (label) step.textContent = label; setTimeout(finish, 800); },
+    close() { setTimeout(finish, 300); },
+  };
 }
 
 // ====== Overlay de progression (barre + pourcentage) ======
@@ -329,7 +384,18 @@ function injectStyles() {
     .cnx-btn.primary { background: var(--accent, #4ade80); color: #06231a; }
     .cnx-btn.ghost { background: var(--bg-elev2, #232a38); color: var(--text, #e8edf5); }
     .cnx-btn.danger { background: rgba(248,113,113,0.12); color: var(--danger, #f87171); }
+    /* Barre de progression intégrée dans la carte */
+    .cnx-cardprog { margin-top: 4px; }
+    .cnx-cardprog-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+    .cnx-cardprog-step { color: var(--text-dim, #8b94a8); font-size: 12px; }
+    .cnx-cardprog-pct { color: var(--accent, #4ade80); font-size: 12px; font-weight: 700; }
+    .cnx-cardprog-bar { height: 8px; background: var(--bg-elev, #161b26); border-radius: 99px; overflow: hidden; border: 1px solid var(--border, #2a3242); }
+    .cnx-cardprog-fill { height: 100%; background: linear-gradient(90deg, #4ade80, #22c55e); border-radius: 99px; transition: width .35s ease; }
     .cnx-foot { color: var(--text-mute, #6b7689); font-size: 11.5px; margin: 4px 0 0; line-height: 1.5; }
+    .cnx-purge { width: 100%; background: rgba(248,113,113,0.10); color: var(--danger, #f87171);
+      border: 1px solid rgba(248,113,113,0.30); border-radius: 10px; padding: 11px; font-size: 12.5px;
+      font-weight: 700; cursor: pointer; font-family: inherit; transition: filter .15s; }
+    .cnx-purge:hover { filter: brightness(1.15); }
 
     /* Écran de choix de déconnexion */
     .cnx-choice { display: flex; flex-direction: column; gap: 12px; }
@@ -368,9 +434,12 @@ function injectStyles() {
       background: var(--bg-elev, #161b26); border: 1px solid var(--border, #2a3242);
       border-radius: 12px; padding: 14px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
       animation: cnxFade .2s ease-out; }
-    .cnx-bg-row { display: flex; justify-content: space-between; align-items: baseline; }
-    .cnx-bg-title { color: var(--text, #e8edf5); font-size: 12.5px; font-weight: 700; }
+    .cnx-bg-row { display: flex; align-items: center; gap: 8px; }
+    .cnx-bg-title { color: var(--text, #e8edf5); font-size: 12.5px; font-weight: 700; flex: 1; }
     .cnx-bg-pct { color: var(--accent, #4ade80); font-size: 12px; font-weight: 700; }
+    .cnx-bg-close { background: none; border: none; color: var(--text-dim, #8b94a8); font-size: 18px;
+      line-height: 1; cursor: pointer; padding: 0 2px; }
+    .cnx-bg-close:hover { color: var(--text, #fff); }
     .cnx-bg-bar { height: 7px; background: var(--bg, #0b0e14); border-radius: 99px; overflow: hidden;
       border: 1px solid var(--border, #2a3242); margin: 8px 0 6px; }
     .cnx-bg-fill { height: 100%; background: linear-gradient(90deg, #4ade80, #22c55e); border-radius: 99px; transition: width .35s ease; }
@@ -389,21 +458,55 @@ function showBgProgress(title) {
   el.id = 'cnx-bg';
   el.className = 'cnx-bg';
   el.innerHTML = `
-    <div class="cnx-bg-row"><span class="cnx-bg-title">${title}</span><span class="cnx-bg-pct" id="cnx-bg-pct">0 %</span></div>
+    <div class="cnx-bg-row">
+      <span class="cnx-bg-title">${title}</span>
+      <span class="cnx-bg-pct" id="cnx-bg-pct">0 %</span>
+    </div>
     <div class="cnx-bg-bar"><div class="cnx-bg-fill" id="cnx-bg-fill" style="width:0%"></div></div>
     <div class="cnx-bg-step" id="cnx-bg-step"></div>`;
   document.body.appendChild(el);
   const fill = el.querySelector('#cnx-bg-fill');
   const pct = el.querySelector('#cnx-bg-pct');
   const step = el.querySelector('#cnx-bg-step');
+  // Pas d'arrêt possible : la barre se ferme seule à la fin (done/fail).
   return {
     update(p, label) { fill.style.width = p + '%'; pct.textContent = p + ' %'; if (label) step.textContent = label; },
+    fail(msg) { step.textContent = 'Erreur : ' + msg; step.style.color = 'var(--danger, #f87171)'; setTimeout(() => el.remove(), 4000); },
     done(label) { fill.style.width = '100%'; pct.textContent = '100 %'; if (label) step.textContent = label; setTimeout(() => el.remove(), 3000); },
     close() { el.remove(); },
   };
 }
 
+// Rafraîchit le contenu de la fenêtre Connexions si elle est ouverte (sans la rouvrir).
+window.refreshConnectionsIfOpen = () => {
+  const o = document.getElementById('connections-overlay');
+  if (o) { const body = o.querySelector('#cnx-body'); if (body) render(body); }
+};
+
 window.openConnectionsModal = openConnectionsModal;
 // Barres de progression réutilisables par les autres modules (import Strava/Whoop).
 window.coachProgress = showProgress;       // bloquante (centrée)
 window.coachBgProgress = showBgProgress;   // non-bloquante (coin)
+
+// Si une synchro Strava tourne pendant que la fenêtre Connexions est ouverte,
+// on met à jour la barre de la carte en direct (et on réaffiche les boutons à la fin).
+if (!window.__cnxSyncListener) {
+  window.__cnxSyncListener = true;
+  window.addEventListener('strava-sync-progress', (e) => {
+    const o = document.getElementById('connections-overlay');
+    if (!o) return;
+    const body = o.querySelector('#cnx-body');
+    const bar = o.querySelector('.cnx-cardprog[data-sync="strava"]');
+    if (e.detail.active) {
+      if (bar) {
+        bar.querySelector('[data-ccp="fill"]').style.width = e.detail.pct + '%';
+        bar.querySelector('[data-ccp="pct"]').textContent = e.detail.pct + ' %';
+        if (e.detail.label) bar.querySelector('[data-ccp="step"]').textContent = e.detail.label;
+      } else if (body) {
+        render(body); // afficher la barre dans la carte
+      }
+    } else if (body) {
+      render(body); // synchro finie → réafficher les boutons + compte à jour
+    }
+  });
+}

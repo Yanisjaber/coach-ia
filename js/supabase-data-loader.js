@@ -140,6 +140,7 @@ async function loadFromSupabase() {
       powerProfile,
       whoopData,
       { data: stravaConnection },
+      { data: whoopConnection },
     ] = await Promise.all([
       sb.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
       fetchAllPaged('activities', userId, 'start_date_local', ACTIVITY_LIGHT_COLS),
@@ -147,25 +148,36 @@ async function loadFromSupabase() {
       fetchAllPaged('power_profile', userId, 'duration_s'),
       fetchAllPaged('whoop_data', userId, 'iso_date'),
       sb.from('strava_connections').select(STRAVA_CONN_SAFE_COLS).eq('user_id', userId).maybeSingle(),
+      sb.from('whoop_connections').select('user_id').eq('user_id', userId).maybeSingle(),
     ]);
 
-    // Si la BDD est vide pour cet user, on REMPLACE DASHBOARD_DATA par un dataset
-    // vide-mais-valide pour ne pas montrer les données statiques de data.js (= celles
-    // de l'owner originel). Multi-user safe.
+    // Si un import d'activités est en cours côté serveur (ex : rechargement pendant
+    // le téléchargement), afficher une barre et attendre sa fin, puis recharger.
+    maybeResumeIngest(stravaConnection, userId);
+
+    // Si la BDD est vide pour cet user, on REMPLACE DASHBOARD_DATA par un dataset vide.
     if (!activities || activities.length === 0) {
       console.log('[sb-data] Aucune activité en BDD pour cet user — affichage compte vide');
       window.DASHBOARD_DATA = buildEmptyDataset(_currentUser, profile);
       triggerFullReload();
-      showOnboardingBanner();
+      // Bandeau d'onboarding UNIQUEMENT si AUCUN compte n'est connecté.
+      // Si un compte est connecté (mais 0 activité), pas de bandeau — juste les
+      // messages "aucune donnée" ; la (re)synchro se fait via la page Connexions.
+      if (!stravaConnection && !whoopConnection) showOnboardingBanner();
+      else hideOnboardingBanner();
+      setTimeout(() => setEmptyDataOverlays(true), 400);
       _loadInProgress = false;
       return;
     }
 
-    // Compte vu = compte propriétaire des données : on retire la bannière si présente
-    hideOnboardingBanner();
+    // Bandeau dès qu'AUCUN compte n'est connecté (même s'il reste d'anciennes
+    // données en base après une déconnexion douce).
+    if (!stravaConnection && !whoopConnection) showOnboardingBanner();
+    else hideOnboardingBanner();
+    setEmptyDataOverlays(false); // données présentes → on retire les messages vides
 
     const reconstituted = reconstituteData({
-      profile, activities, dailyMetrics, powerProfile, whoopData, stravaConnection,
+      profile, activities, dailyMetrics, powerProfile, whoopData, stravaConnection, whoopConnection,
     });
 
     // Remplace window.DASHBOARD_DATA
@@ -174,6 +186,11 @@ async function loadFromSupabase() {
 
     // Re-render complet de l'app
     triggerFullReload();
+
+    // Reprise automatique du power profile : si des activités n'ont pas encore de
+    // streams (ex : import interrompu par un rechargement), on relance la boucle
+    // de lots de 40 + la barre, tout seul.
+    maybeResumeStreams(stravaConnection, userId);
   } catch (e) {
     console.error('[sb-data] Erreur chargement Supabase:', e);
   } finally {
@@ -181,8 +198,70 @@ async function loadFromSupabase() {
   }
 }
 
+// Affiche une barre et surveille un import d'activités en cours côté serveur
+// (statut "running"), utile après un rechargement pendant le téléchargement.
+let _ingestWatching = false;
+function maybeResumeIngest(stravaConnection, userId) {
+  if (!stravaConnection || _ingestWatching) return;
+  if (window.coachSyncState && window.coachSyncState.strava && window.coachSyncState.strava.active) return; // déjà une synchro active
+  const status = stravaConnection.last_sync_status;
+  const ageMs = stravaConnection.last_sync_at ? Date.now() - new Date(stravaConnection.last_sync_at).getTime() : Infinity;
+  if (status !== 'running' || ageMs > 3 * 60 * 1000) return; // pas d'import récent en cours
+
+  _ingestWatching = true;
+  const prog = window.coachBgProgress ? window.coachBgProgress('Import Strava') : null;
+  const start = Date.now();
+  const setSync = (active, pct, label) => {
+    window.coachSyncState = window.coachSyncState || {};
+    window.coachSyncState.strava = { active, pct: pct || 0, label: label || '' };
+    window.dispatchEvent(new CustomEvent('strava-sync-progress', { detail: window.coachSyncState.strava }));
+  };
+  const tick = prog ? setInterval(() => {
+    const p = Math.min(92, Math.round((Date.now() - start) / 30000 * 92));
+    prog.update(p, 'Import des activités…');
+    setSync(true, p, 'Import des activités…');
+  }, 300) : null;
+
+  const poll = async () => {
+    try {
+      const { data: conn } = await window.sb.from('strava_connections')
+        .select('last_sync_status').eq('user_id', userId).maybeSingle();
+      if (!conn || conn.last_sync_status !== 'running') {
+        if (tick) clearInterval(tick);
+        prog?.update(100, 'Activités importées');
+        setSync(false, 100, '');
+        setTimeout(() => prog?.close?.(), 600);
+        _ingestWatching = false;
+        setTimeout(() => loadFromSupabase(), 800); // recharge → affiche les activités + reprend le power profile
+        return;
+      }
+    } catch (_) { /* on retentera */ }
+    setTimeout(poll, 3000);
+  };
+  setTimeout(poll, 3000);
+}
+
+// Relance le backfill power profile s'il reste des activités sans streams.
+async function maybeResumeStreams(stravaConnection, userId) {
+  if (!stravaConnection || !window.startStravaStreams) return;
+  // Pas de double lancement si une synchro tourne déjà.
+  if (window.coachSyncState && window.coachSyncState.strava && window.coachSyncState.strava.active) return;
+  try {
+    const { count } = await window.sb.from('activities')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId).is('streams_synced_at', null);
+    if ((count || 0) > 0) {
+      console.log(`[sb-data] ${count} activités sans streams → reprise auto du power profile`);
+      window.startStravaStreams();
+    }
+  } catch (_) { /* silencieux */ }
+}
+
 // ============ RECONSTITUTION FORMAT DASHBOARD_DATA ============
-function reconstituteData({ profile, activities, dailyMetrics, powerProfile, whoopData, stravaConnection }) {
+function reconstituteData({ profile, activities, dailyMetrics, powerProfile, whoopData, stravaConnection, whoopConnection }) {
+  // On n'affiche les données Whoop QUE si un compte Whoop est réellement connecté.
+  // (Évite d'afficher d'anciennes données simulées encore présentes en base.)
+  if (!whoopConnection) whoopData = [];
   // 1) Athlete
   const athlete = {
     id: stravaConnection?.strava_athlete_id ? String(stravaConnection.strava_athlete_id) : '',
@@ -245,7 +324,7 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
   }
 
   // 4) Construire days[] depuis daily_metrics (la liste de référence)
-  const days = (dailyMetrics || []).map(m => {
+  let days = (dailyMetrics || []).map(m => {
     const iso = m.iso_date;
     const acts = actsByDate[iso] || [];
     const main = acts[0] || {};
@@ -282,6 +361,38 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
       remH: w.rem_h ?? null,
     };
   });
+
+  // 4b) Robustesse : si AUCUNE daily_metric (état incohérent — ex : métriques
+  // supprimées mais activités encore là), on reconstruit des jours basiques depuis
+  // les dates d'activités + les 90 derniers jours, pour ne pas planter le rendu.
+  // (Une re-synchro recalculera ensuite les CTL/ATL/TSB côté serveur.)
+  if (days.length === 0) {
+    const dateSet = new Set(Object.keys(actsByDate));
+    const today = new Date();
+    for (let i = 89; i >= 0; i--) {
+      const d = new Date(today); d.setDate(today.getDate() - i);
+      dateSet.add(d.toISOString().slice(0, 10));
+    }
+    days = [...dateSet].sort().map(iso => {
+      const acts = actsByDate[iso] || [];
+      const main = acts[0] || {};
+      const w = whoopByDate[iso] || {};
+      return {
+        date: iso,
+        tss: acts.reduce((s, a) => s + (a.tss || 0), 0),
+        ctl: 0, atl: 0, tsb: 0,
+        duration: acts.reduce((s, a) => s + (a.duration || 0), 0),
+        sessionName: main.name || null, sessionType: main.type || null, sport: main.sport || null,
+        np: main.np || 0, avgW: main.avg_watts || 0, hr: main.hr || 0,
+        ftpPct: main.ftpPct || 0, intensity: main.intensity || 0,
+        compliance: null, zones: main.zones_hr || main.zones_power || null,
+        zones_hr: main.zones_hr || null, zones_power: main.zones_power || null,
+        activities: acts,
+        recovery: w.recovery ?? null, hrv: w.hrv ?? null, sleepH: w.sleep_h ?? null, sleepQ: w.sleep_q ?? null,
+        whoopSource: w.source || null, rhr: w.rhr ?? null, strain: w.strain ?? null, deepH: w.deep_h ?? null, remH: w.rem_h ?? null,
+      };
+    });
+  }
 
   // 5) Power profile
   const ppAlltime = {};
@@ -361,55 +472,126 @@ function buildEmptyDataset(user, profile) {
 }
 
 // ============ BANNIÈRE D'ONBOARDING (compte vide) ============
-function showOnboardingBanner() {
+function showOnboardingBanner(opts = {}) {
+  const stravaConnected = !!opts.stravaConnected;
   let banner = document.getElementById('onboarding-banner');
-  if (banner) { banner.classList.add('active'); return; }
+  if (banner) banner.remove(); // on régénère pour refléter le bon état
   banner = document.createElement('div');
   banner.id = 'onboarding-banner';
   banner.className = 'onboarding-banner active';
+
+  // Bouton Strava : "Re-synchroniser" si déjà connecté (mais 0 activité), sinon "Connecter".
+  const stravaBtn = stravaConnected
+    ? `<button class="onboarding-strava-btn" id="onboarding-sync-strava" type="button"><span>Re-synchroniser Strava</span></button>`
+    : `<button class="onboarding-strava-btn" id="onboarding-connect-strava" type="button">
+         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+         <span>Connecter Strava</span>
+       </button>`;
+  const message = stravaConnected ? 'Aucune activité importée.' : 'Aucun compte connecté.';
+
   banner.innerHTML = `
     <div class="onboarding-banner-inner">
       <div class="onboarding-banner-icon">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="8" x2="12" y2="12"/>
-          <line x1="12" y1="16" x2="12.01" y2="16"/>
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
       </div>
-      <div class="onboarding-banner-body">
-        <strong>Ton compte est vide.</strong>
-        Connecte ton compte Strava pour récupérer toutes tes activités automatiquement.
-      </div>
-      <button class="onboarding-strava-btn" id="onboarding-connect-strava" type="button">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-          <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
-        </svg>
-        <span>Connecter Strava</span>
-      </button>
-      <button class="onboarding-whoop-btn" id="onboarding-connect-whoop" type="button">
-        <span>Connecter Whoop</span>
-      </button>
+      <div class="onboarding-banner-body"><strong>${message}</strong></div>
+      ${stravaBtn}
+      <button class="onboarding-whoop-btn" id="onboarding-connect-whoop" type="button"><span>Connecter Whoop</span></button>
     </div>
   `;
   // Wire les boutons
-  banner.querySelector('#onboarding-connect-strava').addEventListener('click', () => {
-    if (window.startStravaOAuth) window.startStravaOAuth();
-    else alert('Module Strava OAuth non chargé');
+  banner.querySelector('#onboarding-connect-strava')?.addEventListener('click', () => {
+    if (window.startStravaOAuth) window.startStravaOAuth(); else alert('Module Strava OAuth non chargé');
+  });
+  banner.querySelector('#onboarding-sync-strava')?.addEventListener('click', () => {
+    if (window.startStravaIngest) window.startStravaIngest(); else alert('Module Strava non chargé');
   });
   banner.querySelector('#onboarding-connect-whoop').addEventListener('click', () => {
     if (window.startWhoopOAuth) window.startWhoopOAuth();
     else alert('Module Whoop OAuth non chargé');
   });
-  // Insérer dans le flux normal, juste avant les onglets → ne recouvre PAS le header
-  // (menu profil + navigation restent accessibles).
+  // Petit "i" cliquable → explication de la situation actuelle
+  const icon = banner.querySelector('.onboarding-banner-icon');
+  if (icon) {
+    icon.style.cursor = 'pointer';
+    icon.title = 'En savoir plus';
+    icon.addEventListener('click', () => {
+      const msg = "Aucun compte Strava ou Whoop n'est relié à Coach IA pour l'instant.\n\n"
+        + "• Connecte Strava pour importer tes activités, ta puissance et ta charge (CTL/ATL/TSB).\n"
+        + "• Connecte Whoop pour ta récupération, ton sommeil et ton strain.\n\n"
+        + "Tant qu'aucun compte n'est connecté, le tableau de bord reste vide. Si d'anciennes "
+        + "activités sont encore affichées, tu peux les conserver (elles réapparaîtront à la "
+        + "reconnexion) ou les supprimer via la fenêtre Connexions.";
+      if (window.appAlert) window.appAlert({ title: 'Aucun compte connecté', message: msg });
+      else alert(msg);
+    });
+  }
+  // Intégrer dans la barre d'onglets : onglets à gauche, bannière à droite (même ligne).
   const tabs = document.querySelector('.tabs');
-  if (tabs && tabs.parentNode) tabs.parentNode.insertBefore(banner, tabs);
+  if (tabs) tabs.appendChild(banner);
   else document.body.appendChild(banner);
   injectOnboardingStyles();
 }
 function hideOnboardingBanner() {
   const banner = document.getElementById('onboarding-banner');
   if (banner) banner.classList.remove('active');
+}
+
+// ============ MESSAGES "AUCUNE DONNÉE" sur les widgets (compte vide) ============
+// Liste des cartes/graphiques à recouvrir d'un message au lieu d'afficher des zéros.
+function emptyDataTargets() {
+  const set = new Set();
+  document.querySelectorAll('#p1 .hero .card, #p3 .bilan-kpi').forEach(c => set.add(c));
+  document.querySelectorAll('#p1 .chart-wrap, #p3 .chart-wrap').forEach(w => {
+    const c = w.closest('.card');
+    if (c) set.add(c);
+  });
+  return [...set];
+}
+
+function setEmptyDataOverlays(on) {
+  // Nettoyage systématique
+  document.querySelectorAll('.empty-data-overlay').forEach(e => e.remove());
+  document.querySelectorAll('[data-ed-pos]').forEach(c => { c.style.position = ''; c.removeAttribute('data-ed-pos'); });
+  if (!on) return;
+
+  injectEmptyOverlayStyles();
+  emptyDataTargets().forEach(card => {
+    if (getComputedStyle(card).position === 'static') {
+      card.style.position = 'relative';
+      card.setAttribute('data-ed-pos', '1');
+    }
+    const o = document.createElement('div');
+    o.className = 'empty-data-overlay';
+    o.innerHTML = `
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15V6a2 2 0 0 0-2-2H9l-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h6"/><line x1="16" y1="19" x2="22" y2="19"/>
+      </svg>
+      <div class="ed-title">Aucune donnée importée</div>
+      <div class="ed-sub">Connecte Strava ou Whoop</div>`;
+    card.appendChild(o);
+  });
+}
+
+function injectEmptyOverlayStyles() {
+  if (document.getElementById('empty-data-overlay-styles')) return;
+  const s = document.createElement('style');
+  s.id = 'empty-data-overlay-styles';
+  s.textContent = `
+    .empty-data-overlay {
+      position: absolute; inset: 0; z-index: 6; border-radius: inherit;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 6px; text-align: center; padding: 12px;
+      background: color-mix(in srgb, var(--bg-elev, #161b26) 82%, transparent);
+      backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+      color: var(--text-mute, #6b7689);
+    }
+    .empty-data-overlay .ed-title { color: var(--text-dim, #8b94a8); font-size: 12.5px; font-weight: 700; }
+    .empty-data-overlay .ed-sub { font-size: 11px; }
+  `;
+  document.head.appendChild(s);
 }
 function injectOnboardingStyles() {
   if (document.getElementById('onboarding-banner-styles')) return;
@@ -422,14 +604,15 @@ function injectOnboardingStyles() {
       border-radius: 12px;
       color: var(--text);
       display: none;
-      max-width: 1200px;
-      margin: 14px auto 0;
+      width: fit-content;
+      max-width: 100%;
+      margin: 0 0 0 auto;   /* pousse la bannière à droite dans la barre d'onglets */
     }
     .onboarding-banner.active { display: block; animation: ob-fade 0.3s ease-out; }
     @keyframes ob-fade { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
     .onboarding-banner-inner {
-      display: flex; gap: 14px; align-items: center;
-      padding: 12px 20px;
+      display: flex; gap: 12px; align-items: center; justify-content: flex-end;
+      padding: 7px 12px; flex-wrap: wrap;
     }
     .onboarding-banner-icon {
       flex-shrink: 0;
@@ -444,8 +627,7 @@ function injectOnboardingStyles() {
     }
     .onboarding-banner-body strong { display: inline; margin-right: 8px; color: var(--info); }
     .onboarding-banner-soon { display: block; font-size: 11px; color: var(--text-mute); margin-top: 3px; }
-    .onboarding-banner-inner { flex-wrap: wrap; }
-    .onboarding-banner-body { flex: 1; min-width: 250px; }
+    .onboarding-banner-body { flex: 0 0 auto; }
     .onboarding-strava-btn {
       display: inline-flex; align-items: center; gap: 8px;
       background: #FC4C02;

@@ -114,7 +114,7 @@ function showWhoopToast(message, type = 'loading') {
     document.head.appendChild(s);
   }
   document.body.appendChild(toast);
-  if (type !== 'loading') setTimeout(() => { toast.remove(); if (_whoopToast === toast) _whoopToast = null; }, 8000);
+  if (type !== 'loading') setTimeout(() => { toast.remove(); if (_whoopToast === toast) _whoopToast = null; }, 4000);
 }
 
 // Expose globalement
