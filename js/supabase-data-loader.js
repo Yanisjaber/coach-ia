@@ -19,14 +19,16 @@ let _loadInProgress = false;
 window.addEventListener('coach-ia-auth', async (e) => {
   _currentUser = e.detail.user || null;
   if (_currentUser) {
-    // Le boot overlay (mis en place dans dashboard.html) est encore actif :
-    // il masque visuellement le flash de data.js pendant qu'on charge la BDD.
-    // On charge, puis on le retire.
+    // On masque TOUT le dashboard pendant le chargement des données pour ne pas
+    // laisser voir des zéros/tirets : le boot overlay (au démarrage) OU le
+    // loading overlay (transition après login) reste affiché jusqu'à la fin.
+    showLoadingOverlay();
     try {
       await loadFromSupabase();
     } catch (err) {
       console.error('[sb-data]', err);
     } finally {
+      hideLoadingOverlay();
       if (window.hideBootOverlay) window.hideBootOverlay();
     }
   }

@@ -29,6 +29,7 @@ import './cloud-sync.js';
 import './supabase-data-loader.js';
 import './strava-oauth.js';
 import './whoop-oauth.js';
+import './connections-modal.js';
 
 // ========= MODE IA / MANUEL =========
 // Sorti dans js/app-mode.js. Auto-bootstrap au DOMContentLoaded à l'import.
