@@ -30,7 +30,7 @@ create table if not exists public.competitions (
   name text not null,
   date date not null,
   sport text,
-  priority text check (priority in ('A', 'B', 'C') or priority is null),
+  priority text check (priority in ('principal', 'secondaire', 'A', 'B', 'C') or priority is null),
   km numeric,
   d_plus integer,
   d_minus integer,

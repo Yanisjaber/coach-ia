@@ -18,23 +18,83 @@
    ============================================================ */
 
 // ============ STORAGE ============
-const NOTES_KEY = 'coach_ia_day_notes_v1';
+const NOTES_KEY = 'coach_ia_day_notes_v1';   // legacy (texte par jour)
+const NOTES_V2_KEY = 'coach_ia_notes_v2';    // nouveau : notes typées, sur plage de dates, avec couleur
 const PHASES_KEY = 'coach_ia_phases_v1';
 
+// Types de note + couleur par défaut
+export const NOTE_TYPES = {
+  maladie:  { label: 'Maladie',  color: '#f87171' },
+  blessure: { label: 'Blessure', color: '#fb923c' },
+  texte:    { label: 'Note',     color: '#60a5fa' },
+};
+// Palette de couleurs proposée
+export const NOTE_COLORS = ['#f87171', '#fb923c', '#fbbf24', '#4ade80', '#34d399', '#60a5fa', '#a78bfa', '#f472b6', '#94a3b8'];
+
+// Icônes par type pour les bandeaux : croix de pharmacie (maladie), ambulance (blessure).
+const NOTE_ICONS = {
+  maladie: '<svg class="note-band-icon" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg>',
+  blessure: '<svg class="note-band-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 10H6"/><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.28a1 1 0 0 0-.684-.948l-1.923-.641a1 1 0 0 1-.578-.502l-1.539-3.076A1 1 0 0 0 16.382 8H14"/><path d="M8 8v4"/><circle cx="7" cy="18" r="2"/><path d="M9 18h6"/><circle cx="17" cy="18" r="2"/></svg>',
+};
+
+// ----- legacy (conservé pour compat / migration) -----
 export function loadNotes() {
   try { return JSON.parse(localStorage.getItem(NOTES_KEY) || '{}'); }
   catch { return {}; }
 }
-export function saveNote(iso, text) {
-  const all = loadNotes();
-  if (text && text.trim()) all[iso] = text.trim();
-  else delete all[iso];
-  localStorage.setItem(NOTES_KEY, JSON.stringify(all));
-  // Mirror cloud
-  if (window.cloudSync) window.cloudSync.pushNote(iso, text);
+export function getNote(iso) { return loadNotes()[iso] || ''; }
+
+// ----- notes v2 (typées, plage, couleur) -----
+export function loadNotesV2() {
+  try { return JSON.parse(localStorage.getItem(NOTES_V2_KEY) || '[]'); }
+  catch { return []; }
+}
+function _saveNotesV2(arr) {
+  localStorage.setItem(NOTES_V2_KEY, JSON.stringify(arr));
   triggerCalendarRefresh();
 }
-export function getNote(iso) { return loadNotes()[iso] || ''; }
+export function upsertNote(note) {
+  // note: {id, type, text, color, from, to, _sbId?}
+  const arr = loadNotesV2();
+  const idx = arr.findIndex(n => n.id === note.id);
+  if (idx >= 0) arr[idx] = note; else arr.push(note);
+  _saveNotesV2(arr);
+  if (window.cloudSync && window.cloudSync.pushNoteRange) {
+    window.cloudSync.pushNoteRange(note).then(sbId => {
+      if (sbId && note._sbId !== sbId) {
+        note._sbId = sbId;
+        _saveNotesV2(loadNotesV2().map(n => n.id === note.id ? note : n));
+      }
+    });
+  }
+}
+export function removeNote(id) {
+  const arr = loadNotesV2();
+  const toDel = arr.find(n => n.id === id);
+  _saveNotesV2(arr.filter(n => n.id !== id));
+  if (window.cloudSync && window.cloudSync.deleteNoteRange && toDel) window.cloudSync.deleteNoteRange(toDel);
+}
+export function notesForDate(iso) {
+  return loadNotesV2().filter(n => iso >= n.from && iso <= n.to);
+}
+// Convertit une fois les anciennes notes (texte par jour) en notes v2 (type 'texte').
+function migrateLegacyNotes() {
+  let legacy;
+  try { legacy = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}'); } catch { legacy = {}; }
+  const keys = Object.keys(legacy || {});
+  if (!keys.length) return;
+  const arr = loadNotesV2();
+  for (const iso of keys) {
+    const text = legacy[iso];
+    if (!text) continue;
+    if (arr.some(n => n.from === iso && n.to === iso && n.text === text)) continue;
+    const note = { id: 'mig-' + iso, type: 'texte', text, color: NOTE_TYPES.texte.color, from: iso, to: iso };
+    arr.push(note);
+    if (window.cloudSync && window.cloudSync.pushNoteRange) window.cloudSync.pushNoteRange(note);
+  }
+  localStorage.setItem(NOTES_V2_KEY, JSON.stringify(arr));
+  localStorage.removeItem(NOTES_KEY);
+}
 
 export function loadPhases() {
   try { return JSON.parse(localStorage.getItem(PHASES_KEY) || '[]'); }
@@ -186,7 +246,9 @@ function _handleActionInner(action, iso) {
   switch (action) {
     case 'training':
       if (typeof window.openTrainModal === 'function') {
-        window.openTrainModal('prevu');
+        // Mode selon le sous-onglet actif du calendrier : Réalisé → 'realise', sinon 'prevu'
+        const _mode = document.querySelector('#calendar-subtabs .subtab.active')?.dataset.mode === 'realise' ? 'realise' : 'prevu';
+        window.openTrainModal(_mode);
         // Pré-remplir la date dans la modal
         const dateInp = document.getElementById('train-modal-date');
         if (dateInp) {
@@ -232,89 +294,52 @@ function formatPopoverDate(iso) {
   return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-// ============ MODAL NOTE ============
-// Deux modes :
-//   - 'view' : lecture seule, avec bouton "..." qui ouvre un menu (Modifier / Supprimer)
-//   - 'edit' : textarea + save/cancel/delete
-// Si mode non spécifié : view si la note existe, edit sinon.
-function openNoteModal(iso, mode) {
-  const existing = getNote(iso);
-  if (!mode) mode = existing ? 'view' : 'edit';
-  if (mode === 'view' && !existing) mode = 'edit'; // pas de view possible si vide
+// ============ MODAL NOTE (typée, plage, couleur) ============
+// Depuis le "+" d'un jour → nouvelle note (from=to=jour).
+// Depuis un clic sur un bandeau → édition de la note existante.
+function openNoteModal(iso) {
+  openNoteEditor({
+    id: 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    type: 'texte', text: '', color: NOTE_TYPES.texte.color, from: iso, to: iso,
+  }, true);
+}
 
+function openNoteEditor(note, isNew) {
   closeAnyDayModal();
   const overlay = document.createElement('div');
   overlay.className = 'day-modal-overlay active';
   overlay.id = '_day-note-modal';
 
-  if (mode === 'view') {
-    overlay.innerHTML = `
-      <div class="day-modal day-modal-note">
-        <div class="day-modal-header">
-          <h3>Note du ${formatPopoverDate(iso)}</h3>
-          <div class="day-modal-header-actions">
-            <div class="day-note-menu-wrap">
-              <button class="day-note-menu-btn" type="button" title="Options">...</button>
-              <div class="day-note-menu" hidden>
-                <button type="button" data-action="edit">Modifier</button>
-                <button type="button" data-action="delete">Supprimer</button>
-              </div>
-            </div>
-            <button class="day-modal-close" type="button" title="Fermer">×</button>
-          </div>
-        </div>
-        <div class="day-modal-body">
-          <div class="day-note-content">${escapeHtml(existing).replace(/\n/g, '<br>')}</div>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    overlay.querySelector('.day-modal-close').addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  let curType = note.type || 'texte';
+  let curColor = note.color || NOTE_TYPES[curType].color;
 
-    // Bouton "..." → toggle menu
-    const menuBtn = overlay.querySelector('.day-note-menu-btn');
-    const menu = overlay.querySelector('.day-note-menu');
-    menuBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      menu.hidden = !menu.hidden;
-    });
-    // Click ailleurs → ferme le menu
-    overlay.addEventListener('click', (e) => {
-      if (!e.target.closest('.day-note-menu-wrap')) menu.hidden = true;
-    });
-    // Actions du menu
-    menu.querySelectorAll('button[data-action]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const action = btn.dataset.action;
-        if (action === 'edit') {
-          overlay.remove();
-          openNoteModal(iso, 'edit');
-        } else if (action === 'delete') {
-          const ok = await confirmDelete('Supprimer la note de ce jour ?');
-          if (ok) {
-            saveNote(iso, '');
-            overlay.remove();
-          }
-        }
-      });
-    });
-    return;
-  }
+  const typeChips = Object.entries(NOTE_TYPES).map(([k, v]) =>
+    `<button type="button" class="note-type-chip${k === curType ? ' active' : ''}" data-type="${k}">${v.label}</button>`
+  ).join('');
+  const colorSwatches = NOTE_COLORS.map(c =>
+    `<button type="button" class="note-color-swatch${c === curColor ? ' active' : ''}" data-color="${c}" style="background:${c};"></button>`
+  ).join('');
 
-  // Mode edit
   overlay.innerHTML = `
     <div class="day-modal day-modal-note">
       <div class="day-modal-header">
-        <h3>${existing ? 'Modifier la note' : 'Nouvelle note'} · ${formatPopoverDate(iso)}</h3>
+        <h3>${isNew ? 'Nouvelle note' : 'Modifier la note'}</h3>
         <button class="day-modal-close" type="button" title="Fermer">×</button>
       </div>
       <div class="day-modal-body">
-        <textarea id="_day-note-input" rows="6" placeholder="Sensations, contexte, douleurs, événements...">${escapeHtml(existing)}</textarea>
+        <label class="note-field-label">Type</label>
+        <div class="note-type-chips">${typeChips}</div>
+        <label class="note-field-label">Description</label>
+        <textarea id="_note-text" rows="3" placeholder="Ex : Grippe, tendinite au genou, déplacement pro…">${escapeHtml(note.text || '')}</textarea>
+        <div class="note-range-row">
+          <div><label class="note-field-label">Du</label><input type="date" id="_note-from" value="${note.from}"></div>
+          <div><label class="note-field-label">Au</label><input type="date" id="_note-to" value="${note.to}"></div>
+        </div>
+        <label class="note-field-label">Couleur</label>
+        <div class="note-color-row">${colorSwatches}</div>
       </div>
       <div class="day-modal-footer">
-        ${existing ? '<button class="day-modal-delete" type="button">Supprimer</button>' : ''}
+        ${isNew ? '' : '<button class="day-modal-delete" type="button">Supprimer</button>'}
         <div style="flex:1;"></div>
         <button class="day-modal-cancel" type="button">Annuler</button>
         <button class="day-modal-save" type="button">Enregistrer</button>
@@ -322,31 +347,43 @@ function openNoteModal(iso, mode) {
     </div>
   `;
   document.body.appendChild(overlay);
-  overlay.querySelector('.day-modal-close').addEventListener('click', () => overlay.remove());
-  overlay.querySelector('.day-modal-cancel').addEventListener('click', () => {
-    overlay.remove();
-    // Si on annulait une édition d'une note existante, on revient en view
-    if (existing) openNoteModal(iso, 'view');
+
+  const setActiveColor = (c) => {
+    curColor = c;
+    overlay.querySelectorAll('.note-color-swatch').forEach(s => s.classList.toggle('active', s.dataset.color === c));
+  };
+  overlay.querySelectorAll('.note-type-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const prevDefault = NOTE_TYPES[curType].color;
+      overlay.querySelectorAll('.note-type-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      curType = chip.dataset.type;
+      // Si la couleur courante était celle du type précédent (non personnalisée), on adopte celle du nouveau type
+      if (curColor === prevDefault) setActiveColor(NOTE_TYPES[curType].color);
+    });
   });
+  overlay.querySelectorAll('.note-color-swatch').forEach(sw => {
+    sw.addEventListener('click', () => setActiveColor(sw.dataset.color));
+  });
+  overlay.querySelector('.day-modal-close').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('.day-modal-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   overlay.querySelector('.day-modal-save').addEventListener('click', () => {
-    const txt = document.getElementById('_day-note-input').value;
-    saveNote(iso, txt);
+    let from = document.getElementById('_note-from').value || note.from;
+    let to = document.getElementById('_note-to').value || from;
+    if (to < from) { const t = from; from = to; to = t; }
+    const text = document.getElementById('_note-text').value.trim();
+    upsertNote({ ...note, type: curType, color: curColor, text, from, to });
     overlay.remove();
-    // Retourner en view après save si la note n'est pas vide
-    if (txt && txt.trim()) openNoteModal(iso, 'view');
   });
   const delBtn = overlay.querySelector('.day-modal-delete');
   if (delBtn) {
     delBtn.addEventListener('click', async () => {
-      const ok = await confirmDelete('Supprimer la note de ce jour ?');
-      if (ok) {
-        saveNote(iso, '');
-        overlay.remove();
-      }
+      const ok = await confirmDelete('Supprimer cette note ?');
+      if (ok) { removeNote(note.id); overlay.remove(); }
     });
   }
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  setTimeout(() => document.getElementById('_day-note-input')?.focus(), 50);
+  setTimeout(() => document.getElementById('_note-text')?.focus(), 50);
 }
 
 // ============ MODAL PHASE ============
@@ -573,30 +610,13 @@ function attachAddButtons() {
     btn.type = 'button';
     btn.className = 'day-add-btn';
     btn.title = 'Actions rapides : entraînement, note, repos, cycle';
-    btn.innerHTML = '+';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
     btn.addEventListener('click', (e) => {
       e.stopPropagation(); // ne pas déclencher le clic sur la card (qui ouvre la modal détail)
       openPopover(iso, btn);
     });
     card.appendChild(btn);
-
-    // Indicateur note : petit tag "· note" à côté du nom du jour (.day-card-dow)
-    // Cliquable : ouvre la modal pour lire/modifier la note.
-    const note = getNote(iso);
-    if (note) {
-      const dowEl = card.querySelector('.day-card-dow');
-      if (dowEl && !dowEl.querySelector('.day-note-tag')) {
-        const tag = document.createElement('span');
-        tag.className = 'day-note-tag';
-        tag.title = 'Voir / modifier la note';
-        tag.textContent = ' · note';
-        tag.addEventListener('click', (e) => {
-          e.stopPropagation(); // ne pas ouvrir la modal détail séance
-          openNoteModal(iso);
-        });
-        dowEl.appendChild(tag);
-      }
-    }
+    // (Les notes s'affichent désormais en bandeaux via injectNoteBanners, plus de tag inline.)
   });
 }
 
@@ -682,6 +702,59 @@ function injectPhaseBanners() {
   });
 }
 
+// ============ BANDEAUX DE NOTE (maladie / blessure / texte) ============
+// Une bande colorée par note, couvrant les colonnes de sa plage de dates dans
+// la semaine. Chaque note occupe sa propre ligne (pas de collision). Clic = édition.
+function injectNoteBanners() {
+  const root = document.getElementById('week-calendar');
+  if (!root) return;
+  const allNotes = loadNotesV2();
+  root.querySelectorAll('.week-row').forEach(row => {
+    // Nettoyer d'anciennes lignes de note
+    row.querySelectorAll('.note-row').forEach(el => el.remove());
+    const cards = row.querySelectorAll('.day-card[data-iso]');
+    if (!cards.length || allNotes.length === 0) return;
+    const isos = Array.from(cards).map(c => c.dataset.iso);
+    const daysEl = row.querySelector('.week-row-days');
+
+    allNotes.forEach(note => {
+      // Colonnes couvertes par la note dans cette semaine
+      let startCol = null, endCol = null;
+      isos.forEach((iso, idx) => {
+        if (iso >= note.from && iso <= note.to) {
+          if (startCol === null) startCol = idx + 1;
+          endCol = idx + 2;
+        }
+      });
+      if (startCol === null) return; // note absente de cette semaine
+
+      const typeLabel = (NOTE_TYPES[note.type] && NOTE_TYPES[note.type].label) || 'Note';
+      const label = note.text ? note.text : typeLabel;
+      const color = note.color || '#60a5fa';
+
+      const noteRow = document.createElement('div');
+      noteRow.className = 'note-row';
+      const band = document.createElement('div');
+      band.className = 'note-band';
+      band.dataset.noteId = note.id;
+      band.style.gridColumn = `${startCol} / ${endCol}`;
+      band.style.background = `linear-gradient(90deg, ${color}38, ${color}18)`;
+      band.style.borderLeft = `3px solid ${color}`;
+      band.style.color = color;
+      band.title = `${typeLabel} (${note.from} → ${note.to}) — cliquer pour modifier`;
+      const marker = NOTE_ICONS[note.type] || `<span class="note-band-dot" style="background:${color};"></span>`;
+      band.innerHTML = `${marker}<span class="note-band-label">${escapeHtml(label)}</span>`;
+      band.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openNoteEditor(note, false);
+      });
+      noteRow.appendChild(band);
+      if (daysEl) row.insertBefore(noteRow, daysEl);
+      else row.appendChild(noteRow);
+    });
+  });
+}
+
 // ============ HOOK : observer le calendrier pour ré-attacher après render ============
 // IMPORTANT : safeAttach() modifie le DOM (ajout de boutons + et de phase-row).
 // Pour éviter une boucle infinie avec le MutationObserver, on déconnecte le
@@ -701,6 +774,8 @@ function safeAttach() {
   catch (e) { console.error('[day-extras] attachAddButtons error:', e); }
   try { injectPhaseBanners(); }
   catch (e) { console.error('[day-extras] injectPhaseBanners error:', e); }
+  try { injectNoteBanners(); }
+  catch (e) { console.error('[day-extras] injectNoteBanners error:', e); }
   // Reconnecte
   if (_observer && _observerRoot) {
     _observer.observe(_observerRoot, { childList: true, subtree: true });
@@ -757,6 +832,7 @@ async function notify(message, title) {
 
 // ============ INIT ============
 function init() {
+  try { migrateLegacyNotes(); } catch (e) { console.warn('[day-extras] migrate notes:', e); }
   setupCalendarObserver();
 }
 
@@ -765,6 +841,10 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
+// Re-migrer après pull cloud (les notes legacy peuvent arriver à la connexion)
+window.addEventListener('coach-ia-auth', () => {
+  setTimeout(() => { try { migrateLegacyNotes(); } catch (e) {} }, 1500);
+});
 
 // Expose pour debug
 window.openDayPopover = openPopover;

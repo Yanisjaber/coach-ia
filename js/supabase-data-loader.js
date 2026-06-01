@@ -98,13 +98,16 @@ function hideLoadingOverlay() {
 // ces blobs sont lourds (Mo par activité) et chargés à la demande seulement
 // (voir loadStreams dans app.js). Charger tout d'un coup ferait des dizaines de Mo.
 const ACTIVITY_LIGHT_COLS = [
-  'strava_id', 'name', 'type', 'sport', 'sport_raw', 'tss',
+  'id', 'strava_id', 'name', 'type', 'sport', 'sport_raw', 'tss',
   'moving_time', 'elapsed_time', 'start_date_local',
   'distance_km', 'total_elevation_gain', 'total_elevation_loss',
   'avg_speed_kmh', 'max_speed_kmh', 'max_speed_smooth_kmh',
   'np', 'avg_watts', 'max_watts', 'avg_heartrate', 'max_heartrate',
   'avg_cadence', 'max_cadence', 'kj', 'calories',
   'intensity', 'variability_index', 'zones_hr', 'zones_power',
+  // Modèle unifié : catégorie + source + champs manuels/compétition
+  'category', 'source', 'client_id', 'user_notes',
+  'priority', 'target', 'course_dplus', 'laps', 'gpx_name', 'stages',
 ].join(',');
 
 // Colonnes "safe" de strava_connections : SURTOUT PAS les tokens.
@@ -291,7 +294,18 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
     if (!iso) continue;
     if (!actsByDate[iso]) actsByDate[iso] = [];
     actsByDate[iso].push({
-      id: String(a.strava_id),
+      id: a.strava_id != null ? String(a.strava_id) : String(a.id),
+      _sbId: a.id,                          // uuid (pour update/delete des manuelles)
+      source: a.source || 'strava',
+      category: a.category || 'entrainement',
+      client_id: a.client_id || null,
+      notes: a.user_notes || null,
+      priority: a.priority || null,
+      target: a.target || null,
+      course_dplus: a.course_dplus ?? null,
+      laps: a.laps ?? null,
+      gpx_name: a.gpx_name || null,
+      stages: a.stages || null,
       name: a.name,
       type: a.type,
       sport: a.sport,
@@ -404,6 +418,84 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
         whoopSource: w.source || null, rhr: w.rhr ?? null, strain: w.strain ?? null, deepH: w.deep_h ?? null, remH: w.rem_h ?? null,
       };
     });
+  }
+
+  // 4c) Garantir un jour pour chaque date d'activité (ex : activité manuelle /
+  // compétition sur une date sans daily_metric) — sinon elle n'apparaît pas.
+  {
+    const have = new Set(days.map(d => d.date));
+    for (const iso of Object.keys(actsByDate)) {
+      if (have.has(iso)) continue;
+      const acts = actsByDate[iso];
+      const main = acts[0] || {};
+      const w = whoopByDate[iso] || {};
+      days.push({
+        date: iso,
+        tss: acts.reduce((s, a) => s + (a.tss || 0), 0),
+        ctl: 0, atl: 0, tsb: 0,
+        duration: acts.reduce((s, a) => s + (a.duration || 0), 0),
+        sessionName: main.name || null, sessionType: main.type || null, sport: main.sport || null,
+        np: main.np || 0, avgW: main.avg_watts || 0, hr: main.hr || 0,
+        ftpPct: main.ftpPct || 0, intensity: main.intensity || 0,
+        compliance: null, zones: main.zones_hr || main.zones_power || null,
+        zones_hr: main.zones_hr || null, zones_power: main.zones_power || null,
+        activities: acts,
+        recovery: w.recovery ?? null, hrv: w.hrv ?? null, sleepH: w.sleep_h ?? null, sleepQ: w.sleep_q ?? null,
+        whoopSource: w.source || null, rhr: w.rhr ?? null, strain: w.strain ?? null, deepH: w.deep_h ?? null, remH: w.rem_h ?? null,
+      });
+    }
+    days.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  }
+
+  // 4d) Série CONTINUE : un jour pour CHAQUE date de la plage (du 1er jour à
+  // aujourd'hui), même sans activité ni métrique. CTL/ATL reportés du jour
+  // précédent (courbe de forme continue), TSS = 0 pour les jours vides.
+  if (days.length) {
+    const pad = n => String(n).padStart(2, '0');
+    const fmt = dt => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+    const byIso = {};
+    for (const d of days) byIso[d.date] = d;
+    const isos = days.map(d => d.date).sort();
+    const todayIso = fmt(new Date());
+    const startIso = isos[0];
+    let endIso = isos[isos.length - 1];
+    if (todayIso > endIso) endIso = todayIso;
+    const filled = [];
+    let lastCtl = 0, lastAtl = 0;
+    for (let dt = new Date(startIso + 'T12:00:00'); fmt(dt) <= endIso; dt.setDate(dt.getDate() + 1)) {
+      const iso = fmt(dt);
+      let day = byIso[iso];
+      if (!day) {
+        const w = whoopByDate[iso] || {};
+        day = {
+          date: iso, tss: 0, ctl: lastCtl, atl: lastAtl, tsb: +(lastCtl - lastAtl).toFixed(1),
+          duration: 0, sessionName: null, sessionType: null, sport: null,
+          np: 0, avgW: 0, hr: 0, ftpPct: 0, intensity: 0, compliance: null,
+          zones: null, zones_hr: null, zones_power: null, activities: [],
+          recovery: w.recovery ?? null, hrv: w.hrv ?? null, sleepH: w.sleep_h ?? null, sleepQ: w.sleep_q ?? null,
+          whoopSource: w.source || null, rhr: w.rhr ?? null, strain: w.strain ?? null, deepH: w.deep_h ?? null, remH: w.rem_h ?? null,
+        };
+      }
+      lastCtl = day.ctl || 0; lastAtl = day.atl || 0;
+      filled.push(day);
+    }
+    days = filled;
+  }
+
+  // 4e) Recalcul PMC (Banister) depuis les TSS : CTL(J)=CTL(J-1)+(TSS-CTL(J-1))/42,
+  // ATL(J)=ATL(J-1)+(TSS-ATL(J-1))/7, TSB(J)=CTL(J-1)-ATL(J-1). Le 1er jour sert
+  // d'amorce (valeur serveur conservée). daily_metrics n'est plus qu'une source de TSS.
+  if (days.length) {
+    let ctl = days[0].ctl || 0, atl = days[0].atl || 0;
+    for (let i = 1; i < days.length; i++) {
+      const prevCtl = ctl, prevAtl = atl;
+      const tss = days[i].tss || 0;
+      ctl = prevCtl + (tss - prevCtl) / 42;
+      atl = prevAtl + (tss - prevAtl) / 7;
+      days[i].ctl = +ctl.toFixed(1);
+      days[i].atl = +atl.toFixed(1);
+      days[i].tsb = +(prevCtl - prevAtl).toFixed(1);
+    }
   }
 
   // 5) Power profile
@@ -587,21 +679,14 @@ function setEmptyDataOverlays(on) {
   });
 }
 
-// Overlay "Aucune donnée Whoop" sur la carte Récupération Whoop quand Whoop n'est
-// pas connecté (le reste du dashboard a des données Strava).
+// Quand Whoop n'est pas connecté, la carte "Récupération Whoop" est remplacée par
+// la carte "Ratio de charge (ACWR)" (calculée depuis Strava). Le swap est géré par
+// renderHeroKpi() dans app.js, via le flag window.__noWhoopCard.
 function setWhoopCardEmpty(on) {
-  const card = document.getElementById('whoop-card');
-  if (!card) return;
-  card.querySelector('.empty-data-overlay')?.remove();
-  if (!on) { if (card.getAttribute('data-ed-pos')) { card.style.position = ''; card.removeAttribute('data-ed-pos'); } return; }
-  injectEmptyOverlayStyles();
-  if (getComputedStyle(card).position === 'static') { card.style.position = 'relative'; card.setAttribute('data-ed-pos', '1'); }
-  const o = document.createElement('div');
-  o.className = 'empty-data-overlay';
-  o.innerHTML = `
-    <div class="ed-title">Aucune donnée Whoop</div>
-    <div class="ed-sub">Connecte Whoop dans la page Connexions</div>`;
-  card.appendChild(o);
+  window.__noWhoopCard = !!on;
+  // Nettoie un éventuel ancien overlay (versions précédentes).
+  document.getElementById('whoop-card')?.querySelector('.empty-data-overlay')?.remove();
+  if (typeof window.renderHeroKpi === 'function') window.renderHeroKpi();
 }
 
 function injectEmptyOverlayStyles() {

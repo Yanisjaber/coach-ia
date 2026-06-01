@@ -31,6 +31,7 @@ import './strava-oauth.js';
 import './whoop-oauth.js';
 import './connections-modal.js';
 import './settings-modal.js';
+import './help-modal.js';
 
 // ========= MODE IA / MANUEL =========
 // Sorti dans js/app-mode.js. Auto-bootstrap au DOMContentLoaded à l'import.
@@ -63,6 +64,106 @@ import './bilan.js';
 // ========= DATA LOADER (data.js via window.DASHBOARD_DATA) =========
 // Sorti dans js/data-loader.js.
 import { loadData } from './data-loader.js';
+
+// ========= UTIL : format durée =========
+// < 60 min → "X min" ; sinon "XhYY". Utilisé partout pour homogénéiser l'affichage.
+function fmtDur(min) {
+  min = Math.round(Number(min) || 0);
+  if (min < 60) return min + ' min';
+  const h = Math.floor(min / 60);
+  const m = (min % 60).toString().padStart(2, '0');
+  return h + 'h' + m;
+}
+window.fmtDur = fmtDur;
+
+// Priorité de compétition : Principal (doré) / Secondaire (argenté).
+// Compat : anciennes valeurs 'A' → principal, 'B'/'C' → secondaire.
+function compPrio(priority) {
+  const isPrincipal = (priority === 'A' || priority === 'principal' || priority == null || priority === '');
+  return isPrincipal
+    ? { key: 'principal', label: 'Objectif', color: '#fbbf24' }
+    : { key: 'secondaire', label: 'Préparation', color: '#9ca3af' };
+}
+function trophySvg(color, size = 15) {
+  return `<svg class="comp-trophy" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>`;
+}
+window.compPrio = compPrio;
+window.trophySvg = trophySvg;
+
+// Petit canapé dessiné pour les jours de repos.
+const REST_COUCH_SVG = `<svg class="rest-couch" viewBox="0 0 64 44" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round" stroke-linecap="round"><path d="M14 24 V12 C14 9.2 15.6 8 18 8 H30.5 C31.5 8 32 8.6 32 9.6 V24"/><path d="M50 24 V12 C50 9.2 48.4 8 46 8 H33.5 C32.5 8 32 8.6 32 9.6 V24"/><path d="M13 24 H31 C31.6 24 32 24.5 32 25.2 V31 H10 V27 C10 25.3 11.3 24 13 24 Z"/><path d="M51 24 H33 C32.4 24 32 24.5 32 25.2 V31 H54 V27 C54 25.3 52.7 24 51 24 Z"/><path d="M9 31 H55 V35 H9 Z"/><path d="M13 35 V40"/><path d="M51 35 V40"/></svg>`;
+
+// ========= CALQUE D'OVERRIDES D'ACTIVITÉ =========
+// Les activités viennent de Strava (réécrites à chaque synchro). On stocke ici
+// les modifications manuelles (nom/type/sport/durée/distance/TSS/notes) et les
+// masquages de métriques (puissance/cardio/distance), réappliqués après synchro.
+const ACT_OV_KEY = 'coach_ia_activity_overrides_v1';
+function loadActivityOverrides() {
+  try { return JSON.parse(localStorage.getItem(ACT_OV_KEY) || '{}'); } catch { return {}; }
+}
+function getActivityOverride(id) { return loadActivityOverrides()[String(id)] || null; }
+function setActivityOverride(id, ov) {
+  const map = loadActivityOverrides();
+  if (ov && Object.keys(ov).length) map[String(id)] = ov; else delete map[String(id)];
+  localStorage.setItem(ACT_OV_KEY, JSON.stringify(map));
+  if (window.cloudSync) {
+    if (map[String(id)] && window.cloudSync.pushActivityOverride) window.cloudSync.pushActivityOverride(String(id), map[String(id)]);
+    else if (window.cloudSync.deleteActivityOverride) window.cloudSync.deleteActivityOverride(String(id));
+  }
+  if (window.__applyOverridesAndRerender) window.__applyOverridesAndRerender();
+}
+window.activityOverrides = { get: getActivityOverride, set: setActivityOverride, load: loadActivityOverrides };
+
+// Applique les overrides sur une liste de jours (mutation), recalcule les totaux
+// jour + le PMC (CTL/ATL/TSB) si au moins un TSS a été modifié.
+function applyActivityOverridesToDays(days) {
+  const overrides = loadActivityOverrides();
+  if (!days || !days.length) return days;
+  let anyTss = false;
+  for (const d of days) {
+    if (!d.activities || !d.activities.length) continue;
+    for (const a of d.activities) {
+      const ov = overrides[String(a.id)];
+      if (!ov) continue;
+      if (ov.name != null) a.name = ov.name;
+      if (ov.type != null) { a.type = ov.type; a.sessionType = ov.type; }
+      if (ov.sport != null) { a.sport = ov.sport; a.raw_type = ov.sport; }
+      if (ov.duration != null) a.duration = ov.duration;
+      if (ov.distance_km != null) a.distance_km = ov.distance_km;
+      if (ov.tss != null) { a.tss = ov.tss; anyTss = true; }
+      if (ov.notes != null) a.notes = ov.notes;
+      // Exclusion des records/stats : la donnée RESTE sur l'activité, on pose juste
+      // des drapeaux pour que le power profile / les stats l'ignorent.
+      a._exclPower = !!ov.excludePower;
+      a._exclHr = !!ov.excludeHr;
+      a._exclDistance = !!ov.excludeDistance;
+    }
+    d.activities.sort((x, y) => (y.tss || 0) - (x.tss || 0));
+    d.tss = d.activities.reduce((s, a) => s + (a.tss || 0), 0);
+    d.duration = d.activities.reduce((s, a) => s + (a.duration || 0), 0);
+    const main = d.activities[0];
+    if (main) {
+      d.sessionName = main.name; d.sessionType = main.type; d.sport = main.sport;
+      d.np = main.np || 0; d.avgW = main.avg_watts || 0; d.hr = main.hr || 0; d.ftpPct = main.ftpPct || 0;
+    }
+  }
+  // Recalcul PMC depuis les TSS (toujours), ancré sur le 1er jour — reflète les
+  // activités manuelles / TSS modifiés. (anyTss conservé pour lisibilité.)
+  void anyTss;
+  if (days.length) {
+    let ctl = days[0].ctl || 0, atl = days[0].atl || 0;
+    for (let i = 1; i < days.length; i++) {
+      const prevCtl = ctl, prevAtl = atl;
+      const tss = days[i].tss || 0;
+      ctl = prevCtl + (tss - prevCtl) / 42;
+      atl = prevAtl + (tss - prevAtl) / 7;
+      days[i].ctl = +ctl.toFixed(1);
+      days[i].atl = +atl.toFixed(1);
+      days[i].tsb = +(prevCtl - prevAtl).toFixed(1);
+    }
+  }
+  return days;
+}
 
 // ========= MAIN (IIFE async) =========
 (async () => {
@@ -109,15 +210,29 @@ window.addEventListener('appModeChange', () => {
 
 // Re-render complet quand le data loader Supabase remplace window.DASHBOARD_DATA
 // (après login + chargement depuis BDD)
+// Reconstruit _allData depuis window.DASHBOARD_DATA (clone profond des activités
+// pour ne pas muter la source), applique le calque d'overrides, puis re-render.
+function rebuildFromDashboard() {
+  if (!window.DASHBOARD_DATA || !window.DASHBOARD_DATA.days) return;
+  _allData = window.DASHBOARD_DATA.days.map(d => ({
+    ...d,
+    date: new Date(d.date + 'T12:00:00'),
+    activities: (d.activities || []).map(a => ({ ...a })),
+  }));
+  applyActivityOverridesToDays(_allData);
+  data = _allData;
+  todayData = _allData[_allData.length - 1];
+  if (typeof renderHeroKpi === 'function') renderHeroKpi();
+  if (typeof rerenderFilteredCharts === 'function') rerenderFilteredCharts();
+  if (typeof renderCalendar === 'function') renderCalendar();
+  const f = getInputDate('load-from'), t = getInputDate('load-to');
+  if (f && t && typeof renderLoadChart === 'function') renderLoadChart(f, t);
+}
+window.__applyOverridesAndRerender = rebuildFromDashboard;
+
 window.addEventListener('dashboardDataReplaced', () => {
   try {
-    // Re-charger toute la pipeline avec les nouvelles données
-    _allData = window.DASHBOARD_DATA.days.map(d => ({ ...d, date: new Date(d.date + 'T12:00:00') }));
-    data = _allData;
-    todayData = _allData[_allData.length - 1];
-    if (typeof renderHeroKpi === 'function') renderHeroKpi();
-    if (typeof rerenderFilteredCharts === 'function') rerenderFilteredCharts();
-    if (typeof renderCalendar === 'function') renderCalendar();
+    rebuildFromDashboard();
     console.log('[main] Vues re-rendues avec données Supabase');
   } catch (e) {
     console.error('[main] Erreur re-render après load Supabase:', e);
@@ -145,22 +260,77 @@ document.addEventListener('visibilitychange', () => {
   if (_dateEl) _dateEl.textContent = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-function renderHeroKpi() {
-const hasRecovery = todayData.recovery != null;
-document.getElementById('recovery-val').textContent = hasRecovery ? todayData.recovery + '%' : '—';
-const ringDash = 213.6;
-if (hasRecovery) {
-  document.getElementById('recovery-ring').style.strokeDashoffset = ringDash * (1 - todayData.recovery / 100);
-  const recColor = todayData.recovery > 66 ? 'var(--accent)' : todayData.recovery > 33 ? 'var(--warn)' : 'var(--danger)';
-  document.getElementById('recovery-ring').style.stroke = recColor;
-} else {
-  document.getElementById('recovery-ring').style.strokeDashoffset = ringDash;
-  document.getElementById('recovery-ring').style.stroke = 'var(--text-mute)';
+// HTML d'origine de la carte Whoop (mode "Récupération"), capturé avant tout swap ACWR.
+let _whoopCardOriginal = null;
+
+// Carte ACWR (Acute:Chronic Workload Ratio) affichée à la place de la carte Whoop
+// quand Whoop n'est pas connecté. ACWR ≈ charge aiguë (ATL) / charge chronique (CTL),
+// cohérent avec les CTL/ATL affichés dans la carte Forme (TSB).
+function renderAcwrCard() {
+  const card = document.getElementById('whoop-card');
+  if (!card) return;
+  const ctl = todayData.ctl || 0;
+  const atl = todayData.atl || 0;
+  const acwr = ctl > 0 ? atl / ctl : 0;
+  let color, state;
+  if (ctl <= 0) { color = 'var(--text-mute)'; state = 'Pas assez de données'; }
+  else if (acwr < 0.8) { color = 'var(--warn)'; state = 'Sous-charge · désentraînement'; }
+  else if (acwr <= 1.3) { color = 'var(--accent)'; state = 'Zone optimale'; }
+  else if (acwr <= 1.5) { color = 'var(--warn)'; state = 'Charge élevée · vigilance'; }
+  else { color = 'var(--danger)'; state = 'Risque de blessure'; }
+  const ringDash = 213.6;
+  const frac = Math.max(0, Math.min(1, acwr / 2)); // 2.0 = anneau plein
+  const off = ctl > 0 ? ringDash * (1 - frac) : ringDash;
+  card.dataset.mode = 'acwr';
+  card.innerHTML = `
+    <div class="kpi-label">Ratio de charge (ACWR)</div>
+    <div class="ring-container">
+      <div class="ring">
+        <svg width="80" height="80"><circle cx="40" cy="40" r="34" fill="none" stroke="var(--border)" stroke-width="8"/><circle cx="40" cy="40" r="34" fill="none" stroke="${color}" stroke-width="8" stroke-dasharray="${ringDash}" stroke-dashoffset="${off}" stroke-linecap="round"/></svg>
+        <div class="ring-text">${ctl > 0 ? acwr.toFixed(2) : '—'}</div>
+      </div>
+      <div>
+        <div style="font-size:12.5px;font-weight:600;color:${color};margin-bottom:8px;">${state}</div>
+        <div style="font-size:11px;color:var(--text-dim);">Charge aiguë 7j</div>
+        <div style="font-size:17px;font-weight:600;">${atl.toFixed(0)}<span style="font-size:11px;font-weight:500;color:var(--text-dim);"> /j</span></div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Charge chronique 42j</div>
+        <div style="font-size:13px;">${ctl.toFixed(0)}<span style="font-size:11px;color:var(--text-dim);"> /j</span></div>
+      </div>
+    </div>`;
 }
-document.getElementById('hrv-val').textContent = todayData.hrv != null ? todayData.hrv + ' ms' : '— ms';
-document.getElementById('sleep-val').textContent = todayData.sleepH != null
-  ? todayData.sleepH + ' h' + (todayData.sleepQ != null ? ' (qualité ' + todayData.sleepQ + '%)' : '')
-  : '— h';
+
+function renderHeroKpi() {
+// Capture le HTML d'origine de la carte Whoop (mode récupération) avant tout swap ACWR.
+if (_whoopCardOriginal === null) {
+  const _wc = document.getElementById('whoop-card');
+  if (_wc) _whoopCardOriginal = _wc.innerHTML;
+}
+const noWhoop = !!window.__noWhoopCard;
+if (noWhoop) {
+  renderAcwrCard();
+} else {
+  // Restaure la carte Récupération si elle était passée en mode ACWR.
+  const _wc = document.getElementById('whoop-card');
+  if (_wc && _wc.dataset.mode === 'acwr' && _whoopCardOriginal !== null) {
+    _wc.innerHTML = _whoopCardOriginal;
+    _wc.removeAttribute('data-mode');
+  }
+  const hasRecovery = todayData.recovery != null;
+  document.getElementById('recovery-val').textContent = hasRecovery ? todayData.recovery + '%' : '—';
+  const ringDash = 213.6;
+  if (hasRecovery) {
+    document.getElementById('recovery-ring').style.strokeDashoffset = ringDash * (1 - todayData.recovery / 100);
+    const recColor = todayData.recovery > 66 ? 'var(--accent)' : todayData.recovery > 33 ? 'var(--warn)' : 'var(--danger)';
+    document.getElementById('recovery-ring').style.stroke = recColor;
+  } else {
+    document.getElementById('recovery-ring').style.strokeDashoffset = ringDash;
+    document.getElementById('recovery-ring').style.stroke = 'var(--text-mute)';
+  }
+  document.getElementById('hrv-val').textContent = todayData.hrv != null ? todayData.hrv + ' ms' : '— ms';
+  document.getElementById('sleep-val').textContent = todayData.sleepH != null
+    ? todayData.sleepH + ' h' + (todayData.sleepQ != null ? ' (qualité ' + todayData.sleepQ + '%)' : '')
+    : '— h';
+}
 
 document.getElementById('tsb-val').textContent = (todayData.tsb >= 0 ? '+' : '') + todayData.tsb.toFixed(0);
 const tsbState = todayData.tsb > 5 ? 'Frais · prêt à performer' : todayData.tsb > -10 ? 'Optimal · zone de progression' : todayData.tsb > -25 ? 'Fatigué · vigilance' : 'Surchargé · décharge recommandée';
@@ -181,7 +351,10 @@ const trendEl = document.getElementById('weekly-trend');
 trendEl.textContent = (trendPct > 0 ? '↑ +' : '↓ ') + trendPct + '% vs semaine précédente';
 trendEl.className = 'kpi-trend ' + (trendPct > 5 ? 'up' : trendPct < -5 ? 'down' : '');
 document.getElementById('weekly-sessions').textContent = last7.filter(d => d.tss > 0).length;
-document.getElementById('weekly-hours').textContent = (last7.reduce((s,d)=>s+(d.duration||0),0)/60).toFixed(1) + ' h';
+{
+  const _wkMin = last7.reduce((s,d)=>s+(d.duration||0),0);
+  document.getElementById('weekly-hours').textContent = _wkMin < 60 ? Math.round(_wkMin) + ' min' : (_wkMin/60).toFixed(1) + ' h';
+}
 
 // Dernière séance — bloc en haut à gauche du hero
 const lastSession = [...data].reverse().find(d => d.sessionType);
@@ -201,16 +374,15 @@ if (!lastSession) {
   nameEl.textContent = lastSession.sessionName || 'Séance';
 
   const dur = lastSession.duration || 0;
-  const h = Math.floor(dur / 60);
-  const m = (dur % 60).toString().padStart(2, '0');
   const metrics = [];
   if (lastSession.tss) metrics.push(`<div class="ls-metric"><div class="ls-val">${lastSession.tss}</div><div class="ls-lbl">TSS</div></div>`);
-  if (dur) metrics.push(`<div class="ls-metric"><div class="ls-val">${h}h${m}</div><div class="ls-lbl">Durée</div></div>`);
+  if (dur) metrics.push(`<div class="ls-metric"><div class="ls-val">${fmtDur(dur)}</div><div class="ls-lbl">Durée</div></div>`);
   if (lastSession.np) metrics.push(`<div class="ls-metric"><div class="ls-val">${lastSession.np}<span style="font-size:13px;font-weight:500;">W</span></div><div class="ls-lbl">NP</div></div>`);
   if (lastSession.hr) metrics.push(`<div class="ls-metric"><div class="ls-val">${lastSession.hr}<span style="font-size:13px;font-weight:500;">bpm</span></div><div class="ls-lbl">FC moy</div></div>`);
   metricsEl.innerHTML = metrics.join('');
 }
 }
+window.renderHeroKpi = renderHeroKpi;
 renderHeroKpi();
 
 // ========= CHART DEFAULTS =========
@@ -417,7 +589,41 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
   options: {
     responsive: true, maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
-    plugins: { legend: { display: false } },
+    onClick: (evt, elements) => {
+      let els = elements;
+      if ((!els || !els.length) && loadChart.getElementsAtEventForMode) {
+        els = loadChart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+      }
+      if (!els || !els.length) return;
+      const d = loadChart._subset && loadChart._subset[els[0].index];
+      if (d && typeof goToCalendarDay === 'function') goToCalendarDay(toIsoDate(d.date));
+    },
+    onHover: (evt, elements) => {
+      const el = evt.native && evt.native.target;
+      if (el) el.style.cursor = (elements && elements.length) ? 'pointer' : 'default';
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          // Ajoute le(s) nom(s) de sortie + durée/km sous les valeurs CTL/ATL/TSB.
+          afterBody: (items) => {
+            if (!items || !items.length) return '';
+            const d = loadChart._subset && loadChart._subset[items[0].dataIndex];
+            if (!d) return '';
+            const acts = (d.activities && d.activities.length) ? d.activities : (d.sessionType ? [d] : []);
+            if (!acts.length) return '';
+            return acts.map(a => {
+              const name = a.name || a.sessionName || 'Séance';
+              const dur = a.duration ? fmtDur(a.duration) : '';
+              const km = a.distance_km ? Math.round(a.distance_km) + ' km' : '';
+              const meta = [dur, km].filter(Boolean).join(' · ');
+              return meta ? `• ${name} — ${meta}` : `• ${name}`;
+            });
+          }
+        }
+      }
+    },
     scales: {
       x: { ticks: { maxTicksLimit: 8 }, grid: { display: false } },
       y: { position: 'left', title: { display: true, text: 'TSS / TSB' } }
@@ -425,13 +631,47 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
   }
 });
 
+function dayHasActivity(d) {
+  return !!((d.activities && d.activities.length) || d.sessionType || (d.duration > 0));
+}
+
 function renderLoadChart(fromIso, toIso) {
   const subset = sliceByDate(data, fromIso, toIso);
+  loadChart._subset = subset; // pour le tooltip + le clic
   loadChart.data.labels = subset.map(d => fmtDate(d.date));
   loadChart.data.datasets[0].data = subset.map(d => d.ctl);
   loadChart.data.datasets[1].data = subset.map(d => d.atl);
   loadChart.data.datasets[2].data = subset.map(d => d.tsb);
+  // Point sur la courbe de forme (CTL) uniquement les jours avec activité
+  loadChart.data.datasets[0].pointRadius = subset.map(d => dayHasActivity(d) ? 3.5 : 0);
+  loadChart.data.datasets[0].pointHoverRadius = subset.map(d => dayHasActivity(d) ? 6 : 0);
+  loadChart.data.datasets[0].pointBackgroundColor = '#60a5fa';
+  loadChart.data.datasets[0].pointBorderColor = '#0b0e14';
+  loadChart.data.datasets[0].pointBorderWidth = 1.5;
   loadChart.update();
+}
+
+// Navigue vers un jour précis dans le calendrier (mode Réalisé) et le met en évidence.
+function goToCalendarDay(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  if (isNaN(d.getTime())) return;
+  calendarMode = 'realise';
+  document.querySelectorAll('#calendar-subtabs .subtab').forEach(b => b.classList.toggle('active', b.dataset.mode === 'realise'));
+  // Vue "4 semaines" ancrée sur la semaine de l'activité (en haut), pas le mois.
+  selectedMonth = null;
+  calendarAnchorDate = d;
+  if (window.__updateMonthOverlay) window.__updateMonthOverlay();
+  if (window.location.hash !== '#calendrier') window.location.hash = '#calendrier';
+  if (typeof renderCalendar === 'function') renderCalendar();
+  setTimeout(() => {
+    // Pas de scroll : la semaine de l'activité est déjà en haut du calendrier.
+    const card = document.querySelector(`#week-calendar .day-card[data-iso="${iso}"]`);
+    if (card) {
+      card.classList.add('day-flash');
+      setTimeout(() => card.classList.remove('day-flash'), 1500);
+    }
+    if (typeof openSessionModal === 'function') openSessionModal(iso, 'realise');
+  }, 300);
 }
 
 // Init : 30 derniers jours par défaut
@@ -902,14 +1142,12 @@ function renderZones(fromIso, toIso) {
     zonesChart.data.datasets[0].backgroundColor = zoneColors;
   }
   zonesChart.update();
-  const hours = Math.floor(totalMin / 60);
-  const mins = totalMin % 60;
   const rows = zoneLabels.map((label, i) =>
     `<div class="zone-summary-row"><span class="zname"><span class="legend-dot" style="background:${zoneColors[i]};"></span>${label}</span><span class="zpct">${pct[i]}%</span></div>`
   ).join('');
   document.getElementById('zone-summary').innerHTML = `
     <div style="margin-bottom:8px;color:var(--text-dim);">
-      <strong style="color:var(--text);">${sessions}</strong> séance${sessions>1?'s':''} · <strong style="color:var(--text);">${hours}h${mins.toString().padStart(2,'0')}</strong> de pratique
+      <strong style="color:var(--text);">${sessions}</strong> séance${sessions>1?'s':''} · <strong style="color:var(--text);">${fmtDur(totalMin)}</strong> de pratique
     </div>
     ${rows}
   `;
@@ -986,11 +1224,12 @@ function loadCompetitionsExpanded() {
         out.push({
           id: `${c.id}-stage-${idx}`,
           parentId: c.id,
+          _table: c._table,
           name: `${c.name} — Étape ${idx + 1}`,
           date: st.date,
           time: st.time || null,
           // Priority et sport sont GLOBAUX (depuis la compé), pas par étape
-          priority: c.priority || 'A',
+          priority: c.priority || 'principal',
           sport: c.sport || 'Ride',
           type: st.type || null,
           km: st.km || null,
@@ -1125,9 +1364,9 @@ function renderCompList() {
     } else {
       dateStr = fmtFullDate(c.dateObj);
     }
-    return `<div class="comp-item" data-comp-id="${c.id}" title="Voir le détail de la compétition">
-      <span class="comp-prio ${c.priority}">${c.priority}</span>
-      <span class="comp-name">${c.name}</span>
+    const _pi = compPrio(c.priority);
+    return `<div class="comp-item" data-prio="${_pi.key}" data-comp-id="${c.id}" title="Voir le détail de la compétition">
+      <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span></span>
       <span class="comp-date">${dateStr}</span>
       <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'dans ' + daysUntil + ' j'}</span>
       <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
@@ -1973,7 +2212,7 @@ function openCompModal() {
   if (window.resetTimeStepper) window.resetTimeStepper('comp-modal-time', 12, 0);
   const prioEl = document.getElementById('comp-modal-priority');
   if (prioEl) {
-    prioEl.value = 'A';
+    prioEl.value = 'principal';
     if (typeof enhanceSelect === 'function') enhanceSelect('comp-modal-priority');
     if (prioEl._customUpdate) prioEl._customUpdate();
   }
@@ -2135,6 +2374,9 @@ async function saveCompFromModal() {
     if (idx >= 0) {
       // Conserve les éventuels champs GPX existants si non modifiés
       const old = comps[idx];
+      // IMPORTANT : conserver l'id Supabase pour METTRE À JOUR la ligne existante
+      // (sinon le push crée une nouvelle ligne et la modif est perdue au rechargement)
+      if (old._sbId) newEntry._sbId = old._sbId;
       if (!gpxContent && old.gpxContent) {
         newEntry.gpxName = old.gpxName;
         newEntry.gpxContent = old.gpxContent;
@@ -2406,9 +2648,14 @@ function saveTrainFromModal() {
   const saveFn = trainModalMode === 'realise' ? saveRealisedTrainings : saveTrainings;
   const arr = loadFn();
   if (editingId) {
-    // Mode édition : remplace l'entry existante
+    // Mode édition : remplace l'entry existante en conservant l'id Supabase
     const idx = arr.findIndex(t => t.id === editingId);
-    if (idx >= 0) arr[idx] = entry; else arr.push(entry);
+    if (idx >= 0) {
+      if (arr[idx]._sbId) entry._sbId = arr[idx]._sbId; // sinon le push crée un doublon
+      arr[idx] = entry;
+    } else {
+      arr.push(entry);
+    }
   } else {
     arr.push(entry);
   }
@@ -2518,7 +2765,7 @@ const PLAN_TEMPLATES = {
     4: { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Veille de veille de course' },
     5: { type: 'tempo', name: 'Openers courts', dur: 30, tss: 25, why: 'Activation neuromusculaire' },
     6: { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Repos avant course' },
-    0: { type: 'vo2', name: 'COURSE 🏁', dur: 120, tss: 200, why: 'Jour J — donne tout' }
+    0: { type: 'vo2', name: 'Course', dur: 120, tss: 200, why: 'Jour J — donne tout' }
   },
   recovery: {
     1: { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Décharge : récupération maximale' },
@@ -2563,7 +2810,11 @@ function determinePhaseForDate(comps, fromDate, currentTSB) {
 }
 
 function renderWeekPlan() {
-  const comps = loadCompetitionsExpanded().map(c => ({ ...c, dateObj: new Date(c.date + 'T12:00:00') }));
+  // En Prévu : seulement les compétitions PLANIFIÉES (futures). Les compés
+  // réalisées/passées (_table='activity') s'affichent dans le Réalisé.
+  const comps = loadCompetitionsExpanded()
+    .filter(c => c._table !== 'activity')
+    .map(c => ({ ...c, dateObj: new Date(c.date + 'T12:00:00') }));
   const { phase, daysUntil, comp } = determinePhase(comps, todayData.tsb);
 
   // Pill de phase supprimée — l'info est dans le sous-titre
@@ -2571,7 +2822,7 @@ function renderWeekPlan() {
   // Sous-titre supprimé
   const subEl = { textContent: '' };
   if (comp) {
-    subEl.textContent = `Prochain objectif : ${comp.name} (priorité ${comp.priority}) dans ${daysUntil} jours · phase actuelle ${PHASE_LABELS[phase]}`;
+    subEl.textContent = `Prochain objectif : ${comp.name} (${compPrio(comp.priority).label}) dans ${daysUntil} jours · phase actuelle ${PHASE_LABELS[phase]}`;
   } else if (phase === 'recovery') {
     subEl.textContent = `TSB actuel ${todayData.tsb.toFixed(0)} : décharge prioritaire avant tout objectif`;
   } else {
@@ -2692,7 +2943,7 @@ function renderWeekPlan() {
             sport: c.sport || 'Ride',
             km: c.km || null,
             priority: c.priority,
-            why: `Compétition · priorité ${c.priority || 'A'}${c.km ? ' · ' + Math.round(c.km) + ' km' : ''}`,
+            why: `Compétition · ${compPrio(c.priority).label}${c.km ? ' · ' + Math.round(c.km) + ' km' : ''}`,
           });
         }
 
@@ -2737,8 +2988,8 @@ function renderWeekPlan() {
         // 5) Si aucun item ne passe le filtre → jour vide, on saute le rendu de la card normale
         if (items.length === 0) {
           cardHTML = `
-            <div class="day-card empty-past" data-iso="${iso}" data-source="prevu">
-              <div class="day-card-dow">${dowFr[dow]}</div>
+            <div class="day-card empty-past${isToday ? ' today' : ''}" data-iso="${iso}" data-source="prevu">
+              <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
               <div class="day-card-date">${d.getDate()}</div>
             </div>
           `;
@@ -2770,7 +3021,7 @@ function renderWeekPlan() {
       // L'item actuellement affiché peut être une compé ou un entraînement manuel
       const isRace = !!proposal.isRace;
       const raceClass = isRace ? ' race' : '';
-      const raceAttr = isRace ? ` data-priority="${proposal.priority || 'A'}"` : '';
+      const raceAttr = isRace ? ` data-prio="${compPrio(proposal.priority).key}"` : '';
       // Sport label
       let sportLabel = '';
       let sportCat = 'autre';
@@ -2779,7 +3030,7 @@ function renderWeekPlan() {
         sportCat = window.activitySportColorKey({ sport: proposal.sport || 'cyclisme' }) || 'autre';
       }
       const kmStr = proposal.km ? Math.round(proposal.km) + ' km' : '';
-      const durStr = proposal.dur ? `${Math.floor(proposal.dur/60)}h${(proposal.dur%60).toString().padStart(2,'0')}` : '';
+      const durStr = proposal.dur ? fmtDur(proposal.dur) : '';
       const metaLine = [durStr, kmStr].filter(Boolean).join(' · ');
       const sportBlock = sportLabel
         ? `<div class="day-card-sport"><span class="sport-pill" data-sport-cat="${sportCat}">${sportLabel}</span></div>`
@@ -2806,10 +3057,11 @@ function renderWeekPlan() {
         <div class="day-card${isRest ? ' rest' : ''}${todayClass}${pastClass}${raceClass}" data-iso="${iso}" data-source="prevu"${raceAttr}>
           <div class="day-card-dow">${dowFr[dow]}${dowSuffix}</div>
           ${dateRow}
-          <div class="day-card-name">${proposal.name}</div>
+          <div class="day-card-name">${isRace ? trophySvg(compPrio(proposal.priority).color, 13) : ''}<span class="dc-name-text">${proposal.name}</span></div>
           ${stageInfoLine}
           <div class="day-card-meta">${metaLine}</div>
           ${sportBlock}
+          ${isRest ? REST_COUCH_SVG : ''}
           ${counter}
         </div>
       `;
@@ -2824,7 +3076,9 @@ function renderWeekPlan() {
     // Carte des totaux (réalisé pour passé/courant, prévu pour future)
     const _wh = Math.floor(weekTotalDur / 60);
     const _wm = Math.round(weekTotalDur % 60);
-    const totalHours = `${_wh}<span style="font-size:11px;font-weight:500;">h</span>${_wm.toString().padStart(2, '0')}`;
+    const totalHours = weekTotalDur < 60
+      ? `${Math.round(weekTotalDur)}<span style="font-size:11px;font-weight:500;"> min</span>`
+      : `${_wh}<span style="font-size:11px;font-weight:500;">h</span>${_wm.toString().padStart(2, '0')}`;
     const totalsLabel = weekKind === 'future' ? 'Prévu' : (weekKind === 'current' ? 'En cours' : 'Bilan');
     // Prévu : pas de km réels (à venir), pas de CTL/ATL projetés (complexe)
     const totalsCard = `
@@ -2870,6 +3124,7 @@ document.querySelectorAll('#calendar-subtabs .subtab').forEach(b => {
   b.classList.toggle('active', b.dataset.mode === calendarMode);
 });
 let selectedMonth = null; // null = 4 dernières semaines, sinon Date 1er du mois sélectionné
+let calendarAnchorDate = null; // si défini : ancre les 4 semaines sur cette date (clic graphe)
 // Index de l'activité affichée par jour (pour les jours multi-activités). Clé = ISO date.
 const dayActivityIndex = {};
 // Index de l'item Prévu affiché par jour (pour jours avec plusieurs compés/entraînements)
@@ -2893,8 +3148,6 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   const iso = toIsoDate(d);
 
   const dur = act.duration || 0;
-  const h = Math.floor(dur / 60);
-  const m = (dur % 60).toString().padStart(2, '0');
 
   const hasMulti = total > 1;
   const dateRow = hasMulti ? `
@@ -2921,11 +3174,11 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   const comps = (typeof loadCompetitionsExpanded === 'function') ? loadCompetitionsExpanded() : [];
   const compToday = comps.find(c => c.date === iso);
   const raceClass = compToday ? ' race' : '';
-  const raceAttr = compToday ? ` data-priority="${compToday.priority || 'A'}"` : '';
+  const raceAttr = compToday ? ` data-prio="${compPrio(compToday.priority).key}"` : '';
 
   // Meta : durée + km (Strava) OU durée + TSS (manuel sans km, ex: muscu/yoga)
   let metaParts = [];
-  if (dur) metaParts.push(`${h}h${m}`);
+  if (dur) metaParts.push(fmtDur(dur));
   if (km) metaParts.push(km);
   else if (act.tss) metaParts.push(act.tss + ' TSS'); // pas de km → on met TSS
   const metaLine = metaParts.join(' · ');
@@ -2944,7 +3197,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
     <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass}" data-iso="${iso}" data-source="realise"${raceAttr}>
       <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
       ${dateRow}
-      <div class="day-card-name">${aName}</div>
+      <div class="day-card-name">${compToday ? trophySvg(compPrio(compToday.priority).color, 13) : ''}<span class="dc-name-text">${aName}</span></div>
       <div class="day-card-meta">${metaLine}</div>
       ${sportBlock}
       ${counter}
@@ -2960,6 +3213,7 @@ function renderCalendar() {
   if (resetBtn) {
     resetBtn.textContent = calendarMode === 'prevu' ? '4 sem. à venir' : '4 dernières semaines';
   }
+  if (window.__updateMonthOverlay) window.__updateMonthOverlay();
   if (calendarMode === 'prevu') {
     renderWeekPlan();
   } else {
@@ -2997,8 +3251,11 @@ function renderRealiseCalendar() {
     const monthLabel = selectedMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
     subEl.textContent = `Réalisé · ${monthLabel}`;
   } else {
-    // Default : 4 dernières semaines incluant la semaine en cours
-    const thisMonday = getMondayOfWeek(today);
+    // 4 semaines se terminant par la semaine d'ancrage (par défaut : aujourd'hui).
+    // Si on vient d'un clic sur le graphe, l'ancre = la date de l'activité → sa
+    // semaine se retrouve tout en haut après l'inversion.
+    const anchor = calendarAnchorDate || today;
+    const thisMonday = getMondayOfWeek(anchor);
     for (let i = 3; i >= 0; i--) {
       const w = new Date(thisMonday);
       w.setDate(thisMonday.getDate() - i * 7);
@@ -3091,7 +3348,7 @@ function renderRealiseCalendar() {
         if (realDay && (realDay.ctl != null || realDay.atl != null)) {
           lastDayWithMetrics = realDay;
         }
-        if (realDay && realDay.sessionType) {
+        if (realDay && (realDay.sessionType || (realDay.activities && realDay.activities.length))) {
           const dur = realDay.duration || 0;
           weekTotalDur += dur;
           weekTotalTss += realDay.tss || 0;
@@ -3104,10 +3361,11 @@ function renderRealiseCalendar() {
           cardHTML = renderRealisedDayCard(d, dow, realDay, isToday);
         } else {
           cardHTML = `
-            <div class="day-card empty-past" data-iso="${iso}" data-source="realise">
+            <div class="day-card empty-past rest-clickable${isToday ? ' today' : ''}" data-iso="${iso}" data-source="realise">
               <div class="day-card-dow">${dowFr[dow]}${isToday ? " · auj." : ''}</div>
               <div class="day-card-date">${d.getDate()}</div>
               <div class="day-card-name" style="color:var(--text-mute);font-weight:500;">Repos</div>
+              ${REST_COUCH_SVG}
             </div>
           `;
         }
@@ -3117,7 +3375,9 @@ function renderRealiseCalendar() {
 
     const _rh = Math.floor(weekTotalDur / 60);
     const _rm = Math.round(weekTotalDur % 60);
-    const totalHours = `${_rh}<span style="font-size:11px;font-weight:500;">h</span>${_rm.toString().padStart(2, '0')}`;
+    const totalHours = weekTotalDur < 60
+      ? `${Math.round(weekTotalDur)}<span style="font-size:11px;font-weight:500;"> min</span>`
+      : `${_rh}<span style="font-size:11px;font-weight:500;">h</span>${_rm.toString().padStart(2, '0')}`;
     const totalKm = Math.round(weekTotalKm);
     const lastCtl = lastDayWithMetrics && lastDayWithMetrics.ctl != null ? Math.round(lastDayWithMetrics.ctl) : '—';
     const lastAtl = lastDayWithMetrics && lastDayWithMetrics.atl != null ? Math.round(lastDayWithMetrics.atl) : '—';
@@ -3215,10 +3475,15 @@ document.getElementById('week-calendar').addEventListener('click', (e) => {
   }
   // Clic sur la carte → ouvrir la modal (sauf si c'est une carte totaux)
   const card = e.target.closest('.day-card');
-  if (!card || card.classList.contains('empty-past')) return;
+  if (!card) return;
   const iso = card.dataset.iso;
   const source = card.dataset.source;
   if (!iso) return;
+  // Jour de repos passé : clic → détail récupération (Whoop) au lieu de rien.
+  if (card.classList.contains('empty-past')) {
+    if (card.classList.contains('rest-clickable')) openRestDayModal(iso);
+    return;
+  }
   openSessionModal(iso, source);
 });
 
@@ -5988,6 +6253,168 @@ function renderGpxTrack(gpxContent, svgId) {
   }
 }
 
+// Détail d'un jour de repos passé : si Whoop est connecté et qu'on a des données
+// de récupération pour ce jour, on les affiche. Sinon message simple.
+function openRestDayModal(iso) {
+  const date = new Date(iso + 'T12:00:00');
+  if (isNaN(date.getTime())) return;
+  const dateStr = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const titleEl = document.getElementById('modal-title');
+  const metaEl = document.getElementById('modal-meta');
+  const bodyEl = document.getElementById('modal-body');
+  const _e = document.getElementById('modal-edit-btn'); if (_e) _e.hidden = true;
+  const _d = document.getElementById('modal-delete-btn'); if (_d) _d.hidden = true;
+
+  titleEl.innerHTML = 'Repos';
+  metaEl.textContent = dateStr;
+
+  const day = data.find(d => toIsoDate(d.date) === iso);
+  const hasReco = day && day.recovery != null;
+  const whoopConnected = !window.__noWhoopCard;
+  const couchBlock = `<div class="rest-modal-couch">${REST_COUCH_SVG}</div>`;
+
+  if (hasReco) {
+    const rec = day.recovery;
+    const recColor = rec > 66 ? 'var(--accent)' : rec > 33 ? 'var(--warn)' : 'var(--danger)';
+    const cards = [];
+    cards.push(`<div class="modal-metric"><div class="m-label">Récupération</div><div class="m-value" style="color:${recColor};">${rec}<span style="font-size:14px;">%</span></div></div>`);
+    if (day.hrv != null) cards.push(`<div class="modal-metric"><div class="m-label">HRV</div><div class="m-value">${day.hrv}<span style="font-size:14px;"> ms</span></div></div>`);
+    if (day.rhr != null) cards.push(`<div class="modal-metric"><div class="m-label">FC repos</div><div class="m-value">${day.rhr}<span style="font-size:14px;"> bpm</span></div></div>`);
+    if (day.sleepH != null) cards.push(`<div class="modal-metric"><div class="m-label">Sommeil</div><div class="m-value">${fmtDur(Math.round(day.sleepH * 60))}${day.sleepQ != null ? `<span style="font-size:13px;color:var(--text-dim);"> · ${day.sleepQ}%</span>` : ''}</div></div>`);
+    if (day.strain != null) cards.push(`<div class="modal-metric"><div class="m-label">Strain</div><div class="m-value">${typeof day.strain === 'number' ? day.strain.toFixed(1) : day.strain}</div></div>`);
+    bodyEl.innerHTML = `
+      ${couchBlock}
+      <div style="margin-bottom:14px;color:var(--text-dim);font-size:13px;">Jour de repos — récupération Whoop</div>
+      <div class="modal-metrics">${cards.join('')}</div>`;
+  } else if (whoopConnected) {
+    bodyEl.innerHTML = `${couchBlock}<div class="modal-placeholder">Jour de repos. Aucune donnée de récupération Whoop pour ce jour.</div>`;
+  } else {
+    bodyEl.innerHTML = `${couchBlock}<div class="modal-placeholder">Jour de repos. Connecte Whoop pour voir ta récupération ce jour-là.</div>`;
+  }
+  document.getElementById('session-modal').classList.add('active');
+}
+
+// Modale d'édition d'une activité (calque d'overrides) + transformer en compétition.
+function openActivityEditModal(activityId, iso) {
+  const day = data.find(d => toIsoDate(d.date) === iso);
+  const act = day && day.activities ? day.activities.find(a => String(a.id) === String(activityId)) : null;
+  if (!act) return;
+  const ov = getActivityOverride(activityId) || {};
+  let exclPower = !!ov.excludePower, exclHr = !!ov.excludeHr, exclDist = !!ov.excludeDistance;
+
+  document.getElementById('_act-edit-modal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'day-modal-overlay active';
+  overlay.id = '_act-edit-modal';
+  overlay.innerHTML = `
+    <div class="day-modal day-modal-note">
+      <div class="day-modal-header">
+        <h3>Modifier l'activité</h3>
+        <button class="day-modal-close" type="button" title="Fermer">×</button>
+      </div>
+      <div class="day-modal-body">
+        <label class="note-field-label">Nom</label>
+        <input type="text" id="_ae-name">
+        <div class="note-range-row">
+          <div><label class="note-field-label">Type</label><input type="text" id="_ae-type" placeholder="endurance, seuil…"></div>
+          <div><label class="note-field-label">Sport</label><input type="text" id="_ae-sport"></div>
+        </div>
+        <div class="note-range-row">
+          <div><label class="note-field-label">Durée (min)</label><input type="number" id="_ae-dur" min="0"></div>
+          <div><label class="note-field-label">Distance (km)</label><input type="number" step="0.1" id="_ae-dist" min="0"></div>
+        </div>
+        <label class="note-field-label">TSS</label>
+        <input type="number" id="_ae-tss" min="0">
+        <label class="note-field-label">Notes</label>
+        <textarea id="_ae-notes" rows="2" placeholder="Commentaire…"></textarea>
+        <label class="note-field-label">Retirer des records &amp; statistiques</label>
+        <div class="ae-field-hint">La donnée reste sur l'activité, mais n'est plus comptée dans les records / stats.</div>
+        <div class="ae-metric-btns">
+          <button type="button" class="ae-metric-btn${exclPower ? ' active' : ''}" data-m="power">Puissance</button>
+          <button type="button" class="ae-metric-btn${exclHr ? ' active' : ''}" data-m="hr">Cardio</button>
+          <button type="button" class="ae-metric-btn${exclDist ? ' active' : ''}" data-m="dist">Distance</button>
+        </div>
+        <button type="button" class="ae-transform-btn" id="_ae-transform">
+          ${trophySvg('#fbbf24', 15)} Transformer en compétition
+        </button>
+      </div>
+      <div class="day-modal-footer">
+        <button class="day-modal-delete" type="button" id="_ae-reset">Réinitialiser</button>
+        <div style="flex:1;"></div>
+        <button class="day-modal-cancel" type="button">Annuler</button>
+        <button class="day-modal-save" type="button">Enregistrer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  // Pré-remplissage (via .value pour éviter les soucis d'échappement)
+  document.getElementById('_ae-name').value = act.name || '';
+  document.getElementById('_ae-type').value = act.type || '';
+  document.getElementById('_ae-sport').value = act.sport || '';
+  document.getElementById('_ae-dur').value = act.duration || 0;
+  document.getElementById('_ae-dist').value = act.distance_km != null ? act.distance_km : '';
+  document.getElementById('_ae-tss').value = act.tss || 0;
+  document.getElementById('_ae-notes').value = act.notes || ov.notes || '';
+
+  overlay.querySelectorAll('.ae-metric-btn').forEach(b => b.addEventListener('click', () => {
+    b.classList.toggle('active');
+    const on = b.classList.contains('active');
+    if (b.dataset.m === 'power') exclPower = on;
+    if (b.dataset.m === 'hr') exclHr = on;
+    if (b.dataset.m === 'dist') exclDist = on;
+  }));
+
+  const close = () => overlay.remove();
+  overlay.querySelector('.day-modal-close').addEventListener('click', close);
+  overlay.querySelector('.day-modal-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+  overlay.querySelector('.day-modal-save').addEventListener('click', () => {
+    const newOv = {};
+    const nameV = document.getElementById('_ae-name').value.trim();
+    const typeV = document.getElementById('_ae-type').value.trim();
+    const sportV = document.getElementById('_ae-sport').value.trim();
+    const durV = parseInt(document.getElementById('_ae-dur').value, 10);
+    const distV = parseFloat(document.getElementById('_ae-dist').value);
+    const tssV = parseInt(document.getElementById('_ae-tss').value, 10);
+    const notesV = document.getElementById('_ae-notes').value.trim();
+    if (nameV) newOv.name = nameV;
+    if (typeV) newOv.type = typeV;
+    if (sportV) newOv.sport = sportV;
+    if (!isNaN(durV)) newOv.duration = durV;
+    if (!isNaN(distV)) newOv.distance_km = distV;
+    if (!isNaN(tssV)) newOv.tss = tssV;
+    if (notesV) newOv.notes = notesV;
+    if (exclPower) newOv.excludePower = true;
+    if (exclHr) newOv.excludeHr = true;
+    if (exclDist) newOv.excludeDistance = true;
+    setActivityOverride(activityId, newOv);
+    close();
+  });
+  overlay.querySelector('#_ae-reset').addEventListener('click', async () => {
+    const ok = await appConfirm({ title: 'Réinitialiser', html: "Annuler toutes les modifications de cette activité et revenir aux données Strava ?", confirmLabel: 'Réinitialiser', danger: true });
+    if (ok) { setActivityOverride(activityId, null); close(); }
+  });
+  overlay.querySelector('#_ae-transform').addEventListener('click', () => {
+    close();
+    transformActivityToCompetition(act, iso);
+  });
+}
+
+// Pré-remplit le formulaire compétition à partir d'une activité.
+function transformActivityToCompetition(act, iso) {
+  if (typeof openCompModal !== 'function') return;
+  openCompModal();
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v != null && v !== '') el.value = v; };
+  set('comp-modal-name', act.name || '');
+  const dEl = document.getElementById('comp-modal-date');
+  if (dEl) { dEl.value = iso; if (dEl._flatpickr) dEl._flatpickr.setDate(iso, false); }
+  const sp = document.getElementById('comp-modal-sport');
+  if (sp && act.sport) { sp.value = act.sport; if (sp._customUpdate) sp._customUpdate(); }
+  set('comp-modal-km', act.distance_km ? Math.round(act.distance_km) : '');
+  set('comp-modal-dplus', act.elevation_gain ? Math.round(act.elevation_gain) : '');
+}
+
 function openSessionModal(iso, source) {
   // Reconstruire la date depuis l'iso (les jours futurs ne sont PAS dans data)
   const date = new Date(iso + 'T12:00:00');
@@ -6058,8 +6485,14 @@ function openSessionModal(iso, source) {
             _delBtn2.dataset.trainingMode = 'realise';
           }
         } else {
-          // Activité Strava : pas modifiable (source de vérité). Mais on offre "Masquer" via delete.
-          if (_editBtn2) _editBtn2.hidden = true;
+          // Activité Strava : éditable via calque d'overrides (le crayon ouvre l'éditeur).
+          // La poubelle masque l'activité.
+          if (_editBtn2) {
+            _editBtn2.hidden = false;
+            _editBtn2.dataset.kind = 'strava-edit';
+            _editBtn2.dataset.activityId = String(act.id || act.activityId || '');
+            _editBtn2.dataset.iso = iso;
+          }
           if (_delBtn2) {
             _delBtn2.hidden = false;
             _delBtn2.dataset.kind = 'strava';
@@ -6207,7 +6640,7 @@ function openSessionModal(iso, source) {
         }
         const vMaxToShow = act.max_speed_smooth_kmh || act.max_speed_kmh;
         const syntheseHTML = section('Synthèse', [
-          card('Durée', `${h}<span style="font-size:14px;">h</span>${m}`, '', elapsedSub),
+          card('Durée', dur < 60 ? `${Math.round(dur)}<span style="font-size:14px;"> min</span>` : `${h}<span style="font-size:14px;">h</span>${m}`, '', elapsedSub),
           act.distance_km && card('Distance', act.distance_km, 'km'),
           act.elevation_gain && card('Dénivelé +', act.elevation_gain, 'm',
             act.elevation_loss ? `D− ${act.elevation_loss} m` : ''),
@@ -6524,7 +6957,7 @@ function openSessionModal(iso, source) {
       const sportPill = `<span class="sport-pill" data-sport-cat="${sportCat}" style="margin-left:10px;vertical-align:middle;">${sportLabel}</span>`;
 
       // Title : juste le nom de la course (pas le numéro d'étape — déjà visible dans le switcher + section dédiée)
-      titleEl.innerHTML = `🏁 ${parentName}`;
+      titleEl.innerHTML = `${trophySvg(compPrio(c.priority).color, 18)} ${parentName}`;
 
       // Meta : date + heure + sport pill
       const timeStr = c.time ? ` · ${c.time.replace(':', 'h')}` : '';
@@ -6943,9 +7376,8 @@ function openSessionModal(iso, source) {
       titleEl.innerHTML = `${t.name} ${t.type ? `<span class="pill ${t.type}" style="margin-left:8px;">${t.type}</span>` : ''}${sportPill}`;
       metaEl.innerHTML = `${_dateStr} · Séance ajoutée manuellement`;
       const dur = t.duration || 0;
-      const h = Math.floor(dur / 60), mm = (dur % 60).toString().padStart(2, '0');
       const cards = [];
-      if (dur) cards.push({ label: 'Durée', value: `${h}h${mm}`, unit: '' });
+      if (dur) cards.push({ label: 'Durée', value: fmtDur(dur), unit: '' });
       if (t.tss) cards.push({ label: 'TSS', value: t.tss, unit: '' });
       if (t.type) cards.push({ label: 'Type', value: t.type, unit: '', isText: true });
 
@@ -7030,11 +7462,11 @@ function openSessionModal(iso, source) {
       const dur = proposal.dur || 0;
       const h = Math.floor(dur / 60), mm = (dur % 60).toString().padStart(2, '0');
       titleEl.innerHTML = `${proposal.name} ${proposal.type ? `<span class="pill ${proposal.type}">${proposal.type}</span>` : ''}`;
-      metaEl.textContent = `${_dateStr} · ${h}h${mm} · ${proposal.tss || 0} TSS prévus · phase ${PHASE_LABELS[phase] || phase}`;
+      metaEl.textContent = `${_dateStr} · ${fmtDur(dur)} · ${proposal.tss || 0} TSS prévus · phase ${PHASE_LABELS[phase] || phase}`;
       bodyEl.innerHTML = `
         ${switchHTML}
         <div class="modal-metrics">
-          <div class="modal-metric"><div class="m-label">Durée cible</div><div class="m-value">${h}<span style="font-size:14px;">h</span>${mm}</div></div>
+          <div class="modal-metric"><div class="m-label">Durée cible</div><div class="m-value">${dur < 60 ? `${Math.round(dur)}<span style="font-size:14px;"> min</span>` : `${h}<span style="font-size:14px;">h</span>${mm}`}</div></div>
           <div class="modal-metric"><div class="m-label">TSS cible</div><div class="m-value">${proposal.tss || 0}</div></div>
           <div class="modal-metric"><div class="m-label">Type</div><div class="m-value" style="font-size:15px;text-transform:capitalize;">${proposal.type || '—'}</div></div>
           <div class="modal-metric"><div class="m-label">Phase</div><div class="m-value" style="font-size:15px;">${PHASE_LABELS[phase] || '—'}</div></div>
@@ -7266,6 +7698,11 @@ if (_modalEditBtn) {
       if (!id) return;
       closeSessionModal();
       if (typeof window.gpxEditTraining === 'function') window.gpxEditTraining(id, mode);
+    } else if (kind === 'strava-edit') {
+      const aid = _modalEditBtn.dataset.activityId;
+      const iso = _modalEditBtn.dataset.iso;
+      closeSessionModal();
+      openActivityEditModal(aid, iso);
     } else if (kind === 'template') {
       // Matérialise la suggestion IA en entraînement manuel prévu modifiable
       const isoT = _modalEditBtn.dataset.templateIso;
@@ -7390,7 +7827,7 @@ function openCompModalForEdit(comp) {
   ['priority', 'sport', 'type'].forEach(k => {
     const el = document.getElementById('comp-modal-' + k);
     if (el && comp[k] !== undefined && comp[k] !== null) {
-      el.value = comp[k];
+      el.value = (k === 'priority') ? compPrio(comp[k]).key : comp[k];
       if (el._customUpdate) el._customUpdate();
     }
   });
@@ -7494,6 +7931,7 @@ document.querySelectorAll('#calendar-subtabs .subtab').forEach(btn => {
     calendarMode = btn.dataset.mode;
     // Reset selectedMonth mais on garde le mois courant affiché dans l'input
     selectedMonth = null;
+    calendarAnchorDate = null;
     document.getElementById('month-input').value = `${today.getFullYear()}-${(today.getMonth()+1).toString().padStart(2,'0')}`;
     renderCalendar();
   });
@@ -7503,19 +7941,45 @@ document.querySelectorAll('#calendar-subtabs .subtab').forEach(btn => {
 const monthInput = document.getElementById('month-input');
 // Pré-remplit avec le mois courant à l'init (sans changer selectedMonth = vue par défaut)
 monthInput.value = `${today.getFullYear()}-${(today.getMonth()+1).toString().padStart(2,'0')}`;
+
+// Overlay "4 sem" : en vue 4 dernières semaines (selectedMonth null), on masque le mois
+// affiché par l'input natif et on superpose "4 sem" pour ne pas tromper l'utilisateur.
+(function setupMonthOverlay() {
+  const wrap = document.createElement('span');
+  wrap.className = 'month-input-wrap';
+  monthInput.parentNode.insertBefore(wrap, monthInput);
+  wrap.appendChild(monthInput);
+  const overlay = document.createElement('span');
+  overlay.className = 'month-input-overlay';
+  overlay.textContent = '4 sem';
+  wrap.appendChild(overlay);
+  window.__updateMonthOverlay = function () {
+    const fourWeek = (selectedMonth === null);
+    overlay.style.display = fourWeek ? '' : 'none';
+    monthInput.classList.toggle('hide-value', fourWeek);
+  };
+  window.__updateMonthOverlay();
+})();
 document.getElementById('month-prev').addEventListener('click', () => {
+  calendarAnchorDate = null;
   const base = selectedMonth || new Date(today.getFullYear(), today.getMonth(), 1);
   selectedMonth = new Date(base.getFullYear(), base.getMonth() - 1, 1);
   monthInput.value = `${selectedMonth.getFullYear()}-${(selectedMonth.getMonth()+1).toString().padStart(2,'0')}`;
   renderCalendar();
 });
 document.getElementById('month-next').addEventListener('click', () => {
-  const base = selectedMonth || new Date(today.getFullYear(), today.getMonth(), 1);
-  selectedMonth = new Date(base.getFullYear(), base.getMonth() + 1, 1);
+  calendarAnchorDate = null;
+  if (selectedMonth === null) {
+    // Depuis la vue "4 sem" : le clic → affiche le mois en cours (pas le mois suivant)
+    selectedMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  } else {
+    selectedMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 1);
+  }
   monthInput.value = `${selectedMonth.getFullYear()}-${(selectedMonth.getMonth()+1).toString().padStart(2,'0')}`;
   renderCalendar();
 });
 monthInput.addEventListener('change', () => {
+  calendarAnchorDate = null;
   if (!monthInput.value) {
     selectedMonth = null;
   } else {
@@ -7526,6 +7990,7 @@ monthInput.addEventListener('change', () => {
 });
 document.getElementById('month-reset').addEventListener('click', () => {
   selectedMonth = null;
+  calendarAnchorDate = null;
   // Garde le mois courant affiché visuellement (au lieu de tout vider)
   monthInput.value = `${today.getFullYear()}-${(today.getMonth()+1).toString().padStart(2,'0')}`;
   renderCalendar();
@@ -7918,7 +8383,7 @@ function renderSessionsTable() {
       <td>${s.sessionName}</td>
       <td><span class="sport-pill" data-sport-cat="${sportCat}">${sportLabel}</span></td>
       <td><span class="pill ${s.sessionType}">${s.sessionType}</span></td>
-      <td>${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')}</td>
+      <td>${fmtDur(s.duration)}</td>
       <td>${s.tss}</td>
       <td>${s.np}W (${s.ftpPct}%)</td>
       <td>${s.hr} bpm</td>
@@ -7946,7 +8411,7 @@ function renderSessionDetail(s) {
     <div class="session-detail-header">
       <div>
         <h3>${s.sessionName} <span class="pill ${s.sessionType}" style="margin-left:8px;">${s.sessionType}</span></h3>
-        <div class="meta">${s.date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · ${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')} · ${s.tss} TSS</div>
+        <div class="meta">${s.date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · ${fmtDur(s.duration)} · ${s.tss} TSS</div>
       </div>
       <div style="text-align:right;font-size:12px;color:var(--text-dim);">Recovery avant : <strong style="color:var(--text);">${s.recovery != null ? s.recovery + '%' : '—'}</strong></div>
     </div>
@@ -7970,7 +8435,7 @@ function renderSessionDetail(s) {
       ${(() => {
         const c = s.compliance;
         const recTxt = s.recovery != null ? s.recovery + '%' : 'inconnue';
-        if (c == null) return `Pas de TSS planifié pour cette séance (mode libre). NP ${s.np}W sur ${Math.floor(s.duration/60)}h${(s.duration%60).toString().padStart(2,'0')}.`;
+        if (c == null) return `Pas de TSS planifié pour cette séance (mode libre). NP ${s.np}W sur ${fmtDur(s.duration)}.`;
         if (c >= 95) return `Séance conforme au plan. Exécution propre, ${s.ftpPct}% FTP atteint comme prévu.`;
         if (c >= 85) return `Léger écart (${c}% du prévu). Probablement lié à la récupération de départ (${recTxt}). Pas d'inquiétude — adapter la prochaine séance similaire.`;
         return `Écart significatif (${c}%). Possible signe de fatigue accumulée ou objectif trop ambitieux. Suggérer une décharge.`;
@@ -8024,6 +8489,27 @@ function syncTabFromHash() {
 }
 window.addEventListener('hashchange', syncTabFromHash);
 syncTabFromHash();
+
+// Clic sur le logo / "Coach IA" → retour au Tableau de bord (ferme aussi
+// profil / paramètres / aide en restaurant le header).
+window.goHome = function () {
+  document.querySelector('.tabs')?.classList.remove('profile-hidden');
+  document.getElementById('sport-filter')?.style.setProperty('display', '');
+  document.getElementById('mode-toggle')?.style.setProperty('display', '');
+  const hi = document.querySelector('.header-info'); if (hi) hi.style.display = '';
+  const ft = document.querySelector('footer'); if (ft) ft.style.display = '';
+  const ob = document.getElementById('onboarding-banner'); if (ob) ob.style.display = '';
+  ['profile-header-title', 'settings-header-title', 'help-header-title'].forEach(id => {
+    const e = document.getElementById(id); if (e) e.style.display = 'none';
+  });
+  activatePanel('p1', true); // active le tableau de bord + nettoie l'ancre
+};
+const _logoEl = document.querySelector('header .logo');
+if (_logoEl) {
+  _logoEl.style.cursor = 'pointer';
+  _logoEl.title = 'Retour au tableau de bord';
+  _logoEl.addEventListener('click', () => window.goHome());
+}
 
 // ========= FILTRES SPORTS (boutons header) =========
 document.querySelectorAll('#sport-filter .sport-btn').forEach(btn => {

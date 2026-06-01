@@ -39,6 +39,13 @@
   select, html, body {
     color-scheme: dark;
   }
+  /* Réserve l'espace de la barre de défilement en permanence : sinon les pages
+     courtes (profil, paramètres, aide) n'ont pas de scrollbar et le conteneur
+     centré glisse de ~8px vers la droite par rapport au dashboard (qui scrolle). */
+  html {
+    scrollbar-gutter: stable;
+    overflow-y: scroll;
+  }
   /* Désactive globalement la sélection de texte (sauf inputs texte et textareas) */
   html, body {
     user-select: none;

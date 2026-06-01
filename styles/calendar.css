@@ -61,6 +61,19 @@
     font-size: 13px;
   }
   .month-filter button:hover { color: var(--text); }
+  .month-input-wrap { position: relative; display: inline-flex; }
+  .month-filter input[type="month"].hide-value { color: transparent; }
+  .month-input-overlay {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
   .month-filter .reset {
     color: var(--accent);
     border-color: rgba(74, 222, 128, 0.35);
@@ -244,6 +257,22 @@
     font-weight: 600;
   }
   .day-card.rest { background: var(--bg); border-style: dashed; }
+  .day-card .rest-couch {
+    width: 46px;
+    height: auto;
+    margin: auto auto 6px;   /* poussé vers le bas de la carte */
+    display: block;
+    color: var(--text-mute);
+    opacity: 0.7;
+  }
+  .rest-modal-couch { text-align: center; margin: 2px 0 18px; }
+  .rest-modal-couch .rest-couch {
+    width: 104px;
+    height: auto;
+    display: inline-block;
+    color: var(--text-dim);
+    opacity: 0.85;
+  }
   /* Day card de séance ajoutée MANUELLEMENT (pas tracké par Strava) : fond standard,
      pas de différenciation visuelle bizarre. Garde le même look que Strava. */
   .day-card.manual { background: var(--bg-elev2); }
@@ -256,13 +285,32 @@
   }
   .day-card.prevu-past:hover { opacity: 0.85; filter: none; }
   .day-card.today {
-    border-color: rgba(74, 222, 128, 0.5);
-    box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.3);
+    border-color: var(--accent);
+    border-style: solid;
+    border-width: 1px;
+    border-color: rgba(74, 222, 128, 0.55);
+    box-shadow: none;
+    background: rgba(74, 222, 128, 0.035);
   }
+  /* Aujourd'hui en jour de repos : on annule l'estompage de .empty-past */
+  .day-card.today.empty-past {
+    opacity: 1;
+    border-style: solid;
+    background: rgba(74, 222, 128, 0.035);
+  }
+  .day-card.today .day-card-dow { color: var(--accent); font-weight: 800; }
+  .day-card.today .day-card-date { color: var(--accent); }
+  .day-card.today .day-card-name { color: var(--text) !important; }
   .day-card.empty-past {
-    opacity: 0.5;
+    opacity: 0.72;
     background: transparent;
     border-style: dashed;
+  }
+  /* Mise en évidence d'un jour atteint depuis le graphe Forme & fatigue */
+  .day-card.day-flash { animation: dayFlash 1.5s ease-out; }
+  @keyframes dayFlash {
+    0%, 100% { box-shadow: none; }
+    25% { box-shadow: 0 0 0 2px var(--accent), 0 0 18px rgba(74, 222, 128, 0.55); }
   }
   .day-card-dow {
     font-size: 10px;

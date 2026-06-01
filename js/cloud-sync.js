@@ -62,15 +62,32 @@ async function pullAllFromCloud() {
     }
   } catch (e) { console.warn('[pull wellness]', e); }
 
-  // ----- day_notes → {iso: text} -----
+  // ----- activity_overrides → { activityId: {...override} } -----
+  try {
+    const { data } = await sb.from('activity_overrides').select('*').eq('user_id', userId);
+    if (data) {
+      const map = {};
+      for (const r of data) map[r.activity_id] = r.data || {};
+      localStorage.setItem('coach_ia_activity_overrides_v1', JSON.stringify(map));
+    }
+  } catch (e) { console.warn('[pull activity overrides]', e); }
+
+  // ----- day_notes (typées) → notes v2 [{id, type, text, color, from, to}] -----
   try {
     const { data } = await sb.from('day_notes').select('*').eq('user_id', userId);
     if (data) {
-      const dict = {};
-      for (const r of data) dict[r.iso_date] = r.note;
-      localStorage.setItem('coach_ia_day_notes_v1', JSON.stringify(dict));
+      const arr = data.map(r => ({
+        id: r.client_id || r.id,
+        _sbId: r.id,
+        type: r.type,
+        text: r.text || '',
+        color: r.color,
+        from: r.from_date,
+        to: r.to_date,
+      }));
+      localStorage.setItem('coach_ia_notes_v2', JSON.stringify(arr));
     }
-  } catch (e) { console.warn('[pull notes]', e); }
+  } catch (e) { console.warn('[pull notes v2]', e); }
 
   // ----- training_phases → [{id, phase, from, to, name}] -----
   try {
@@ -109,44 +126,45 @@ async function pullAllFromCloud() {
     }
   } catch (e) { console.warn('[pull goals]', e); }
 
-  // ----- competitions → array -----
+  // ----- compétitions → planned_sessions(competition) + activities(competition) -----
   try {
-    const { data } = await sb.from('competitions').select('*').eq('user_id', userId);
-    if (data) {
-      const arr = data.map(r => ({
-        id: r.client_id || r.id,
-        _sbId: r.id,
-        name: r.name, date: r.date, sport: r.sport ?? null,
-        priority: r.priority ?? null, km: r.km ?? null,
-        dplus: r.d_plus ?? null, target: r.target ?? null,
-        laps: r.laps ?? null, notes: r.notes ?? null,
-        gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null,
-        stages: r.stages ?? null,
-      }));
-      localStorage.setItem('coach_ia_competitions_v1', JSON.stringify(arr));
-    }
-  } catch (e) { console.warn('[pull competitions]', e); }
+    const comps = [];
+    const { data: pc } = await sb.from('planned_sessions').select('*').eq('user_id', userId).eq('category', 'competition');
+    for (const r of (pc || [])) comps.push({
+      id: r.client_id || r.id, _sbId: r.id, _table: 'planned',
+      name: r.name, date: r.date, sport: r.sport ?? null,
+      priority: r.priority ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
+      target: r.target ?? null, laps: r.laps ?? null, notes: r.notes ?? null,
+      gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null, stages: r.stages ?? null,
+    });
+    const { data: ac } = await sb.from('activities')
+      .select('id,client_id,name,start_date_local,sport,priority,target,distance_km,course_dplus,laps,user_notes,gpx_name,gpx_content,stages')
+      .eq('user_id', userId).eq('category', 'competition');
+    for (const r of (ac || [])) comps.push({
+      id: r.client_id || r.id, _sbId: r.id, _table: 'activity',
+      name: r.name, date: (r.start_date_local || '').slice(0, 10), sport: r.sport ?? null,
+      priority: r.priority ?? null, km: r.distance_km ?? null, dplus: r.course_dplus ?? null,
+      target: r.target ?? null, laps: r.laps ?? null, notes: r.user_notes ?? null,
+      gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null, stages: r.stages ?? null,
+    });
+    // Dédoublonnage par id effectif (client_id) — garde une seule entrée
+    const seen = new Set();
+    const deduped = comps.filter(c => { const k = c.id; if (seen.has(k)) return false; seen.add(k); return true; });
+    localStorage.setItem('coach_ia_competitions_v1', JSON.stringify(deduped));
+  } catch (e) { console.warn('[pull comps]', e); }
 
-  // ----- trainings (prevu + realise) → 2 listes -----
+  // ----- prévus → planned_sessions(entrainement) ; réalisés = activities (via le loader) -----
   try {
-    const { data } = await sb.from('trainings').select('*').eq('user_id', userId);
-    if (data) {
-      const prevu = [], realise = [];
-      for (const r of data) {
-        const t = {
-          id: r.client_id || r.id,
-          _sbId: r.id,
-          name: r.name, date: r.date, sport: r.sport ?? null,
-          type: r.type ?? null, duration: r.duration ?? 0, tss: r.tss ?? 0,
-          notes: r.notes ?? '', mode: r.mode,
-          structure: r.structure ?? null,
-        };
-        if (r.mode === 'realise') realise.push(t); else prevu.push(t);
-      }
-      localStorage.setItem('coach_ia_trainings_v1', JSON.stringify(prevu));
-      localStorage.setItem('coach_ia_trainings_realise_v1', JSON.stringify(realise));
-    }
-  } catch (e) { console.warn('[pull trainings]', e); }
+    const { data } = await sb.from('planned_sessions').select('*').eq('user_id', userId).eq('category', 'entrainement');
+    const prevu = (data || []).map(r => ({
+      id: r.client_id || r.id, _sbId: r.id,
+      name: r.name, date: r.date, sport: r.sport ?? null, type: r.type ?? null,
+      duration: r.duration ?? 0, tss: r.tss ?? 0, notes: r.notes ?? '', mode: 'prevu',
+      structure: r.structure ?? null,
+    }));
+    localStorage.setItem('coach_ia_trainings_v1', JSON.stringify(prevu));
+    localStorage.setItem('coach_ia_trainings_realise_v1', JSON.stringify([]));
+  } catch (e) { console.warn('[pull planned]', e); }
 
   // ----- template_rest_days → array d'isos -----
   try {
@@ -214,6 +232,47 @@ export async function pushNote(isoDate, text) {
   } catch (e) { console.warn('[push note]', e.message); }
 }
 
+export async function pushActivityOverride(activityId, data) {
+  if (!isAuthed()) return;
+  try {
+    await window.sb.from('activity_overrides').upsert(
+      { user_id: uid(), activity_id: String(activityId), data },
+      { onConflict: 'user_id,activity_id' }
+    );
+  } catch (e) { console.warn('[push activity override]', e.message); }
+}
+export async function deleteActivityOverride(activityId) {
+  if (!isAuthed()) return;
+  try {
+    await window.sb.from('activity_overrides').delete().eq('user_id', uid()).eq('activity_id', String(activityId));
+  } catch (e) { console.warn('[del activity override]', e.message); }
+}
+
+export async function pushNoteRange(note) {
+  // note: {id, type, text, color, from, to, _sbId?}
+  if (!isAuthed()) return;
+  try {
+    const row = {
+      user_id: uid(), client_id: note.id,
+      type: note.type, text: note.text ?? null, color: note.color ?? null,
+      from_date: note.from, to_date: note.to,
+    };
+    if (note._sbId) row.id = note._sbId;
+    if (!row.id) row.id = await _resolveId('day_notes', note.id);
+    if (!row.id) delete row.id;
+    const { data, error } = await window.sb.from('day_notes').upsert(row).select().single();
+    if (error) throw error;
+    return data && data.id;
+  } catch (e) { console.warn('[push note range]', e.message); }
+}
+export async function deleteNoteRange(note) {
+  if (!isAuthed()) return;
+  try {
+    if (note._sbId) await window.sb.from('day_notes').delete().eq('id', note._sbId).eq('user_id', uid());
+    else if (note.id) await window.sb.from('day_notes').delete().eq('client_id', note.id).eq('user_id', uid());
+  } catch (e) { console.warn('[del note range]', e.message); }
+}
+
 export async function pushPhase(phase) {
   // phase: {id, phase, from, to, name?, _sbId?}
   if (!isAuthed()) return;
@@ -262,53 +321,102 @@ export async function deleteGoal(goal) {
   } catch (e) { console.warn('[del goal]', e.message); }
 }
 
+// Aujourd'hui (ISO) pour router compé passée (activities) vs future (planned_sessions).
+function _todayIso() { return new Date().toISOString().slice(0, 10); }
+
+// Évite les doublons : si la ligne n'a pas d'id Supabase, on récupère l'id existant
+// par client_id avant l'upsert (sinon chaque save réinsère une nouvelle ligne).
+async function _resolveId(table, clientId) {
+  try {
+    const { data } = await window.sb.from(table).select('id').eq('user_id', uid()).eq('client_id', clientId).limit(1).maybeSingle();
+    return data && data.id;
+  } catch { return null; }
+}
+
 export async function pushCompetition(comp) {
   if (!isAuthed()) return;
   try {
-    const row = {
-      user_id: uid(), client_id: comp.id,
-      name: comp.name, date: comp.date, sport: comp.sport ?? null,
-      priority: comp.priority ?? null, km: comp.km ?? null,
-      d_plus: comp.dplus ?? null, target: comp.target ?? null,
-      laps: comp.laps ?? null, notes: comp.notes ?? null,
-      gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
-      stages: comp.stages ?? null,
-    };
-    if (comp._sbId) row.id = comp._sbId;
-    const { data, error } = await window.sb.from('competitions').upsert(row).select().single();
-    if (error) throw error;
-    return data && data.id;
+    const future = (comp.date || '') > _todayIso();
+    if (future) {
+      const row = {
+        user_id: uid(), client_id: comp.id, category: 'competition',
+        name: comp.name, date: comp.date, sport: comp.sport ?? null,
+        priority: comp.priority ?? null, km: comp.km ?? null, d_plus: comp.dplus ?? null,
+        target: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
+        gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null, stages: comp.stages ?? null,
+      };
+      if (comp._sbId && comp._table === 'planned') row.id = comp._sbId;
+      if (!row.id) row.id = await _resolveId('planned_sessions', comp.id);
+      if (!row.id) delete row.id;
+      const { data, error } = await window.sb.from('planned_sessions').upsert(row).select().single();
+      if (error) throw error;
+      return data && data.id;
+    } else {
+      const row = {
+        user_id: uid(), source: 'manual', category: 'competition', client_id: comp.id,
+        name: comp.name, start_date_local: comp.date + 'T12:00:00', sport: comp.sport ?? null,
+        priority: comp.priority ?? null, distance_km: comp.km ?? null, course_dplus: comp.dplus ?? null,
+        target: comp.target ?? null, laps: comp.laps ?? null, user_notes: comp.notes ?? null,
+        gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null, stages: comp.stages ?? null,
+      };
+      if (comp._sbId && comp._table === 'activity') row.id = comp._sbId;
+      if (!row.id) row.id = await _resolveId('activities', comp.id);
+      if (!row.id) delete row.id;
+      const { data, error } = await window.sb.from('activities').upsert(row).select().single();
+      if (error) throw error;
+      return data && data.id;
+    }
   } catch (e) { console.warn('[push comp]', e.message); }
 }
 export async function deleteCompetition(comp) {
   if (!isAuthed()) return;
+  const table = comp._table === 'activity' ? 'activities' : 'planned_sessions';
   try {
-    if (comp._sbId) await window.sb.from('competitions').delete().eq('id', comp._sbId).eq('user_id', uid());
-    else if (comp.id) await window.sb.from('competitions').delete().eq('client_id', comp.id).eq('user_id', uid());
+    if (comp._sbId) await window.sb.from(table).delete().eq('id', comp._sbId).eq('user_id', uid());
+    else if (comp.id) await window.sb.from(table).delete().eq('client_id', comp.id).eq('user_id', uid());
   } catch (e) { console.warn('[del comp]', e.message); }
 }
 
 export async function pushTraining(training, mode) {
   if (!isAuthed()) return;
+  mode = mode || training.mode || 'prevu';
   try {
-    const row = {
-      user_id: uid(), client_id: training.id,
-      name: training.name, date: training.date, sport: training.sport ?? null,
-      type: training.type ?? null, duration: training.duration ?? 0, tss: training.tss ?? 0,
-      notes: training.notes ?? '', mode: mode || training.mode || 'prevu',
-      structure: training.structure ?? null,
-    };
-    if (training._sbId) row.id = training._sbId;
-    const { data, error } = await window.sb.from('trainings').upsert(row).select().single();
-    if (error) throw error;
-    return data && data.id;
+    if (mode === 'prevu') {
+      const row = {
+        user_id: uid(), client_id: training.id, category: 'entrainement',
+        name: training.name, date: training.date, sport: training.sport ?? null,
+        type: training.type ?? null, duration: training.duration ?? 0, tss: training.tss ?? 0,
+        notes: training.notes ?? '', structure: training.structure ?? null,
+      };
+      if (training._sbId) row.id = training._sbId;
+      if (!row.id) row.id = await _resolveId('planned_sessions', training.id);
+      if (!row.id) delete row.id;
+      const { data, error } = await window.sb.from('planned_sessions').upsert(row).select().single();
+      if (error) throw error;
+      return data && data.id;
+    } else {
+      // réalisé → activity manuelle
+      const row = {
+        user_id: uid(), source: 'manual', category: 'entrainement', client_id: training.id,
+        name: training.name, start_date_local: training.date + 'T12:00:00', sport: training.sport ?? null,
+        type: training.type ?? null, moving_time: (training.duration || 0) * 60, tss: training.tss ?? 0,
+        user_notes: training.notes ?? null,
+      };
+      if (training._sbId) row.id = training._sbId;
+      if (!row.id) row.id = await _resolveId('activities', training.id);
+      if (!row.id) delete row.id;
+      const { data, error } = await window.sb.from('activities').upsert(row).select().single();
+      if (error) throw error;
+      return data && data.id;
+    }
   } catch (e) { console.warn('[push training]', e.message); }
 }
 export async function deleteTraining(training) {
   if (!isAuthed()) return;
+  const table = (training.mode === 'realise') ? 'activities' : 'planned_sessions';
   try {
-    if (training._sbId) await window.sb.from('trainings').delete().eq('id', training._sbId).eq('user_id', uid());
-    else if (training.id) await window.sb.from('trainings').delete().eq('client_id', training.id).eq('user_id', uid());
+    if (training._sbId) await window.sb.from(table).delete().eq('id', training._sbId).eq('user_id', uid());
+    else if (training.id) await window.sb.from(table).delete().eq('client_id', training.id).eq('user_id', uid());
   } catch (e) { console.warn('[del training]', e.message); }
 }
 
@@ -347,6 +455,8 @@ export async function pushPlanSnapshot(isoDate, proposal) {
 window.cloudSync = {
   pushWellness, deleteWellness,
   pushNote,
+  pushActivityOverride, deleteActivityOverride,
+  pushNoteRange, deleteNoteRange,
   pushPhase, deletePhase,
   pushGoal, deleteGoal,
   pushCompetition, deleteCompetition,

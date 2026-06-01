@@ -22,18 +22,19 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  margin-bottom: 8px;
+  margin: 10px 0 16px;
 }
 .profile-back-btn {
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-dim);
   border-radius: 999px;
-  padding: 7px 16px 7px 12px;
+  padding: 11px 20px 11px 16px;
   font-size: 12.5px;
   font-weight: 600;
   font-family: inherit;
@@ -45,6 +46,17 @@
   color: var(--text);
   border-color: var(--text-mute);
   transform: translateX(-2px);
+}
+/* Colonne gauche page profil : Retour (au-dessus) + carte sidebar (en dessous) */
+.profile-left { display: flex; flex-direction: column; gap: 12px; }
+/* Retour : hauteur fixe = en-tête "Identité", padding vertical nul (contenu centré
+   par le flex) → texte bien centré, compact, et cartes alignées. */
+.profile-left .profile-back-btn {
+  margin: 8px 0 0;   /* 4px de padding panel + 8px ≈ 12px au-dessus = 12px en dessous (gap) */
+  height: 38px;
+  padding-top: 0;
+  padding-bottom: 0;
+  box-sizing: border-box;
 }
 .profile-header-row {
   display: flex;
@@ -84,8 +96,12 @@
   gap: 16px;
   text-align: right;
 }
-.profile-header-title h2 { font-size: 20px; margin: 0 0 2px; font-weight: 700; color: var(--text); }
-.profile-header-title p { margin: 0; font-size: 12px; color: var(--text-dim); max-width: 420px; }
+.profile-header-title { height: 40px; }  /* même hauteur que le logo → header identique à l'accueil */
+.profile-header-title h2 { font-size: 18px; margin: 0; font-weight: 700; color: var(--text); }
+.profile-header-title p { display: none; }  /* sous-titre masqué dans le header (sinon le header grandit) */
+/* Icône du titre à la même hauteur que le logo (40px) : sinon le header grandit
+   et, étant centré verticalement, le logo descend → décalage vers le bas. */
+.profile-header-title .profile-page-icon { width: 40px !important; height: 40px !important; border-radius: 11px !important; box-shadow: none !important; }
 .profile-page-icon {
   width: 50px;
   height: 50px;
@@ -241,7 +257,7 @@
 .profile-section-panel {
   display: none;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   animation: profileSectionIn 0.2s ease-out;
 }
 .profile-section-panel.active { display: flex; }
@@ -250,8 +266,19 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* L'en-tête de section est une balise <header> → on retire la bordure grise globale,
+   et on lui donne la hauteur du bouton Retour pour aligner le titre avec le texte de
+   Retour, et la carte de contenu avec le haut de la sidebar. */
+.profile-section-header {
+  border-bottom: none !important;
+  padding-bottom: 0 !important;
+  margin: 8px 0 0 !important;  /* même décalage haut que le bouton Retour → titre + cartes alignés */
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}
 .profile-section-header h3 {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: 18px;
   font-weight: 700;
   color: var(--text);

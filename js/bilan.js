@@ -168,8 +168,10 @@ function fmtNum(n, digits = 0) {
   return Number(n).toLocaleString('fr-FR', { maximumFractionDigits: digits, minimumFractionDigits: digits });
 }
 function fmtDuration(minutes) {
+  minutes = Math.round(Number(minutes) || 0);
+  if (minutes < 60) return `${minutes} min`;
   const h = Math.floor(minutes / 60);
-  const m = Math.round(minutes % 60);
+  const m = minutes % 60;
   return `${h}h${String(m).padStart(2, '0')}`;
 }
 function fmtFullDate(iso) {

@@ -147,35 +147,33 @@
   }
   .comp-item {
     display: grid;
-    grid-template-columns: 32px 1fr auto 90px 28px;
+    grid-template-columns: 1fr auto 90px 28px;
     gap: 10px;
     align-items: center;
-    padding: 10px 12px;
+    padding: 10px 14px;
     background: var(--bg-elev2);
     border-radius: 8px;
     font-size: 13px;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
     border: 1px solid transparent;
+    box-shadow: inset 3px 0 0 #fbbf24;  /* liseré, couleur selon le type ci-dessous */
   }
-  .comp-item:hover {
-    background: rgba(74, 222, 128, 0.06);
-    border-color: rgba(74, 222, 128, 0.25);
+  .comp-item[data-prio="principal"] { box-shadow: inset 3px 0 0 #fbbf24; }
+  .comp-item[data-prio="secondaire"] { box-shadow: inset 3px 0 0 #9ca3af; }
+  .comp-item[data-prio="principal"]:hover {
+    background: rgba(251, 191, 36, 0.08);
+    border-color: rgba(251, 191, 36, 0.3);
   }
-  .comp-prio {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    font-size: 12px;
-    font-weight: 700;
+  .comp-item[data-prio="secondaire"]:hover {
+    background: rgba(156, 163, 175, 0.10);
+    border-color: rgba(156, 163, 175, 0.35);
   }
-  .comp-prio.A { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
-  .comp-prio.B { background: rgba(200, 200, 200, 0.2); color: #c0c0c0; }
-  .comp-prio.C { background: rgba(205, 127, 50, 0.2); color: #cd7f32; }
-  .comp-name { font-weight: 600; }
+  .comp-name { display: flex; align-items: center; gap: 8px; font-weight: 700; min-width: 0; }
+  .comp-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .comp-trophy { flex-shrink: 0; vertical-align: -3px; }
+  .comp-item[data-prio="principal"] .comp-name-text { color: #fbbf24; }
+  .comp-item[data-prio="secondaire"] .comp-name-text { color: #d1d5db; }
   .comp-date { color: var(--text-dim); font-size: 12px; }
   .comp-stages-badge {
     display: inline-block;
@@ -275,13 +273,40 @@
     padding: 2px 6px;
     font-size: 9px;
   }
+  /* === DAY CARD : jour de course (design spécial, sans priorité) === */
+  /* Thème doré "événement". La priorité n'est plus affichée ici (seulement dans le détail). */
   .day-card.race {
     position: relative;
-    border: 2px solid transparent;
-    background:
-      linear-gradient(var(--bg-elev2), var(--bg-elev2)) padding-box,
-      repeating-conic-gradient(#fff 0% 25%, #000 0% 50%) border-box;
-    background-size: auto, 8px 8px;
+    --race-gold: #fbbf24;
+    border: 1.5px solid color-mix(in srgb, var(--race-gold) 60%, var(--border));
+    background: linear-gradient(165deg, color-mix(in srgb, var(--race-gold) 10%, var(--bg-elev2)) 0%, var(--bg-elev2) 62%);
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--race-gold) 18%, transparent);
+    overflow: hidden;
   }
-  /* Trophée supprimé : on garde juste le damier F1 sur les jours de course */
+  .day-card.race[data-prio="principal"] { --race-gold: #fbbf24; } /* objectif principal — doré */
+  .day-card.race[data-prio="secondaire"] { --race-gold: #9ca3af; } /* secondaire — argenté */
+  /* Liseré doré dégradé en haut */
+  .day-card.race::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--race-gold), color-mix(in srgb, var(--race-gold) 35%, transparent));
+  }
+  /* Écritures dans la couleur de la compétition + trophée avant le nom */
+  .day-card.race .day-card-name {
+    color: var(--race-gold);
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .day-card.race .day-card-name .comp-trophy { flex-shrink: 0; vertical-align: 0; }
+  .day-card.race .day-card-name .dc-name-text { overflow: hidden; text-overflow: ellipsis; }
+  .day-card.race .day-card-date { color: var(--race-gold); }
+  .day-card.race .day-card-dow,
+  .day-card.race .day-card-meta {
+    color: color-mix(in srgb, var(--race-gold) 70%, var(--text-dim));
+  }
 

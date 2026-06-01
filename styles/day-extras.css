@@ -495,7 +495,95 @@
   white-space: nowrap;
 }
 
+/* === BANDEAUX DE NOTE (même grille que .week-row-days, comme les cycles) === */
+.note-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr) 95px;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.note-band {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-height: 22px;
+  transition: transform 0.14s, filter 0.14s;
+}
+.note-band:hover { transform: translateY(-1px); filter: brightness(1.15); }
+.note-band-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
+}
+.note-band-icon { flex-shrink: 0; display: block; }
+.note-band-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* === MODALE NOTE : type, couleur === */
+.note-field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 12px 0 6px;
+}
+.note-field-label:first-child { margin-top: 0; }
+.note-type-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.note-type-chip {
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.note-type-chip.active {
+  background: rgba(74, 222, 128, 0.14);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.note-range-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.note-range-row input[type="date"] {
+  width: 100%;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  color-scheme: dark;
+}
+.note-color-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.note-color-swatch {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.note-color-swatch.active {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px currentColor;
+}
+
 @media (max-width: 540px) {
   .phase-pick-grid { grid-template-columns: 1fr; }
   .phase-range-row { grid-template-columns: 1fr; }
+  .note-range-row { grid-template-columns: 1fr; }
 }

@@ -27,6 +27,7 @@ window.coachPrefs = {
   default_tab: getPref('default_tab', 'realise'),
 };
 
+const SETTINGS_HASH = '#parametres';
 let _panel = null;
 let _prevTab = null;
 
@@ -35,20 +36,39 @@ function buildPanel() {
   section.className = 'panel profile-page';
   section.id = 'settings-page';
   section.innerHTML = `
-    <div class="profile-page-header">
-      <button type="button" class="profile-back-btn" id="settings-back-btn">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
-        </svg>
-        Retour
-      </button>
+    <div class="profile-page-body">
+      <div class="profile-left">
+        <button type="button" class="profile-back-btn" id="settings-back-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+          </svg>
+          Retour
+        </button>
+        <aside class="profile-sidebar">
+          <div class="profile-sidebar-group">
+            <div class="profile-sidebar-group-label">Réglages</div>
+            <button type="button" class="set-nav-item active" data-target="sec-compte">Compte</button>
+            <button type="button" class="set-nav-item" data-target="sec-unites">Unités</button>
+            <button type="button" class="set-nav-item" data-target="sec-affichage">Affichage</button>
+            <button type="button" class="set-nav-item" data-target="sec-donnees">Données &amp; connexions</button>
+          </div>
+        </aside>
+      </div>
+      <div class="settings-body" id="set-body"></div>
     </div>
-    <div class="settings-body" id="set-body"></div>
   `;
   // insérer dans le même conteneur que les autres panels
   const anchor = document.querySelector('.panel') || document.body;
   anchor.parentNode.appendChild(section);
   section.querySelector('#settings-back-btn').addEventListener('click', closeSettingsPage);
+  // Navigation : scroll vers la section + état actif
+  section.querySelectorAll('.set-nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      section.querySelectorAll('.set-nav-item').forEach(b => b.classList.remove('active'));
+      item.classList.add('active');
+      section.querySelector('#' + item.dataset.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
   return section;
 }
 
@@ -73,8 +93,11 @@ function showSettingsHeaderTitle() {
   el.style.display = '';
 }
 
-export function openSettingsModal() {
+export function openSettingsModal(skipHash = false) {
   injectStyles();
+  if (!skipHash && window.location.hash !== SETTINGS_HASH) {
+    history.pushState(null, '', SETTINGS_HASH);
+  }
   if (!_panel) _panel = buildPanel();
 
   _prevTab = document.querySelector('.tabs .tab.active') || document.querySelector('.tabs .tab[data-panel="p1"]');
@@ -115,6 +138,24 @@ function closeSettingsPage() {
     const panel = document.getElementById(target.dataset.panel);
     if (panel) panel.classList.add('active');
   }
+  if (window.location.hash === SETTINGS_HASH) {
+    history.pushState(null, '', window.location.pathname + window.location.search);
+  }
+}
+
+// Routage par ancre : ouverture/fermeture via #parametres (lien, back/forward, chargement).
+function _settingsHashChange() {
+  if (window.location.hash === SETTINGS_HASH) openSettingsModal(true);
+  else if (_panel && _panel.classList.contains('active')) closeSettingsPage();
+}
+window.addEventListener('hashchange', _settingsHashChange);
+window.addEventListener('popstate', _settingsHashChange);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.location.hash === SETTINGS_HASH) setTimeout(() => openSettingsModal(true), 200);
+  });
+} else if (window.location.hash === SETTINGS_HASH) {
+  setTimeout(() => openSettingsModal(true), 200);
 }
 
 async function renderBody(body) {
@@ -127,7 +168,7 @@ async function renderBody(body) {
   const dt = getPref('default_tab', 'realise');
 
   body.innerHTML = `
-    <section class="set-section">
+    <section class="set-section" id="sec-compte">
       <h3>Compte</h3>
       <div class="set-row"><span class="set-label">Email</span><span class="set-value">${email}</span></div>
       <div class="set-actions">
@@ -141,7 +182,7 @@ async function renderBody(body) {
       </form>
     </section>
 
-    <section class="set-section">
+    <section class="set-section" id="sec-unites">
       <h3>Unités</h3>
       <div class="set-row">
         <span class="set-label">Distance</span>
@@ -159,7 +200,7 @@ async function renderBody(body) {
       </div>
     </section>
 
-    <section class="set-section">
+    <section class="set-section" id="sec-affichage">
       <h3>Affichage</h3>
       <div class="set-row">
         <span class="set-label">Onglet calendrier par défaut</span>
@@ -171,7 +212,7 @@ async function renderBody(body) {
       <div class="set-row"><span class="set-label">Thème</span><span class="set-value">Sombre</span></div>
     </section>
 
-    <section class="set-section">
+    <section class="set-section" id="sec-donnees">
       <h3>Données &amp; connexions</h3>
       <div class="set-actions">
         <button class="set-btn" data-act="open-connections">Gérer les connexions (Strava / Whoop)</button>
@@ -253,6 +294,12 @@ function injectStyles() {
   s.id = 'set-styles';
   s.textContent = `
     .settings-body { max-width: 720px; }
+    .set-nav-item { display: block; width: 100%; text-align: left; background: none; border: none;
+      color: var(--text-dim, #8b94a8); font-size: 13px; font-weight: 600; padding: 9px 12px;
+      border-radius: 8px; cursor: pointer; font-family: inherit; }
+    .set-nav-item:hover { background: var(--bg-elev2, #232a38); color: var(--text, #e8edf5); }
+    .set-nav-item.active { background: rgba(74,222,128,0.12); color: var(--accent, #4ade80); }
+    .set-section { scroll-margin-top: 16px; }
     .set-section { padding: 18px 0; border-bottom: 1px solid var(--border, #2a3242); }
     .set-section:last-child { border-bottom: none; }
     .set-section h3 { margin: 0 0 12px; font-size: 15px; font-weight: 700; color: var(--text, #e8edf5); }

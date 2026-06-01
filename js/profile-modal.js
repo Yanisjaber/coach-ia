@@ -70,21 +70,20 @@ function buildPanel() {
   section.className = 'panel profile-page';
   section.id = 'p-profile';
   section.innerHTML = `
-    <!-- Header de page : retour + titre + barre de complétion -->
-    <div class="profile-page-header">
-      <button type="button" class="profile-back-btn" id="profile-back-btn">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
-        </svg>
-        Retour
-      </button>
-    </div>
-
-    <!-- Body : sidebar nav + content -->
+    <!-- Body : (Retour + sidebar nav) | content. Retour en haut de la colonne gauche
+         pour que "Identité" (contenu) démarre au même niveau que Retour. -->
     <div class="profile-page-body">
-      <aside class="profile-sidebar" id="profile-sidebar">
-        ${buildSidebarHTML()}
-      </aside>
+      <div class="profile-left">
+        <button type="button" class="profile-back-btn" id="profile-back-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+          </svg>
+          Retour
+        </button>
+        <aside class="profile-sidebar" id="profile-sidebar">
+          ${buildSidebarHTML()}
+        </aside>
+      </div>
 
       <form class="profile-page-form" id="profile-modal-form">
         <div class="profile-content" id="profile-content">
