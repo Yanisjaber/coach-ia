@@ -644,7 +644,8 @@
   .day-card.empty-past.rest-clickable { cursor: pointer; }
 
   /* === Modale d'édition d'activité === */
-  #_act-edit-modal .day-modal { width: min(460px, 94vw); }
+  #_act-edit-modal .day-modal,
+  #_stagerace-modal .day-modal { width: min(720px, 94vw); max-width: 720px; }
   /* Espacement vertical homogène entre tous les champs */
   #_act-edit-modal .day-modal-body { display: flex; flex-direction: column; }
   #_act-edit-modal .note-field-label { margin: 16px 0 6px; }
@@ -701,6 +702,50 @@
     font-family: inherit;
   }
   .ae-transform-btn:hover { background: rgba(251, 191, 36, 0.2); }
+  .ae-stagerace-btn {
+    width: 100%;
+    margin-top: 12px;
+    background: var(--bg-elev2);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    color: #fbbf24;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .ae-stagerace-btn:hover { background: rgba(251, 191, 36, 0.12); }
+
+  /* === Constructeur course à étapes === */
+  .sr-list {
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+  }
+  .sr-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .sr-row:last-child { border-bottom: none; }
+  .sr-row input { width: auto; }
+  .sr-date { color: var(--text-dim); font-size: 12px; min-width: 92px; }
+  .sr-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sr-tag {
+    font-size: 9px; font-weight: 800; text-transform: uppercase;
+    color: #fbbf24; background: rgba(251, 191, 36, 0.16);
+    padding: 2px 6px; border-radius: 999px;
+  }
+  .sr-preview { display: flex; flex-direction: column; gap: 4px; }
+  .sr-stage { font-size: 12.5px; color: var(--text-dim); }
+  .sr-stage strong { color: #fbbf24; }
 
 
   /* === MODAL D'AJOUT (compé + entraînement) === */

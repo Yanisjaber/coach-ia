@@ -3170,11 +3170,13 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   const sportLabel = window.activitySportLabel ? window.activitySportLabel(act) : '';
   const sportCat = window.activitySportColorKey ? window.activitySportColorKey(act) : 'autre';
 
-  // Check si c'est un jour de compétition
+  // Jour de compétition : détecté par la CATÉGORIE de l'activité (fiable pour
+  // toutes les étapes), avec repli sur la liste compétitions par date.
   const comps = (typeof loadCompetitionsExpanded === 'function') ? loadCompetitionsExpanded() : [];
   const compToday = comps.find(c => c.date === iso);
-  const raceClass = compToday ? ' race' : '';
-  const raceAttr = compToday ? ` data-prio="${compPrio(compToday.priority).key}"` : '';
+  const isCompAct = act.category === 'competition';
+  const raceClass = isCompAct ? ' race' : '';
+  const raceAttr = isCompAct ? ` data-prio="${compPrio(compToday ? compToday.priority : null).key}"` : '';
 
   // Meta : durée + km (Strava) OU durée + TSS (manuel sans km, ex: muscu/yoga)
   let metaParts = [];
@@ -3197,7 +3199,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
     <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass}" data-iso="${iso}" data-source="realise"${raceAttr}>
       <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
       ${dateRow}
-      <div class="day-card-name">${compToday ? trophySvg(compPrio(compToday.priority).color, 13) : ''}<span class="dc-name-text">${aName}</span></div>
+      <div class="day-card-name">${isCompAct ? trophySvg(compPrio(compToday ? compToday.priority : null).color, 13) : ''}<span class="dc-name-text">${aName}</span></div>
       <div class="day-card-meta">${metaLine}</div>
       ${sportBlock}
       ${counter}
@@ -6302,6 +6304,13 @@ function openActivityEditModal(activityId, iso) {
   const ov = getActivityOverride(activityId) || {};
   let exclPower = !!ov.excludePower, exclHr = !!ov.excludeHr, exclDist = !!ov.excludeDistance;
 
+  // Course à étapes parente (si cette activité est une étape d'une course multi-activités)
+  const _comps = (typeof loadCompetitions === 'function') ? loadCompetitions() : [];
+  const _race = act._sbId ? _comps.find(c => Array.isArray(c.activityIds) && c.activityIds.map(String).includes(String(act._sbId)) && c.activityIds.length > 1) : null;
+  const _singleComp = act._sbId ? _comps.find(c => String(c.id) === 'act-' + String(act._sbId)) : null;
+  const _curPrioKey = compPrio((_race ? _race.priority : (_singleComp ? _singleComp.priority : null))).key;
+  let _aePrio = _curPrioKey;
+
   document.getElementById('_act-edit-modal')?.remove();
   const overlay = document.createElement('div');
   overlay.className = 'day-modal-overlay active';
@@ -6335,8 +6344,20 @@ function openActivityEditModal(activityId, iso) {
           <button type="button" class="ae-metric-btn${exclDist ? ' active' : ''}" data-m="dist">Distance</button>
         </div>
         <button type="button" class="ae-transform-btn" id="_ae-transform">
-          ${trophySvg('#fbbf24', 15)} Transformer en compétition
+          ${act.category === 'competition'
+            ? 'Repasser en entraînement'
+            : `${trophySvg('#fbbf24', 15)} Transformer en compétition`}
         </button>
+        <div id="_ae-event-wrap" style="${act.category === 'competition' ? '' : 'display:none;'}">
+          <label class="note-field-label">Priorité</label>
+          <div class="note-type-chips" id="_ae-prio">
+            <button type="button" class="note-type-chip${_curPrioKey === 'principal' ? ' active' : ''}" data-prio="principal">Objectif</button>
+            <button type="button" class="note-type-chip${_curPrioKey === 'secondaire' ? ' active' : ''}" data-prio="secondaire">Préparation</button>
+          </div>
+          ${_race
+            ? `<button type="button" class="ae-stagerace-btn" id="_ae-dissociate">Dissocier de « ${window._confirmEscape ? window._confirmEscape(_race.name) : _race.name} »</button>`
+            : `<button type="button" class="ae-stagerace-btn" id="_ae-stagerace">+ Ajouter à une course à étapes</button>`}
+        </div>
       </div>
       <div class="day-modal-footer">
         <button class="day-modal-delete" type="button" id="_ae-reset">Réinitialiser</button>
@@ -6355,6 +6376,14 @@ function openActivityEditModal(activityId, iso) {
   document.getElementById('_ae-dist').value = act.distance_km != null ? act.distance_km : '';
   document.getElementById('_ae-tss').value = act.tss || 0;
   document.getElementById('_ae-notes').value = act.notes || ov.notes || '';
+  overlay.querySelector('#_ae-stagerace')?.addEventListener('click', () => {
+    close();
+    openStageRaceBuilder(activityId);
+  });
+  overlay.querySelector('#_ae-dissociate')?.addEventListener('click', async () => {
+    close();
+    await dissociateFromStageRace(act, _race, iso);
+  });
 
   overlay.querySelectorAll('.ae-metric-btn').forEach(b => b.addEventListener('click', () => {
     b.classList.toggle('active');
@@ -6362,6 +6391,11 @@ function openActivityEditModal(activityId, iso) {
     if (b.dataset.m === 'power') exclPower = on;
     if (b.dataset.m === 'hr') exclHr = on;
     if (b.dataset.m === 'dist') exclDist = on;
+  }));
+  overlay.querySelectorAll('#_ae-prio .note-type-chip').forEach(chip => chip.addEventListener('click', () => {
+    overlay.querySelectorAll('#_ae-prio .note-type-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    _aePrio = chip.dataset.prio;
   }));
 
   const close = () => overlay.remove();
@@ -6389,30 +6423,265 @@ function openActivityEditModal(activityId, iso) {
     if (exclHr) newOv.excludeHr = true;
     if (exclDist) newOv.excludeDistance = true;
     setActivityOverride(activityId, newOv);
+    // Priorité de la compétition (course à étapes → la course ; sinon la compét d'un jour)
+    if (act.category === 'competition' && window.sb && _aePrio !== _curPrioKey) {
+      const base = window.sb.from('competitions').update({ priority: _aePrio });
+      const q = _race ? base.eq('id', _race._sbId) : base.eq('client_id', 'act-' + act._sbId);
+      q.then(() => {
+        if (window.cloudSync && window.cloudSync.pullAllFromCloud) window.cloudSync.pullAllFromCloud().then(() => {
+          if (typeof renderCalendar === 'function') renderCalendar();
+          if (typeof renderCompList === 'function') renderCompList();
+        });
+      });
+    }
     close();
   });
   overlay.querySelector('#_ae-reset').addEventListener('click', async () => {
     const ok = await appConfirm({ title: 'Réinitialiser', html: "Annuler toutes les modifications de cette activité et revenir aux données Strava ?", confirmLabel: 'Réinitialiser', danger: true });
     if (ok) { setActivityOverride(activityId, null); close(); }
   });
-  overlay.querySelector('#_ae-transform').addEventListener('click', () => {
+  overlay.querySelector('#_ae-transform').addEventListener('click', async () => {
+    const target = (act.category === 'competition') ? 'entrainement' : 'competition';
     close();
-    transformActivityToCompetition(act, iso);
+    await setActivityCategory(act, target, iso);
   });
 }
 
-// Pré-remplit le formulaire compétition à partir d'une activité.
-function transformActivityToCompetition(act, iso) {
-  if (typeof openCompModal !== 'function') return;
-  openCompModal();
-  const set = (id, v) => { const el = document.getElementById(id); if (el && v != null && v !== '') el.value = v; };
-  set('comp-modal-name', act.name || '');
-  const dEl = document.getElementById('comp-modal-date');
-  if (dEl) { dEl.value = iso; if (dEl._flatpickr) dEl._flatpickr.setDate(iso, false); }
-  const sp = document.getElementById('comp-modal-sport');
-  if (sp && act.sport) { sp.value = act.sport; if (sp._customUpdate) sp._customUpdate(); }
-  set('comp-modal-km', act.distance_km ? Math.round(act.distance_km) : '');
-  set('comp-modal-dplus', act.elevation_gain ? Math.round(act.elevation_gain) : '');
+// Bascule la catégorie d'une activité (entrainement ↔ competition) directement
+// en base, sans formulaire. Re-pull + re-render pour refléter le changement.
+async function setActivityCategory(act, category, iso) {
+  if (!act || !act._sbId || !window.sb) return;
+  try {
+    const { error } = await window.sb.from('activities').update({ category }).eq('id', act._sbId);
+    if (error) throw error;
+    act.category = category;
+    // Refléter dans DASHBOARD_DATA (source des reconstructions) sinon l'affichage
+    // repasse en compétition au prochain rebuild.
+    if (window.DASHBOARD_DATA && window.DASHBOARD_DATA.days) {
+      for (const d of window.DASHBOARD_DATA.days) {
+        for (const a of (d.activities || [])) {
+          if (String(a._sbId) === String(act._sbId)) a.category = category;
+        }
+      }
+    }
+    // Maintenir le registre competitions : 1 compét reliant cette activité
+    if (window.cloudSync) {
+      if (category === 'competition' && window.cloudSync.pushCompetitionRegistry) {
+        await window.cloudSync.pushCompetitionRegistry({
+          id: 'act-' + act._sbId, name: act.name || 'Compétition',
+          date: iso, sport: act.sport || null, activityIds: [act._sbId],
+        });
+      } else if (category !== 'competition') {
+        // L'activité quitte sa/ses compétition(s). On RETIRE juste cette étape :
+        //  • ≥2 étapes restantes → la course continue (date = étape la + ancienne) ;
+        //  • 1 restante → la course devient une compétition simple ;
+        //  • 0 → on supprime la ligne (compét d'un jour ou ancienne migrée).
+        try {
+          const { data: allComps } = await window.sb.from('competitions').select('id,name,date,activity_ids');
+          const sid = String(act._sbId);
+          for (const r of (allComps || [])) {
+            const ids = Array.isArray(r.activity_ids) ? r.activity_ids.map(String) : [];
+            const linked = ids.includes(sid);
+            const legacySameDay = ids.length === 0 && String(r.date) === String(iso);
+            if (!linked && !legacySameDay) continue;
+            const remaining = ids.filter(id => id !== sid);
+            if (remaining.length >= 2) {
+              // La course continue : date = étape la plus ancienne, on garde le nom du tour
+              const dates = remaining.map(id => (_findActBySbId(id) || {}).iso).filter(Boolean).sort();
+              await window.sb.from('competitions').update({ activity_ids: remaining, date: dates[0] || r.date }).eq('id', r.id);
+            } else if (remaining.length === 1) {
+              // Devient une compétition simple : nom = celui de l'activité restante
+              const f = _findActBySbId(remaining[0]);
+              await window.sb.from('competitions').update({
+                activity_ids: remaining,
+                name: f ? (f.act.name || r.name) : r.name,
+                date: f ? f.iso : r.date,
+              }).eq('id', r.id);
+            } else {
+              await window.sb.from('competitions').delete().eq('id', r.id);
+            }
+          }
+        } catch (e2) { console.warn('[unset comp]', e2.message || e2); }
+      }
+    }
+    if (window.cloudSync && window.cloudSync.pullAllFromCloud) await window.cloudSync.pullAllFromCloud();
+    if (window.__applyOverridesAndRerender) window.__applyOverridesAndRerender(); // rebuild data depuis DASHBOARD_DATA mis à jour
+    if (typeof renderCompList === 'function') renderCompList();
+  } catch (e) {
+    console.warn('[setActivityCategory]', e.message || e);
+  }
+}
+
+// Cherche une activité (chargée) par son id Supabase → { act, iso }.
+function _findActBySbId(sbId) {
+  for (const d of data) {
+    if (!d.activities) continue;
+    for (const a of d.activities) {
+      if (String(a._sbId) === String(sbId)) return { act: a, iso: toIsoDate(d.date) };
+    }
+  }
+  return null;
+}
+
+// Retire une activité d'une course à étapes : elle redevient une compét d'un jour.
+async function dissociateFromStageRace(act, race, iso) {
+  if (!act || !act._sbId || !race || !window.sb) return;
+  try {
+    const remaining = (race.activityIds || []).map(String).filter(id => id !== String(act._sbId));
+    if (remaining.length >= 2) {
+      // La course garde les autres étapes
+      await window.sb.from('competitions').update({ activity_ids: remaining }).eq('id', race._sbId);
+    } else {
+      // Plus assez d'étapes → on supprime la course ; l'étape restante redevient compét d'un jour
+      await window.sb.from('competitions').delete().eq('id', race._sbId);
+      if (remaining.length === 1) {
+        const found = _findActBySbId(remaining[0]);
+        if (found && window.cloudSync.pushCompetitionRegistry) {
+          await window.cloudSync.pushCompetitionRegistry({
+            id: 'act-' + remaining[0], name: found.act.name || 'Compétition',
+            date: found.iso, sport: found.act.sport || null, activityIds: [remaining[0]],
+          });
+        }
+      }
+    }
+    // Cette activité redevient une compét d'un jour autonome
+    if (window.cloudSync.pushCompetitionRegistry) {
+      await window.cloudSync.pushCompetitionRegistry({
+        id: 'act-' + act._sbId, name: act.name || 'Compétition',
+        date: iso, sport: act.sport || null, activityIds: [act._sbId],
+      });
+    }
+    if (window.cloudSync.pullAllFromCloud) await window.cloudSync.pullAllFromCloud();
+    if (typeof renderCalendar === 'function') renderCalendar();
+    if (typeof renderCompList === 'function') renderCompList();
+  } catch (e) { console.warn('[dissociate]', e.message || e); }
+}
+
+// Constructeur de course à étapes : choisis les activités qui sont les étapes,
+// nomme la course → elles deviennent des compétitions partageant la même "épreuve".
+// L'ordre des étapes est chronologique (étape 1 = la plus ancienne).
+function openStageRaceBuilder(currentActivityId) {
+  // Rassemble toutes les activités (réalisées) avec leur date
+  const allActs = [];
+  for (const d of data) {
+    if (!d.activities) continue;
+    const iso = toIsoDate(d.date);
+    for (const a of d.activities) {
+      if (!a._sbId) continue; // seulement les lignes en base
+      allActs.push({ sbId: a._sbId, iso, name: a.name || 'Séance', sport: a.sport || '', category: a.category, event: a.event || null });
+    }
+  }
+  allActs.sort((x, y) => (x.iso < y.iso ? 1 : x.iso > y.iso ? -1 : 0)); // récent en haut
+
+  const current = allActs.find(a => a.sbId === currentActivityId);
+  const presetEvent = current && current.event ? current.event : '';
+  const preChecked = new Set();
+  if (current) preChecked.add(current.sbId);
+  if (presetEvent) allActs.filter(a => a.event === presetEvent).forEach(a => preChecked.add(a.sbId));
+
+  document.getElementById('_act-edit-modal')?.remove();
+  document.getElementById('_stagerace-modal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'day-modal-overlay active';
+  overlay.id = '_stagerace-modal';
+  const fmtD = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  const rows = allActs.map(a => `
+    <label class="sr-row">
+      <input type="checkbox" data-sbid="${a.sbId}" ${preChecked.has(a.sbId) ? 'checked' : ''}>
+      <span class="sr-date">${fmtD(a.iso)}</span>
+      <span class="sr-name">${window._confirmEscape ? window._confirmEscape(a.name) : a.name}</span>
+      ${a.category === 'competition' ? '<span class="sr-tag">compét</span>' : ''}
+    </label>`).join('');
+
+  overlay.innerHTML = `
+    <div class="day-modal day-modal-note">
+      <div class="day-modal-header">
+        <h3>Course à étapes</h3>
+        <button class="day-modal-close" type="button" title="Fermer">×</button>
+      </div>
+      <div class="day-modal-body">
+        <label class="note-field-label">Nom de la course</label>
+        <input type="text" id="_sr-name" placeholder="Ex : Tour de la Région">
+        <label class="note-field-label">Priorité</label>
+        <div class="note-type-chips" id="_sr-prio">
+          <button type="button" class="note-type-chip active" data-prio="principal">Objectif</button>
+          <button type="button" class="note-type-chip" data-prio="secondaire">Préparation</button>
+        </div>
+        <label class="note-field-label">Étapes (coche les activités)</label>
+        <div class="ae-field-hint">Les activités cochées deviennent des compétitions de cette course. L'ordre des étapes suit la date (étape 1 = la plus ancienne).</div>
+        <div class="sr-list">${rows || '<div class="modal-placeholder">Aucune activité.</div>'}</div>
+        <label class="note-field-label">Aperçu des étapes</label>
+        <div class="sr-preview" id="_sr-preview"></div>
+      </div>
+      <div class="day-modal-footer">
+        <div style="flex:1;"></div>
+        <button class="day-modal-cancel" type="button">Annuler</button>
+        <button class="day-modal-save" type="button">Valider</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('_sr-name').value = presetEvent;
+
+  let srPrio = 'principal';
+  overlay.querySelectorAll('#_sr-prio .note-type-chip').forEach(chip => chip.addEventListener('click', () => {
+    overlay.querySelectorAll('#_sr-prio .note-type-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    srPrio = chip.dataset.prio;
+  }));
+
+  const close = () => overlay.remove();
+  const refreshPreview = () => {
+    const checked = [...overlay.querySelectorAll('.sr-list input:checked')]
+      .map(c => allActs.find(a => a.sbId === c.dataset.sbid))
+      .filter(Boolean)
+      .sort((x, y) => (x.iso < y.iso ? -1 : 1)); // chronologique
+    const prev = document.getElementById('_sr-preview');
+    prev.innerHTML = checked.length
+      ? checked.map((a, i) => `<div class="sr-stage"><strong>Étape ${i + 1}</strong> · ${fmtD(a.iso)} — ${window._confirmEscape ? window._confirmEscape(a.name) : a.name}</div>`).join('')
+      : '<div class="modal-placeholder">Coche au moins 2 activités.</div>';
+  };
+  overlay.querySelectorAll('.sr-list input').forEach(c => c.addEventListener('change', refreshPreview));
+  refreshPreview();
+
+  overlay.querySelector('.day-modal-close').addEventListener('click', close);
+  overlay.querySelector('.day-modal-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+  overlay.querySelector('.day-modal-save').addEventListener('click', async () => {
+    const name = document.getElementById('_sr-name').value.trim();
+    if (!name) { if (window.appAlert) await window.appAlert({ title: 'Nom requis', message: 'Donne un nom à la course.' }); return; }
+    const selected = [...overlay.querySelectorAll('.sr-list input:checked')].map(c => c.dataset.sbid);
+    if (selected.length < 1 || !window.sb) { close(); return; }
+    try {
+      // Étapes sélectionnées (ordre chronologique) → activités en catégorie compétition
+      const selActs = allActs.filter(a => selected.includes(a.sbId)).sort((x, y) => (x.iso < y.iso ? -1 : 1));
+      await Promise.all(selActs.map(a => window.sb.from('activities').update({ category: 'competition' }).eq('id', a.sbId)));
+      // Supprime les compét "1 jour" (act-…) des activités qui deviennent des étapes
+      await Promise.all(selActs.map(a => window.sb.from('competitions').delete().eq('client_id', 'act-' + a.sbId)));
+      // UNE ligne dans le registre competitions reliant ces activités
+      if (window.cloudSync && window.cloudSync.pushCompetitionRegistry) {
+        await window.cloudSync.pushCompetitionRegistry({
+          id: 'race-' + selActs[0].sbId,
+          name,
+          date: selActs[0].iso,                 // date = 1ʳᵉ étape
+          sport: selActs[0].sport || null,
+          priority: srPrio,
+          activityIds: selActs.map(a => a.sbId),
+        });
+      }
+      // Refléter category=competition dans DASHBOARD_DATA (source des rebuilds)
+      const selSet = new Set(selActs.map(a => String(a.sbId)));
+      if (window.DASHBOARD_DATA && window.DASHBOARD_DATA.days) {
+        for (const d of window.DASHBOARD_DATA.days) {
+          for (const a of (d.activities || [])) if (selSet.has(String(a._sbId))) a.category = 'competition';
+        }
+      }
+      if (window.cloudSync && window.cloudSync.pullAllFromCloud) await window.cloudSync.pullAllFromCloud();
+      if (window.__applyOverridesAndRerender) window.__applyOverridesAndRerender();
+      if (typeof renderCompList === 'function') renderCompList();
+    } catch (e) { console.warn('[stage race]', e.message || e); }
+    close();
+  });
 }
 
 function openSessionModal(iso, source) {

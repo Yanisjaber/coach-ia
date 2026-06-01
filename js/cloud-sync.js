@@ -126,9 +126,20 @@ async function pullAllFromCloud() {
     }
   } catch (e) { console.warn('[pull goals]', e); }
 
-  // ----- compétitions → planned_sessions(competition) + activities(competition) -----
+  // ----- compétitions → registre competitions (passées) + planned_sessions (futures) -----
   try {
     const comps = [];
+    const _todayIso = new Date().toISOString().slice(0, 10);
+    // competitions = registre des PASSÉES uniquement (les futures sont dans planned_sessions)
+    const { data: reg } = await sb.from('competitions').select('*').eq('user_id', userId).lte('date', _todayIso);
+    for (const r of (reg || [])) comps.push({
+      id: r.client_id || r.id, _sbId: r.id, _table: 'competition',
+      name: r.name, date: r.date, sport: r.sport ?? null,
+      priority: r.priority ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
+      target: r.target ?? null, laps: r.laps ?? null, notes: r.notes ?? null,
+      gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null, stages: r.stages ?? null,
+      activityIds: r.activity_ids ?? null,
+    });
     const { data: pc } = await sb.from('planned_sessions').select('*').eq('user_id', userId).eq('category', 'competition');
     for (const r of (pc || [])) comps.push({
       id: r.client_id || r.id, _sbId: r.id, _table: 'planned',
@@ -137,20 +148,7 @@ async function pullAllFromCloud() {
       target: r.target ?? null, laps: r.laps ?? null, notes: r.notes ?? null,
       gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null, stages: r.stages ?? null,
     });
-    const { data: ac } = await sb.from('activities')
-      .select('id,client_id,name,start_date_local,sport,priority,target,distance_km,course_dplus,laps,user_notes,gpx_name,gpx_content,stages')
-      .eq('user_id', userId).eq('category', 'competition');
-    for (const r of (ac || [])) comps.push({
-      id: r.client_id || r.id, _sbId: r.id, _table: 'activity',
-      name: r.name, date: (r.start_date_local || '').slice(0, 10), sport: r.sport ?? null,
-      priority: r.priority ?? null, km: r.distance_km ?? null, dplus: r.course_dplus ?? null,
-      target: r.target ?? null, laps: r.laps ?? null, notes: r.user_notes ?? null,
-      gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null, stages: r.stages ?? null,
-    });
-    // Dédoublonnage par id effectif (client_id) — garde une seule entrée
-    const seen = new Set();
-    const deduped = comps.filter(c => { const k = c.id; if (seen.has(k)) return false; seen.add(k); return true; });
-    localStorage.setItem('coach_ia_competitions_v1', JSON.stringify(deduped));
+    localStorage.setItem('coach_ia_competitions_v1', JSON.stringify(comps));
   } catch (e) { console.warn('[pull comps]', e); }
 
   // ----- prévus → planned_sessions(entrainement) ; réalisés = activities (via le loader) -----
@@ -344,6 +342,7 @@ export async function pushCompetition(comp) {
         priority: comp.priority ?? null, km: comp.km ?? null, d_plus: comp.dplus ?? null,
         target: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
         gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null, stages: comp.stages ?? null,
+        event: comp.event ?? null,
       };
       if (comp._sbId && comp._table === 'planned') row.id = comp._sbId;
       if (!row.id) row.id = await _resolveId('planned_sessions', comp.id);
@@ -352,17 +351,19 @@ export async function pushCompetition(comp) {
       if (error) throw error;
       return data && data.id;
     } else {
+      // Compétition passée → registre competitions (relie une ou plusieurs activités)
       const row = {
-        user_id: uid(), source: 'manual', category: 'competition', client_id: comp.id,
-        name: comp.name, start_date_local: comp.date + 'T12:00:00', sport: comp.sport ?? null,
-        priority: comp.priority ?? null, distance_km: comp.km ?? null, course_dplus: comp.dplus ?? null,
-        target: comp.target ?? null, laps: comp.laps ?? null, user_notes: comp.notes ?? null,
+        user_id: uid(), client_id: comp.id,
+        name: comp.name, date: comp.date, sport: comp.sport ?? null,
+        priority: comp.priority ?? null, km: comp.km ?? null, d_plus: comp.dplus ?? null,
+        target: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
         gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null, stages: comp.stages ?? null,
+        activity_ids: comp.activityIds ?? [],
       };
-      if (comp._sbId && comp._table === 'activity') row.id = comp._sbId;
-      if (!row.id) row.id = await _resolveId('activities', comp.id);
+      if (comp._sbId && comp._table === 'competition') row.id = comp._sbId;
+      if (!row.id) row.id = await _resolveId('competitions', comp.id);
       if (!row.id) delete row.id;
-      const { data, error } = await window.sb.from('activities').upsert(row).select().single();
+      const { data, error } = await window.sb.from('competitions').upsert(row).select().single();
       if (error) throw error;
       return data && data.id;
     }
@@ -370,11 +371,22 @@ export async function pushCompetition(comp) {
 }
 export async function deleteCompetition(comp) {
   if (!isAuthed()) return;
-  const table = comp._table === 'activity' ? 'activities' : 'planned_sessions';
+  const table = comp._table === 'planned' ? 'planned_sessions' : 'competitions';
   try {
     if (comp._sbId) await window.sb.from(table).delete().eq('id', comp._sbId).eq('user_id', uid());
     else if (comp.id) await window.sb.from(table).delete().eq('client_id', comp.id).eq('user_id', uid());
   } catch (e) { console.warn('[del comp]', e.message); }
+}
+
+// Crée/maj une compétition (registre) reliant des activités, et supprime par activité.
+export async function pushCompetitionRegistry(comp) {
+  return await pushCompetition({ ...comp, _table: 'competition' });
+}
+export async function deleteCompetitionByActivity(activityId) {
+  if (!isAuthed()) return;
+  try {
+    await window.sb.from('competitions').delete().eq('user_id', uid()).contains('activity_ids', [String(activityId)]);
+  } catch (e) { console.warn('[del comp by act]', e.message); }
 }
 
 export async function pushTraining(training, mode) {
@@ -460,6 +472,7 @@ window.cloudSync = {
   pushPhase, deletePhase,
   pushGoal, deleteGoal,
   pushCompetition, deleteCompetition,
+  pushCompetitionRegistry, deleteCompetitionByActivity,
   pushTraining, deleteTraining,
   pushRestDay,
   pushStravaIgnored,

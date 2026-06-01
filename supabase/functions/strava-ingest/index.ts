@@ -34,7 +34,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const STRAVA_API = "https://www.strava.com/api/v3";
 const BATCH_SIZE = 100;
-const PER_PAGE = 200;
+const PER_PAGE = 100;
 
 // CORS headers pour pouvoir être appelée depuis n'importe quel domaine front
 const corsHeaders = {
@@ -106,10 +106,19 @@ Deno.serve(async (req) => {
     // ===== 4) Fetch activités paginé =====
     const all: any[] = [];
     let page = 1;
-    while (page <= 50) { // garde-fou 10 000 activités max
-      const res = await fetch(`${STRAVA_API}/athlete/activities?page=${page}&per_page=${PER_PAGE}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+    while (page <= 50) { // garde-fou
+      // Retry sur les 5xx transitoires de Strava (souvent 500 {"message":"error"})
+      let res: Response;
+      let attempt = 0;
+      while (true) {
+        res = await fetch(`${STRAVA_API}/athlete/activities?page=${page}&per_page=${PER_PAGE}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (res.status < 500 || attempt >= 3) break;
+        attempt++;
+        console.warn(`Strava ${res.status} on page ${page}, retry ${attempt}`);
+        await new Promise((r) => setTimeout(r, 1500 * attempt));
+      }
       if (res.status === 401) {
         await markError(sbAdmin, user.id, "strava_unauthorized");
         return json({ error: "strava_unauthorized" }, 401);
