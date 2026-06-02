@@ -36,7 +36,6 @@
 <link rel="stylesheet" href="styles/modals.css">
 <link rel="stylesheet" href="styles/forms-and-pickers.css">
 <link rel="stylesheet" href="styles/mode-ia.css">
-<link rel="stylesheet" href="styles/wellness.css">
 <link rel="stylesheet" href="styles/workout-builder.css">
 <link rel="stylesheet" href="styles/power-profile.css">
 <link rel="stylesheet" href="styles/day-extras.css">
@@ -167,24 +166,6 @@
       </div>
     </div>
   </section>
-
-  <!-- WELLNESS : saisie subjective quotidienne -->
-  <div class="wellness-cta card" id="wellness-cta" style="display:none;">
-    <div class="wellness-cta-left">
-      <div class="wellness-cta-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-        </svg>
-      </div>
-      <div>
-        <div class="wellness-cta-title">Ma forme du jour</div>
-        <div class="wellness-cta-sub" id="wellness-cta-sub">Aucune saisie pour aujourd'hui</div>
-      </div>
-    </div>
-    <button class="wellness-cta-btn" id="wellness-open-btn" type="button">
-      <span id="wellness-cta-btn-label">+ Saisir</span>
-    </button>
-  </div>
 
   <!-- STUB IA : recommandation quotidienne -->
   <div class="grid-1 card ia-only">
@@ -346,7 +327,7 @@
     <div class="section-subtitle">Cliquer sur une ligne pour voir le détail prévu vs réalisé</div>
     <table class="session-table">
       <thead><tr>
-        <th>Date</th><th>Séance</th><th>Sport</th><th>Type</th><th>Durée</th><th>TSS</th><th>NP / FTP%</th><th>FC moy</th><th>Conformité</th>
+        <th>Date</th><th>Séance</th><th>Sport</th><th>Durée</th><th>TSS</th><th>NP / FTP%</th><th>FC moy</th><th>Conformité</th>
       </tr></thead>
       <tbody id="sessions-tbody"></tbody>
     </table>
@@ -442,19 +423,6 @@
     <div class="chart-wrap" style="height:320px;"><canvas id="chart-power-profile"></canvas></div>
     <div class="power-profile-empty" id="power-profile-empty" hidden>
       Aucun Power Profile disponible. Les streams Strava sont téléchargés progressivement à chaque mise à jour automatique (~30 activités par run). Reviens dans quelques heures.
-    </div>
-  </div>
-
-  <!-- 6. Tendances wellness (conservé : c'est un bilan subjectif) -->
-  <div class="grid-1 card wellness-trend-card" style="display:none;">
-    <div class="section-title">Tendances wellness (saisies manuelles)</div>
-    <div class="section-subtitle">Poids, humeur, fatigue, courbatures, motivation sur tes 60 derniers jours saisis</div>
-    <div class="wellness-trend-summary" id="wellness-trend-summary"></div>
-    <div class="chart-wrap"><canvas id="chart-wellness-trend"></canvas></div>
-    <div class="wellness-empty" id="wellness-empty" hidden>
-      Aucune saisie pour le moment.
-      <br>
-      <button type="button" id="wellness-empty-cta">+ Faire ma première saisie</button>
     </div>
   </div>
 
@@ -1039,98 +1007,6 @@
       </button>
     </div>
     <p class="welcome-footnote">Tu peux basculer entre les deux modes à tout moment depuis le header.</p>
-  </div>
-</div>
-
-<!-- ============================================================ -->
-<!-- MODAL WELLNESS — Saisie subjective quotidienne -->
-<!-- ============================================================ -->
-<div class="wellness-backdrop" id="wellness-backdrop">
-  <div class="wellness-modal">
-    <div class="wellness-header">
-      <div>
-        <h2>Ma forme du jour</h2>
-        <p class="wellness-sub" id="wellness-date-label">—</p>
-      </div>
-      <button class="wellness-close" id="wellness-close" type="button" title="Fermer">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-
-    <div class="wellness-grid">
-      <!-- Poids -->
-      <div class="wellness-field wellness-weight">
-        <label for="wellness-weight-input">Poids</label>
-        <div class="wellness-weight-row">
-          <input type="number" id="wellness-weight-input" step="0.1" min="30" max="200" placeholder="ex. 72.5">
-          <span class="wellness-unit">kg</span>
-        </div>
-      </div>
-
-      <!-- Sliders subjectifs 1-5 -->
-      <div class="wellness-field" data-key="mood" data-direction="positive">
-        <label>Humeur · <span class="wellness-val" id="wellness-mood-val">—</span></label>
-        <div class="wellness-scale">
-          <button type="button" data-val="1" title="Morose">1</button>
-          <button type="button" data-val="2" title="Bas">2</button>
-          <button type="button" data-val="3" title="Neutre">3</button>
-          <button type="button" data-val="4" title="Bonne">4</button>
-          <button type="button" data-val="5" title="Excellente">5</button>
-        </div>
-      </div>
-
-      <div class="wellness-field" data-key="fatigue" data-direction="negative">
-        <label>Fatigue · <span class="wellness-val" id="wellness-fatigue-val">—</span></label>
-        <div class="wellness-scale">
-          <button type="button" data-val="1" title="Très frais">1</button>
-          <button type="button" data-val="2" title="Frais">2</button>
-          <button type="button" data-val="3" title="Normal">3</button>
-          <button type="button" data-val="4" title="Fatigué">4</button>
-          <button type="button" data-val="5" title="Épuisé">5</button>
-        </div>
-      </div>
-
-      <div class="wellness-field" data-key="soreness" data-direction="negative">
-        <label>Courbatures · <span class="wellness-val" id="wellness-soreness-val">—</span></label>
-        <div class="wellness-scale">
-          <button type="button" data-val="1" title="Aucune">1</button>
-          <button type="button" data-val="2" title="Légères">2</button>
-          <button type="button" data-val="3" title="Présentes">3</button>
-          <button type="button" data-val="4" title="Marquées">4</button>
-          <button type="button" data-val="5" title="Sévères">5</button>
-        </div>
-      </div>
-
-      <div class="wellness-field" data-key="motivation" data-direction="positive">
-        <label>Motivation · <span class="wellness-val" id="wellness-motivation-val">—</span></label>
-        <div class="wellness-scale">
-          <button type="button" data-val="1" title="Sans envie">1</button>
-          <button type="button" data-val="2" title="Faible">2</button>
-          <button type="button" data-val="3" title="OK">3</button>
-          <button type="button" data-val="4" title="Élevée">4</button>
-          <button type="button" data-val="5" title="À fond">5</button>
-        </div>
-      </div>
-
-      <div class="wellness-field wellness-notes-field">
-        <label for="wellness-notes-input">Notes du jour</label>
-        <textarea id="wellness-notes-input" rows="3" placeholder="Sommeil, alcool, voyage, douleur, sensations..."></textarea>
-      </div>
-    </div>
-
-    <div class="wellness-footer">
-      <button class="btn-trash wellness-delete" id="wellness-delete" type="button" title="Effacer la saisie de ce jour" hidden>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-          <path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
-        </svg>
-      </button>
-      <div style="flex:1;"></div>
-      <button class="btn-secondary" id="wellness-cancel" type="button">Annuler</button>
-      <button class="btn-primary" id="wellness-save" type="button">Enregistrer</button>
-    </div>
   </div>
 </div>
 

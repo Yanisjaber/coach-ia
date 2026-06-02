@@ -24,12 +24,12 @@ async function fetchConnections() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { user: null };
   const [{ data: strava }, { data: whoop }, { count: whoopDays }, { count: stravaActs }] = await Promise.all([
-    sb.from('strava_connections')
-      .select('strava_athlete_id, athlete_name, last_sync_at, last_sync_status, total_activities_synced, first_connected_at')
-      .eq('user_id', user.id).maybeSingle(),
-    sb.from('whoop_connections')
-      .select('whoop_user_id, athlete_name, last_sync_at, last_sync_status, first_connected_at')
-      .eq('user_id', user.id).maybeSingle(),
+    sb.from('connexions_app')
+      .select('external_id, athlete_name, last_sync_at, last_sync_status, total_activities_synced, first_connected_at')
+      .eq('user_id', user.id).eq('app', 'strava').maybeSingle(),
+    sb.from('connexions_app')
+      .select('external_id, athlete_name, last_sync_at, last_sync_status, first_connected_at')
+      .eq('user_id', user.id).eq('app', 'whoop').maybeSingle(),
     sb.from('whoop_data').select('iso_date', { count: 'exact', head: true }).eq('user_id', user.id),
     sb.from('activities').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
   ]);
@@ -170,10 +170,10 @@ function wire(body) {
       if (act === 'strava-connect') return window.startStravaOAuth?.();
       if (act === 'whoop-connect') return window.startWhoopOAuth?.();
       if (act === 'strava-sync') {
-        // Barre DANS la carte ; les boutons réapparaissent à la fin (onFinish → render).
-        const card = btn.closest('.cnx-card');
-        const prog = inCardProgress(card, 'Synchronisation Strava', () => render(body));
-        window.startStravaIngest?.({ prog }); // enchaîne aussi le power profile
+        // Pas de barre liée à la carte : on lance via l'encart bas-droite (beginImport),
+        // qui SURVIT à la fermeture de la fenêtre, et la carte se met à jour en direct
+        // via l'événement 'strava-sync-progress'. La synchro continue si on ferme.
+        window.startStravaIngest?.(); // enchaîne aussi le power profile
         return;
       }
       if (act === 'whoop-sync') {

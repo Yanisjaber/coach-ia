@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
     if (!recomputeOnly) {
       // ===== 2) Tokens Strava + refresh =====
       const { data: conn, error: connErr } = await sbAdmin
-        .from("strava_connections").select("*").eq("user_id", user.id).maybeSingle();
+        .from("connexions_app").select("*").eq("user_id", user.id).eq("app", "strava").maybeSingle();
       if (connErr || !conn) return json({ error: "no_strava_connection" }, 400);
 
       let accessToken = conn.access_token;
@@ -81,11 +81,11 @@ Deno.serve(async (req) => {
         const refreshed = await refreshStravaToken(conn.refresh_token);
         if (!refreshed) return json({ error: "token_refresh_failed" }, 500);
         accessToken = refreshed.access_token;
-        await sbAdmin.from("strava_connections").update({
+        await sbAdmin.from("connexions_app").update({
           access_token: refreshed.access_token,
           refresh_token: refreshed.refresh_token,
           expires_at: new Date(refreshed.expires_at * 1000).toISOString(),
-        }).eq("user_id", user.id);
+        }).eq("user_id", user.id).eq("app", "strava");
       }
 
       // ===== 3) Activités sans streams (les plus récentes d'abord) =====

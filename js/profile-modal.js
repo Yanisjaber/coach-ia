@@ -327,6 +327,7 @@ function renderBike() {
           <span>FTP (W) *</span>
           <input name="ftp" type="number" min="50" max="600" step="1" placeholder="—">
           <small class="profile-hint">Puissance seuil ~ 1h max</small>
+          <small class="profile-hint profile-estimate" id="ftp-est-hint"></small>
         </label>
         <label class="profile-field">
           <span>FTP / kg</span>
@@ -493,6 +494,7 @@ function renderHeart() {
           <span>LTHR (bpm) *</span>
           <input name="lthr" type="number" min="100" max="220" step="1" placeholder="—">
           <small class="profile-hint">~90% HRmax</small>
+          <small class="profile-hint profile-estimate" id="lthr-est-hint"></small>
         </label>
       </div>
 
@@ -998,8 +1000,43 @@ function updateDerivedFields() {
     }
   }
 
+  // Indications "Estimé" quand FTP / LTHR sont vides
+  const hrMax = parseFloat(form.elements['hr_max']?.value || '0');
+  const ftpEst = estimateFtpClient();
+  const lthrEst = hrMax > 0 ? Math.round(hrMax * 0.92) : null;
+  const ftpHint = document.getElementById('ftp-est-hint');
+  if (ftpHint) {
+    if (!(ftp > 0) && ftpEst) {
+      ftpHint.innerHTML = `Estimé : <b>~${ftpEst} W</b> <a href="#" id="ftp-est-apply">utiliser</a>`;
+      ftpHint.style.display = '';
+      const a = document.getElementById('ftp-est-apply');
+      if (a) a.onclick = (e) => { e.preventDefault(); form.elements['ftp'].value = ftpEst; updateDerivedFields(); };
+    } else { ftpHint.textContent = ''; ftpHint.style.display = 'none'; }
+  }
+  const lthrHint = document.getElementById('lthr-est-hint');
+  if (lthrHint) {
+    if (!(lthr > 0) && lthrEst) {
+      lthrHint.innerHTML = `Estimé : <b>~${lthrEst} bpm</b> <a href="#" id="lthr-est-apply">utiliser</a>`;
+      lthrHint.style.display = '';
+      const a = document.getElementById('lthr-est-apply');
+      if (a) a.onclick = (e) => { e.preventDefault(); form.elements['lthr'].value = lthrEst; updateDerivedFields(); };
+    } else { lthrHint.textContent = ''; lthrHint.style.display = 'none'; }
+  }
+
   // Tables de zones
   renderZoneTables({ ftp, lthr, vThr });
+}
+
+// Estimation FTP côté client : 95% du meilleur 20 min, sinon ~100% du meilleur 1h,
+// sinon 90% de la meilleure puissance normalisée vue dans les activités.
+function estimateFtpClient() {
+  const dd = window.DASHBOARD_DATA || {};
+  const at = (dd.power_profile && dd.power_profile.alltime) || {};
+  if (at['1200']) return Math.round(at['1200'] * 0.95);
+  if (at['3600']) return Math.round(at['3600']);
+  let bestNp = 0;
+  for (const d of (dd.days || [])) for (const a of (d.activities || [])) if ((a.np || 0) > bestNp) bestNp = a.np;
+  return bestNp ? Math.round(bestNp * 0.90) : null;
 }
 
 function renderZoneTables({ ftp, lthr, vThr }) {

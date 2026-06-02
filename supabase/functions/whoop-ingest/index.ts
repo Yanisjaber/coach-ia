@@ -59,23 +59,23 @@ Deno.serve(async (req) => {
 
     // ===== 2) Connexion Whoop + refresh =====
     const { data: conn, error: connErr } = await sbAdmin
-      .from("whoop_connections").select("*").eq("user_id", user.id).maybeSingle();
+      .from("connexions_app").select("*").eq("user_id", user.id).eq("app", "whoop").maybeSingle();
     if (connErr || !conn) return json({ error: "no_whoop_connection" }, 400);
 
-    await sbAdmin.from("whoop_connections").update({
+    await sbAdmin.from("connexions_app").update({
       last_sync_status: "running", last_sync_at: new Date().toISOString(),
-    }).eq("user_id", user.id);
+    }).eq("user_id", user.id).eq("app", "whoop");
 
     let accessToken = conn.access_token;
     if (new Date(conn.expires_at) <= new Date(Date.now() + 60_000)) {
       const refreshed = await refreshWhoopToken(conn.refresh_token);
       if (!refreshed) { await markErr(sbAdmin, user.id, "token_refresh_failed"); return json({ error: "token_refresh_failed" }, 500); }
       accessToken = refreshed.access_token;
-      await sbAdmin.from("whoop_connections").update({
+      await sbAdmin.from("connexions_app").update({
         access_token: refreshed.access_token,
         refresh_token: refreshed.refresh_token || conn.refresh_token,
         expires_at: new Date(Date.now() + (refreshed.expires_in || 3600) * 1000 - 60_000).toISOString(),
-      }).eq("user_id", user.id);
+      }).eq("user_id", user.id).eq("app", "whoop");
     }
 
     // ===== 3) Fetch recovery + sleep + cycles =====
@@ -124,9 +124,9 @@ Deno.serve(async (req) => {
     }
 
     // ===== 5) Sync OK =====
-    await sbAdmin.from("whoop_connections").update({
+    await sbAdmin.from("connexions_app").update({
       last_sync_status: "ok", last_sync_at: new Date().toISOString(), last_sync_error: null,
-    }).eq("user_id", user.id);
+    }).eq("user_id", user.id).eq("app", "whoop");
 
     return json({
       ok: true,
@@ -220,9 +220,9 @@ function clampInt(v: any, min: number, max: number, dflt: number): number {
 }
 function round1(v: number): number { return Math.round(v * 10) / 10; }
 async function markErr(sb: any, userId: string, msg: string) {
-  await sb.from("whoop_connections").update({
+  await sb.from("connexions_app").update({
     last_sync_status: "error", last_sync_error: msg.slice(0, 500), last_sync_at: new Date().toISOString(),
-  }).eq("user_id", userId);
+  }).eq("user_id", userId).eq("app", "whoop");
 }
 async function refreshWhoopToken(refreshToken: string) {
   const form = new URLSearchParams({

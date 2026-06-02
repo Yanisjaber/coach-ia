@@ -107,16 +107,17 @@ Deno.serve(async (req) => {
 
     // ===== 4) Stocker dans whoop_connections =====
     const sbAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { error: upErr } = await sbAdmin.from("whoop_connections").upsert({
+    const { error: upErr } = await sbAdmin.from("connexions_app").upsert({
       user_id: user.id,
-      whoop_user_id: whoopUserId,
+      app: "whoop",
+      external_id: whoopUserId != null ? String(whoopUserId) : null,
       athlete_name: athleteName,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       expires_at: expiresAt,
       first_connected_at: new Date().toISOString(),
       last_sync_status: "connected",
-    }, { onConflict: "user_id" });
+    }, { onConflict: "user_id,app" });
     if (upErr) {
       console.error("Insert whoop_connections failed:", upErr);
       return redirectToApp(returnUrl, { whoop_error: "db_insert_failed" });

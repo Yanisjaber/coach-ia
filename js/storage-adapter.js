@@ -14,7 +14,6 @@
      - listRows(table, opts?)           : SELECT * FROM table WHERE user_id = me
      - upsertRow(table, row, pk)        : INSERT ou UPDATE
      - deleteRow(table, pk)             : DELETE WHERE pk match
-     - migrateLocalToCloud()            : push tout le localStorage existant vers la BDD
 
    Tous les modules peuvent simplement importer et utiliser, ils
    marcheront en offline (localStorage) ET avec auth (Supabase).
@@ -23,16 +22,11 @@
 const CACHE_PREFIX = 'coach_ia_';
 
 let _currentUser = null;
-let _migrationDone = false;
 
 window.addEventListener('coach-ia-auth', (e) => {
   _currentUser = e.detail.user || null;
-  // NOTE : on NE lance PLUS migrateLocalToCloud() au login.
-  // Ce push de masse localStorage → cloud datait de l'ancienne époque (localStorage-only).
-  // Désormais le cloud (Supabase) est la source de vérité : le pull au login écrase le
+  // Le cloud (Supabase) est la source de vérité : le pull au login écrase le
   // localStorage, et chaque modification est poussée individuellement (saveCompetitions, etc.).
-  // Le relancer à chaque login RESSUSCITAIT les éléments supprimés sur un autre appareil.
-  // (migrateLocalToCloud reste disponible via window.storageAdapter pour un usage manuel ponctuel.)
 });
 
 function isAuthed() { return !!_currentUser && !!window.sb; }
@@ -150,174 +144,5 @@ export async function deleteRow(table, pkValue, opts = {}) {
   }
 }
 
-// ============ MIGRATION INITIALE : localStorage → cloud ============
-// Au premier login, on prend tout ce qui existe en localStorage et on l'envoie
-// dans Supabase si la BDD est vide pour cet user.
-// Stratégie sécuritaire : on ne push QUE si la table cloud est vide pour cet user
-// (pour ne pas écraser des données plus récentes).
-async function migrateLocalToCloud() {
-  if (!isAuthed()) return;
-  const sb = window.sb;
-  const userId = uid();
-
-  // Liste des migrations : { lsKey, table, transformer(value) → rowsToInsert }
-  const migrations = [
-    // ----- Wellness -----
-    {
-      lsKey: 'coach_ia_wellness_v1',
-      table: 'wellness_days',
-      conflictCol: 'user_id,iso_date',
-      transform: (obj) => Object.entries(obj || {}).map(([iso, v]) => ({
-        user_id: userId,
-        iso_date: iso,
-        weight: v.weight ?? null,
-        mood: v.mood ?? null,
-        fatigue: v.fatigue ?? null,
-        soreness: v.soreness ?? null,
-        motivation: v.motivation ?? null,
-        notes: v.notes ?? null,
-      })),
-    },
-    // ----- Notes -----
-    {
-      lsKey: 'coach_ia_day_notes_v1',
-      table: 'day_notes',
-      conflictCol: 'user_id,iso_date',
-      transform: (obj) => Object.entries(obj || {}).map(([iso, text]) => ({
-        user_id: userId, iso_date: iso, note: text,
-      })),
-    },
-    // ----- Phases -----
-    {
-      lsKey: 'coach_ia_phases_v1',
-      table: 'training_phases',
-      conflictCol: 'id',
-      transform: (arr) => (arr || []).map(p => ({
-        user_id: userId, client_id: p.id || null,
-        phase: p.phase, from_date: p.from, to_date: p.to,
-        name: p.name ?? null,
-      })),
-    },
-    // ----- Objectifs annuels -----
-    {
-      lsKey: 'coach_ia_yearly_goals_v2',
-      table: 'yearly_goals',
-      conflictCol: 'id',
-      transform: (obj) => {
-        const out = [];
-        for (const year of Object.keys(obj || {})) {
-          for (const g of obj[year]) {
-            out.push({
-              user_id: userId, client_id: g.id, year: parseInt(year, 10),
-              sport: g.sport, template: g.template, target: g.target,
-              current_manual: g.currentManual ?? null,
-            });
-          }
-        }
-        return out;
-      },
-    },
-    // ----- Compétitions -----
-    {
-      lsKey: 'coach_ia_competitions_v1',
-      table: 'competitions',
-      conflictCol: 'id',
-      transform: (arr) => (arr || []).map(c => ({
-        user_id: userId, client_id: c.id,
-        name: c.name, date: c.date, sport: c.sport ?? null,
-        priority: c.priority ?? null, km: c.km ?? null,
-        d_plus: c.dplus ?? null, target: c.target ?? null,
-        laps: c.laps ?? null, notes: c.notes ?? null,
-        gpx_name: c.gpxName ?? null, gpx_content: c.gpxContent ?? null,
-        stages: c.stages ?? null,
-      })),
-    },
-    // ----- Entraînements prévus -----
-    {
-      lsKey: 'coach_ia_trainings_v1',
-      table: 'trainings',
-      conflictCol: 'id',
-      transform: (arr) => (arr || []).map(t => ({
-        user_id: userId, client_id: t.id,
-        name: t.name, date: t.date, sport: t.sport ?? null,
-        type: t.type ?? null, duration: t.duration ?? null,
-        tss: t.tss ?? null, notes: t.notes ?? null,
-        mode: 'prevu', structure: t.structure ?? null,
-      })),
-    },
-    // ----- Entraînements réalisés -----
-    {
-      lsKey: 'coach_ia_trainings_realise_v1',
-      table: 'trainings',
-      conflictCol: 'id',
-      transform: (arr) => (arr || []).map(t => ({
-        user_id: userId, client_id: t.id,
-        name: t.name, date: t.date, sport: t.sport ?? null,
-        type: t.type ?? null, duration: t.duration ?? null,
-        tss: t.tss ?? null, notes: t.notes ?? null,
-        mode: 'realise', structure: t.structure ?? null,
-      })),
-    },
-    // ----- Repos forcés -----
-    {
-      lsKey: 'coach_ia_template_rest_days_v1',
-      table: 'template_rest_days',
-      conflictCol: 'user_id,iso_date',
-      transform: (arr) => (arr || []).map(iso => ({ user_id: userId, iso_date: iso })),
-    },
-    // ----- Strava ignored -----
-    {
-      lsKey: 'coach_ia_strava_ignore_v1',
-      table: 'strava_ignored',
-      conflictCol: 'user_id,activity_id',
-      transform: (arr) => (arr || []).map(id => ({ user_id: userId, activity_id: String(id) })),
-    },
-    // ----- Snapshots du plan -----
-    {
-      lsKey: 'coach_ia_plan_snapshots_v1',
-      table: 'plan_snapshots',
-      conflictCol: 'user_id,iso_date',
-      transform: (obj) => Object.entries(obj || {}).map(([iso, proposal]) => ({
-        user_id: userId, iso_date: iso, proposal,
-      })),
-    },
-  ];
-
-  for (const m of migrations) {
-    try {
-      const raw = localStorage.getItem(m.lsKey);
-      if (!raw) continue;
-      let parsed;
-      try { parsed = JSON.parse(raw); } catch { continue; }
-      const rows = m.transform(parsed);
-      if (!rows.length) continue;
-
-      // Check si la table est déjà non vide pour cet user
-      const { count } = await sb.from(m.table).select('*', { count: 'exact', head: true }).eq('user_id', userId);
-      if (count && count > 0) {
-        console.log(`[migrate] ${m.table} : déjà ${count} lignes, skip migration locale`);
-        continue;
-      }
-
-      const { error } = await sb.from(m.table).upsert(rows, { onConflict: m.conflictCol });
-      if (error) {
-        console.warn(`[migrate] ${m.table} :`, error.message);
-      } else {
-        console.log(`[migrate] ${m.table} : ${rows.length} lignes migrées depuis localStorage`);
-      }
-    } catch (e) {
-      console.warn(`[migrate] ${m.lsKey} échec :`, e);
-    }
-  }
-
-  // Force un re-render des vues qui dépendent des données migrées
-  setTimeout(() => {
-    if (window.renderCalendar) window.renderCalendar();
-    if (window.renderCompList) window.renderCompList();
-    if (window.renderBilan) window.renderBilan();
-    if (window.renderWellnessTrend) window.renderWellnessTrend();
-  }, 500);
-}
-
 // Expose pour debug
-window.storageAdapter = { readKv, storeKv, syncKv, listRows, upsertRow, deleteRow, migrateLocalToCloud };
+window.storageAdapter = { readKv, storeKv, syncKv, listRows, upsertRow, deleteRow };

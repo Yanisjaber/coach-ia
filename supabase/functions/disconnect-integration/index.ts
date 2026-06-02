@@ -64,27 +64,38 @@ Deno.serve(async (req) => {
         }
         return json({ ok: true, step: only });
       }
+      if (only === "connexions_app") {
+        const { error } = await sb.from("connexions_app").delete().eq("user_id", uid).eq("app", provider);
+        if (error) { console.error("delete connexions_app:", error.message); return json({ error: "delete_connexions_app_failed", detail: error.message }, 500); }
+        return json({ ok: true, step: only });
+      }
       const { error } = await sb.from(only).delete().eq("user_id", uid);
       if (error) { console.error(`delete ${only}:`, error.message); return json({ error: `delete_${only}_failed`, detail: error.message }, 500); }
       return json({ ok: true, step: only });
     }
 
-    // Tables à vider selon le mode. La connexion est toujours supprimée en dernier.
+    // Tables de DONNÉES à vider selon le mode (la connexion est supprimée à part,
+    // car elle vit dans la table mutualisée connexions_app filtrée par app).
     let tables: string[];
     if (provider === "strava") {
       // Ordre FK : daily_metrics.main_activity_id et power_profile.activity_id_*
       // référencent activities → on les vide avant activities.
-      tables = wipe
-        ? ["power_profile", "daily_metrics", "activities", "strava_connections"]
-        : ["strava_connections"];
+      tables = wipe ? ["power_profile", "daily_metrics", "activities"] : [];
     } else {
-      tables = wipe ? ["whoop_data", "whoop_connections"] : ["whoop_connections"];
+      tables = wipe ? ["whoop_data"] : [];
     }
 
     for (const table of tables) {
       const { error } = await sb.from(table).delete().eq("user_id", uid);
       if (error) { console.error(`delete ${table}:`, error.message); return json({ error: `delete_${table}_failed`, detail: error.message }, 500); }
       deleted[table] = true;
+    }
+
+    // Supprimer la connexion de cette app uniquement (table mutualisée).
+    {
+      const { error } = await sb.from("connexions_app").delete().eq("user_id", uid).eq("app", provider);
+      if (error) { console.error("delete connexions_app:", error.message); return json({ error: "delete_connexions_app_failed", detail: error.message }, 500); }
+      deleted["connexions_app"] = true;
     }
 
     // En mode wipe Strava, on remet aussi à zéro les infos athlète issues de Strava.

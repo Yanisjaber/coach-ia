@@ -118,18 +118,18 @@ Deno.serve(async (req) => {
     const expiresAt = new Date((tokens.expires_at || 0) * 1000).toISOString();
 
     const { error: insertErr } = await sbAdmin
-      .from("strava_connections")
+      .from("connexions_app")
       .upsert({
         user_id: user.id,
-        strava_athlete_id: athlete.id,
+        app: "strava",
+        external_id: athlete.id != null ? String(athlete.id) : null,
         athlete_name: `${athlete.firstname || ""} ${athlete.lastname || ""}`.trim() || null,
-        athlete_email: athlete.email || null,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         expires_at: expiresAt,
         scope: tokens.scope || null,
         first_connected_at: new Date().toISOString(),
-      }, { onConflict: "user_id" });
+      }, { onConflict: "user_id,app" });
 
     if (insertErr) {
       console.error("Insert strava_connections failed:", insertErr);

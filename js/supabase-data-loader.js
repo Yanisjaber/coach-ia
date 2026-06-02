@@ -98,7 +98,7 @@ function hideLoadingOverlay() {
 // ces blobs sont lourds (Mo par activité) et chargés à la demande seulement
 // (voir loadStreams dans app.js). Charger tout d'un coup ferait des dizaines de Mo.
 const ACTIVITY_LIGHT_COLS = [
-  'id', 'strava_id', 'name', 'type', 'sport', 'sport_raw', 'tss',
+  'id', 'strava_id', 'name', 'sport', 'sport_raw', 'tss',
   'moving_time', 'elapsed_time', 'start_date_local',
   'distance_km', 'total_elevation_gain', 'total_elevation_loss',
   'avg_speed_kmh', 'max_speed_kmh', 'max_speed_smooth_kmh',
@@ -114,7 +114,7 @@ const ACTIVITY_LIGHT_COLS = [
 // La migration SQL révoque l'accès aux colonnes access_token/refresh_token
 // pour le rôle authenticated → un select('*') renverrait une erreur 403.
 const STRAVA_CONN_SAFE_COLS =
-  'user_id, strava_athlete_id, athlete_name, scope, first_connected_at, last_sync_at, last_sync_status, last_sync_error, total_activities_synced';
+  'user_id, external_id, athlete_name, scope, first_connected_at, last_sync_at, last_sync_status, last_sync_error, total_activities_synced';
 
 // Fetch paginé : Supabase limite à 1000 lignes par requête, on boucle si besoin.
 async function fetchAllPaged(table, userId, orderCol, columns = '*') {
@@ -158,8 +158,8 @@ async function loadFromSupabase() {
       fetchAllPaged('daily_metrics', userId, 'iso_date'),
       fetchAllPaged('power_profile', userId, 'duration_s'),
       fetchAllPaged('whoop_data', userId, 'iso_date'),
-      sb.from('strava_connections').select(STRAVA_CONN_SAFE_COLS).eq('user_id', userId).maybeSingle(),
-      sb.from('whoop_connections').select('user_id').eq('user_id', userId).maybeSingle(),
+      sb.from('connexions_app').select(STRAVA_CONN_SAFE_COLS).eq('user_id', userId).eq('app', 'strava').maybeSingle(),
+      sb.from('connexions_app').select('user_id').eq('user_id', userId).eq('app', 'whoop').maybeSingle(),
     ]);
 
     // Si un import d'activités est en cours côté serveur (ex : rechargement pendant
@@ -239,8 +239,8 @@ function maybeResumeIngest(stravaConnection, userId) {
 
   const poll = async () => {
     try {
-      const { data: conn } = await window.sb.from('strava_connections')
-        .select('last_sync_status').eq('user_id', userId).maybeSingle();
+      const { data: conn } = await window.sb.from('connexions_app')
+        .select('last_sync_status').eq('user_id', userId).eq('app', 'strava').maybeSingle();
       if (!conn || conn.last_sync_status !== 'running') {
         if (tick) clearInterval(tick);
         prog?.update(100, 'Activités importées');
@@ -279,7 +279,7 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
   if (!whoopConnection) whoopData = [];
   // 1) Athlete
   const athlete = {
-    id: stravaConnection?.strava_athlete_id ? String(stravaConnection.strava_athlete_id) : '',
+    id: stravaConnection?.external_id ? String(stravaConnection.external_id) : '',
     name: profile?.display_name || stravaConnection?.athlete_name || 'Athlete',
     ftp: profile?.ftp || 0,
     hr_max: profile?.hr_max || 0,
@@ -308,7 +308,6 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
       stages: a.stages || null,
       event: a.event || null,
       name: a.name,
-      type: a.type,
       sport: a.sport,
       raw_type: a.sport_raw,
       tss: a.tss || 0,
@@ -364,7 +363,7 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
       tsb: m.tsb || 0,
       duration: m.duration_min || 0,
       sessionName: main.name || null,
-      sessionType: main.type || null,
+      sessionType: null,
       sport: main.sport || null,
       np: main.np || 0,
       avgW: main.avg_watts || 0,
@@ -409,7 +408,7 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
         tss: acts.reduce((s, a) => s + (a.tss || 0), 0),
         ctl: 0, atl: 0, tsb: 0,
         duration: acts.reduce((s, a) => s + (a.duration || 0), 0),
-        sessionName: main.name || null, sessionType: main.type || null, sport: main.sport || null,
+        sessionName: main.name || null, sessionType: null, sport: main.sport || null,
         np: main.np || 0, avgW: main.avg_watts || 0, hr: main.hr || 0,
         ftpPct: main.ftpPct || 0, intensity: main.intensity || 0,
         compliance: null, zones: main.zones_hr || main.zones_power || null,
@@ -435,7 +434,7 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
         tss: acts.reduce((s, a) => s + (a.tss || 0), 0),
         ctl: 0, atl: 0, tsb: 0,
         duration: acts.reduce((s, a) => s + (a.duration || 0), 0),
-        sessionName: main.name || null, sessionType: main.type || null, sport: main.sport || null,
+        sessionName: main.name || null, sessionType: null, sport: main.sport || null,
         np: main.np || 0, avgW: main.avg_watts || 0, hr: main.hr || 0,
         ftpPct: main.ftpPct || 0, intensity: main.intensity || 0,
         compliance: null, zones: main.zones_hr || main.zones_power || null,
@@ -796,7 +795,6 @@ function triggerFullReload() {
   setTimeout(() => {
     if (window.renderBilan) window.renderBilan();
     if (window.renderPowerProfile) window.renderPowerProfile();
-    if (window.renderWellnessTrend) window.renderWellnessTrend();
     if (window.renderCalendar) window.renderCalendar();
     if (window.renderCompList) window.renderCompList();
   }, 100);

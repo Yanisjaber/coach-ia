@@ -124,7 +124,7 @@ async function handleEvent(event: any) {
   // Si l'athlète a révoqué l'autorisation de l'app via Strava → on supprime la connection.
   if (objectType === "athlete" && updates.authorized === "false") {
     console.log(`[webhook] deauth pour athlete ${ownerId}`);
-    await sb.from("strava_connections").delete().eq("strava_athlete_id", ownerId);
+    await sb.from("connexions_app").delete().eq("app", "strava").eq("external_id", String(ownerId));
     return;
   }
 
@@ -136,9 +136,10 @@ async function handleEvent(event: any) {
 
   // Récupère TOUTES les connections liées à ce strava_athlete_id (peut être >1 user)
   const { data: conns } = await sb
-    .from("strava_connections")
+    .from("connexions_app")
     .select("*")
-    .eq("strava_athlete_id", ownerId);
+    .eq("app", "strava")
+    .eq("external_id", String(ownerId));
 
   if (!conns || conns.length === 0) {
     console.warn(`[webhook] aucune connection pour athlete ${ownerId}`);
@@ -154,16 +155,16 @@ async function handleEvent(event: any) {
         await handleActivityUpsert(sb, conn, objectId);
       }
       // Marquer le temps de dernier event reçu
-      await sb.from("strava_connections").update({
+      await sb.from("connexions_app").update({
         last_sync_at: new Date().toISOString(),
         last_sync_status: "ok",
-      }).eq("user_id", conn.user_id);
+      }).eq("user_id", conn.user_id).eq("app", "strava");
     } catch (e: any) {
       console.error(`[webhook] erreur user ${conn.user_id}:`, e);
-      await sb.from("strava_connections").update({
+      await sb.from("connexions_app").update({
         last_sync_status: "error",
         last_sync_error: String(e?.message || e).slice(0, 500),
-      }).eq("user_id", conn.user_id);
+      }).eq("user_id", conn.user_id).eq("app", "strava");
     }
   }
 }
@@ -178,11 +179,11 @@ async function handleActivityUpsert(sb: any, conn: any, activityId: number) {
     const refreshed = await refreshStravaToken(conn.refresh_token);
     if (!refreshed) throw new Error("token_refresh_failed");
     accessToken = refreshed.access_token;
-    await sb.from("strava_connections").update({
+    await sb.from("connexions_app").update({
       access_token: refreshed.access_token,
       refresh_token: refreshed.refresh_token,
       expires_at: new Date(refreshed.expires_at * 1000).toISOString(),
-    }).eq("user_id", conn.user_id);
+    }).eq("user_id", conn.user_id).eq("app", "strava");
   }
 
   // 2) Fetch activité depuis Strava

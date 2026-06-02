@@ -37,11 +37,6 @@ import './help-modal.js';
 // Sorti dans js/app-mode.js. Auto-bootstrap au DOMContentLoaded à l'import.
 import './app-mode.js';
 
-// ========= WELLNESS MANUEL =========
-// Sorti dans js/wellness.js (storage) + js/wellness-ui.js (UI).
-// Auto-bootstrap au DOMContentLoaded à l'import.
-import './wellness-ui.js';
-
 // ========= WORKOUT BUILDER (séances structurées par blocs) =========
 // Sorti dans js/workout-builder.js. Expose window.getCurrentWorkoutStructure().
 import './workout-builder.js';
@@ -97,27 +92,27 @@ const REST_COUCH_SVG = `<svg class="rest-couch" viewBox="0 0 64 44" fill="none" 
 // Les activités viennent de Strava (réécrites à chaque synchro). On stocke ici
 // les modifications manuelles (nom/type/sport/durée/distance/TSS/notes) et les
 // masquages de métriques (puissance/cardio/distance), réappliqués après synchro.
-const ACT_OV_KEY = 'coach_ia_activity_overrides_v1';
-function loadActivityOverrides() {
-  try { return JSON.parse(localStorage.getItem(ACT_OV_KEY) || '{}'); } catch { return {}; }
+const ACT_EDIT_KEY = 'coach_ia_activity_edits_v1';
+function loadActivityEdits() {
+  try { return JSON.parse(localStorage.getItem(ACT_EDIT_KEY) || '{}'); } catch { return {}; }
 }
-function getActivityOverride(id) { return loadActivityOverrides()[String(id)] || null; }
-function setActivityOverride(id, ov) {
-  const map = loadActivityOverrides();
+function getActivityEdit(id) { return loadActivityEdits()[String(id)] || null; }
+function setActivityEdit(id, ov) {
+  const map = loadActivityEdits();
   if (ov && Object.keys(ov).length) map[String(id)] = ov; else delete map[String(id)];
-  localStorage.setItem(ACT_OV_KEY, JSON.stringify(map));
+  localStorage.setItem(ACT_EDIT_KEY, JSON.stringify(map));
   if (window.cloudSync) {
-    if (map[String(id)] && window.cloudSync.pushActivityOverride) window.cloudSync.pushActivityOverride(String(id), map[String(id)]);
-    else if (window.cloudSync.deleteActivityOverride) window.cloudSync.deleteActivityOverride(String(id));
+    if (map[String(id)] && window.cloudSync.pushActivityEdit) window.cloudSync.pushActivityEdit(String(id), map[String(id)]);
+    else if (window.cloudSync.deleteActivityEdit) window.cloudSync.deleteActivityEdit(String(id));
   }
   if (window.__applyOverridesAndRerender) window.__applyOverridesAndRerender();
 }
-window.activityOverrides = { get: getActivityOverride, set: setActivityOverride, load: loadActivityOverrides };
+window.activityEdits = { get: getActivityEdit, set: setActivityEdit, load: loadActivityEdits };
 
 // Applique les overrides sur une liste de jours (mutation), recalcule les totaux
 // jour + le PMC (CTL/ATL/TSB) si au moins un TSS a été modifié.
-function applyActivityOverridesToDays(days) {
-  const overrides = loadActivityOverrides();
+function applyActivityEditsToDays(days) {
+  const overrides = loadActivityEdits();
   if (!days || !days.length) return days;
   let anyTss = false;
   for (const d of days) {
@@ -219,7 +214,7 @@ function rebuildFromDashboard() {
     date: new Date(d.date + 'T12:00:00'),
     activities: (d.activities || []).map(a => ({ ...a })),
   }));
-  applyActivityOverridesToDays(_allData);
+  applyActivityEditsToDays(_allData);
   data = _allData;
   todayData = _allData[_allData.length - 1];
   if (typeof renderHeroKpi === 'function') renderHeroKpi();
@@ -1285,38 +1280,8 @@ function saveCompetitions(comps) {
   if (typeof renderCalendar === 'function') renderCalendar();
 }
 
-// === SNAPSHOTS DU PLAN PRÉVU ===
-// Chaque fois qu'un jour "aujourd'hui ou futur" affiche son prévu, on snapshot.
-// Les snapshots persistent indéfiniment → les anciennes prévus restent visibles
-// (en grisé) même longtemps après être passés.
-const PLAN_SNAPSHOT_KEY = 'coach_ia_plan_snapshots_v1';
-function loadPlanSnapshots() {
-  try {
-    const raw = localStorage.getItem(PLAN_SNAPSHOT_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw) || {};
-  } catch (e) { return {}; }
-}
-function savePlanSnapshot(iso, proposal, allowOverwrite) {
-  if (!iso || !proposal) return;
-  const all = loadPlanSnapshots();
-  // On ré-écrase uniquement si autorisé (cas d'aujourd'hui qui est continuellement ajusté)
-  if (all[iso] && !allowOverwrite) return;
-  all[iso] = {
-    name: proposal.name,
-    type: proposal.type,
-    dur: proposal.dur,
-    tss: proposal.tss,
-    sport: proposal.sport,
-    why: proposal.why,
-    snapshotAt: new Date().toISOString(),
-  };
-  try {
-    localStorage.setItem(PLAN_SNAPSHOT_KEY, JSON.stringify(all));
-  } catch (e) { console.warn('[plan snapshot] localStorage plein ?', e); }
-  // Mirror cloud
-  if (window.cloudSync) window.cloudSync.pushPlanSnapshot(iso, all[iso]);
-}
+// (Les snapshots de plan ont été supprimés : les jours passés lisent désormais
+//  uniquement les vraies données depuis la base.)
 
 function renderCompList() {
   // Helpers de format
@@ -2862,9 +2827,6 @@ function renderWeekPlan() {
     let weekTotalSessions = 0;
     let weekKind = 'past'; // 'past' = entièrement passée, 'current' = en cours, 'future' = à venir
 
-    // Snapshots de plans figés (= ce qui était prévu pour les jours passés)
-    const planSnapshots = loadPlanSnapshots();
-
     for (let i = 0; i < 7; i++) {
       const d = new Date(weekStart);
       d.setDate(weekStart.getDate() + i);
@@ -2874,44 +2836,12 @@ function renderWeekPlan() {
       const isToday = iso === todayIso;
 
       let cardHTML;
-      let proposal; // sera défini soit depuis le snapshot, soit calculé
+      let proposal;
+      let items = [];
 
-      // Cas 1 : jour passé → on regarde si on a un snapshot
-      if (isPast) {
-        if (planSnapshots[iso]) {
-          // Snapshot disponible → on affichera ce qui était prévu ce jour-là (grisé)
-          proposal = { ...planSnapshots[iso] };
-          // Filtre sport : si le snapshot ne match pas, afficher empty-past
-          if (!activeSports.has('tout') && activeSports.size > 0 &&
-              proposal.type !== 'rest' &&
-              !activeSports.has(getSportCategory(proposal.sport))) {
-            cardHTML = `
-              <div class="day-card empty-past" data-iso="${iso}" data-source="prevu">
-                <div class="day-card-dow">${dowFr[dow]}</div>
-                <div class="day-card-date">${d.getDate()}</div>
-              </div>
-            `;
-            dayCards.push(cardHTML);
-            continue;
-          }
-        } else {
-          // Pas de snapshot pour ce jour passé → vierge (avant l'activation du système)
-          cardHTML = `
-            <div class="day-card empty-past" data-iso="${iso}" data-source="prevu">
-              <div class="day-card-dow">${dowFr[dow]}</div>
-              <div class="day-card-date">${d.getDate()}</div>
-            </div>
-          `;
-          dayCards.push(cardHTML);
-          continue;
-        }
-      } else {
-        // Cas 2 : aujourd'hui ou futur
-        // On collecte TOUS les items du jour : compés/étapes + entraînements manuels
-        // Si rien → template AI. Si ≥ 1 → on ignore le template.
-        let items = [];
-
-        // 1) Toutes les compés (chaque étape compte comme un item)
+      // 1) Compétitions réelles de ce jour (étapes incluses) — passé / aujourd'hui / futur.
+      //    Les jours passés lisent désormais la VRAIE compét depuis la base
+      //    (et non plus un snapshot figé), donc les étapes restent correctes.
         const compsForToday = comps.filter(c => toIsoDate(c.dateObj) === iso);
         for (const c of compsForToday) {
           // Si pas de temps cible saisi → on n'affiche PAS de durée par défaut
@@ -2962,10 +2892,10 @@ function renderWeekPlan() {
           });
         }
 
-        // 3) Si aucun item explicite → template AI (uniquement en MODE IA)
-        // En mode Manuel : on ne propose RIEN, le jour reste vide à planifier.
-        // Le repos forcé manuel reste affiché dans les deux modes.
-        if (items.length === 0) {
+        // 3) Aucun item réel pour ce jour.
+        //    Aujourd'hui ou futur → template IA (mode IA) ou repos forcé.
+        //    Jour passé sans donnée réelle → reste vide (plus de snapshot figé).
+        if (items.length === 0 && !isPast) {
           const _isForcedRest = (typeof isTemplateRestDay === 'function') && isTemplateRestDay(iso);
           if (_isForcedRest) {
             items.push({ type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Repos forcé (override utilisateur)' });
@@ -2976,7 +2906,6 @@ function renderWeekPlan() {
             if (isToday) tmplProposal = adjustForRecovery(tmplProposal, todayData.recovery);
             items.push(tmplProposal);
           }
-          // Sinon (mode Manuel + pas de repos forcé) : items reste vide → jour empty-past
         }
 
         // 4) Filtre sport : ne garder que les items dont la catégorie match les sports actifs.
@@ -3002,10 +2931,6 @@ function renderWeekPlan() {
         proposal = items[curIdx];
         proposal._totalItems = items.length;
         proposal._itemIdx = curIdx;
-
-        // Snapshot : aujourd'hui est ré-écrasé à chaque render
-        if (isToday) savePlanSnapshot(iso, proposal, true);
-      }
 
       // Une séance est "rest" uniquement si son TYPE est 'rest'
       // (un entraînement manuel sans TSS reste un vrai entraînement, pas un repos)
@@ -6301,7 +6226,7 @@ function openActivityEditModal(activityId, iso) {
   const day = data.find(d => toIsoDate(d.date) === iso);
   const act = day && day.activities ? day.activities.find(a => String(a.id) === String(activityId)) : null;
   if (!act) return;
-  const ov = getActivityOverride(activityId) || {};
+  const ov = getActivityEdit(activityId) || {};
   let exclPower = !!ov.excludePower, exclHr = !!ov.excludeHr, exclDist = !!ov.excludeDistance;
 
   // Course à étapes parente (si cette activité est une étape d'une course multi-activités)
@@ -6422,7 +6347,7 @@ function openActivityEditModal(activityId, iso) {
     if (exclPower) newOv.excludePower = true;
     if (exclHr) newOv.excludeHr = true;
     if (exclDist) newOv.excludeDistance = true;
-    setActivityOverride(activityId, newOv);
+    setActivityEdit(activityId, newOv);
     // Priorité de la compétition (course à étapes → la course ; sinon la compét d'un jour)
     if (act.category === 'competition' && window.sb && _aePrio !== _curPrioKey) {
       const base = window.sb.from('competitions').update({ priority: _aePrio });
@@ -6438,7 +6363,7 @@ function openActivityEditModal(activityId, iso) {
   });
   overlay.querySelector('#_ae-reset').addEventListener('click', async () => {
     const ok = await appConfirm({ title: 'Réinitialiser', html: "Annuler toutes les modifications de cette activité et revenir aux données Strava ?", confirmLabel: 'Réinitialiser', danger: true });
-    if (ok) { setActivityOverride(activityId, null); close(); }
+    if (ok) { setActivityEdit(activityId, null); close(); }
   });
   overlay.querySelector('#_ae-transform').addEventListener('click', async () => {
     const target = (act.category === 'competition') ? 'entrainement' : 'competition';
@@ -6510,6 +6435,40 @@ async function setActivityCategory(act, category, iso) {
   } catch (e) {
     console.warn('[setActivityCategory]', e.message || e);
   }
+}
+
+// Sélecteur d'étapes dans le détail réalisé : si l'activité du jour appartient à
+// une course à étapes (competitions.activity_ids > 1), affiche « Étape 1 / 2 … »
+// pour naviguer entre les activités-étapes (ordre chronologique).
+function _injectRealisedStageTabs(iso, acts) {
+  const comps = (typeof loadCompetitions === 'function') ? loadCompetitions() : [];
+  const sbIds = (acts || []).map(a => String(a._sbId)).filter(Boolean);
+  const race = comps.find(c => Array.isArray(c.activityIds) && c.activityIds.length > 1
+    && c.activityIds.map(String).some(id => sbIds.includes(id)));
+  if (!race) return;
+  const stages = race.activityIds.map(id => _findActBySbId(id)).filter(Boolean)
+    .sort((a, b) => (a.iso < b.iso ? -1 : 1));
+  if (stages.length < 2) return;
+  const curIdx = stages.findIndex(s => s.iso === iso);
+  // Le titre garde le vrai nom de l'activité (posé par renderModalActivity).
+  // Switcher d'étapes EN HAUT DU CORPS, style identique au prévu (.modal-activity-switch),
+  // précédé à gauche par le nom de la course à étapes.
+  const body = document.getElementById('modal-body');
+  if (!body) return;
+  body.querySelector('.rst-switch')?.remove();
+  const raceName = window._confirmEscape ? window._confirmEscape(race.name) : race.name;
+  const sw = document.createElement('div');
+  sw.className = 'rst-switch';
+  // Le nom de la course est HORS du carré gris ; seules les pastilles sont dans le carré.
+  sw.innerHTML = `<span class="rst-race-label">${raceName}</span>`
+    + `<div class="modal-activity-switch">`
+    + stages.map((s, i) => `<button type="button" class="${i === curIdx ? 'active' : ''}" data-stageiso="${s.iso}">Étape ${i + 1}</button>`).join('')
+    + `</div>`;
+  body.prepend(sw);
+  sw.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    const di = b.dataset.stageiso;
+    if (di && di !== iso) openSessionModal(di, 'realise');
+  }));
 }
 
 // Cherche une activité (chargée) par son id Supabase → { act, iso }.
@@ -6771,7 +6730,7 @@ function openSessionModal(iso, source) {
         const dur = act.duration || 0;
         const h = Math.floor(dur / 60);
         const m = (dur % 60).toString().padStart(2, '0');
-        titleEl.innerHTML = `${act.name || act.sessionName || 'Séance'} ${act.type || act.sessionType ? `<span class="pill ${act.type || act.sessionType}">${act.type || act.sessionType}</span>` : ''}`;
+        titleEl.innerHTML = `${act.name || act.sessionName || 'Séance'}`;
         // Nom de sport Strava exact + clé couleur pour la pill
         const sportLabel = window.activitySportLabel(act);
         const sportCat = window.activitySportColorKey ? window.activitySportColorKey(act) : 'autre';
@@ -7112,6 +7071,8 @@ function openSessionModal(iso, source) {
         }
       }
       renderModalActivity(0);
+      // Sélecteur d'étapes si l'activité fait partie d'une course à étapes
+      try { _injectRealisedStageTabs(iso, acts); } catch (e) { /* ignore */ }
     }
   } else {
     // ============= Source = 'prevu' =============
@@ -7642,7 +7603,7 @@ function openSessionModal(iso, source) {
       const sportLabel = window.sportFr(t.sport || 'Ride');
       const sportCat = window.activitySportColorKey({ sport: t.sport }) || 'autre';
       const sportPill = `<span class="sport-pill" data-sport-cat="${sportCat}" style="margin-left:8px;vertical-align:middle;">${sportLabel}</span>`;
-      titleEl.innerHTML = `${t.name} ${t.type ? `<span class="pill ${t.type}" style="margin-left:8px;">${t.type}</span>` : ''}${sportPill}`;
+      titleEl.innerHTML = `${t.name}${sportPill}`;
       metaEl.innerHTML = `${_dateStr} · Séance ajoutée manuellement`;
       const dur = t.duration || 0;
       const cards = [];
@@ -7730,14 +7691,13 @@ function openSessionModal(iso, source) {
       }
       const dur = proposal.dur || 0;
       const h = Math.floor(dur / 60), mm = (dur % 60).toString().padStart(2, '0');
-      titleEl.innerHTML = `${proposal.name} ${proposal.type ? `<span class="pill ${proposal.type}">${proposal.type}</span>` : ''}`;
+      titleEl.innerHTML = `${proposal.name}`;
       metaEl.textContent = `${_dateStr} · ${fmtDur(dur)} · ${proposal.tss || 0} TSS prévus · phase ${PHASE_LABELS[phase] || phase}`;
       bodyEl.innerHTML = `
         ${switchHTML}
         <div class="modal-metrics">
           <div class="modal-metric"><div class="m-label">Durée cible</div><div class="m-value">${dur < 60 ? `${Math.round(dur)}<span style="font-size:14px;"> min</span>` : `${h}<span style="font-size:14px;">h</span>${mm}`}</div></div>
           <div class="modal-metric"><div class="m-label">TSS cible</div><div class="m-value">${proposal.tss || 0}</div></div>
-          <div class="modal-metric"><div class="m-label">Type</div><div class="m-value" style="font-size:15px;text-transform:capitalize;">${proposal.type || '—'}</div></div>
           <div class="modal-metric"><div class="m-label">Phase</div><div class="m-value" style="font-size:15px;">${PHASE_LABELS[phase] || '—'}</div></div>
         </div>
         <div class="modal-section">
@@ -7906,17 +7866,11 @@ window.appAlert = function(opts) {
 };
 
 // ========= STRAVA IGNORE LIST (masquer des activités Strava localement) =========
-const STRAVA_IGNORE_KEY = 'coach_ia_strava_ignored_v1';
-function loadStravaIgnored() {
-  try { return JSON.parse(localStorage.getItem(STRAVA_IGNORE_KEY) || '[]'); }
-  catch { return []; }
-}
-function isStravaIgnored(id) { return loadStravaIgnored().includes(String(id)); }
+// « Masquer une activité » = drapeau hidden dans activity_edits (table mutualisée).
+function isStravaIgnored(id) { const ov = getActivityEdit(id); return !!(ov && ov.hidden); }
 function addStravaIgnored(id) {
-  const arr = loadStravaIgnored();
-  if (!arr.includes(String(id))) arr.push(String(id));
-  localStorage.setItem(STRAVA_IGNORE_KEY, JSON.stringify(arr));
-  if (window.cloudSync) window.cloudSync.pushStravaIgnored(id, true);
+  const ov = getActivityEdit(id) || {};
+  setActivityEdit(id, { ...ov, hidden: true });
 }
 
 // ========= TEMPLATE IA OVERRIDES (marquer un jour en repos / personnalisation) =========
@@ -8651,7 +8605,6 @@ function renderSessionsTable() {
       <td>${fmtDate(s.date)}</td>
       <td>${s.sessionName}</td>
       <td><span class="sport-pill" data-sport-cat="${sportCat}">${sportLabel}</span></td>
-      <td><span class="pill ${s.sessionType}">${s.sessionType}</span></td>
       <td>${fmtDur(s.duration)}</td>
       <td>${s.tss}</td>
       <td>${s.np}W (${s.ftpPct}%)</td>
@@ -8679,7 +8632,7 @@ function renderSessionDetail(s) {
   <div class="session-detail">
     <div class="session-detail-header">
       <div>
-        <h3>${s.sessionName} <span class="pill ${s.sessionType}" style="margin-left:8px;">${s.sessionType}</span></h3>
+        <h3>${s.sessionName}</h3>
         <div class="meta">${s.date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · ${fmtDur(s.duration)} · ${s.tss} TSS</div>
       </div>
       <div style="text-align:right;font-size:12px;color:var(--text-dim);">Recovery avant : <strong style="color:var(--text);">${s.recovery != null ? s.recovery + '%' : '—'}</strong></div>

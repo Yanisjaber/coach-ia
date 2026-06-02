@@ -61,9 +61,10 @@ Deno.serve(async (req) => {
     // ===== 2) Récupérer les tokens Strava + profil athlète (FTP, HRmax, LTHR) =====
     const sbAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: conn, error: connErr } = await sbAdmin
-      .from("strava_connections")
+      .from("connexions_app")
       .select("*")
       .eq("user_id", user.id)
+      .eq("app", "strava")
       .maybeSingle();
 
     if (connErr || !conn) {
@@ -82,10 +83,10 @@ Deno.serve(async (req) => {
     const athleteLthr = profile?.lthr || (athleteHrMax ? Math.round(athleteHrMax * 0.92) : null);
 
     // Marquer le sync comme "running"
-    await sbAdmin.from("strava_connections").update({
+    await sbAdmin.from("connexions_app").update({
       last_sync_status: "running",
       last_sync_at: new Date().toISOString(),
-    }).eq("user_id", user.id);
+    }).eq("user_id", user.id).eq("app", "strava");
 
     // ===== 3) Refresh token si expiré =====
     let accessToken = conn.access_token;
@@ -96,11 +97,11 @@ Deno.serve(async (req) => {
         return json({ error: "token_refresh_failed" }, 500);
       }
       accessToken = refreshed.access_token;
-      await sbAdmin.from("strava_connections").update({
+      await sbAdmin.from("connexions_app").update({
         access_token: refreshed.access_token,
         refresh_token: refreshed.refresh_token,
         expires_at: new Date(refreshed.expires_at * 1000).toISOString(),
-      }).eq("user_id", user.id);
+      }).eq("user_id", user.id).eq("app", "strava");
     }
 
     // ===== 4) Fetch activités paginé =====
@@ -140,10 +141,32 @@ Deno.serve(async (req) => {
       page++;
     }
 
+    // ===== 4b) FTP effectif : profil sinon ESTIMÉ (comme le LTHR) =====
+    // Priorité : FTP du profil → 95% de la meilleure puissance 20 min (power profile)
+    // → repli : 90% de la meilleure puissance normalisée vue dans les activités.
+    let effFtp = athleteFtp;
+    if (!effFtp) {
+      try {
+        const { data: pp } = await sbAdmin.from("power_profile")
+          .select("best_watts").eq("user_id", user.id).eq("duration_s", 1200).maybeSingle();
+        if (pp && pp.best_watts) effFtp = Math.round(pp.best_watts * 0.95);
+      } catch (_) { /* power_profile pas encore calculé */ }
+    }
+    if (!effFtp) {
+      const nps = all.map((a: any) => a.weighted_average_watts || 0).filter((x: number) => x > 0);
+      if (nps.length) effFtp = Math.round(Math.max(...nps) * 0.90);
+    }
+
     // ===== 5) Mapper au format de notre table =====
+    // On écarte les activités à date aberrante (ex. epoch 1970) → jamais insérées.
+    const ACT_DATE_FLOOR = "2000-01-01";
     const rows = all
       .filter((a: any) => a && a.id)
-      .map((a: any) => stravaToRow(a, user.id, athleteFtp, athleteLthr));
+      .map((a: any) => stravaToRow(a, user.id, effFtp, athleteLthr))
+      .filter((r: any) => {
+        const iso = String(r.start_date_local || "").slice(0, 10);
+        return /^\d{4}-\d{2}-\d{2}$/.test(iso) && iso >= ACT_DATE_FLOOR;
+      });
 
     // ===== 6) Upsert par batches =====
     let inserted = 0;
@@ -170,12 +193,25 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ===== 6b) Purge des activités à date aberrante déjà en base (toutes sources) =====
+    {
+      const { error: delActErr } = await sbAdmin
+        .from("activities")
+        .delete()
+        .eq("user_id", user.id)
+        .lt("start_date_local", ACT_DATE_FLOOR);
+      if (delActErr) console.error("Purge activités aberrantes:", delActErr.message);
+    }
+
     // ===== 7) Recalculer les daily_metrics depuis les activities =====
     // On regroupe par jour : tss total + nombre d'activités + main activity (max TSS)
     // Puis on calcule CTL/ATL/TSB via EWMA (Coggan)
+    const DATE_FLOOR = ACT_DATE_FLOOR; // ignore les dates aberrantes (ex. epoch 1970)
     const dailyMap = new Map<string, { tss: number; duration: number; count: number; mainId: string | null; mainTss: number }>();
     for (const r of rows) {
-      const iso = String(r.start_date_local).slice(0, 10);
+      const iso = String(r.start_date_local || "").slice(0, 10);
+      // Date valide YYYY-MM-DD et plausible : sinon on ignore (évite d'ancrer la série en 1970).
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || iso < DATE_FLOOR) continue;
       const existing = dailyMap.get(iso) || { tss: 0, duration: 0, count: 0, mainId: null, mainTss: -1 };
       existing.tss += r.tss || 0;
       existing.duration += Math.round((r.moving_time || r.elapsed_time || 0) / 60);
@@ -215,6 +251,17 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Purge les daily_metrics antérieurs à la 1ʳᵉ activité (nettoie d'anciennes
+    // lignes aberrantes, ex. série remontée jusqu'en 1970).
+    if (sortedIsos.length > 0) {
+      const { error: delErr } = await sbAdmin
+        .from("daily_metrics")
+        .delete()
+        .eq("user_id", user.id)
+        .lt("iso_date", sortedIsos[0]);
+      if (delErr) console.error("Purge daily_metrics error:", delErr);
+    }
+
     // Upsert daily_metrics par batches
     for (let i = 0; i < dailyRows.length; i += 500) {
       const batch = dailyRows.slice(i, i + 500);
@@ -225,12 +272,12 @@ Deno.serve(async (req) => {
     }
 
     // ===== 8) Marquer sync OK =====
-    await sbAdmin.from("strava_connections").update({
+    await sbAdmin.from("connexions_app").update({
       last_sync_status: "ok",
       last_sync_at: new Date().toISOString(),
       last_sync_error: null,
       total_activities_synced: inserted,
-    }).eq("user_id", user.id);
+    }).eq("user_id", user.id).eq("app", "strava");
 
     return json({
       ok: true,
@@ -258,11 +305,11 @@ function json(body: any, status = 200): Response {
 }
 
 async function markError(sb: any, userId: string, msg: string) {
-  await sb.from("strava_connections").update({
+  await sb.from("connexions_app").update({
     last_sync_status: "error",
     last_sync_error: msg.slice(0, 500),
     last_sync_at: new Date().toISOString(),
-  }).eq("user_id", userId);
+  }).eq("user_id", userId).eq("app", "strava");
 }
 
 async function refreshStravaToken(refreshToken: string) {
@@ -343,7 +390,8 @@ function computeTss(a: any, ftp: number | null, lthr: number | null): number {
   const dur = a.moving_time || a.elapsed_time || 0;
   if (!dur) return 0;
   const durHr = dur / 3600;
-  const np = a.weighted_average_watts || 0;
+  // Puissance : NP si dispo, sinon puissance moyenne (Strava ne fournit pas toujours la NP).
+  const np = a.weighted_average_watts || a.average_watts || 0;
   if (np && ftp) {
     const intensity = np / ftp;
     return Math.round(durHr * intensity * intensity * 100);
@@ -353,13 +401,14 @@ function computeTss(a: any, ftp: number | null, lthr: number | null): number {
     const intensity = avgHr / lthr;
     return Math.round(durHr * intensity * intensity * 100);
   }
+  // Ni puissance ni cardio → 0.
   return 0;
 }
 
 function stravaToRow(a: any, userId: string, ftp: number | null, lthr: number | null) {
   const sportRaw = a.sport_type || a.type || "";
   const sport = getSportCategory(sportRaw);
-  const np = a.weighted_average_watts || 0;
+  const np = a.weighted_average_watts || a.average_watts || 0;
   const intensity = (np && ftp) ? np / ftp : 0;
   const tss = computeTss(a, ftp, lthr);
   const distKm = a.distance ? +(a.distance / 1000).toFixed(2) : null;
@@ -372,7 +421,6 @@ function stravaToRow(a: any, userId: string, ftp: number | null, lthr: number | 
     name: a.name || "Activité",
     sport,
     sport_raw: sportRaw,
-    type: classifyType(a.name, intensity, sport),
     start_date_local: a.start_date_local || a.start_date,
     elapsed_time: a.elapsed_time != null ? Math.round(a.elapsed_time) : null,
     moving_time: a.moving_time != null ? Math.round(a.moving_time) : null,

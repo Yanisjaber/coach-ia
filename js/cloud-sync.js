@@ -8,9 +8,9 @@
      écriture localStorage (asynchrone, fire-and-forget)
 
    Tables couvertes :
-   - wellness_days, day_notes, training_phases, yearly_goals,
-   - competitions, trainings (prevu + realise),
-   - template_rest_days, strava_ignored, plan_snapshots
+   - day_notes, training_phases, yearly_goals,
+   - competitions, activity_planned, activities,
+   - rest_day, activity_edits, connexions_app
    ============================================================ */
 
 let _currentUser = null;
@@ -27,8 +27,6 @@ window.addEventListener('coach-ia-auth', async (e) => {
         if (window.renderCalendar) window.renderCalendar();
         if (window.renderCompList) window.renderCompList();
         if (window.renderBilan) window.renderBilan();
-        if (window.renderWellnessTrend) window.renderWellnessTrend();
-        if (window.refreshCta) window.refreshCta();
       }, 100);
     } catch (e) {
       console.error('[cloud-sync] Pull error:', e);
@@ -46,29 +44,13 @@ async function pullAllFromCloud() {
   const sb = window.sb;
   const userId = uid();
 
-  // ----- wellness_days → {iso: {weight, mood, ...}} -----
+  // ----- activity_edits → { activityId: {...override} } -----
   try {
-    const { data } = await sb.from('wellness_days').select('*').eq('user_id', userId);
-    if (data) {
-      const dict = {};
-      for (const r of data) {
-        dict[r.iso_date] = {
-          weight: r.weight, mood: r.mood, fatigue: r.fatigue,
-          soreness: r.soreness, motivation: r.motivation, notes: r.notes,
-          ts: r.updated_at ? new Date(r.updated_at).getTime() : Date.now(),
-        };
-      }
-      localStorage.setItem('coach_ia_wellness_v1', JSON.stringify(dict));
-    }
-  } catch (e) { console.warn('[pull wellness]', e); }
-
-  // ----- activity_overrides → { activityId: {...override} } -----
-  try {
-    const { data } = await sb.from('activity_overrides').select('*').eq('user_id', userId);
+    const { data } = await sb.from('activity_edits').select('*').eq('user_id', userId);
     if (data) {
       const map = {};
       for (const r of data) map[r.activity_id] = r.data || {};
-      localStorage.setItem('coach_ia_activity_overrides_v1', JSON.stringify(map));
+      localStorage.setItem('coach_ia_activity_edits_v1', JSON.stringify(map));
     }
   } catch (e) { console.warn('[pull activity overrides]', e); }
 
@@ -126,37 +108,41 @@ async function pullAllFromCloud() {
     }
   } catch (e) { console.warn('[pull goals]', e); }
 
-  // ----- compétitions → registre competitions (passées) + planned_sessions (futures) -----
+  // ----- compétitions → registre competitions (passées) + activity_planned (futures) -----
   try {
     const comps = [];
     const _todayIso = new Date().toISOString().slice(0, 10);
-    // competitions = registre des PASSÉES uniquement (les futures sont dans planned_sessions)
+    // competitions = registre des PASSÉES uniquement (les futures sont dans activity_planned)
     const { data: reg } = await sb.from('competitions').select('*').eq('user_id', userId).lte('date', _todayIso);
     for (const r of (reg || [])) comps.push({
       id: r.client_id || r.id, _sbId: r.id, _table: 'competition',
       name: r.name, date: r.date, sport: r.sport ?? null,
       priority: r.priority ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
       target: r.target ?? null, laps: r.laps ?? null, notes: r.notes ?? null,
-      gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null, stages: r.stages ?? null,
+      gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null,
+      stages: Array.isArray(r.stages) && r.stages.length > 0,
+      stagesList: Array.isArray(r.stages) ? r.stages : null,
       activityIds: r.activity_ids ?? null,
     });
-    const { data: pc } = await sb.from('planned_sessions').select('*').eq('user_id', userId).eq('category', 'competition');
+    const { data: pc } = await sb.from('activity_planned').select('*').eq('user_id', userId).eq('category', 'competition');
     for (const r of (pc || [])) comps.push({
       id: r.client_id || r.id, _sbId: r.id, _table: 'planned',
       name: r.name, date: r.date, sport: r.sport ?? null,
       priority: r.priority ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
       target: r.target ?? null, laps: r.laps ?? null, notes: r.notes ?? null,
-      gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null, stages: r.stages ?? null,
+      gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null,
+      stages: Array.isArray(r.stages) && r.stages.length > 0,
+      stagesList: Array.isArray(r.stages) ? r.stages : null,
     });
     localStorage.setItem('coach_ia_competitions_v1', JSON.stringify(comps));
   } catch (e) { console.warn('[pull comps]', e); }
 
-  // ----- prévus → planned_sessions(entrainement) ; réalisés = activities (via le loader) -----
+  // ----- prévus → activity_planned(entrainement) ; réalisés = activities (via le loader) -----
   try {
-    const { data } = await sb.from('planned_sessions').select('*').eq('user_id', userId).eq('category', 'entrainement');
+    const { data } = await sb.from('activity_planned').select('*').eq('user_id', userId).eq('category', 'entrainement');
     const prevu = (data || []).map(r => ({
       id: r.client_id || r.id, _sbId: r.id,
-      name: r.name, date: r.date, sport: r.sport ?? null, type: r.type ?? null,
+      name: r.name, date: r.date, sport: r.sport ?? null,
       duration: r.duration ?? 0, tss: r.tss ?? 0, notes: r.notes ?? '', mode: 'prevu',
       structure: r.structure ?? null,
     }));
@@ -164,58 +150,20 @@ async function pullAllFromCloud() {
     localStorage.setItem('coach_ia_trainings_realise_v1', JSON.stringify([]));
   } catch (e) { console.warn('[pull planned]', e); }
 
-  // ----- template_rest_days → array d'isos -----
+  // ----- rest_day → array d'isos (kind passe/prevu ignoré côté client) -----
   try {
-    const { data } = await sb.from('template_rest_days').select('*').eq('user_id', userId);
+    const { data } = await sb.from('rest_day').select('*').eq('user_id', userId);
     if (data) {
       const arr = data.map(r => r.iso_date);
       localStorage.setItem('coach_ia_template_rest_days_v1', JSON.stringify(arr));
     }
   } catch (e) { console.warn('[pull rest days]', e); }
 
-  // ----- strava_ignored → array d'ids -----
-  try {
-    const { data } = await sb.from('strava_ignored').select('*').eq('user_id', userId);
-    if (data) {
-      const arr = data.map(r => r.activity_id);
-      localStorage.setItem('coach_ia_strava_ignore_v1', JSON.stringify(arr));
-    }
-  } catch (e) { console.warn('[pull strava ignored]', e); }
-
-  // ----- plan_snapshots → {iso: proposal} -----
-  try {
-    const { data } = await sb.from('plan_snapshots').select('*').eq('user_id', userId);
-    if (data) {
-      const dict = {};
-      for (const r of data) dict[r.iso_date] = r.proposal;
-      localStorage.setItem('coach_ia_plan_snapshots_v1', JSON.stringify(dict));
-    }
-  } catch (e) { console.warn('[pull snapshots]', e); }
 }
 
 // ============ PUSH VERS SUPABASE (par entité, fire-and-forget) ============
 // Toutes ces fonctions sont async mais on les appelle SANS await (fire-and-forget).
 // Si erreur réseau, le localStorage garde la donnée et on log dans la console.
-
-export async function pushWellness(isoDate, data) {
-  if (!isAuthed()) return;
-  try {
-    await window.sb.from('wellness_days').upsert({
-      user_id: uid(), iso_date: isoDate,
-      weight: data.weight ?? null,
-      mood: data.mood ?? null,
-      fatigue: data.fatigue ?? null,
-      soreness: data.soreness ?? null,
-      motivation: data.motivation ?? null,
-      notes: data.notes ?? null,
-    }, { onConflict: 'user_id,iso_date' });
-  } catch (e) { console.warn('[push wellness]', e.message); }
-}
-export async function deleteWellness(isoDate) {
-  if (!isAuthed()) return;
-  try { await window.sb.from('wellness_days').delete().eq('user_id', uid()).eq('iso_date', isoDate); }
-  catch (e) { console.warn('[del wellness]', e.message); }
-}
 
 export async function pushNote(isoDate, text) {
   if (!isAuthed()) return;
@@ -230,19 +178,19 @@ export async function pushNote(isoDate, text) {
   } catch (e) { console.warn('[push note]', e.message); }
 }
 
-export async function pushActivityOverride(activityId, data) {
+export async function pushActivityEdit(activityId, data) {
   if (!isAuthed()) return;
   try {
-    await window.sb.from('activity_overrides').upsert(
+    await window.sb.from('activity_edits').upsert(
       { user_id: uid(), activity_id: String(activityId), data },
       { onConflict: 'user_id,activity_id' }
     );
   } catch (e) { console.warn('[push activity override]', e.message); }
 }
-export async function deleteActivityOverride(activityId) {
+export async function deleteActivityEdit(activityId) {
   if (!isAuthed()) return;
   try {
-    await window.sb.from('activity_overrides').delete().eq('user_id', uid()).eq('activity_id', String(activityId));
+    await window.sb.from('activity_edits').delete().eq('user_id', uid()).eq('activity_id', String(activityId));
   } catch (e) { console.warn('[del activity override]', e.message); }
 }
 
@@ -319,7 +267,7 @@ export async function deleteGoal(goal) {
   } catch (e) { console.warn('[del goal]', e.message); }
 }
 
-// Aujourd'hui (ISO) pour router compé passée (activities) vs future (planned_sessions).
+// Aujourd'hui (ISO) pour router compé passée (activities) vs future (activity_planned).
 function _todayIso() { return new Date().toISOString().slice(0, 10); }
 
 // Évite les doublons : si la ligne n'a pas d'id Supabase, on récupère l'id existant
@@ -341,13 +289,14 @@ export async function pushCompetition(comp) {
         name: comp.name, date: comp.date, sport: comp.sport ?? null,
         priority: comp.priority ?? null, km: comp.km ?? null, d_plus: comp.dplus ?? null,
         target: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
-        gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null, stages: comp.stages ?? null,
+        gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
+        stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
         event: comp.event ?? null,
       };
       if (comp._sbId && comp._table === 'planned') row.id = comp._sbId;
-      if (!row.id) row.id = await _resolveId('planned_sessions', comp.id);
+      if (!row.id) row.id = await _resolveId('activity_planned', comp.id);
       if (!row.id) delete row.id;
-      const { data, error } = await window.sb.from('planned_sessions').upsert(row).select().single();
+      const { data, error } = await window.sb.from('activity_planned').upsert(row).select().single();
       if (error) throw error;
       return data && data.id;
     } else {
@@ -357,7 +306,8 @@ export async function pushCompetition(comp) {
         name: comp.name, date: comp.date, sport: comp.sport ?? null,
         priority: comp.priority ?? null, km: comp.km ?? null, d_plus: comp.dplus ?? null,
         target: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
-        gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null, stages: comp.stages ?? null,
+        gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
+        stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
         activity_ids: comp.activityIds ?? [],
       };
       if (comp._sbId && comp._table === 'competition') row.id = comp._sbId;
@@ -371,7 +321,7 @@ export async function pushCompetition(comp) {
 }
 export async function deleteCompetition(comp) {
   if (!isAuthed()) return;
-  const table = comp._table === 'planned' ? 'planned_sessions' : 'competitions';
+  const table = comp._table === 'planned' ? 'activity_planned' : 'competitions';
   try {
     if (comp._sbId) await window.sb.from(table).delete().eq('id', comp._sbId).eq('user_id', uid());
     else if (comp.id) await window.sb.from(table).delete().eq('client_id', comp.id).eq('user_id', uid());
@@ -397,13 +347,13 @@ export async function pushTraining(training, mode) {
       const row = {
         user_id: uid(), client_id: training.id, category: 'entrainement',
         name: training.name, date: training.date, sport: training.sport ?? null,
-        type: training.type ?? null, duration: training.duration ?? 0, tss: training.tss ?? 0,
+        duration: training.duration ?? 0, tss: training.tss ?? 0,
         notes: training.notes ?? '', structure: training.structure ?? null,
       };
       if (training._sbId) row.id = training._sbId;
-      if (!row.id) row.id = await _resolveId('planned_sessions', training.id);
+      if (!row.id) row.id = await _resolveId('activity_planned', training.id);
       if (!row.id) delete row.id;
-      const { data, error } = await window.sb.from('planned_sessions').upsert(row).select().single();
+      const { data, error } = await window.sb.from('activity_planned').upsert(row).select().single();
       if (error) throw error;
       return data && data.id;
     } else {
@@ -411,7 +361,7 @@ export async function pushTraining(training, mode) {
       const row = {
         user_id: uid(), source: 'manual', category: 'entrainement', client_id: training.id,
         name: training.name, start_date_local: training.date + 'T12:00:00', sport: training.sport ?? null,
-        type: training.type ?? null, moving_time: (training.duration || 0) * 60, tss: training.tss ?? 0,
+        moving_time: (training.duration || 0) * 60, tss: training.tss ?? 0,
         user_notes: training.notes ?? null,
       };
       if (training._sbId) row.id = training._sbId;
@@ -425,7 +375,7 @@ export async function pushTraining(training, mode) {
 }
 export async function deleteTraining(training) {
   if (!isAuthed()) return;
-  const table = (training.mode === 'realise') ? 'activities' : 'planned_sessions';
+  const table = (training.mode === 'realise') ? 'activities' : 'activity_planned';
   try {
     if (training._sbId) await window.sb.from(table).delete().eq('id', training._sbId).eq('user_id', uid());
     else if (training.id) await window.sb.from(table).delete().eq('client_id', training.id).eq('user_id', uid());
@@ -436,38 +386,18 @@ export async function pushRestDay(isoDate, isRest) {
   if (!isAuthed()) return;
   try {
     if (isRest) {
-      await window.sb.from('template_rest_days').upsert({ user_id: uid(), iso_date: isoDate }, { onConflict: 'user_id,iso_date' });
+      // passe/prevu n'est PAS stocké : c'est dérivé de la date à l'affichage.
+      await window.sb.from('rest_day').upsert({ user_id: uid(), iso_date: isoDate }, { onConflict: 'user_id,iso_date' });
     } else {
-      await window.sb.from('template_rest_days').delete().eq('user_id', uid()).eq('iso_date', isoDate);
+      await window.sb.from('rest_day').delete().eq('user_id', uid()).eq('iso_date', isoDate);
     }
   } catch (e) { console.warn('[push restday]', e.message); }
 }
 
-export async function pushStravaIgnored(activityId, isIgnored) {
-  if (!isAuthed()) return;
-  try {
-    if (isIgnored) {
-      await window.sb.from('strava_ignored').upsert({ user_id: uid(), activity_id: String(activityId) }, { onConflict: 'user_id,activity_id' });
-    } else {
-      await window.sb.from('strava_ignored').delete().eq('user_id', uid()).eq('activity_id', String(activityId));
-    }
-  } catch (e) { console.warn('[push strava ignored]', e.message); }
-}
-
-export async function pushPlanSnapshot(isoDate, proposal) {
-  if (!isAuthed()) return;
-  try {
-    await window.sb.from('plan_snapshots').upsert({
-      user_id: uid(), iso_date: isoDate, proposal,
-    }, { onConflict: 'user_id,iso_date' });
-  } catch (e) { console.warn('[push snapshot]', e.message); }
-}
-
 // Expose globalement pour faciliter l'usage depuis les modules non-ES6
 window.cloudSync = {
-  pushWellness, deleteWellness,
   pushNote,
-  pushActivityOverride, deleteActivityOverride,
+  pushActivityEdit, deleteActivityEdit,
   pushNoteRange, deleteNoteRange,
   pushPhase, deletePhase,
   pushGoal, deleteGoal,
@@ -475,7 +405,5 @@ window.cloudSync = {
   pushCompetitionRegistry, deleteCompetitionByActivity,
   pushTraining, deleteTraining,
   pushRestDay,
-  pushStravaIgnored,
-  pushPlanSnapshot,
   pullAllFromCloud,
 };

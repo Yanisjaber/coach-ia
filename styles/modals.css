@@ -604,6 +604,23 @@
     pointer-events: none;
     z-index: 5;
   }
+  /* Switcher d'étapes réalisées : nom de course (hors carré) à gauche, pastilles à droite */
+  .rst-switch {
+    display: flex;
+    align-items: center;       /* centre verticalement label + pastilles */
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 0 14px;
+    padding-left: 0;           /* aligné à gauche avec SYNTHÈSE / le titre */
+  }
+  .rst-switch .modal-activity-switch { margin-bottom: 0; }
+  .rst-race-label {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: 0.01em;
+    line-height: 1;
+  }
   .modal-placeholder {
     background: var(--bg-elev2);
     border: 1px dashed var(--border);
