@@ -18,19 +18,20 @@
     background: none;
     border: none;
     color: var(--text-dim);
-    padding: 12px 18px;
+    padding: 8px 14px;
     cursor: pointer;
     font-size: 14px;
     font-weight: 500;
-    border-bottom: 2px solid transparent;
+    border-radius: 9px;
     transition: all 0.15s;
     font-family: inherit;
   }
-  .tab:hover { color: var(--text); }
+  .tab:hover { color: var(--text); background: var(--bg-elev); }
   .tab.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
+    color: #0b0e14;
+    background: var(--accent);
   }
+  .tab.active:hover { background: var(--accent); }
 
   .panel { display: none; }
   .panel.active { display: block; animation: fadeIn 0.2s; }
@@ -73,6 +74,29 @@
 
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-vol { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .vol-head { display: flex; align-items: center; justify-content: space-between; }
+  .chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .chart-reset {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bg-elev2); color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 6px 11px; font-size: 12px; font-weight: 500; cursor: pointer;
+    font-family: inherit; transition: border-color 0.15s, color 0.15s;
+  }
+  .chart-reset:hover { color: var(--accent); border-color: rgba(74, 222, 128, 0.4); }
+  .vol-stats { margin: 2px 0 14px; }
+  .vol-stats-week { text-align: center; font-size: 12px; font-weight: 600; color: var(--text-dim); letter-spacing: 0.02em; margin-bottom: 10px; }
+  .vol-stats-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  .vol-stat {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg-elev2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 8px 14px;
+  }
+  .vol-stat svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
+  .vol-stat .vs-val { display: block; font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.15; }
+  .vol-stat .vs-lbl { display: block; font-size: 10px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.05em; }
+  @media (max-width: 900px) { .grid-vol { grid-template-columns: 1fr; } }
   .grid-1 { margin-bottom: 16px; }
 
   .chart-wrap { position: relative; height: 320px; }

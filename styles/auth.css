@@ -220,6 +220,18 @@
   color: var(--text-dim);
   word-break: break-all;
 }
+.auth-user-menu-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 10px 8px;
+}
+.auth-user-menu-mode-label {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.auth-user-menu-mode .mode-toggle { width: 100%; box-sizing: border-box; }
+.auth-user-menu-mode .mode-toggle .mode-opt { flex: 1; justify-content: center; }
 .auth-user-menu-item {
   display: flex;
   align-items: center;

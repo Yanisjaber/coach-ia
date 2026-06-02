@@ -75,6 +75,8 @@ export function initAppMode() {
 
   // 3. Re-positionner le slider quand on resize ou quand les fonts chargent
   window.addEventListener('resize', positionModeSlider);
+  // Exposé pour repositionner à l'ouverture du menu compte (le toggle y est masqué).
+  window.positionModeSlider = positionModeSlider;
   // Petit délai pour laisser les fonts/layout se stabiliser au 1er load
   setTimeout(positionModeSlider, 50);
   setTimeout(positionModeSlider, 300);

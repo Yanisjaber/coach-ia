@@ -36,12 +36,17 @@ const STRAVA_API = "https://www.strava.com/api/v3";
 const DEFAULT_LIMIT = 40;          // activités traitées par appel
 const STREAM_FORMAT = "gzip+base64+json-array";
 
-// Durées standard du Power Profile (secondes) — identique à power_profile.py
-const DURATIONS = [
-  1, 5, 10, 15, 30, 60,
-  120, 180, 300, 600, 900, 1200, 1800,
-  2700, 3600, 5400, 7200,
-];
+// Durée (secondes) → nom de colonne de power_profile_sport (libellé lisible).
+const SEC_TO_COL: Record<number, string> = {
+  1:"1s",2:"2s",3:"3s",4:"4s",5:"5s",6:"6s",7:"7s",8:"8s",9:"9s",10:"10s",
+  11:"11s",12:"12s",13:"13s",14:"14s",15:"15s",20:"20s",25:"25s",30:"30s",45:"45s",
+  60:"1min",120:"2min",180:"3min",240:"4min",300:"5min",360:"6min",420:"7min",480:"8min",540:"9min",600:"10min",
+  720:"12min",900:"15min",1200:"20min",1500:"25min",1800:"30min",2100:"35min",2400:"40min",2700:"45min",
+  3600:"1h",5400:"1h30",7200:"2h",9000:"2h30",10800:"3h",12600:"3h30",14400:"4h",16200:"4h30",18000:"5h",
+  21600:"6h",25200:"7h",28800:"8h",
+};
+// Durées du Power Profile (secondes), dérivées de SEC_TO_COL.
+const DURATIONS = Object.keys(SEC_TO_COL).map(Number).sort((a, b) => a - b);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -118,28 +123,37 @@ Deno.serve(async (req) => {
         const raw = await res.json();                                    // { watts:{data:[]}, ... }
         const streamArray = toIntervalsFormat(raw);                      // [{type,data}, ...]
         const watts = (raw?.watts?.data) || [];
-        const powerCurve = computeMMP(watts);
+        const powerCurve: Record<string, number> = computeMMP(watts);
+        powerCurve.v = POWER_CURVE_VERSION; // marqueur de version (ignoré par l'agrégation)
         const gz = await gzipBase64(JSON.stringify(streamArray));
 
         const { error: upErr } = await sbAdmin.from("activities").update({
           streams_gz: gz,
           streams_format: STREAM_FORMAT,
           streams_synced_at: new Date().toISOString(),
-          power_curve: Object.keys(powerCurve).length ? powerCurve : null,
+          power_curve: powerCurve,
         }).eq("id", a.id);
         if (upErr) { fetchErrors++; continue; }
         streamsSynced++;
       }
     }
 
-    // ===== 5) Recalcul power_profile (alltime + 90j) depuis les power_curve =====
-    const ppRows = await recomputePowerProfile(sbAdmin, user.id);
+    // ===== 5) Backfill power_curve (nouvelles durées) depuis les streams stockés =====
+    // Lot limité (idempotent) : recalcule la courbe des activités obsolètes.
+    const backfill = await backfillPowerCurves(sbAdmin, user.id, 100);
 
-    // ===== 6) Combien d'activités restent sans streams ? =====
+    // ===== 6) Recalculs power_profile (legacy) + power_profile_sport (par sport) =====
+    // Le recalcul par sport n'est fait qu'une fois le backfill terminé (sinon inutile
+    // de ré-agréger à chaque lot).
+    const ppRows = await recomputePowerProfile(sbAdmin, user.id);
+    const ppSportRows = backfill.remaining === 0 ? await recomputePowerProfileBySport(sbAdmin, user.id) : 0;
+
+    // ===== 7) Combien d'activités restent sans streams ? =====
     const { count: remaining } = await sbAdmin
       .from("activities").select("id", { count: "exact", head: true })
       .eq("user_id", user.id).is("streams_synced_at", null);
 
+    const moreBackfill = backfill.remaining > 0;
     return json({
       ok: true,
       streams_synced: streamsSynced,
@@ -147,9 +161,14 @@ Deno.serve(async (req) => {
       rate_limited: rateLimited,
       remaining: remaining ?? 0,
       power_profile_durations: ppRows,
+      power_profile_sports: ppSportRows,
+      power_curve_backfilled: backfill.done,
+      power_curve_remaining: backfill.remaining,
       hint: rateLimited
         ? "Rate-limit Strava atteint — relance dans ~15 min pour continuer."
-        : (remaining ? "Reste des activités à traiter — relance pour continuer." : "Tout est à jour."),
+        : (remaining || moreBackfill)
+          ? "Reste des activités à traiter — relance pour continuer."
+          : "Tout est à jour.",
     });
   } catch (e: any) {
     console.error("strava-streams unhandled:", e);
@@ -210,6 +229,7 @@ async function recomputePowerProfile(sb: any, userId: string): Promise<number> {
     const date = String(a.start_date_local).slice(0, 10);
     const isRecent = new Date(a.start_date_local) >= cutoff90;
     for (const [dur, wattsRaw] of Object.entries(pc)) {
+      if (!Number.isFinite(Number(dur))) continue; // ignore le marqueur "v"
       const watts = Number(wattsRaw);
       if (!watts) continue;
       const b = best[dur] || { all: 0, allDate: date, allId: a.id, d90: 0, d90Date: null, d90Id: null };
@@ -239,6 +259,126 @@ async function recomputePowerProfile(sb: any, userId: string): Promise<number> {
   return rows.length;
 }
 
+// ============ POWER PROFILE PAR SPORT (table large power_profile_sport) ============
+// Recalcule la MMP par sport depuis les power_curve déjà stockées et remplit la
+// table large (une ligne par sport, une colonne par durée) + details jsonb.
+async function recomputePowerProfileBySport(sb: any, userId: string): Promise<number> {
+  // Récupère toutes les activités avec une power_curve + leur sport + durée.
+  const acts: any[] = [];
+  const PAGE = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await sb
+      .from("activities")
+      .select("id, sport, start_date_local, moving_time, elapsed_time, power_curve")
+      .eq("user_id", userId)
+      .not("power_curve", "is", null)
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || !data.length) break;
+    acts.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  if (!acts.length) return 0;
+
+  const cutoff90 = Date.now() - 90 * 86400_000;
+  // best[sport][dur] = { all, allDate, allId, d90, d90Date, d90Id }
+  const best: Record<string, Record<string, any>> = {};
+  const count: Record<string, number> = {};
+  const longest: Record<string, number> = {};
+
+  for (const a of acts) {
+    const sport = a.sport || "autre";
+    const pc = a.power_curve || {};
+    const date = String(a.start_date_local).slice(0, 10);
+    const isRecent = new Date(a.start_date_local).getTime() >= cutoff90;
+    const durS = a.moving_time || a.elapsed_time || 0;
+    count[sport] = (count[sport] || 0) + 1;
+    if (durS > (longest[sport] || 0)) longest[sport] = durS;
+    best[sport] = best[sport] || {};
+    for (const [dur, wattsRaw] of Object.entries(pc)) {
+      const watts = Number(wattsRaw);
+      if (!watts) continue;
+      const b = best[sport][dur] || { all: 0, allDate: date, allId: a.id, d90: 0, d90Date: null, d90Id: null };
+      if (watts > b.all) { b.all = watts; b.allDate = date; b.allId = a.id; }
+      if (isRecent && watts > b.d90) { b.d90 = watts; b.d90Date = date; b.d90Id = a.id; }
+      best[sport][dur] = b;
+    }
+  }
+
+  // Construit une ligne large par sport.
+  const rows = Object.keys(best).map((sport) => {
+    const row: Record<string, any> = {
+      user_id: userId, sport,
+      activities_count: count[sport] || 0,
+      longest_activity_s: longest[sport] || null,
+      updated_at: new Date().toISOString(),
+    };
+    const details: Record<string, any> = {};
+    for (const [dur, b] of Object.entries(best[sport])) {
+      const col = SEC_TO_COL[Number(dur)];
+      if (!col) continue;                       // durée hors plafond (>8h) ignorée
+      row[col] = Math.round((b as any).all);
+      details[col] = {
+        w90: (b as any).d90 ? Math.round((b as any).d90) : null,
+        date: (b as any).allDate,
+        activity_id: (b as any).allId,
+      };
+    }
+    row.details = details;
+    return row;
+  });
+
+  // Remplace l'ensemble pour ce user (purge puis upsert).
+  await sb.from("power_profile_sport").delete().eq("user_id", userId);
+  for (let i = 0; i < rows.length; i += 50) {
+    const batch = rows.slice(i, i + 50);
+    const { error } = await sb.from("power_profile_sport").upsert(batch, { onConflict: "user_id,sport" });
+    if (error) console.error("power_profile_sport upsert error:", error.message);
+  }
+  return rows.length;
+}
+
+// Recalcule la power_curve (avec les NOUVELLES durées) depuis les streams déjà
+// stockés, pour les activités dont la courbe est absente/obsolète. Lot limité
+// (idempotent, relançable). Renvoie { done, remaining }.
+const POWER_CURVE_VERSION = 2; // bump quand on change les durées (force un backfill)
+async function backfillPowerCurves(sb: any, userId: string, limit: number): Promise<{ done: number; remaining: number }> {
+  // 1) Repère les activités obsolètes SANS charger les streams (power_curve est léger).
+  const { data, error } = await sb
+    .from("activities")
+    .select("id, power_curve")
+    .eq("user_id", userId)
+    .not("streams_gz", "is", null)
+    .order("start_date_local", { ascending: false })
+    .limit(2000);
+  if (error) throw error;
+  // Obsolète = pas de power_curve OU version différente (durées étendues).
+  const stale = (data || []).filter((a: any) => !a.power_curve || a.power_curve.v !== POWER_CURVE_VERSION);
+  const todo = stale.slice(0, limit);
+  let done = 0;
+  for (const a of todo) {
+    try {
+      // 2) Charge le stream de CETTE activité uniquement (évite un gros payload global).
+      const { data: row } = await sb.from("activities").select("streams_gz").eq("id", a.id).maybeSingle();
+      if (!row || !row.streams_gz) {
+        await sb.from("activities").update({ power_curve: { v: POWER_CURVE_VERSION } }).eq("id", a.id);
+        done++; continue;
+      }
+      const jsonStr = await gunzipBase64(row.streams_gz);
+      const watts = wattsFromStreamArray(JSON.parse(jsonStr));
+      const pc: Record<string, number> = computeMMP(watts);
+      pc.v = POWER_CURVE_VERSION; // marqueur de version (ignoré par l'agrégation)
+      await sb.from("activities").update({ power_curve: pc }).eq("id", a.id);
+      done++;
+    } catch (e) {
+      console.error("backfill power_curve", a.id, (e as any)?.message);
+    }
+  }
+  return { done, remaining: Math.max(0, stale.length - done) };
+}
+
 // ============ STREAMS ============
 
 // Strava (key_by_type=true) → format intervals.icu attendu par l'app : [{type,data}]
@@ -264,6 +404,26 @@ async function gzipBase64(str: string): Promise<string> {
     bin += String.fromCharCode(...buf.subarray(i, i + CHUNK));
   }
   return btoa(bin);
+}
+
+// Inverse de gzipBase64 : base64(gzip(json)) → string JSON.
+async function gunzipBase64(b64: string): Promise<string> {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const ds = new DecompressionStream("gzip");
+  const writer = ds.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const buf = await new Response(ds.readable).arrayBuffer();
+  return new TextDecoder().decode(buf);
+}
+
+// Extrait le tableau de watts depuis les streams stockés [{type,data}].
+function wattsFromStreamArray(streamArray: any[]): number[] {
+  if (!Array.isArray(streamArray)) return [];
+  const w = streamArray.find((s) => s && s.type === "watts");
+  return (w && Array.isArray(w.data)) ? w.data : [];
 }
 
 // ============ HELPERS ============

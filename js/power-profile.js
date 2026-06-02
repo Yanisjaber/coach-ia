@@ -10,34 +10,37 @@
    Affiche aussi un résumé des records clés (1s, 5min, 20min, 60min).
    ============================================================ */
 
-// Format une durée en label lisible : 60 → "1 min", 1200 → "20 min", 3600 → "1 h"
-function formatDuration(secStr) {
-  const s = parseInt(secStr, 10);
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.round(s / 60)} min`;
-  const h = Math.floor(s / 3600);
-  const m = Math.round((s % 3600) / 60);
-  return m ? `${h}h${String(m).padStart(2, '0')}` : `${h} h`;
+// Ordre des durées (= colonnes de power_profile_sport), de la plus courte à la plus longue.
+const ALL_LABELS = [
+  '1s','2s','3s','4s','5s','6s','7s','8s','9s','10s','11s','12s','13s','14s','15s',
+  '20s','25s','30s','45s',
+  '1min','2min','3min','4min','5min','6min','7min','8min','9min','10min',
+  '12min','15min','20min','25min','30min','35min','40min','45min',
+  '1h','1h30','2h','2h30','3h','3h30','4h','4h30','5h','6h','7h','8h',
+];
+// Durées mises en avant dans le bandeau "records clés"
+const HIGHLIGHT_LABELS = ['1s', '5s', '1min', '5min', '20min', '1h'];
+
+// Sport ciblé = celui choisi dans le sélecteur local des records (bilan.js).
+function ppTargetSport() {
+  return (typeof window.coachPowerSport === 'function' && window.coachPowerSport()) || 'cyclisme';
 }
 
-// Durées affichées dans le bandeau "records clés"
-const HIGHLIGHT_DURATIONS = ['1', '5', '60', '300', '1200', '3600'];
-
-function renderSummary(ppData) {
+function renderSummary(pps) {
   const el = document.getElementById('power-profile-summary');
   if (!el) return;
-  const alltime = ppData.alltime || {};
-  const recent = ppData.last_90d || {};
+  const durations = pps.durations || {};
+  const details = pps.details || {};
 
-  const items = HIGHLIGHT_DURATIONS.map(dur => {
-    const at = alltime[dur];
-    const r = recent[dur];
-    if (!at && !r) return null;
+  const items = HIGHLIGHT_LABELS.map(lab => {
+    const at = durations[lab];
+    const r = (details[lab] || {}).w90;
+    if (at == null && r == null) return null;
     return `
       <div class="pp-record">
-        <span class="pp-record-label">${formatDuration(dur)}</span>
-        <span class="pp-record-value">${at ? Math.round(at) + ' W' : '—'}</span>
-        ${r ? `<span class="pp-record-value recent" style="font-size:11px;font-weight:500;">90j : ${Math.round(r)} W</span>` : ''}
+        <span class="pp-record-label">${lab}</span>
+        <span class="pp-record-value">${at != null ? Math.round(at) + ' W' : '—'}</span>
+        ${r != null ? `<span class="pp-record-value recent" style="font-size:11px;font-weight:500;">90j : ${Math.round(r)} W</span>` : ''}
       </div>
     `;
   }).filter(Boolean).join('');
@@ -47,18 +50,20 @@ function renderSummary(ppData) {
 
 let _ppChart = null;
 
-function renderChart(ppData) {
+function renderChart(pps) {
   const canvas = document.getElementById('chart-power-profile');
   if (!canvas || !window.Chart) return;
 
-  const durations = (ppData.durations || []).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
-  const alltime = ppData.alltime || {};
-  const recent = ppData.last_90d || {};
-
-  // Construire les datasets : on aligne sur les durées disponibles
-  const labels = durations.map(d => formatDuration(d));
-  const allData = durations.map(d => alltime[d] != null ? Math.round(alltime[d]) : null);
-  const recentData = durations.map(d => recent[d] != null ? Math.round(recent[d]) : null);
+  const durations = pps.durations || {};
+  const details = pps.details || {};
+  // On n'affiche que les durées présentes, dans l'ordre.
+  const present = ALL_LABELS.filter(lab => durations[lab] != null);
+  const labels = present;
+  const allData = present.map(lab => Math.round(durations[lab]));
+  const recentData = present.map(lab => {
+    const w = (details[lab] || {}).w90;
+    return w != null ? Math.round(w) : null;
+  });
 
   if (_ppChart) { _ppChart.destroy(); _ppChart = null; }
 
@@ -128,17 +133,18 @@ function renderChart(ppData) {
 
 export function renderPowerProfile() {
   const dataRoot = window.DASHBOARD_DATA;
-  const pp = dataRoot && dataRoot.power_profile;
+  const bySport = (dataRoot && dataRoot.power_by_sport) || {};
+  const pps = bySport[ppTargetSport()];
   const card = document.querySelector('.power-profile-card');
   const emptyEl = document.getElementById('power-profile-empty');
   const chartWrap = card ? card.querySelector('.chart-wrap') : null;
   const summaryEl = document.getElementById('power-profile-summary');
 
-  // Pas de PP ou cache vide → message d'attente
-  if (!pp || !pp.alltime || Object.keys(pp.alltime).length === 0) {
+  // Pas de données de puissance pour ce sport → message d'attente
+  if (!pps || !pps.durations || Object.keys(pps.durations).length === 0) {
     if (chartWrap) chartWrap.style.display = 'none';
     if (summaryEl) summaryEl.style.display = 'none';
-    if (emptyEl) emptyEl.hidden = false;
+    if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = 'Aucune donnée de puissance pour ce sport.'; }
     return;
   }
 
@@ -146,8 +152,8 @@ export function renderPowerProfile() {
   if (summaryEl) summaryEl.style.display = '';
   if (emptyEl) emptyEl.hidden = true;
 
-  renderSummary(pp);
-  renderChart(pp);
+  renderSummary(pps);
+  renderChart(pps);
 }
 
 function init() {

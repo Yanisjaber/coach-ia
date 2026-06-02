@@ -464,6 +464,7 @@ function getSportCategory(sport) {
   const entry = window.SPORTS_CATALOG && window.SPORTS_CATALOG[s];
   return entry ? entry.category : 'autre';
 }
+window.getSportCategory = getSportCategory;
 
 function applySportFilter() {
   // Reset des index activité par jour (les arrays changent selon le filtre)
@@ -556,6 +557,8 @@ function rerenderFilteredCharts() {
   if (typeof renderCalendar === 'function') renderCalendar();
   // Page Bilan : KPIs annuels, records, chart cumul → filtrés par sport actif
   if (typeof window.renderBilan === 'function') window.renderBilan();
+  // Graphe Power Profile : suit aussi le sport actif (records par sport)
+  if (typeof window.renderPowerProfile === 'function') window.renderPowerProfile();
 }
 
 // ========= HELPERS DATE RANGE =========
@@ -587,9 +590,9 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
   data: {
     labels: [],
     datasets: [
-      { label: 'CTL', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.1)', cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#60a5fa', fill: true, yAxisID: 'y' },
-      { label: 'ATL', data: [], borderColor: '#fbbf24', backgroundColor: 'transparent', cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#fbbf24', yAxisID: 'y' },
-      { label: 'TSB', data: [], borderColor: '#a78bfa', backgroundColor: 'transparent', borderDash: [4,4], cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#a78bfa', yAxisID: 'y' }
+      { label: 'CTL', data: [], borderColor: '#60a5fa', backgroundColor: (c) => { const ch = c.chart, a = ch.chartArea; if (!a) return 'rgba(96,165,250,0.12)'; const g = ch.ctx.createLinearGradient(0, a.top, 0, a.bottom); g.addColorStop(0, 'rgba(96,165,250,0.30)'); g.addColorStop(1, 'rgba(96,165,250,0.02)'); return g; }, borderWidth: 2.5, cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#60a5fa', fill: 'origin', order: 3, yAxisID: 'y' },
+      { label: 'ATL', data: [], borderColor: '#fbbf24', backgroundColor: 'transparent', borderWidth: 2, cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#fbbf24', fill: false, order: 2, yAxisID: 'y' },
+      { label: 'TSB', data: [], borderColor: '#a78bfa', borderWidth: 2, cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#a78bfa', fill: { target: { value: 0 }, above: 'rgba(167,139,250,0.22)', below: 'rgba(83,74,183,0.30)' }, order: 1, yAxisID: 'y' }
     ]
   },
   options: {
@@ -630,14 +633,55 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
             });
           }
         }
+      },
+      // Sélection à la souris (drag) → met à jour la plage de dates.
+      zoom: {
+        zoom: {
+          drag: { enabled: true, backgroundColor: 'rgba(74,222,128,0.12)', borderColor: 'rgba(74,222,128,0.55)', borderWidth: 1 },
+          mode: 'x',
+          onZoomComplete: ({ chart }) => { applyLoadChartDragSelection(chart); },
+        }
       }
     },
     scales: {
-      x: { ticks: { maxTicksLimit: 8 }, grid: { display: false } },
-      y: { position: 'left', title: { display: true, text: 'TSS / TSB' } }
+      x: {
+        ticks: { maxTicksLimit: 8, color: '#6b7488' },
+        grid: { display: false },
+        border: { display: false },
+      },
+      y: {
+        position: 'left',
+        title: { display: true, text: 'TSS / TSB', color: '#6b7488' },
+        ticks: { color: '#6b7488', stepSize: 20 },
+        grid: { color: 'rgba(255,255,255,0.045)', drawBorder: false },
+        border: { display: false },
+      },
     }
   }
 });
+
+// Drag souris sur le graphe → convertit la sélection en plage de dates + re-render.
+let _loadDragBusy = false;
+function applyLoadChartDragSelection(chart) {
+  if (_loadDragBusy) return;
+  const sub = loadChart._subset || [];
+  if (!sub.length) { try { chart.resetZoom(); } catch (_) {} return; }
+  const x = chart.scales.x;
+  let i0 = Math.round(x.min), i1 = Math.round(x.max);
+  i0 = Math.max(0, Math.min(sub.length - 1, i0));
+  i1 = Math.max(0, Math.min(sub.length - 1, i1));
+  _loadDragBusy = true;
+  try { chart.resetZoom(); } catch (_) {}
+  if (i1 - i0 >= 1) {
+    const from = toIsoDate(sub[i0].date);
+    const to = toIsoDate(sub[i1].date);
+    setInputDate('load-from', new Date(from + 'T12:00:00'));
+    setInputDate('load-to', new Date(to + 'T12:00:00'));
+    document.querySelectorAll('#load-range .preset').forEach(b => b.classList.remove('active'));
+    renderLoadChart(from, to);
+  }
+  setTimeout(() => { _loadDragBusy = false; }, 60);
+}
 
 function dayHasActivity(d) {
   return !!((d.activities && d.activities.length) || d.sessionType || (d.duration > 0));
@@ -719,6 +763,12 @@ document.querySelectorAll('#load-range .preset').forEach(btn => {
     renderLoadChart(getInputDate('load-from'), getInputDate('load-to'));
   });
 });
+// Bouton « Réinitialiser » : revient à la plage par défaut (30 jours).
+document.getElementById('load-reset')?.addEventListener('click', () => {
+  try { if (loadChart.resetZoom) loadChart.resetZoom(); } catch (_) {}
+  const p30 = document.querySelector('#load-range .preset[data-days="30"]');
+  if (p30) p30.click();
+});
 
 // (Corrélations supprimées du dashboard — bloc retiré sur demande)
 
@@ -727,11 +777,46 @@ let currentHoursWeeks = [];
 let selectedHoursIndex = null;
 let hoursDailyChart = null;
 
+// Bandeau de stats au-dessus du graphe Volume : durée, km, D+, TSS de la semaine.
+function formatWeekStats(week) {
+  if (!week) return '';
+  let mins = 0, km = 0, dplus = 0;
+  for (const d of (week.days || [])) {
+    mins += d.duration || 0;
+    for (const a of (d.activities || [])) { km += a.distance_km || 0; dplus += a.elevation_gain || 0; }
+  }
+  const h = Math.floor(mins / 60), m = Math.round(mins % 60);
+  const durStr = h > 0 ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m} min`;
+  const ic = {
+    dur: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    km: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.4"/><circle cx="18" cy="5" r="2.4"/><path d="M8.4 19H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.6"/></svg>',
+    dplus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 20 9 9 13 15 16 10 21 20"/></svg>',
+    tss: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+  };
+  const chip = (icon, val, lbl) => `<div class="vol-stat">${icon}<div><span class="vs-val">${val}</span><span class="vs-lbl">${lbl}</span></div></div>`;
+  const chips = [chip(ic.dur, durStr, 'Durée')];
+  if (km > 0) chips.push(chip(ic.km, Math.round(km) + ' km', 'Distance'));
+  if (dplus > 0) chips.push(chip(ic.dplus, Math.round(dplus) + ' m', 'D+'));
+  chips.push(chip(ic.tss, Math.round(week.tss || 0), 'TSS'));
+  return `<div class="vol-stats-week">${week.label}</div><div class="vol-stats-grid">${chips.join('')}</div>`;
+}
+function setVolStats(week) {
+  const el = document.getElementById('vol-stats');
+  if (el) el.innerHTML = formatWeekStats(week);
+}
+
 const hoursChart = new Chart(document.getElementById('chart-hours'), {
-  type: 'bar',
-  data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 4 }] },
+  type: 'line',
+  data: { labels: [], datasets: [{
+    data: [],
+    borderColor: '#4ade80', borderWidth: 2.5,
+    backgroundColor: (c) => { const ch = c.chart, a = ch.chartArea; if (!a) return 'rgba(74,222,128,0.10)'; const g = ch.ctx.createLinearGradient(0, a.top, 0, a.bottom); g.addColorStop(0, 'rgba(74,222,128,0.28)'); g.addColorStop(1, 'rgba(74,222,128,0.02)'); return g; },
+    fill: 'origin', cubicInterpolationMode: 'monotone', tension: 0.35,
+    pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: [], pointBorderColor: '#0b0e14', pointBorderWidth: 1.5,
+  }] },
   options: {
     responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
     onClick: (event, elements) => {
       if (elements.length === 0) return;
       const idx = elements[0].index;
@@ -744,26 +829,25 @@ const hoursChart = new Chart(document.getElementById('chart-hours'), {
     },
     onHover: (event, elements) => {
       event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+      if (elements.length) setVolStats(currentHoursWeeks[elements[0].index]);
     },
     plugins: {
       legend: { display: false },
-      tooltip: {
-        callbacks: {
-          title: (items) => 'Semaine ' + items[0].label,
-          label: (ctx) => ctx.parsed.y + ' h (clique pour détail)'
-        }
-      }
+      tooltip: { enabled: false }
     },
     scales: {
-      y: { title: { display: true, text: 'Heures' }, beginAtZero: true },
-      x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 14 } }
+      y: { title: { display: true, text: 'Heures', color: '#6b7488' }, beginAtZero: true, ticks: { color: '#6b7488' }, grid: { color: 'rgba(255,255,255,0.045)', drawBorder: false }, border: { display: false } },
+      x: { grid: { display: false }, border: { display: false }, ticks: { color: '#6b7488', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } }
     }
   }
 });
 
 function renderHoursChart(fromIso, toIso) {
   currentHoursWeeks = computeWeeksByDate(fromIso, toIso);
-  const labels = currentHoursWeeks.map(w => w.label);
+  const labels = currentHoursWeeks.map(w => {
+    const d = w.days && w.days[0] && w.days[0].date;
+    return d ? String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') : w.label;
+  });
   const hoursArr = currentHoursWeeks.map(w => +(w.days.reduce((s, d) => s + (d.duration || 0), 0) / 60).toFixed(1));
   const colors = hoursArr.map(h => {
     if (h === 0) return '#2a3142';
@@ -773,8 +857,9 @@ function renderHoursChart(fromIso, toIso) {
   });
   hoursChart.data.labels = labels;
   hoursChart.data.datasets[0].data = hoursArr;
-  hoursChart.data.datasets[0].backgroundColor = colors;
+  hoursChart.data.datasets[0].pointBackgroundColor = '#4ade80';
   hoursChart.update();
+  setVolStats(currentHoursWeeks[currentHoursWeeks.length - 1]);
   hideHoursDetail();
 }
 
@@ -945,13 +1030,20 @@ function computeWeeksByDate(fromIso, toIso) {
 }
 
 const weeklyChart = new Chart(document.getElementById('chart-weekly'), {
-  type: 'bar',
+  type: 'line',
   data: {
     labels: [],
-    datasets: [{ data: [], backgroundColor: [], borderRadius: 4 }]
+    datasets: [{
+      data: [],
+      borderColor: '#4ade80', borderWidth: 2.5,
+      backgroundColor: (c) => { const ch = c.chart, a = ch.chartArea; if (!a) return 'rgba(74,222,128,0.10)'; const g = ch.ctx.createLinearGradient(0, a.top, 0, a.bottom); g.addColorStop(0, 'rgba(74,222,128,0.28)'); g.addColorStop(1, 'rgba(74,222,128,0.02)'); return g; },
+      fill: 'origin', cubicInterpolationMode: 'monotone', tension: 0.35,
+      pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: [], pointBorderColor: '#0b0e14', pointBorderWidth: 1.5,
+    }]
   },
   options: {
     responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
     onClick: (event, elements) => {
       if (elements.length === 0) return;
       const idx = elements[0].index;
@@ -965,26 +1057,29 @@ const weeklyChart = new Chart(document.getElementById('chart-weekly'), {
     },
     onHover: (event, elements) => {
       event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+      if (elements.length) setVolStats(currentWeeks[elements[0].index]);
     },
     plugins: {
       legend: { display: false },
-      tooltip: { callbacks: { title: (items) => 'Semaine ' + items[0].label, label: (ctx) => ctx.parsed.y + ' TSS (clique pour détail)' } }
+      tooltip: { enabled: false }
     },
     scales: {
-      y: { title: { display: true, text: 'TSS hebdo' } },
-      x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 14 } }
+      y: { title: { display: true, text: 'TSS hebdo', color: '#6b7488' }, beginAtZero: true, ticks: { color: '#6b7488' }, grid: { color: 'rgba(255,255,255,0.045)', drawBorder: false }, border: { display: false } },
+      x: { grid: { display: false }, border: { display: false }, ticks: { color: '#6b7488', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } }
     }
   }
 });
 
 function renderWeeklyChart(fromIso, toIso) {
   currentWeeks = computeWeeksByDate(fromIso, toIso);
-  weeklyChart.data.labels = currentWeeks.map(w => w.label);
+  weeklyChart.data.labels = currentWeeks.map(w => {
+    const d = w.days && w.days[0] && w.days[0].date;
+    return d ? String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') : w.label;
+  });
   weeklyChart.data.datasets[0].data = currentWeeks.map(w => w.tss);
-  weeklyChart.data.datasets[0].backgroundColor = currentWeeks.map(w =>
-    w.tss > 500 ? '#f87171' : w.tss > 380 ? '#fbbf24' : '#4ade80'
-  );
+  weeklyChart.data.datasets[0].pointBackgroundColor = '#4ade80';
   weeklyChart.update();
+  setVolStats(currentWeeks[currentWeeks.length - 1]);
   hideWeekDetail();
 }
 
@@ -1068,22 +1163,51 @@ document.getElementById('weekly-to').min = toIsoDate(data[0].date);
 document.getElementById('weekly-to').max = toIsoDate(data[data.length-1].date);
 applyWeeklyPreset(12);
 
-// Presets : 4 sem / 12 sem
+// Presets : 4 sem / 12 sem (pilotent Heures ET TSS pour rester en phase)
 document.querySelectorAll('#weekly-range .preset').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#weekly-range .preset').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     applyWeeklyPreset(+btn.dataset.weeks);
+    if (typeof applyHoursPreset === 'function') applyHoursPreset(+btn.dataset.weeks);
   });
 });
 
-// Date inputs manuels : déselectionne les presets
+// Date inputs manuels : déselectionne les presets + synchronise les deux graphes
 ['weekly-from', 'weekly-to'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => {
     document.querySelectorAll('#weekly-range .preset').forEach(b => b.classList.remove('active'));
-    renderWeeklyChart(getInputDate('weekly-from'), getInputDate('weekly-to'));
+    const f = getInputDate('weekly-from'), t = getInputDate('weekly-to');
+    renderWeeklyChart(f, t);
+    setInputDate('hours-from', new Date(f + 'T12:00:00'));
+    setInputDate('hours-to', new Date(t + 'T12:00:00'));
+    renderHoursChart(f, t);
   });
 });
+
+// Bascule métrique de la carte Volume (Heures / TSS) : montre le bon graphe.
+(function setupVolumeToggle() {
+  const toggle = document.getElementById('vol-toggle');
+  if (!toggle) return;
+  const hoursWrap = document.getElementById('vol-hours-wrap');
+  const tssWrap = document.getElementById('vol-tss-wrap');
+  toggle.querySelectorAll('.ztoggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      toggle.querySelectorAll('.ztoggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const showHours = btn.dataset.metric === 'hours';
+      if (hoursWrap) hoursWrap.style.display = showHours ? '' : 'none';
+      if (tssWrap) tssWrap.style.display = showHours ? 'none' : '';
+      if (typeof hideHoursDetail === 'function') hideHoursDetail();
+      if (typeof hideWeekDetail === 'function') hideWeekDetail();
+      // Un graphe caché a une taille nulle → resize quand il réapparaît.
+      try { if (showHours) hoursChart.resize(); else weeklyChart.resize(); } catch (_) {}
+      // Rafraîchit le bandeau de stats selon le graphe affiché (dernière semaine).
+      const arr = showHours ? currentHoursWeeks : currentWeeks;
+      setVolStats(arr[arr.length - 1]);
+    });
+  });
+})();
 
 // ========= CHART ZONES (avec sélecteur de période) =========
 const zoneLabels = ['Z1 récup', 'Z2 endurance', 'Z3 tempo', 'Z4 seuil', 'Z5 VO2max'];
@@ -1126,12 +1250,13 @@ const zonesChart = new Chart(document.getElementById('chart-zones'), {
   type: 'doughnut',
   data: {
     labels: zoneLabels,
-    datasets: [{ data: [0,0,0,0,0], backgroundColor: zoneColors, borderWidth: 0 }]
+    datasets: [{ data: [0,0,0,0,0], backgroundColor: zoneColors, borderWidth: 0, borderRadius: 4, spacing: 2, hoverOffset: 6 }]
   },
   options: {
     responsive: true, maintainAspectRatio: false,
+    cutout: '70%',
     plugins: {
-      legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 } } },
+      legend: { display: false },
       tooltip: { callbacks: { label: (ctx) => ctx.label + ' : ' + ctx.parsed + '%' } }
     }
   }
@@ -1140,16 +1265,21 @@ const zonesChart = new Chart(document.getElementById('chart-zones'), {
 function renderZones(fromIso, toIso) {
   const { pct, totalMin, sessions } = computeZonesByDate(fromIso, toIso);
   const total = pct.reduce((a, b) => a + (b || 0), 0);
+  const emptyEl = document.getElementById('zones-empty');
+  const wrapEl = document.getElementById('zones-chart-wrap');
   if (total === 0) {
-    // Aucune donnée : on affiche un anneau gris plein (sinon le camembert est invisible).
-    zonesChart.data.labels = ['Aucune donnée'];
-    zonesChart.data.datasets[0].data = [1];
-    zonesChart.data.datasets[0].backgroundColor = ['rgba(255,255,255,0.07)'];
-  } else {
-    zonesChart.data.labels = zoneLabels;
-    zonesChart.data.datasets[0].data = pct;
-    zonesChart.data.datasets[0].backgroundColor = zoneColors;
+    // Aucune donnée : message au lieu d'un anneau vide.
+    if (wrapEl) wrapEl.style.display = 'none';
+    if (emptyEl) emptyEl.hidden = false;
+    const zs = document.getElementById('zone-summary');
+    if (zs) zs.innerHTML = '';
+    return;
   }
+  if (wrapEl) wrapEl.style.display = '';
+  if (emptyEl) emptyEl.hidden = true;
+  zonesChart.data.labels = zoneLabels;
+  zonesChart.data.datasets[0].data = pct;
+  zonesChart.data.datasets[0].backgroundColor = zoneColors;
   zonesChart.update();
   const rows = zoneLabels.map((label, i) =>
     `<div class="zone-summary-row"><span class="zname"><span class="legend-dot" style="background:${zoneColors[i]};"></span>${label}</span><span class="zpct">${pct[i]}%</span></div>`
@@ -1344,11 +1474,20 @@ function renderCompList() {
       dateStr = fmtFullDate(c.dateObj);
     }
     const _pi = compPrio(c.priority);
+    // Progression de la jauge : temps écoulé depuis le début de saison
+    // (1er janvier de l'année de la course) jusqu'au jour de course.
+    const seasonStart = new Date(c.dateObj.getFullYear(), 0, 1);
+    const totalMs = c.dateObj - seasonStart;
+    let fillPct = totalMs > 0 ? ((today - seasonStart) / totalMs) * 100 : 100;
+    fillPct = Math.max(0, Math.min(100, fillPct));
     return `<div class="comp-item" data-prio="${_pi.key}" data-comp-id="${c.id}" title="Voir le détail de la compétition">
-      <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span></span>
-      <span class="comp-date">${dateStr}</span>
-      <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'dans ' + daysUntil + ' j'}</span>
-      <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
+      <div class="comp-row">
+        <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span></span>
+        <span class="comp-date">${dateStr}</span>
+        <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'J‑' + daysUntil}</span>
+        <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
+      </div>
+      <div class="comp-phase-track"><div class="comp-phase-fill" style="width:${fillPct.toFixed(1)}%"></div></div>
     </div>`;
   }).join('');
 }
@@ -8618,89 +8757,169 @@ document.getElementById('alerts-list').innerHTML = alerts.map(a => `
 
 // ========= PANEL 4: SESSIONS =========
 let sessions = [];
+// Index plat de toutes les activités (une ligne = une activité, pas un jour),
+// pour la recherche par titre + filtre sport.
+function buildActivityIndex() {
+  const out = [];
+  for (const d of data) {
+    const acts = (d.activities && d.activities.length)
+      ? d.activities
+      : (d.sessionName ? [{ ...d, name: d.sessionName }] : []);
+    for (const a of acts) {
+      const dt = a.start_date_local ? new Date(a.start_date_local) : d.date;
+      out.push({
+        ...a,
+        sessionName: a.name || d.sessionName || '—',
+        date: (dt instanceof Date && !isNaN(dt)) ? dt : d.date,
+        recovery: d.recovery ?? null,
+        compliance: null,
+      });
+    }
+  }
+  out.sort((x, y) => y.date - x.date);
+  return out;
+}
+
+function populateActSportFilter(allActs) {
+  const sel = document.getElementById('act-sport-filter');
+  if (!sel || sel.dataset.filled) return;
+  const labels = new Set();
+  for (const a of allActs) {
+    const label = window.activitySportLabel ? window.activitySportLabel(a) : (a.sport || '');
+    if (label) labels.add(label);
+  }
+  const opts = [...labels].sort((a, b) => a.localeCompare(b, 'fr'));
+  sel.innerHTML = '<option value="">Tous les sports</option>'
+    + opts.map(o => `<option value="${o}">${o}</option>`).join('');
+  sel.dataset.filled = '1';
+}
+
+const fmtSearchDate = d => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+// Valeur d'un input (chaîne vide si vide/absent)
+const _fv = id => { const el = document.getElementById(id); return el && el.value !== '' ? el.value : ''; };
+// val dans [min, max] ? (bornes vides ignorées ; valeur nulle exclue si une borne active)
+function _inRange(val, min, max) {
+  if (min !== '' && (val == null || val < +min)) return false;
+  if (max !== '' && (val == null || val > +max)) return false;
+  return true;
+}
+
+// Tri du tableau d'activités
+let _actSort = { key: 'date', dir: 'desc' };
+function _sortVal(a, key) {
+  switch (key) {
+    case 'sport': return (window.activitySportLabel ? window.activitySportLabel(a) : (a.sport || '')).toLowerCase();
+    case 'date': return (a.date instanceof Date) ? a.date.getTime() : 0;
+    case 'title': return (a.sessionName || '').toLowerCase();
+    case 'duration': return a.duration || 0;
+    case 'distance': return a.distance_km || 0;
+    case 'elevation': return a.elevation_gain || 0;
+    case 'tss': return a.tss || 0;
+    default: return 0;
+  }
+}
+function sortActs(arr) {
+  const { key, dir } = _actSort;
+  const mul = dir === 'asc' ? 1 : -1;
+  return arr.sort((x, y) => {
+    const vx = _sortVal(x, key), vy = _sortVal(y, key);
+    if (vx < vy) return -mul;
+    if (vx > vy) return mul;
+    return 0;
+  });
+}
+function updateSortIndicators() {
+  document.querySelectorAll('.session-table th.th-sort').forEach(th => {
+    const isActive = th.dataset.sort === _actSort.key;
+    th.classList.toggle('active', isActive);
+    th.classList.toggle('sort-asc', isActive && _actSort.dir === 'asc');
+    th.classList.toggle('sort-desc', isActive && _actSort.dir === 'desc');
+  });
+}
+
+let _actSearchInited = false;
 function renderSessionsTable() {
-  sessions = data.filter(d => d.sessionName || (d.activities && d.activities.length > 0)).slice(-12).reverse();
+  const allActs = buildActivityIndex();
+  populateActSportFilter(allActs);
+
+  const sportF = document.getElementById('act-sport-filter')?.value || '';
+  const distMin = _fv('act-dist-min'), distMax = _fv('act-dist-max');
+  const durMin = _fv('act-dur-min'), durMax = _fv('act-dur-max');
+  const dpMin = _fv('act-dplus-min'), dpMax = _fv('act-dplus-max');
+  const tssMin = _fv('act-tss-min'), tssMax = _fv('act-tss-max');
+
+  let filtered = allActs;
+  if (sportF) filtered = filtered.filter(a => (window.activitySportLabel ? window.activitySportLabel(a) : a.sport) === sportF);
+  filtered = filtered.filter(a => _inRange(a.distance_km, distMin, distMax));
+  filtered = filtered.filter(a => _inRange(a.duration, durMin, durMax));
+  filtered = filtered.filter(a => _inRange(a.elevation_gain, dpMin, dpMax));
+  filtered = filtered.filter(a => _inRange(a.tss, tssMin, tssMax));
+
+  const total = filtered.length;
+  sortActs(filtered);
+  updateSortIndicators();
+  sessions = filtered.slice(0, 10);
+
   const tbody = document.getElementById('sessions-tbody');
   tbody.innerHTML = sessions.map((s, i) => {
-    // Récup du sport Strava depuis la 1re activité du jour, sinon depuis la racine
-    const firstAct = (s.activities && s.activities.length) ? s.activities[0] : s;
-    const sportLabel = window.activitySportLabel ? window.activitySportLabel(firstAct) : (s.sport || '—');
-    const sportCat = window.activitySportColorKey ? window.activitySportColorKey(firstAct) : 'autre';
+    const sportLabel = window.activitySportLabel ? window.activitySportLabel(s) : (s.sport || '—');
+    const sportCat = window.activitySportColorKey ? window.activitySportColorKey(s) : 'autre';
+    const dist = s.distance_km != null
+      ? (s.distance_km >= 100 ? Math.round(s.distance_km) : s.distance_km.toFixed(1)).toString().replace('.', ',') + ' km'
+      : '—';
+    const dplus = s.elevation_gain != null ? Math.round(s.elevation_gain) + ' m' : '—';
     return `
     <tr data-idx="${i}">
-      <td>${fmtDate(s.date)}</td>
-      <td>${s.sessionName}</td>
       <td><span class="sport-pill" data-sport-cat="${sportCat}">${sportLabel}</span></td>
+      <td>${fmtSearchDate(s.date)}</td>
+      <td class="act-title-cell">${s.sessionName}</td>
       <td>${fmtDur(s.duration)}</td>
-      <td>${s.tss}</td>
-      <td>${s.np}W (${s.ftpPct}%)</td>
-      <td>${s.hr} bpm</td>
-      <td>${s.compliance != null ? `<span style="color:${s.compliance>=95?'var(--accent)':s.compliance>=85?'var(--warn)':'var(--danger)'};">${s.compliance}%</span>` : '<span style="color:var(--text-mute);">—</span>'}</td>
+      <td>${dist}</td>
+      <td>${dplus}</td>
+      <td>${s.tss || 0}</td>
     </tr>
     `;
   }).join('');
-  // Auto-affichage de la 1ère séance ou message vide
-  const detailWrap = document.getElementById('session-detail-wrap');
-  if (sessions.length) {
-    tbody.querySelector('tr')?.classList.add('selected');
-    renderSessionDetail(sessions[0]);
-  } else {
-    detailWrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:13px;">Aucune séance pour le filtre sélectionné.</div>';
+
+  const countEl = document.getElementById('act-search-count');
+  if (countEl) countEl.textContent = total
+    ? `${total} activité${total > 1 ? 's' : ''}${total > 10 ? ' · 10 affichées' : ''}`
+    : 'Aucune activité ne correspond aux filtres.';
+
+  if (!_actSearchInited) {
+    _actSearchInited = true;
+    const bar = document.getElementById('act-filter-bar');
+    bar?.addEventListener('input', () => renderSessionsTable());
+    bar?.addEventListener('change', () => renderSessionsTable());
+    document.getElementById('act-filter-reset')?.addEventListener('click', () => {
+      bar.querySelectorAll('input').forEach(i => { i.value = ''; });
+      const sel = document.getElementById('act-sport-filter');
+      if (sel) sel.value = '';
+      renderSessionsTable();
+    });
+    document.querySelector('.session-table thead')?.addEventListener('click', (e) => {
+      const th = e.target.closest('.th-sort');
+      if (!th) return;
+      const key = th.dataset.sort;
+      if (_actSort.key === key) {
+        _actSort.dir = _actSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        _actSort.key = key;
+        _actSort.dir = (key === 'title' || key === 'sport') ? 'asc' : 'desc';
+      }
+      renderSessionsTable();
+    });
+    // Clic sur une ligne → ouvre le détail de l'activité (sans bouger le calendrier)
+    document.getElementById('sessions-tbody')?.addEventListener('click', (e) => {
+      const tr = e.target.closest('tr');
+      if (!tr) return;
+      const s = sessions[+tr.dataset.idx];
+      if (s && typeof openSessionModal === 'function') openSessionModal(toIsoDate(s.date), 'realise');
+    });
   }
 }
 try { renderSessionsTable(); } catch (e) { console.error('[renderSessionsTable]', e); }
-
-function renderSessionDetail(s) {
-  const zoneColors = ['#bbf7d0','#86efac','#4ade80','#16a34a','#14532d'];
-  const zones = (s.zones && s.zones.length) ? s.zones : (s.zones_hr || s.zones_power || [0,0,0,0,0]);
-  const zonesHTML = zones.map((z, i) => `<div class="zone-seg" style="width:${z}%;background:${zoneColors[i]};">${z>8?z+'%':''}</div>`).join('');
-  const html = `
-  <div class="session-detail">
-    <div class="session-detail-header">
-      <div>
-        <h3>${s.sessionName}</h3>
-        <div class="meta">${s.date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · ${fmtDur(s.duration)} · ${s.tss} TSS</div>
-      </div>
-      <div style="text-align:right;font-size:12px;color:var(--text-dim);">Recovery avant : <strong style="color:var(--text);">${s.recovery != null ? s.recovery + '%' : '—'}</strong></div>
-    </div>
-    <div class="metric-row">
-      <div class="mini-metric"><div class="label">NP / Puissance norm.</div><div class="value">${s.np} W</div><div class="compare">${s.ftpPct}% FTP</div></div>
-      <div class="mini-metric"><div class="label">FC moyenne</div><div class="value">${s.hr} bpm</div><div class="compare">Max ${s.hr + randInt(15,30)} bpm</div></div>
-      <div class="mini-metric"><div class="label">TSS réalisé</div><div class="value">${s.tss}</div><div class="compare ${s.compliance>=95?'up':'down'}">${s.compliance}% du prévu</div></div>
-      <div class="mini-metric"><div class="label">Variabilité</div><div class="value">${(rand(1.02,1.18)).toFixed(2)}</div><div class="compare">IF ${(s.ftpPct/100).toFixed(2)}</div></div>
-    </div>
-    <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">Répartition du temps par zone de FC</div>
-    <div class="zone-bar">${zonesHTML}</div>
-    <div class="legend">
-      <span><span class="legend-dot" style="background:#4ade80;"></span>Z1 récup</span>
-      <span><span class="legend-dot" style="background:#60a5fa;"></span>Z2 endurance</span>
-      <span><span class="legend-dot" style="background:#a78bfa;"></span>Z3 tempo</span>
-      <span><span class="legend-dot" style="background:#fbbf24;"></span>Z4 seuil</span>
-      <span><span class="legend-dot" style="background:#f87171;"></span>Z5 VO2max</span>
-    </div>
-    <div style="margin-top:14px;padding:12px;background:var(--bg);border-radius:6px;font-size:13px;">
-      <strong style="color:var(--info);">Analyse Coach IA :</strong>
-      ${(() => {
-        const c = s.compliance;
-        const recTxt = s.recovery != null ? s.recovery + '%' : 'inconnue';
-        if (c == null) return `Pas de TSS planifié pour cette séance (mode libre). NP ${s.np}W sur ${fmtDur(s.duration)}.`;
-        if (c >= 95) return `Séance conforme au plan. Exécution propre, ${s.ftpPct}% FTP atteint comme prévu.`;
-        if (c >= 85) return `Léger écart (${c}% du prévu). Probablement lié à la récupération de départ (${recTxt}). Pas d'inquiétude — adapter la prochaine séance similaire.`;
-        return `Écart significatif (${c}%). Possible signe de fatigue accumulée ou objectif trop ambitieux. Suggérer une décharge.`;
-      })()}
-    </div>
-  </div>`;
-  document.getElementById('session-detail-wrap').innerHTML = html;
-}
-
-document.getElementById('sessions-tbody').addEventListener('click', (e) => {
-  const tr = e.target.closest('tr');
-  if (!tr) return;
-  const tbody = e.currentTarget;
-  tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
-  tr.classList.add('selected');
-  renderSessionDetail(sessions[+tr.dataset.idx]);
-});
 
 // ========= TABS =========
 // ========= ONGLETS + routage par ancre (#entraineur, #bilan, #termes) =========
@@ -8717,6 +8936,9 @@ function activatePanel(panelId, updateHash = true) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
   panelEl.classList.add('active');
+  // Met à jour le titre de la barre supérieure avec le libellé de l'onglet actif.
+  const _tbTitle = document.getElementById('topbar-title');
+  if (_tbTitle) { const _lbl = btn.querySelector('span'); _tbTitle.textContent = _lbl ? _lbl.textContent : btn.textContent.trim(); }
   if (updateHash) {
     const h = PANEL_HASH[panelId] || '';
     if (h) {

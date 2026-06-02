@@ -254,6 +254,7 @@ async function streamsPhase(session, prog, base = 0) {
     }
 
     const remaining = data.remaining || 0;
+    const pcRemaining = data.power_curve_remaining || 0; // backfill power_curve par sport
     target = total ? Math.max(0, total - remaining) : (target + (data.streams_synced || 0));
 
     if (data.rate_limited) {
@@ -262,11 +263,16 @@ async function streamsPhase(session, prog, base = 0) {
       setTimeout(() => { stopTween(); prog?.update(pct, `Limite Strava atteinte — ${remaining} restantes, reprise plus tard.`); setTimeout(() => prog?.close(), 4000); }, 700);
       return;
     }
-    if (!remaining) {
-      // laisser le tween finir de compter jusqu'au total avant de clore
+    if (!remaining && !pcRemaining) {
+      // tout fini (streams + recalcul power profile par sport)
       setTimeout(() => { stopTween(); displayed = target; prog?.update(100, 'Terminé ✓'); setTimeout(() => prog?.close(), 900); }, 700);
       if (window.reloadDataFromSupabase) setTimeout(() => window.reloadDataFromSupabase(), 1200);
       return;
+    }
+    if (!remaining && pcRemaining) {
+      // streams OK : on continue à recalculer la power_curve (records par sport).
+      stopTween();
+      prog?.update(99, `Recalcul des records… ${pcRemaining} activités restantes`);
     }
   }
   stopTween();

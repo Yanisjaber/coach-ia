@@ -20,6 +20,12 @@ const GOALS_KEY = 'coach_ia_yearly_goals_v2';
 const GOALS_LEGACY_KEY = 'coach_ia_yearly_goals_v1';
 const GOALS_EXPAND_KEY = 'coach_ia_goals_expanded';
 
+// Année affichée (sélecteur). Comparaison toujours avec l'année précédente.
+let _bilanYear = new Date().getFullYear();
+function bilanYear() { return _bilanYear; }
+// Métrique du graphe de cumul annuel : 'distance_km' ou 'elevation_gain'.
+let _cumulMetric = 'distance_km';
+
 const SPORT_LABELS = {
   cyclisme: 'Cyclisme',
   course: 'Course à pied',
@@ -242,10 +248,62 @@ function sumActs(acts) {
   return { dist, dur, tss, sessions, elev };
 }
 
+// ============ SÉLECTEUR D'ANNÉE ============
+function bilanAvailableYears(all) {
+  const set = new Set();
+  for (const a of all) set.add(a.date.getFullYear());
+  set.add(new Date().getFullYear());
+  return [...set].filter(y => y >= 2000).sort((a, b) => b - a);
+}
+function populateYearSelect(all) {
+  const sel = document.getElementById('bilan-year-select');
+  if (!sel) return;
+  const years = bilanAvailableYears(all);
+  if (!years.includes(_bilanYear)) _bilanYear = years[0];
+  sel.innerHTML = years.map(y => `<option value="${y}"${y === _bilanYear ? ' selected' : ''}>${y}</option>`).join('');
+  const prevEl = document.getElementById('bilan-prev-year');
+  if (prevEl) prevEl.textContent = _bilanYear - 1;
+  if (!sel._wired) {
+    sel._wired = true;
+    sel.addEventListener('change', () => { _bilanYear = +sel.value; renderBilan(); });
+  }
+}
+
+// ============ SPARKLINES KPI ============
+// Cumul mensuel d'une métrique pour une année donnée (null après le mois courant).
+function monthlyCumul(all, year, key) {
+  const m = new Array(12).fill(0);
+  for (const a of all) {
+    if (a.date.getFullYear() !== year) continue;
+    const mo = a.date.getMonth();
+    m[mo] += key === 'hours' ? (a.duration_min || 0) / 60
+      : key === 'sessions' ? 1
+      : (a[key] || 0);
+  }
+  for (let i = 1; i < 12; i++) m[i] += m[i - 1];
+  const now = new Date();
+  if (year === now.getFullYear()) for (let i = now.getMonth() + 1; i < 12; i++) m[i] = null;
+  return m;
+}
+function drawSpark(svgId, arr) {
+  const svg = document.getElementById(svgId);
+  if (!svg) return;
+  const pts = arr.map((v, i) => [i, v]).filter(p => p[1] != null);
+  if (pts.length < 2) { svg.innerHTML = ''; return; }
+  const W = 120, H = 24, pad = 2;
+  const maxY = Math.max(...pts.map(p => p[1])) || 1;
+  const X = i => pad + (i / 11) * (W - 2 * pad);
+  const Y = v => H - pad - (v / maxY) * (H - 2 * pad);
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' ');
+  const last = pts[pts.length - 1];
+  const area = `${line} L${X(last[0]).toFixed(1)},${H} L${X(pts[0][0]).toFixed(1)},${H} Z`;
+  svg.innerHTML = `<path d="${area}" fill="rgba(74,222,128,0.12)" stroke="none"/>`
+    + `<path d="${line}" fill="none" stroke="#4ade80" stroke-width="1.6" stroke-linejoin="round"/>`;
+}
+
 // ============ KPIs ANNUELS (respectent filtre header) ============
 function renderKPIs(allUnfiltered) {
-  const now = new Date();
-  const year = now.getFullYear();
+  const year = _bilanYear;
   const prevYear = year - 1;
   document.querySelectorAll('.bilan-year-label').forEach(el => el.textContent = year);
 
@@ -253,6 +311,12 @@ function renderKPIs(allUnfiltered) {
   const all = filterByHeaderActiveSports(allUnfiltered);
   const ytd = sumActs(activitiesYTD(all, year));
   const prev = sumActs(activitiesYTDPrevYear(all, year));
+
+  // Sparklines (cumul mensuel de l'année affichée)
+  drawSpark('bilan-spark-dist', monthlyCumul(all, year, 'distance_km'));
+  drawSpark('bilan-spark-hours', monthlyCumul(all, year, 'hours'));
+  drawSpark('bilan-spark-sessions', monthlyCumul(all, year, 'sessions'));
+  drawSpark('bilan-spark-tss', monthlyCumul(all, year, 'tss'));
 
   function setCard(prefix, currentVal, prevVal, fmt, unit) {
     const valEl = document.getElementById(`bilan-${prefix}-val`);
@@ -330,8 +394,7 @@ function computeGoalCurrent(goal, allUnfiltered, year) {
 
 // ============ AFFICHAGE OBJECTIFS ============
 function renderGoals(allUnfiltered) {
-  const now = new Date();
-  const year = now.getFullYear();
+  const year = _bilanYear;
   document.getElementById('bilan-goals-year').textContent = year;
 
   const allGoals = loadGoalsForYear(year);
@@ -446,11 +509,23 @@ function renderGoalRow(goal, allUnfiltered, year, showSport) {
     : '';
 
   // Indicateur manuel : pas de barre de progression "rythme attendu"
-  const showMark = !isLower && (tpl.calc.startsWith('sum_') || tpl.calc.startsWith('avg_'));
-  const expectedMark = (() => {
-    const now = new Date();
-    return Math.min(100, ((now - new Date(year, 0, 1)) / (365 * 86400000)) * 100);
-  })();
+  const isCumulative = tpl.calc.startsWith('sum_') || tpl.calc.startsWith('avg_');
+  const showMark = !isLower && isCumulative;
+  const now = new Date();
+  const expectedMark = Math.min(100, ((now - new Date(year, 0, 1)) / (365 * 86400000)) * 100);
+
+  // Projection de fin d'année (seulement année en cours + objectif cumulé)
+  let projHtml = '';
+  if (isCumulative && current != null && year === now.getFullYear()) {
+    const frac = (now - new Date(year, 0, 1)) / (365 * 86400000);
+    if (frac > 0.02) {
+      const projection = current / frac;
+      const projPct = Math.round((projection / target) * 100);
+      const projStr = fmtNum(projection, tpl.unit === 'h' ? 1 : 0);
+      const cls = projPct >= 100 ? 'proj-ok' : 'proj-low';
+      projHtml = `<div class="bilan-goal-proj ${cls}">Projection fin d'année : <strong>${projStr} ${tpl.unit}</strong> · cible à ${projPct}%</div>`;
+    }
+  }
 
   return `
     <div class="bilan-goal-row" data-goal-id="${goal.id}">
@@ -470,6 +545,7 @@ function renderGoalRow(goal, allUnfiltered, year, showSport) {
         <div class="bilan-goal-fill ${onTrack ? 'on-track' : 'behind'}" style="width:${pct.toFixed(1)}%;"></div>
         ${showMark ? `<div class="bilan-goal-mark" style="left:${expectedMark.toFixed(1)}%;" title="Rythme attendu à cette date"></div>` : ''}
       </div>
+      ${projHtml}
     </div>
   `;
 }
@@ -510,8 +586,7 @@ function openGoalAdd(sport) {
 
 // ============ MODAL : ÉDITER UN OBJECTIF (ajout / modif) ============
 function openGoalEditor(id, presetSport, presetTpl) {
-  const now = new Date();
-  const year = now.getFullYear();
+  const year = _bilanYear;
   const goals = loadGoalsForYear(year);
   let goal = id ? goals.find(g => g.id === id) : null;
   const sport = goal ? goal.sport : presetSport;
@@ -606,7 +681,7 @@ async function confirmAndDelete(id) {
     title: 'Supprimer', message: 'Supprimer cet objectif ?', confirmLabel: 'Supprimer', danger: true,
   }) : Promise.resolve(window.confirm('Supprimer cet objectif ?')));
   if (!ok) return;
-  const year = new Date().getFullYear();
+  const year = _bilanYear;
   const all = loadGoalsForYear(year);
   const goalToDelete = all.find(g => g.id === id);
   const remaining = all.filter(g => g.id !== id);
@@ -644,7 +719,7 @@ function renderVolumeRecords(allUnfiltered) {
 
   wrap.innerHTML = rows.map(r => `
     <div class="bilan-record"${r.date ? ` data-date="${r.date}"` : ''}>
-      <div class="bilan-record-label">${r.label}</div>
+      <div class="bilan-record-label">${r.label}${isRecentRecord(r.date) ? ' <span class="bilan-record-new">nouveau</span>' : ''}</div>
       <div class="bilan-record-value">${r.value}</div>
       <div class="bilan-record-sub">${escapeHtml(r.sub || '—')}</div>
       <div class="bilan-record-date">${fmtFullDate(r.date)}</div>
@@ -653,51 +728,79 @@ function renderVolumeRecords(allUnfiltered) {
   wireRecordClicks(wrap);
 }
 
-// Affiche les records de puissance (Mean Maximal Power) depuis window.DASHBOARD_DATA.power_profile
+// Un record est "nouveau" s'il a été établi dans les 30 derniers jours.
+function isRecentRecord(iso) {
+  if (!iso) return false;
+  const d = new Date(iso + 'T12:00:00');
+  if (isNaN(d)) return false;
+  return (Date.now() - d.getTime()) < 30 * 86400000;
+}
+
+// Sport choisi pour les records de puissance (sélecteur local, indépendant).
+let _powerSport = 'cyclisme';
+function powerTargetSport() { return _powerSport; }
+window.coachPowerSport = () => _powerSport; // lu aussi par power-profile.js
+
+const POWER_SPORT_LABELS = { cyclisme: 'Cyclisme', course: 'Course', musculation: 'Muscu', natation: 'Natation', autre: 'Autre' };
+
+// Remplit le <select> des sports disposant de données de puissance + câble le change.
+function populatePowerSportSelect(bySport) {
+  const sel = document.getElementById('power-sport-select');
+  if (!sel) return;
+  const order = ['cyclisme', 'course', 'musculation', 'natation', 'autre'];
+  const avail = order.filter(s => bySport[s] && bySport[s].durations && Object.keys(bySport[s].durations).length);
+  if (avail.length && !avail.includes(_powerSport)) _powerSport = avail[0];
+  sel.innerHTML = avail.map(s => `<option value="${s}"${s === _powerSport ? ' selected' : ''}>${POWER_SPORT_LABELS[s] || s}</option>`).join('');
+  sel.style.display = avail.length > 1 ? '' : 'none'; // inutile s'il n'y a qu'un sport
+  if (!sel._wired) {
+    sel._wired = true;
+    sel.addEventListener('change', () => {
+      _powerSport = sel.value;
+      renderPowerRecords();
+      if (window.renderPowerProfile) window.renderPowerProfile();
+    });
+  }
+}
+
+// Affiche les records de puissance depuis power_by_sport, pour le sport actif.
 function renderPowerRecords() {
   const wrap = document.getElementById('bilan-power-records');
   if (!wrap) return;
-  // La puissance est une donnée vélo : on n'affiche les records que si le filtre
-  // sport est « Tout » ou inclut le cyclisme.
-  const active = window.activeSports;
-  const cyclingActive = !active || active.size === 0 || active.has('tout') || active.has('cyclisme');
-  if (!cyclingActive) {
-    wrap.innerHTML = `<p class="bilan-empty">Records de puissance disponibles pour le cyclisme.</p>`;
-    return;
-  }
   const data = window.DASHBOARD_DATA;
-  const pp = data && data.power_profile;
-  if (!pp || !pp.alltime || Object.keys(pp.alltime).length === 0) {
-    wrap.innerHTML = `<p class="bilan-empty">Power Profile non disponible.<br>Sera calculé au prochain run de fetch_data.py (cron 15min).</p>`;
+  const bySport = (data && data.power_by_sport) || {};
+  populatePowerSportSelect(bySport);
+  const sport = powerTargetSport();
+  const pps = bySport[sport];
+  if (!pps || !pps.durations || Object.keys(pps.durations).length === 0) {
+    wrap.innerHTML = `<p class="bilan-empty">Aucun record de puissance pour ce sport.</p>`;
     return;
   }
-  // Durées clés à mettre en avant (secondes → label)
+  // Durées clés (libellés = colonnes de power_profile_sport)
   const KEY_DURS = [
-    { s: '5',    label: '5 secondes'  },
-    { s: '15',   label: '15 secondes' },
-    { s: '30',   label: '30 secondes' },
-    { s: '60',   label: '1 minute'    },
-    { s: '120',  label: '2 minutes'   },
-    { s: '300',  label: '5 minutes'   },
-    { s: '600',  label: '10 minutes'  },
-    { s: '1200', label: '20 minutes'  },
-    { s: '1800', label: '30 minutes'  },
-    { s: '3600', label: '1 heure'     },
+    { c: '5s',   label: '5 secondes'  },
+    { c: '15s',  label: '15 secondes' },
+    { c: '30s',  label: '30 secondes' },
+    { c: '1min', label: '1 minute'    },
+    { c: '2min', label: '2 minutes'   },
+    { c: '5min', label: '5 minutes'   },
+    { c: '10min',label: '10 minutes'  },
+    { c: '20min',label: '20 minutes'  },
+    { c: '30min',label: '30 minutes'  },
+    { c: '1h',   label: '1 heure'     },
   ];
-  const alltime = pp.alltime || {};
-  const recent = pp.last_90d || {};
-  const dates = pp.alltime_dates || {};
+  const durations = pps.durations || {};
+  const details = pps.details || {};
   const rows = KEY_DURS.map(k => {
-    const at = alltime[k.s];
-    const r = recent[k.s];
+    const at = durations[k.c];
     if (at == null) return null;
+    const d = details[k.c] || {};
+    const r = d.w90;
     const subParts = [];
     if (r != null && r !== at) {
       const diff = Math.round(r - at);
-      const diffStr = diff >= 0 ? `+${diff}` : `${diff}`;
-      subParts.push(`90j : ${Math.round(r)} W (${diffStr} W)`);
+      subParts.push(`90j : ${Math.round(r)} W (${diff >= 0 ? '+' : ''}${diff} W)`);
     } else if (r != null) {
-      subParts.push(`Égal au record sur les 90 derniers jours`);
+      subParts.push('Égal au record sur les 90 derniers jours');
     } else {
       subParts.push('Pas de récent comparable');
     }
@@ -705,16 +808,16 @@ function renderPowerRecords() {
       label: k.label,
       value: Math.round(at) + ' W',
       sub: subParts.join(' · '),
-      date: dates[k.s] || null,
+      date: d.date || null,
     };
   }).filter(Boolean);
   if (!rows.length) {
-    wrap.innerHTML = `<p class="bilan-empty">Aucun record de puissance encore calculé.</p>`;
+    wrap.innerHTML = `<p class="bilan-empty">Aucun record de puissance pour ce sport.</p>`;
     return;
   }
   wrap.innerHTML = rows.map(r => `
     <div class="bilan-record"${r.date ? ` data-date="${r.date}"` : ''}>
-      <div class="bilan-record-label">${escapeHtml(r.label)}</div>
+      <div class="bilan-record-label">${escapeHtml(r.label)}${isRecentRecord(r.date) ? ' <span class="bilan-record-new">nouveau</span>' : ''}</div>
       <div class="bilan-record-value">${r.value}</div>
       <div class="bilan-record-sub">${escapeHtml(r.sub)}</div>
     </div>
@@ -744,12 +847,14 @@ function renderYearlyChart(allUnfiltered) {
   const currentYear = now.getFullYear();
   const years = [currentYear - 2, currentYear - 1, currentYear];
 
+  const metric = _cumulMetric;            // 'distance_km' | 'elevation_gain'
+  const unit = metric === 'elevation_gain' ? ' m' : ' km';
   const datasets = years.map((year, i) => {
     const cumul = new Array(12).fill(0);
     const acts = all.filter(a => a.date.getFullYear() === year);
     for (const a of acts) {
       const m = a.date.getMonth();
-      cumul[m] += a.distance_km || 0;
+      cumul[m] += a[metric] || 0;
     }
     for (let j = 1; j < 12; j++) cumul[j] += cumul[j - 1];
     if (year === currentYear) {
@@ -777,12 +882,58 @@ function renderYearlyChart(allUnfiltered) {
       plugins: {
         legend: { position: 'top', labels: { color: '#e6e9ef', font: { size: 11 }, boxWidth: 14 } },
         tooltip: { mode: 'index', intersect: false, callbacks: {
-          label: (item) => `${item.dataset.label} : ${item.parsed.y == null ? '—' : Math.round(item.parsed.y) + ' km'}`,
+          label: (item) => `${item.dataset.label} : ${item.parsed.y == null ? '—' : Math.round(item.parsed.y) + unit}`,
         }},
       },
       scales: {
         x: { ticks: { color: '#8b94a8' }, grid: { color: '#232a3a' } },
-        y: { ticks: { color: '#8b94a8', callback: (v) => v + ' km' }, grid: { color: '#232a3a' }, beginAtZero: true },
+        y: { ticks: { color: '#8b94a8', callback: (v) => v + unit }, grid: { color: '#232a3a' }, beginAtZero: true },
+      },
+    },
+  });
+}
+
+// ============ CHART VOLUME PAR MOIS (année vs N-1) ============
+let _monthlyChart = null;
+function renderMonthlyVolumeChart(allUnfiltered) {
+  const canvas = document.getElementById('chart-bilan-monthly');
+  if (!canvas || !window.Chart) return;
+  const all = filterByHeaderActiveSports(allUnfiltered);
+  const year = _bilanYear, prev = year - 1;
+  const cur = new Array(12).fill(0), pre = new Array(12).fill(0);
+  for (const a of all) {
+    const y = a.date.getFullYear(), mo = a.date.getMonth();
+    const h = (a.duration_min || 0) / 60;
+    if (y === year) cur[mo] += h;
+    else if (y === prev) pre[mo] += h;
+  }
+  const r1 = v => Math.round(v * 10) / 10;
+  const yEl = document.getElementById('bilan-monthly-year');
+  const pEl = document.getElementById('bilan-monthly-prev');
+  if (yEl) yEl.textContent = year;
+  if (pEl) pEl.textContent = prev;
+  if (_monthlyChart) { _monthlyChart.destroy(); _monthlyChart = null; }
+  _monthlyChart = new window.Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'],
+      datasets: [
+        { label: String(prev), data: pre.map(r1), backgroundColor: '#2c3447', borderRadius: 4, categoryPercentage: 0.7, barPercentage: 0.9 },
+        { label: String(year), data: cur.map(r1), backgroundColor: '#4ade80', borderRadius: 4, categoryPercentage: 0.7, barPercentage: 0.9 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { color: '#e6e9ef', font: { size: 11 }, boxWidth: 12 } },
+        tooltip: { mode: 'index', intersect: false, callbacks: {
+          label: (item) => `${item.dataset.label} : ${r1(item.parsed.y)} h`,
+        }},
+      },
+      scales: {
+        x: { ticks: { color: '#8b94a8' }, grid: { display: false } },
+        y: { ticks: { color: '#8b94a8', callback: (v) => v + ' h' }, grid: { color: '#232a3a' }, beginAtZero: true },
       },
     },
   });
@@ -792,11 +943,12 @@ function renderYearlyChart(allUnfiltered) {
 function renderBilan() {
   try {
     const all = getAllActivities();
+    populateYearSelect(all);
     renderKPIs(all);
     renderGoals(all);
     renderVolumeRecords(all);
     renderPowerRecords();
-    setTimeout(() => renderYearlyChart(all), 50);
+    setTimeout(() => { renderMonthlyVolumeChart(all); renderYearlyChart(all); }, 50);
   } catch (e) {
     console.error('[bilan] render error:', e);
   }
@@ -809,6 +961,17 @@ function init() {
     collapseBtn.addEventListener('click', () => {
       setExpanded(!isExpanded());
       renderBilan();
+    });
+  }
+  // Toggle Distance / Dénivelé sur le cumul annuel
+  const cumulToggle = document.getElementById('bilan-cumul-toggle');
+  if (cumulToggle) {
+    cumulToggle.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-metric]');
+      if (!btn) return;
+      _cumulMetric = btn.dataset.metric;
+      cumulToggle.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+      renderYearlyChart(getAllActivities());
     });
   }
   setTimeout(renderBilan, 200);

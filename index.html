@@ -67,24 +67,21 @@
 </head>
 <body>
 <div id="boot-overlay"><div class="spinner"></div></div>
-<div class="container">
-
-<header>
+<div class="app-shell">
+<aside class="sidebar">
   <div class="logo">
     <div class="logo-icon">CI</div>
     <div class="logo-text">
       <h1>Coach IA</h1>
     </div>
   </div>
-  <div class="sport-filter" id="sport-filter">
-    <button class="sport-btn active" data-sport="tout">Tout</button>
-    <button class="sport-btn" data-sport="cyclisme">Cyclisme</button>
-    <button class="sport-btn" data-sport="course">Course</button>
-    <button class="sport-btn" data-sport="musculation">Muscu</button>
-    <button class="sport-btn" data-sport="natation">Natation</button>
-    <button class="sport-btn" data-sport="autre">Autre</button>
-  </div>
-  <div class="header-info">
+  <nav class="tabs sidebar-nav">
+    <button class="tab active" data-panel="p1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg><span>Tableau de bord</span></button>
+    <button class="tab" data-panel="p2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Calendrier</span></button>
+    <button class="tab" data-panel="p3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Statistiques</span></button>
+    <button class="tab" data-panel="p5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Termes</span></button>
+  </nav>
+  <div class="header-info sidebar-foot">
     <!-- Toggle Mode IA / Manuel -->
     <div class="mode-toggle" id="mode-toggle" title="Basculer entre Mode IA (assistance intelligente) et Mode Manuel (planification 100% manuelle)">
       <div class="mode-slider" id="mode-slider"></div>
@@ -107,15 +104,10 @@
     <!-- Date supprimée (info redondante avec le calendrier) -->
     <span class="date" id="today-date" style="display:none;">—</span>
   </div>
-</header>
-
-<!-- TABS -->
-<div class="tabs">
-  <button class="tab active" data-panel="p1">Tableau de bord</button>
-  <button class="tab" data-panel="p2">Calendrier</button>
-  <button class="tab" data-panel="p3">Statistiques</button>
-  <button class="tab" data-panel="p5">Termes</button>
-</div>
+</aside>
+<main class="main">
+<header class="topbar"><span class="topbar-title" id="topbar-title">Tableau de bord</span></header>
+<div class="container">
 
 <!-- PANEL 1: Charge vs Récupération -->
 <section class="panel active" id="p1">
@@ -183,7 +175,13 @@
   </div>
 
   <div class="grid-1 card">
-    <div class="section-title">Forme & fatigue</div>
+    <div class="chart-head">
+      <div class="section-title" style="margin-bottom:0;">Forme & fatigue</div>
+      <button class="chart-reset" id="load-reset" type="button" title="Réinitialiser la période">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        Réinitialiser
+      </button>
+    </div>
     <div class="date-range" id="load-range">
       <button class="preset active" data-days="30">30j</button>
       <button class="preset" data-days="90">90j</button>
@@ -203,28 +201,15 @@
     </div>
   </div>
 
-  <div class="grid-3">
+  <div class="grid-vol">
     <div class="card">
-      <div class="section-title">Heures hebdomadaires</div>
-      <div class="date-range" id="hours-range">
-        <button class="preset" data-weeks="4">4 sem</button>
-        <button class="preset active" data-weeks="12">12 sem</button>
-        <span class="sep">·</span>
-        <input type="date" id="hours-from">
-        <span>→</span>
-        <input type="date" id="hours-to">
-      </div>
-      <div class="chart-wrap small"><canvas id="chart-hours"></canvas></div>
-      <div id="hours-detail" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <div style="font-size:11px; color:var(--text-dim);" id="hours-detail-title">Détail jour par jour</div>
-          <button id="hours-detail-close" style="background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:18px; line-height:1; padding:0 6px;">×</button>
+      <div class="section-title vol-head">
+        <span>Volume hebdomadaire</span>
+        <div class="zones-toggle" id="vol-toggle">
+          <button class="ztoggle-btn active" data-metric="hours" type="button">Heures</button>
+          <button class="ztoggle-btn" data-metric="tss" type="button">TSS</button>
         </div>
-        <div class="chart-wrap" style="height:110px;"><canvas id="chart-hours-daily"></canvas></div>
       </div>
-    </div>
-    <div class="card">
-      <div class="section-title">Charge hebdomadaire</div>
       <div class="date-range" id="weekly-range">
         <button class="preset" data-weeks="4">4 sem</button>
         <button class="preset active" data-weeks="12">12 sem</button>
@@ -233,13 +218,32 @@
         <span>→</span>
         <input type="date" id="weekly-to">
       </div>
-      <div class="chart-wrap small"><canvas id="chart-weekly"></canvas></div>
+      <div class="vol-stats" id="vol-stats"></div>
+      <div class="chart-wrap small" id="vol-hours-wrap"><canvas id="chart-hours"></canvas></div>
+      <div class="chart-wrap small" id="vol-tss-wrap" style="display:none;"><canvas id="chart-weekly"></canvas></div>
+      <div id="hours-detail" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <div style="font-size:11px; color:var(--text-dim);" id="hours-detail-title">Détail jour par jour</div>
+          <button id="hours-detail-close" style="background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:18px; line-height:1; padding:0 6px;">×</button>
+        </div>
+        <div class="chart-wrap" style="height:110px;"><canvas id="chart-hours-daily"></canvas></div>
+      </div>
       <div id="weekly-detail" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
           <div style="font-size:11px; color:var(--text-dim);" id="weekly-detail-title">Détail jour par jour</div>
           <button id="weekly-detail-close" style="background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:18px; line-height:1; padding:0 6px;">×</button>
         </div>
         <div class="chart-wrap" style="height:110px;"><canvas id="chart-weekly-daily"></canvas></div>
+      </div>
+      <!-- Plage "Heures" masquée (conteneur caché → cache aussi les sélecteurs flatpickr).
+           Pilotée par la plage visible ci-dessus (sync). -->
+      <div style="display:none;" aria-hidden="true">
+        <div id="hours-range">
+          <button class="preset" data-weeks="4"></button>
+          <button class="preset active" data-weeks="12"></button>
+        </div>
+        <input type="date" id="hours-from">
+        <input type="date" id="hours-to">
       </div>
     </div>
     <div class="card">
@@ -259,8 +263,12 @@
         <span>→</span>
         <input type="date" id="zones-to">
       </div>
-      <div class="chart-wrap small"><canvas id="chart-zones"></canvas></div>
-      <div class="zone-summary" id="zone-summary"></div>
+      <div class="chart-wrap small" id="zones-chart-wrap"><canvas id="chart-zones"></canvas></div>
+      <div class="zones-empty" id="zones-empty" hidden>
+        Aucune donnée de zones sur cette période.
+        <span>Les zones nécessitent les streams FC / puissance des activités.</span>
+      </div>
+      <div class="zone-summary" id="zone-summary" style="display:none;"></div>
     </div>
   </div>
 </section>
@@ -285,7 +293,6 @@
   <!-- Compétitions à venir (les boutons d'ajout sont désormais dans le popover "+" de chaque jour) -->
   <div class="grid-1 card">
     <div class="section-title">Compétitions à venir</div>
-    <div class="section-subtitle">Survole un jour du calendrier ci-dessous et clique sur le « + » pour ajouter une compétition, un entraînement, une note ou marquer le jour en repos.</div>
     <div class="comp-list" id="comp-list"></div>
   </div>
 
@@ -321,17 +328,45 @@
     </div>
   </div>
 
-  <!-- Séances récentes (déplacé depuis l'ancien onglet Détail séances) -->
+  <!-- Recherche d'activité -->
   <div class="grid-1 card">
-    <div class="section-title">Séances récentes</div>
-    <div class="section-subtitle">Cliquer sur une ligne pour voir le détail prévu vs réalisé</div>
+    <div class="section-title">Recherche d'activité</div>
+    <div class="act-filter-bar" id="act-filter-bar">
+      <div class="act-filter">
+        <label>Sport</label>
+        <select id="act-sport-filter"><option value="">Tous</option></select>
+      </div>
+      <div class="act-filter">
+        <label>Distance (km)</label>
+        <div class="act-range"><input type="number" id="act-dist-min" placeholder="min" min="0"><span>–</span><input type="number" id="act-dist-max" placeholder="max" min="0"></div>
+      </div>
+      <div class="act-filter">
+        <label>Durée (min)</label>
+        <div class="act-range"><input type="number" id="act-dur-min" placeholder="min" min="0"><span>–</span><input type="number" id="act-dur-max" placeholder="max" min="0"></div>
+      </div>
+      <div class="act-filter">
+        <label>Dénivelé (m)</label>
+        <div class="act-range"><input type="number" id="act-dplus-min" placeholder="min" min="0"><span>–</span><input type="number" id="act-dplus-max" placeholder="max" min="0"></div>
+      </div>
+      <div class="act-filter">
+        <label>TSS</label>
+        <div class="act-range"><input type="number" id="act-tss-min" placeholder="min" min="0"><span>–</span><input type="number" id="act-tss-max" placeholder="max" min="0"></div>
+      </div>
+      <button type="button" id="act-filter-reset" class="act-filter-reset">Réinitialiser</button>
+    </div>
     <table class="session-table">
       <thead><tr>
-        <th>Date</th><th>Séance</th><th>Sport</th><th>Durée</th><th>TSS</th><th>NP / FTP%</th><th>FC moy</th><th>Conformité</th>
+        <th class="th-sort" data-sort="sport">Sport<span class="sort-caret"></span></th>
+        <th class="th-sort" data-sort="date">Date<span class="sort-caret"></span></th>
+        <th class="th-sort" data-sort="title">Titre<span class="sort-caret"></span></th>
+        <th class="th-sort" data-sort="duration">Temps<span class="sort-caret"></span></th>
+        <th class="th-sort" data-sort="distance">Distance<span class="sort-caret"></span></th>
+        <th class="th-sort" data-sort="elevation">Dénivelé<span class="sort-caret"></span></th>
+        <th class="th-sort" data-sort="tss">Effort relatif<span class="sort-caret"></span></th>
       </tr></thead>
       <tbody id="sessions-tbody"></tbody>
     </table>
-    <div id="session-detail-wrap"></div>
+    <div id="act-search-count" class="act-search-count"></div>
   </div>
 
   <!-- Compat : anciens IDs cachés pour ne pas casser le JS legacy -->
@@ -345,6 +380,12 @@
 
 <!-- PANEL 3: Tendances long-terme -->
 <section class="panel" id="p3">
+  <!-- Sélecteur d'année -->
+  <div class="bilan-toolbar">
+    <select id="bilan-year-select" class="bilan-year-select" aria-label="Année affichée"></select>
+    <span class="bilan-vs-label">vs <span id="bilan-prev-year">—</span></span>
+  </div>
+
   <!-- 1. KPIs annuels : YTD vs même période N-1 -->
   <section class="hero bilan-hero">
     <div class="card bilan-kpi" data-metric="distance">
@@ -352,24 +393,28 @@
       <div><span class="kpi-value" id="bilan-dist-val">—</span><span class="kpi-unit">km</span></div>
       <div class="kpi-trend bilan-diff" id="bilan-dist-diff">—</div>
       <div class="bilan-sub" id="bilan-dist-prev">—</div>
+      <svg class="bilan-spark" id="bilan-spark-dist" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true"></svg>
     </div>
     <div class="card bilan-kpi" data-metric="hours">
       <div class="kpi-label">Temps <span class="bilan-year-label" id="bilan-year-2">2026</span></div>
       <div><span class="kpi-value" id="bilan-hours-val">—</span><span class="kpi-unit">h</span></div>
       <div class="kpi-trend bilan-diff" id="bilan-hours-diff">—</div>
       <div class="bilan-sub" id="bilan-hours-prev">—</div>
+      <svg class="bilan-spark" id="bilan-spark-hours" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true"></svg>
     </div>
     <div class="card bilan-kpi" data-metric="sessions">
       <div class="kpi-label">Séances <span class="bilan-year-label" id="bilan-year-3">2026</span></div>
       <div><span class="kpi-value" id="bilan-sessions-val">—</span></div>
       <div class="kpi-trend bilan-diff" id="bilan-sessions-diff">—</div>
       <div class="bilan-sub" id="bilan-sessions-prev">—</div>
+      <svg class="bilan-spark" id="bilan-spark-sessions" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true"></svg>
     </div>
     <div class="card bilan-kpi" data-metric="tss">
       <div class="kpi-label">TSS cumulé <span class="bilan-year-label" id="bilan-year-4">2026</span></div>
       <div><span class="kpi-value" id="bilan-tss-val">—</span></div>
       <div class="kpi-trend bilan-diff" id="bilan-tss-diff">—</div>
       <div class="bilan-sub" id="bilan-tss-prev">—</div>
+      <svg class="bilan-spark" id="bilan-spark-tss" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true"></svg>
     </div>
   </section>
 
@@ -391,6 +436,13 @@
     </div>
   </div>
 
+  <!-- Volume par mois (barres, année vs N-1) -->
+  <div class="grid-1 card">
+    <div class="section-title">Volume par mois</div>
+    <div class="section-subtitle">Heures d'entraînement · <span id="bilan-monthly-year">—</span> vs <span id="bilan-monthly-prev">—</span> (gris)</div>
+    <div class="chart-wrap" style="height:240px;"><canvas id="chart-bilan-monthly"></canvas></div>
+  </div>
+
   <!-- 3. Records perso : volume + sport -->
   <div class="grid-2">
     <div class="card">
@@ -399,16 +451,29 @@
       <div class="bilan-records" id="bilan-volume-records"></div>
     </div>
     <div class="card">
-      <div class="section-title">Records de puissance</div>
-      <div class="section-subtitle">Tes meilleurs efforts par durée standard (depuis le Power Profile cumulé)</div>
+      <div class="bilan-power-head">
+        <div>
+          <div class="section-title">Records de puissance</div>
+          <div class="section-subtitle">Tes meilleurs efforts par durée, pour le sport choisi</div>
+        </div>
+        <select id="power-sport-select" class="power-sport-select" aria-label="Sport"></select>
+      </div>
       <div class="bilan-records" id="bilan-power-records"></div>
     </div>
   </div>
 
-  <!-- 4. Cumul kilométrique par année -->
+  <!-- 4. Cumul annuel (distance ou dénivelé) -->
   <div class="grid-1 card">
-    <div class="section-title">Cumul kilométrique par année</div>
-    <div class="section-subtitle">Compare ta progression annuelle mois par mois (3 dernières années)</div>
+    <div class="chart-head">
+      <div>
+        <div class="section-title">Cumul annuel</div>
+        <div class="section-subtitle">Compare ta progression annuelle mois par mois (3 dernières années)</div>
+      </div>
+      <div class="bilan-metric-toggle" id="bilan-cumul-toggle">
+        <button type="button" class="active" data-metric="distance_km">Distance</button>
+        <button type="button" data-metric="elevation_gain">Dénivelé</button>
+      </div>
+    </div>
     <div class="chart-wrap" style="height:280px;"><canvas id="chart-bilan-yearly"></canvas></div>
   </div>
 
@@ -697,9 +762,6 @@
   </div>
 </section>
 
-<footer>
-  Coach IA · dashboard d'entraînement · Strava + Whoop
-</footer>
 
 <!-- Modal détail séance -->
 <div class="modal-overlay" id="session-modal">
@@ -1006,8 +1068,10 @@
         </ul>
       </button>
     </div>
-    <p class="welcome-footnote">Tu peux basculer entre les deux modes à tout moment depuis le header.</p>
+    <p class="welcome-footnote">Tu peux basculer entre les deux modes à tout moment depuis le compte.</p>
   </div>
+</div>
+</main>
 </div>
 
 <!-- ============================================================ -->

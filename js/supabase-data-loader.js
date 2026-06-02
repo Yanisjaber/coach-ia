@@ -152,6 +152,7 @@ async function loadFromSupabase() {
       whoopData,
       { data: stravaConnection },
       { data: whoopConnection },
+      { data: powerProfileSport },
     ] = await Promise.all([
       sb.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
       fetchAllPaged('activities', userId, 'start_date_local', ACTIVITY_LIGHT_COLS),
@@ -160,6 +161,7 @@ async function loadFromSupabase() {
       fetchAllPaged('whoop_data', userId, 'iso_date'),
       sb.from('connexions_app').select(STRAVA_CONN_SAFE_COLS).eq('user_id', userId).eq('app', 'strava').maybeSingle(),
       sb.from('connexions_app').select('user_id, last_sync_at').eq('user_id', userId).eq('app', 'whoop').maybeSingle(),
+      sb.from('power_profile_sport').select('*').eq('user_id', userId),
     ]);
 
     // Si un import d'activités est en cours côté serveur (ex : rechargement pendant
@@ -188,7 +190,7 @@ async function loadFromSupabase() {
     setEmptyDataOverlays(false); // données présentes → on retire les messages vides
 
     const reconstituted = reconstituteData({
-      profile, activities, dailyMetrics, powerProfile, whoopData, stravaConnection, whoopConnection,
+      profile, activities, dailyMetrics, powerProfile, whoopData, stravaConnection, whoopConnection, powerProfileSport,
     });
 
     // Remplace window.DASHBOARD_DATA
@@ -293,7 +295,7 @@ function maybeRefreshWhoop(whoopConnection) {
 }
 
 // ============ RECONSTITUTION FORMAT DASHBOARD_DATA ============
-function reconstituteData({ profile, activities, dailyMetrics, powerProfile, whoopData, stravaConnection, whoopConnection }) {
+function reconstituteData({ profile, activities, dailyMetrics, powerProfile, whoopData, stravaConnection, whoopConnection, powerProfileSport }) {
   // On n'affiche les données Whoop QUE si un compte Whoop est réellement connecté.
   // (Évite d'afficher d'anciennes données simulées encore présentes en base.)
   if (!whoopConnection) whoopData = [];
@@ -519,23 +521,49 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
   }
 
   // 5) Power profile
+  // Sport de chaque activité (pour étiqueter les records de puissance par discipline).
+  const sportById = {};
+  for (const a of activities || []) if (a && a.id) sportById[a.id] = a.sport;
+
   const ppAlltime = {};
   const ppRecent = {};
-  const ppDates = {}; // {duration_s: date iso du meilleur effort all-time}
+  const ppDates = {};   // {duration_s: date iso du meilleur effort all-time}
+  const ppSports = {};  // {duration_s: sport brut de l'activité du record}
   const durations = [];
   for (const p of powerProfile || []) {
     const k = String(p.duration_s);
     if (p.watts_alltime != null) ppAlltime[k] = p.watts_alltime;
     if (p.watts_90d != null) ppRecent[k] = p.watts_90d;
     if (p.achieved_at_alltime) ppDates[k] = String(p.achieved_at_alltime).slice(0, 10);
+    if (p.activity_id_alltime && sportById[p.activity_id_alltime]) ppSports[k] = sportById[p.activity_id_alltime];
     durations.push(k);
   }
   const power_profile = (powerProfile && powerProfile.length > 0) ? {
     alltime: ppAlltime,
     last_90d: ppRecent,
     alltime_dates: ppDates,
+    alltime_sports: ppSports,
     durations,
   } : null;
+
+  // Power profile PAR SPORT (table large power_profile_sport).
+  // power_by_sport = { cyclisme: { durations:{label:watts}, details:{label:{w90,date,activity_id}}, ... }, ... }
+  const PP_META_COLS = ['user_id', 'sport', 'details', 'activities_count', 'longest_activity_s', 'ftp', 'weight', 'updated_at'];
+  const power_by_sport = {};
+  for (const row of powerProfileSport || []) {
+    if (!row || !row.sport) continue;
+    const dur = {};
+    for (const [col, val] of Object.entries(row)) {
+      if (PP_META_COLS.includes(col)) continue;
+      if (val != null) dur[col] = val;
+    }
+    power_by_sport[row.sport] = {
+      durations: dur,
+      details: row.details || {},
+      activities_count: row.activities_count ?? null,
+      longest_activity_s: row.longest_activity_s ?? null,
+    };
+  }
 
   // 6) Source + meta
   const realDays = (whoopData || []).filter(w => w.source === 'whoop').length;
@@ -556,6 +584,7 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
     days,
     plan: [],
     power_profile,
+    power_by_sport,
   };
 }
 

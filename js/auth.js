@@ -191,6 +191,23 @@ function injectUserMenu(user) {
     `;
     headerInfo.appendChild(wrap);
 
+    // Déplace le toggle Manuel/IA dans le menu déroulant (allège le header).
+    // On déplace le NŒUD existant → ses handlers (app-mode.js) restent attachés.
+    const menuEl = wrap.querySelector('#auth-user-menu');
+    const headerEl = wrap.querySelector('.auth-user-menu-header');
+    const modeToggle = document.getElementById('mode-toggle');
+    if (menuEl && modeToggle && !menuEl.contains(modeToggle)) {
+      const row = document.createElement('div');
+      row.className = 'auth-user-menu-mode';
+      row.appendChild(modeToggle);
+      modeToggle.style.display = '';
+      const sep = document.createElement('div');
+      sep.className = 'auth-user-menu-sep';
+      const anchor = headerEl ? headerEl.nextSibling : menuEl.firstChild;
+      menuEl.insertBefore(row, anchor);
+      menuEl.insertBefore(sep, anchor);
+    }
+
     const btn = wrap.querySelector('#auth-user-btn');
     const menu = wrap.querySelector('#auth-user-menu');
 
@@ -198,6 +215,11 @@ function injectUserMenu(user) {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       menu.hidden = !menu.hidden;
+      // Le toggle Manuel/IA est dans le menu (masqué jusqu'ici) → recalcule le slider
+      // une fois visible, sinon getBoundingClientRect renvoie 0.
+      if (!menu.hidden && typeof window.positionModeSlider === 'function') {
+        requestAnimationFrame(() => window.positionModeSlider());
+      }
     });
     // Click ailleurs → ferme
     document.addEventListener('click', (e) => {
