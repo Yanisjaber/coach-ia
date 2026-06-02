@@ -85,6 +85,7 @@ async function render(body) {
   body.innerHTML = `
     ${cardStrava(data.strava, data.stravaActs)}
     ${cardWhoop(data.whoop, data.whoopDays)}
+    ${cardOpenDossard()}
     ${orphanStrava ? `<button class="cnx-purge" data-act="purge-strava" type="button">Vider les activités restantes (${data.stravaActs})</button>` : ''}
     <p class="cnx-foot">Tes jetons d'accès restent stockés côté serveur (Supabase) et ne sont jamais exposés ici.</p>
   `;
@@ -163,10 +164,37 @@ function cardWhoop(c, days = 0) {
     </div>`;
 }
 
+function cardOpenDossard() {
+  const lic = window.odGetLicence ? window.odGetLicence() : null;
+  const name = lic ? `${lic.firstName || ''} ${lic.lastName || lic.name || ''}`.trim() : '';
+  const sub = lic
+    ? `${name || 'Licence liée'}${lic.licenceNumber ? ' · N° ' + lic.licenceNumber : ''}${lic.club ? ' · ' + lic.club : ''}`
+    : 'Importe ton palmarès et tes résultats officiels (FSGT, UFOLEP…).';
+  return `
+    <div class="cnx-card opendossard">
+      <div class="cnx-card-top">
+        <div class="cnx-logo opendossard">OD</div>
+        <div class="cnx-card-title"><strong>Open Dossard</strong>${statusPill(lic ? { last_sync_status: 'ok' } : null)}</div>
+      </div>
+      <p class="cnx-card-sub">${sub}</p>
+      <div class="cnx-actions">
+        ${lic
+          ? `<button class="cnx-btn ghost" data-act="od-relink">Changer de licence</button>
+             <button class="cnx-btn danger" data-act="od-unlink">Délier</button>`
+          : `<button class="cnx-btn primary" data-act="od-link">Lier ma licence</button>`}
+      </div>
+    </div>`;
+}
+
 function wire(body) {
   body.querySelectorAll('[data-act]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const act = btn.dataset.act;
+      if (act === 'od-link' || act === 'od-relink') return window.odOpenLinkModal?.();
+      if (act === 'od-unlink') {
+        window.odUnlinkLicence?.();
+        return;
+      }
       if (act === 'strava-connect') return window.startStravaOAuth?.();
       if (act === 'whoop-connect') return window.startWhoopOAuth?.();
       if (act === 'strava-sync') {
@@ -364,6 +392,8 @@ function injectStyles() {
       border-radius: 12px; padding: 16px; }
     .cnx-card.strava { border-left: 3px solid #FC4C02; }
     .cnx-card.whoop { border-left: 3px solid #0bbfa6; }
+    .cnx-card.opendossard { border-left: 3px solid #fbbf24; }
+    .cnx-logo.opendossard { background: rgba(251,191,36,0.15); color: #fbbf24; font-size: 13px; }
     .cnx-card-top { display: flex; align-items: center; gap: 12px; }
     .cnx-logo { width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center;
       justify-content: center; flex-shrink: 0; font-weight: 800; }

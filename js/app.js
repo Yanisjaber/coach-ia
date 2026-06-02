@@ -54,6 +54,9 @@ import './day-extras.js';
 // ========= BILAN ANNUEL (nouvelle page p3, remplace Tendances long-terme) =========
 // KPIs YTD vs N-1, objectifs annuels, records, cumul kilométrique annuel.
 import './bilan.js';
+import './library.js';
+import './opendossard.js';
+import './coach-ai.js';
 
 
 // ========= DATA LOADER (data.js via window.DASHBOARD_DATA) =========
@@ -1419,8 +1422,9 @@ function saveCompetitions(comps) {
     for (const d of deleted) window.cloudSync.deleteCompetition(d);
   }
 
-  // Re-render automatique : "Compétitions à venir" + calendrier
+  // Re-render automatique : "Compétitions à venir" + calendrier + page Compétitions
   if (typeof renderCompList === 'function') renderCompList();
+  if (typeof renderCompetitionsPage === 'function') renderCompetitionsPage();
   if (typeof renderCalendar === 'function') renderCalendar();
 }
 
@@ -1492,6 +1496,305 @@ function renderCompList() {
   }).join('');
 }
 
+// Page "Compétitions" (onglet dédié) : hero prochain objectif + frise de saison
+// + à venir (jauge) + passées enrichies (résultats réels).
+const _PHASE_COLORS = { build: '#60a5fa', peak: '#fbbf24', taper: '#a78bfa', race: '#f87171', recovery: '#4ade80' };
+function _formInfo(tsb) {
+  if (tsb == null) return { t: '—', c: 'var(--text-mute)' };
+  if (tsb >= 10) return { t: 'très frais', c: 'var(--accent)' };
+  if (tsb >= 0) return { t: 'frais', c: 'var(--accent)' };
+  if (tsb >= -10) return { t: 'équilibré', c: 'var(--warn)' };
+  if (tsb >= -20) return { t: 'fatigué', c: 'var(--warn)' };
+  return { t: 'très fatigué', c: 'var(--danger)' };
+}
+function _prepReco(phaseKey, tsb) {
+  if (tsb != null && tsb < -20) return "Fatigue marquée — priorité à la récupération avant d'affûter.";
+  switch (phaseKey) {
+    case 'race': return 'Semaine de course : repos et activations courtes, garde la fraîcheur.';
+    case 'taper': return 'Affûtage en cours — réduis le volume, conserve un peu d\'intensité.';
+    case 'peak': return 'Pic de charge : intensité spécifique, surveille bien la récupération.';
+    case 'build': return 'Construis le foncier et le CTL. L\'affûtage viendra plus tard.';
+    case 'recovery': return 'Phase de décharge : récupère pour mieux rebondir.';
+    default: return 'Continue ta préparation régulière.';
+  }
+}
+
+function renderCompetitionsPage() {
+  const heroWrap = document.getElementById('comp-hero');
+  const seasonWrap = document.getElementById('comp-season');
+  const upWrap = document.getElementById('comp-page-upcoming');
+  const pastWrap = document.getElementById('comp-page-past');
+  if (!heroWrap && !seasonWrap && !upWrap && !pastWrap) return;
+
+  const fmtFullDate = d => d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+  const fmtShortDayMonth = d => d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+  const fmtYear = d => d.getFullYear();
+
+  const comps = loadCompetitions().map(c => {
+    let startDate = c.date, endDate = c.date;
+    if (c.stages && Array.isArray(c.stagesList) && c.stagesList.length) {
+      const dates = c.stagesList.map(s => s.date).filter(Boolean).sort();
+      if (dates.length) { startDate = dates[0]; endDate = dates[dates.length - 1]; }
+    }
+    return { ...c, dateObj: new Date(startDate + 'T12:00:00'), endDateObj: new Date(endDate + 'T12:00:00') };
+  });
+
+  const dateLabel = (c) => {
+    if (c.stages && c.endDateObj.getTime() !== c.dateObj.getTime()) {
+      const sameYear = c.dateObj.getFullYear() === c.endDateObj.getFullYear();
+      const base = sameYear
+        ? `${fmtShortDayMonth(c.dateObj)} → ${fmtShortDayMonth(c.endDateObj)} ${fmtYear(c.endDateObj)}`
+        : `${fmtShortDayMonth(c.dateObj)} ${fmtYear(c.dateObj)} → ${fmtShortDayMonth(c.endDateObj)} ${fmtYear(c.endDateObj)}`;
+      return `${base} <span class="comp-stages-badge" title="${c.stagesList.length} étapes">· ${c.stagesList.length} étapes</span>`;
+    }
+    return fmtFullDate(c.dateObj);
+  };
+
+  const upcoming = comps.filter(c => c.endDateObj >= today).sort((a, b) => a.dateObj - b.dateObj);
+  const past = comps.filter(c => c.endDateObj < today).sort((a, b) => b.dateObj - a.dateObj);
+
+  // Métriques de forme les plus récentes
+  const last = (Array.isArray(data) && data.length) ? data[data.length - 1] : null;
+  const tsb = last && Number.isFinite(last.tsb) ? Math.round(last.tsb) : null;
+  const ctl = last && Number.isFinite(last.ctl) ? Math.round(last.ctl) : null;
+  const atl = last && Number.isFinite(last.atl) ? Math.round(last.atl) : null;
+
+  // ---- HERO : prochain objectif ----
+  if (heroWrap) {
+    const next = upcoming[0];
+    if (!next) {
+      heroWrap.innerHTML = '';
+    } else {
+      const daysUntil = Math.max(0, Math.ceil((next.dateObj - today) / 86400000));
+      const _pi = compPrio(next.priority);
+      const phKey = daysUntil <= 7 ? 'race' : daysUntil <= 28 ? 'taper' : daysUntil <= 56 ? 'peak' : 'build';
+      const phColor = _PHASE_COLORS[phKey];
+      const phLabel = (typeof PHASE_LABELS !== 'undefined' && PHASE_LABELS[phKey]) || phKey;
+      const seasonStart = new Date(next.dateObj.getFullYear(), 0, 1);
+      const totalMs = next.dateObj - seasonStart;
+      const frac = totalMs > 0 ? Math.max(0, Math.min(1, (today - seasonStart) / totalMs)) : 1;
+      const C = 301; const off = (C * (1 - frac)).toFixed(0);
+      const form = _formInfo(tsb);
+      const prioLabel = _pi.key === 'principal' ? 'Objectif principal' : 'Préparation';
+      heroWrap.innerHTML = `
+        <div class="comp-hero" data-comp-id="${next.id}" style="--pc:${_pi.color};" title="Voir le détail">
+          <div class="comp-hero-lbl">Prochain objectif</div>
+          <div class="comp-hero-body">
+            <div class="comp-hero-ring">
+              <svg viewBox="0 0 108 108">
+                <circle cx="54" cy="54" r="48" fill="none" stroke="var(--border)" stroke-width="8"/>
+                <circle cx="54" cy="54" r="48" fill="none" stroke="${_pi.color}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${off}" transform="rotate(-90 54 54)"/>
+              </svg>
+              <div class="comp-hero-ring-txt">
+                <div class="comp-hero-jx" style="color:${_pi.color};">${daysUntil <= 0 ? 'Jour J' : 'J‑' + daysUntil}</div>
+                <div class="comp-hero-jdate">${fmtShortDayMonth(next.dateObj)}</div>
+              </div>
+            </div>
+            <div class="comp-hero-main">
+              <div class="comp-hero-name">${trophySvg(_pi.color)}<span style="color:${_pi.color};">${next.name}</span>
+                <span class="comp-pill" style="background:${_pi.color}28;color:${_pi.color};">${prioLabel}</span>
+              </div>
+              <div class="comp-hero-sub">${dateLabel(next)}</div>
+              <div class="comp-hero-tags">
+                <span class="comp-pill" style="background:${phColor}28;color:${phColor};">Phase : ${phLabel}</span>
+                <span class="comp-pill" style="background:color-mix(in srgb, ${form.c} 22%, transparent);color:${form.c};">Forme ${tsb == null ? '—' : (tsb >= 0 ? '+' : '') + tsb} · ${form.t}</span>
+              </div>
+            </div>
+            <div class="comp-hero-prep">
+              <div class="comp-hero-lbl">État de préparation</div>
+              <div class="comp-prep-grid">
+                <div><div class="comp-prep-val">${ctl == null ? '—' : ctl}</div><div class="comp-prep-k">CTL</div></div>
+                <div><div class="comp-prep-val">${atl == null ? '—' : atl}</div><div class="comp-prep-k">ATL</div></div>
+                <div><div class="comp-prep-val" style="color:${form.c};">${tsb == null ? '—' : (tsb >= 0 ? '+' : '') + tsb}</div><div class="comp-prep-k">TSB</div></div>
+              </div>
+              <div class="comp-prep-reco">${_prepReco(phKey, tsb)}</div>
+            </div>
+          </div>
+        </div>`;
+    }
+  }
+
+  // ---- FRISE DE SAISON + chiffres ----
+  if (seasonWrap) {
+    const yr = today.getFullYear();
+    const jan1 = new Date(yr, 0, 1), dec31 = new Date(yr, 11, 31);
+    const span = dec31 - jan1;
+    const yearComps = comps.filter(c => c.dateObj.getFullYear() === yr).sort((a, b) => a.dateObj - b.dateObj);
+    const pos = d => Math.max(0, Math.min(100, ((d - jan1) / span) * 100));
+    const todayPos = pos(today);
+    // Répartition des étiquettes en "lanes" verticales pour éviter le chevauchement
+    const GAP = 16; // % minimal entre 2 étiquettes sur la même lane
+    const laneLast = [];
+    const tlItems = yearComps.map(c => ({ c, p: pos(c.dateObj) })).sort((a, b) => a.p - b.p);
+    tlItems.forEach(m => {
+      let lane = 0;
+      while (laneLast[lane] != null && m.p - laneLast[lane] < GAP) lane++;
+      laneLast[lane] = m.p; m.lane = lane;
+    });
+    const maxLane = Math.max(0, laneLast.length - 1);
+    const tlHeight = 34 + (maxLane + 1) * 15 + 4;
+    const markers = tlItems.map(m => {
+      const c = m.c;
+      const _pi = compPrio(c.priority);
+      const isPast = c.endDateObj < today;
+      const color = _pi.key === 'principal' ? _pi.color : '#9ca3af';
+      const big = _pi.key === 'principal';
+      return `<div class="comp-tl-marker${isPast ? ' past' : ''}" style="left:${m.p.toFixed(1)}%;">
+        <span class="comp-tl-dot${big ? ' big' : ''}" style="background:${color};${big ? `box-shadow:0 0 0 2px ${color};` : ''}"></span>
+        <span class="comp-tl-stem" style="top:13px;height:${5 + m.lane * 15}px;background:${color};"></span>
+        <span class="comp-tl-cap" style="margin-top:${5 + m.lane * 15}px;${big ? `color:${color};font-weight:700;` : ''}">${c.name} · ${c.dateObj.getDate()}/${c.dateObj.getMonth() + 1}</span>
+      </div>`;
+    }).join('');
+    const nPrincipal = yearComps.filter(c => compPrio(c.priority).key === 'principal').length;
+    const nPast = yearComps.filter(c => c.endDateObj < today).length;
+    seasonWrap.innerHTML = `
+      <div class="grid-1 card">
+        <div class="section-title">Saison ${yr}</div>
+        ${yearComps.length === 0 ? '<div class="comp-empty">Aucune compétition cette saison.</div>' : `
+        <div class="comp-timeline" style="height:${tlHeight}px;">
+          <div class="comp-tl-axis"></div>
+          <div class="comp-tl-today" style="left:${todayPos.toFixed(1)}%;"><span>auj.</span></div>
+          ${markers}
+        </div>
+        <div class="comp-season-stats">
+          <div><span class="comp-ss-val">${yearComps.length}</span> <span class="comp-ss-k">compétition${yearComps.length > 1 ? 's' : ''}</span></div>
+          <div><span class="comp-ss-val" style="color:#fbbf24;">${nPrincipal}</span> <span class="comp-ss-k">objectif${nPrincipal > 1 ? 's' : ''} principal${nPrincipal > 1 ? 'aux' : ''}</span></div>
+          <div><span class="comp-ss-val">${yearComps.length - nPrincipal}</span> <span class="comp-ss-k">préparation</span></div>
+          <div><span class="comp-ss-val">${nPast}</span> <span class="comp-ss-k">déjà courue${nPast > 1 ? 's' : ''}</span></div>
+        </div>`}
+      </div>`;
+  }
+
+  // ---- À venir (avec jauge de prépa) ----
+  if (upWrap) {
+    upWrap.innerHTML = upcoming.length ? upcoming.map(c => {
+      const daysUntil = Math.ceil((c.dateObj - today) / 86400000);
+      const _pi = compPrio(c.priority);
+      const seasonStart = new Date(c.dateObj.getFullYear(), 0, 1);
+      const totalMs = c.dateObj - seasonStart;
+      let fillPct = totalMs > 0 ? ((today - seasonStart) / totalMs) * 100 : 100;
+      fillPct = Math.max(0, Math.min(100, fillPct));
+      return `<div class="comp-item" data-prio="${_pi.key}" data-comp-id="${c.id}" title="Voir le détail">
+        <div class="comp-row">
+          <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span></span>
+          <span class="comp-date">${dateLabel(c)}</span>
+          <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'J‑' + daysUntil}</span>
+          <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
+        </div>
+        <div class="comp-phase-track"><div class="comp-phase-fill" style="width:${fillPct.toFixed(1)}%"></div></div>
+      </div>`;
+    }).join('') : '<div class="comp-empty">Aucune compétition à venir.</div>';
+  }
+
+  // ---- Passées enrichies (résultats réels) ----
+  if (pastWrap) {
+    pastWrap.innerHTML = past.length ? past.map(c => {
+      const _pi = compPrio(c.priority);
+      const iso = toIsoDate(c.dateObj);
+      const day = Array.isArray(data) ? data.find(d => toIsoDate(d.date) === iso) : null;
+      const acts = (day && day.activities) ? day.activities : [];
+      // Agrège les activités du jour (course par étapes : on prend le jour de départ)
+      let dist = 0, dur = 0, elev = 0, tssV = 0, hrSum = 0, hrN = 0;
+      for (const a of acts) {
+        dist += a.distance_km || 0; dur += a.duration || 0; elev += a.elevation_gain || 0;
+        tssV += a.tss || 0; if (a.hr) { hrSum += a.hr; hrN++; }
+      }
+      if (!tssV && day) tssV = day.tss || 0;
+      // Stats en ligne légère (valeurs + unités), pas de boîtes
+      const metrics = [];
+      if (dist) metrics.push(Math.round(dist) + ' km');
+      if (dur) metrics.push(fmtDur(dur));
+      if (elev) metrics.push(Math.round(elev) + ' m D+');
+      if (tssV) metrics.push(Math.round(tssV) + ' TSS');
+      if (hrN) metrics.push(Math.round(hrSum / hrN) + ' bpm');
+      const metricsHtml = metrics.length
+        ? `<div class="comp-res-metrics">${metrics.map(m => `<span class="comp-res-m">${m}</span>`).join('<span class="comp-res-sep">·</span>')}</div>`
+        : '<div class="comp-res-metrics comp-res-nodata">Pas de données d\'activité</div>';
+
+      // Médaille = résultat officiel Open Dossard (lié par date), sinon trophée neutre
+      const od = window.odResultForDate ? window.odResultForDate(iso) : null;
+      let medal;
+      if (od && od.rankingScratch != null) {
+        const podium = od.rankingScratch === 1 ? ' gold' : (od.rankingScratch <= 3 ? ' podium' : '');
+        const cat = (od.rankingInCategory != null && od.totalInCategory != null)
+          ? `${od.rankingInCategory}/${od.totalInCategory}${od.catev ? ' · ' + od.catev : ''}`
+          : (od.catev ? od.catev : 'scratch');
+        medal = `<div class="comp-res-medal${podium}" title="Résultat officiel Open Dossard">
+          <div class="comp-res-medal-rank">${od.rankingScratch}<sup>${od.rankingScratch === 1 ? 'er' : 'e'}</sup></div>
+          <div class="comp-res-medal-cat">${cat}</div>
+        </div>`;
+      } else {
+        medal = `<div class="comp-res-medal none">${trophySvg(_pi.color, 22)}</div>`;
+      }
+
+      return `<div class="comp-result-card" data-prio="${_pi.key}" data-comp-id="${c.id}" style="--pc:${_pi.color};" title="Voir le détail">
+        ${medal}
+        <div class="comp-res-content">
+          <div class="comp-res-top">
+            <span class="comp-res-name"><span style="color:${_pi.color};">${c.name}</span></span>
+            <span class="comp-res-date">${dateLabel(c)}</span>
+            <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
+          </div>
+          ${metricsHtml}
+        </div>
+      </div>`;
+    }).join('') : '<div class="comp-empty">Aucune compétition passée.</div>';
+  }
+}
+window.renderCompetitionsPage = renderCompetitionsPage;
+
+// Contexte pour la génération de plan IA (prochaine compétition, forme, volume récent).
+window.coachGetPlanContext = function () {
+  const comps = loadCompetitions().map(c => {
+    let startDate = c.date;
+    if (c.stages && Array.isArray(c.stagesList) && c.stagesList.length) {
+      const ds = c.stagesList.map(s => s.date).filter(Boolean).sort();
+      if (ds.length) startDate = ds[0];
+    }
+    return { ...c, dateObj: new Date(startDate + 'T12:00:00'), startDate };
+  }).filter(c => c.dateObj >= today).sort((a, b) => a.dateObj - b.dateObj);
+  const next = comps[0] || null;
+
+  const last = (Array.isArray(data) && data.length) ? data[data.length - 1] : null;
+  const forme = {
+    ctl: last && Number.isFinite(last.ctl) ? Math.round(last.ctl) : null,
+    atl: last && Number.isFinite(last.atl) ? Math.round(last.atl) : null,
+    tsb: last && Number.isFinite(last.tsb) ? Math.round(last.tsb) : null,
+  };
+
+  // Volume des 28 derniers jours
+  const from = new Date(today); from.setDate(from.getDate() - 28);
+  let mins = 0, sessions = 0;
+  const sportCount = {};
+  for (const d of (data || [])) {
+    if (!(d.date >= from && d.date <= today)) continue;
+    mins += d.duration || 0;
+    const acts = d.activities || [];
+    if (acts.length || d.sessionName) sessions++;
+    for (const a of acts) {
+      const k = window.activitySportColorKey ? window.activitySportColorKey(a) : (a.sport || 'autre');
+      sportCount[k] = (sportCount[k] || 0) + 1;
+    }
+  }
+  const sportPrincipal = Object.keys(sportCount).sort((a, b) => sportCount[b] - sportCount[a])[0] || 'cyclisme';
+
+  return {
+    today: toIsoDate(today),
+    competition: next ? {
+      nom: next.name,
+      date: toIsoDate(next.dateObj),
+      joursAvant: Math.ceil((next.dateObj - today) / 86400000),
+      priorite: compPrio(next.priority).key,
+    } : null,
+    forme,
+    volume_recent: {
+      heures_par_semaine: Math.round((mins / 60 / 4) * 10) / 10,
+      seances_par_semaine: Math.round((sessions / 4) * 10) / 10,
+    },
+    sport_principal: sportPrincipal,
+  };
+};
+
 document.getElementById('comp-add').addEventListener('click', async () => {
   const name = document.getElementById('comp-name').value.trim();
   const date = document.getElementById('comp-date').value;
@@ -1509,10 +1812,12 @@ document.getElementById('comp-add').addEventListener('click', async () => {
   document.getElementById('comp-name').value = '';
   document.getElementById('comp-date').value = '';
   renderCompList();
+  renderCompetitionsPage();
   renderCalendar();
 });
 
-document.getElementById('comp-list').addEventListener('click', (e) => {
+// Handler de clic partagé entre la carte du calendrier (#comp-list) et la page Compétitions.
+function _handleCompClick(e) {
   // Clic sur la croix de suppression
   if (e.target.classList.contains('comp-del')) {
     e.stopPropagation();
@@ -1520,11 +1825,12 @@ document.getElementById('comp-list').addEventListener('click', (e) => {
     const comps = loadCompetitions().filter(c => c.id !== id);
     saveCompetitions(comps);
     renderCompList();
+    renderCompetitionsPage();
     renderCalendar();
     return;
   }
-  // Clic sur la ligne de compé → ouvre la modal de détail
-  const item = e.target.closest('.comp-item');
+  // Clic sur une carte de compé (ligne, hero, carte résultat) → ouvre le détail
+  const item = e.target.closest('[data-comp-id]');
   if (!item) return;
   const compId = item.dataset.compId;
   if (!compId) return;
@@ -1536,11 +1842,15 @@ document.getElementById('comp-list').addEventListener('click', (e) => {
     const dates = comp.stagesList.map(s => s.date).filter(Boolean).sort();
     if (dates.length) openDate = dates[0];
   }
-  if (openDate) {
-    // S'assure d'être sur l'onglet Entraîneur (le modal nécessite que today soit accessible)
-    if (typeof openSessionModal === 'function') openSessionModal(openDate, 'prevu');
+  if (openDate && typeof openSessionModal === 'function') {
+    const isPast = new Date(openDate + 'T12:00:00') < today;
+    openSessionModal(openDate, isPast ? 'realise' : 'prevu');
   }
-});
+}
+document.getElementById('comp-list')?.addEventListener('click', _handleCompClick);
+document.getElementById('comp-hero')?.addEventListener('click', _handleCompClick);
+document.getElementById('comp-page-upcoming')?.addEventListener('click', _handleCompClick);
+document.getElementById('comp-page-past')?.addEventListener('click', _handleCompClick);
 
 // ========= MODAL D'AJOUT DE COMPÉTITION =========
 // === Custom dropdown qui remplace les <select> natifs ===
@@ -2795,6 +3105,35 @@ function saveTrainFromModal() {
   closeTrainModal();
   renderCalendar();
 }
+
+// Insertion d'un modèle de la bibliothèque sur un jour (glisser-déposer).
+// mode 'prevu' → entraînement prévu ; mode 'realise' → activité manuelle réalisée.
+// Les deux passent par le système d'entraînements existant (sync Supabase incluse).
+window.coachInsertTemplate = function (iso, tpl, mode) {
+  if (!iso || !tpl) return;
+  const m = mode === 'realise' ? 'realise' : 'prevu';
+  const entry = {
+    id: Date.now().toString() + Math.random().toString(36).slice(2, 5),
+    name: tpl.name || 'Séance',
+    date: iso,
+    sport: tpl.sport || 'cyclisme',
+    type: tpl.type || '',
+    duration: tpl.duration_min || 0,
+    tss: tpl.tss || 0,
+    notes: tpl.description || '',
+    mode: m,
+    structure: null,
+  };
+  const arr = m === 'realise' ? loadRealisedTrainings() : loadTrainings();
+  arr.push(entry);
+  if (m === 'realise') saveRealisedTrainings(arr); else saveTrainings(arr);
+  if (typeof renderCalendar === 'function') renderCalendar();
+};
+// Sous-mode courant du calendrier (réalisé / prévu) pour le drop.
+window.coachCalendarMode = function () {
+  const b = document.querySelector('#calendar-subtabs .subtab.active');
+  return b && b.dataset.mode === 'realise' ? 'realise' : 'prevu';
+};
 
 // Helpers globaux pour edit/delete depuis n'importe où
 window.gpxEditTraining = function(id, mode) {
@@ -8924,9 +9263,9 @@ try { renderSessionsTable(); } catch (e) { console.error('[renderSessionsTable]'
 // ========= TABS =========
 // ========= ONGLETS + routage par ancre (#entraineur, #bilan, #termes) =========
 // p1 (Tableau de bord) = pas de hash. #profil est géré par profile-modal.js.
-const PANEL_HASH = { p2: '#calendrier', p3: '#statistiques', p5: '#termes' };
+const PANEL_HASH = { p2: '#calendrier', p3: '#statistiques', p4: '#performance', p5: '#termes', p6: '#competitions' };
 // '#bilan' conservé comme alias (anciens liens/favoris) → pointe toujours sur p3.
-const HASH_PANEL = { '#calendrier': 'p2', '#statistiques': 'p3', '#bilan': 'p3', '#termes': 'p5' };
+const HASH_PANEL = { '#calendrier': 'p2', '#statistiques': 'p3', '#performance': 'p4', '#bilan': 'p3', '#termes': 'p5', '#competitions': 'p6' };
 
 function activatePanel(panelId, updateHash = true) {
   const panelEl = document.getElementById(panelId);

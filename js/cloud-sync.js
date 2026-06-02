@@ -26,7 +26,11 @@ window.addEventListener('coach-ia-auth', async (e) => {
       setTimeout(() => {
         if (window.renderCalendar) window.renderCalendar();
         if (window.renderCompList) window.renderCompList();
+        if (window.renderCompetitionsPage) window.renderCompetitionsPage();
         if (window.renderBilan) window.renderBilan();
+        if (window.renderSeanceLibrary) window.renderSeanceLibrary();
+        if (window.renderPostSession) window.renderPostSession();
+        if (window.renderPlanStub) window.renderPlanStub();
       }, 100);
     } catch (e) {
       console.error('[cloud-sync] Pull error:', e);
@@ -107,6 +111,26 @@ async function pullAllFromCloud() {
       localStorage.setItem('coach_ia_yearly_goals_v2', JSON.stringify(dict));
     }
   } catch (e) { console.warn('[pull goals]', e); }
+
+  // ----- activity_template → [{id, _sbId, sport, name, duration_min, tss, description}] -----
+  try {
+    const { data } = await sb.from('activity_template').select('*').eq('user_id', userId);
+    if (data) {
+      const arr = data
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+        .map(r => ({
+          id: r.client_id || r.id,
+          _sbId: r.id,
+          sport: r.sport || 'autre',
+          name: r.name,
+          duration_min: r.duration_min || 0,
+          tss: r.tss || 0,
+          description: r.description || '',
+          sort_order: r.sort_order || 0,
+        }));
+      localStorage.setItem('coach_ia_templates_v1', JSON.stringify(arr));
+    }
+  } catch (e) { console.warn('[pull templates]', e); }
 
   // ----- compétitions → registre competitions (passées) + activity_planned (futures) -----
   try {
@@ -267,6 +291,30 @@ export async function deleteGoal(goal) {
   } catch (e) { console.warn('[del goal]', e.message); }
 }
 
+export async function pushTemplate(tpl) {
+  if (!isAuthed()) return;
+  try {
+    const row = {
+      user_id: uid(), client_id: tpl.id,
+      sport: tpl.sport || 'autre', name: tpl.name,
+      duration_min: tpl.duration_min || 0, tss: tpl.tss || 0,
+      description: tpl.description || null, sort_order: tpl.sort_order || 0,
+      updated_at: new Date().toISOString(),
+    };
+    if (tpl._sbId) row.id = tpl._sbId;
+    const { data, error } = await window.sb.from('activity_template').upsert(row).select().single();
+    if (error) throw error;
+    return data && data.id;
+  } catch (e) { console.warn('[push template]', e.message); }
+}
+export async function deleteTemplate(tpl) {
+  if (!isAuthed()) return;
+  try {
+    if (tpl._sbId) await window.sb.from('activity_template').delete().eq('id', tpl._sbId).eq('user_id', uid());
+    else if (tpl.id) await window.sb.from('activity_template').delete().eq('client_id', tpl.id).eq('user_id', uid());
+  } catch (e) { console.warn('[del template]', e.message); }
+}
+
 // Aujourd'hui (ISO) pour router compé passée (activities) vs future (activity_planned).
 function _todayIso() { return new Date().toISOString().slice(0, 10); }
 
@@ -401,6 +449,7 @@ window.cloudSync = {
   pushNoteRange, deleteNoteRange,
   pushPhase, deletePhase,
   pushGoal, deleteGoal,
+  pushTemplate, deleteTemplate,
   pushCompetition, deleteCompetition,
   pushCompetitionRegistry, deleteCompetitionByActivity,
   pushTraining, deleteTraining,

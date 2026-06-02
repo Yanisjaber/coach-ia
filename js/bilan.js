@@ -269,38 +269,6 @@ function populateYearSelect(all) {
   }
 }
 
-// ============ SPARKLINES KPI ============
-// Cumul mensuel d'une métrique pour une année donnée (null après le mois courant).
-function monthlyCumul(all, year, key) {
-  const m = new Array(12).fill(0);
-  for (const a of all) {
-    if (a.date.getFullYear() !== year) continue;
-    const mo = a.date.getMonth();
-    m[mo] += key === 'hours' ? (a.duration_min || 0) / 60
-      : key === 'sessions' ? 1
-      : (a[key] || 0);
-  }
-  for (let i = 1; i < 12; i++) m[i] += m[i - 1];
-  const now = new Date();
-  if (year === now.getFullYear()) for (let i = now.getMonth() + 1; i < 12; i++) m[i] = null;
-  return m;
-}
-function drawSpark(svgId, arr) {
-  const svg = document.getElementById(svgId);
-  if (!svg) return;
-  const pts = arr.map((v, i) => [i, v]).filter(p => p[1] != null);
-  if (pts.length < 2) { svg.innerHTML = ''; return; }
-  const W = 120, H = 24, pad = 2;
-  const maxY = Math.max(...pts.map(p => p[1])) || 1;
-  const X = i => pad + (i / 11) * (W - 2 * pad);
-  const Y = v => H - pad - (v / maxY) * (H - 2 * pad);
-  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' ');
-  const last = pts[pts.length - 1];
-  const area = `${line} L${X(last[0]).toFixed(1)},${H} L${X(pts[0][0]).toFixed(1)},${H} Z`;
-  svg.innerHTML = `<path d="${area}" fill="rgba(74,222,128,0.12)" stroke="none"/>`
-    + `<path d="${line}" fill="none" stroke="#4ade80" stroke-width="1.6" stroke-linejoin="round"/>`;
-}
-
 // ============ KPIs ANNUELS (respectent filtre header) ============
 function renderKPIs(allUnfiltered) {
   const year = _bilanYear;
@@ -311,12 +279,6 @@ function renderKPIs(allUnfiltered) {
   const all = filterByHeaderActiveSports(allUnfiltered);
   const ytd = sumActs(activitiesYTD(all, year));
   const prev = sumActs(activitiesYTDPrevYear(all, year));
-
-  // Sparklines (cumul mensuel de l'année affichée)
-  drawSpark('bilan-spark-dist', monthlyCumul(all, year, 'distance_km'));
-  drawSpark('bilan-spark-hours', monthlyCumul(all, year, 'hours'));
-  drawSpark('bilan-spark-sessions', monthlyCumul(all, year, 'sessions'));
-  drawSpark('bilan-spark-tss', monthlyCumul(all, year, 'tss'));
 
   function setCard(prefix, currentVal, prevVal, fmt, unit) {
     const valEl = document.getElementById(`bilan-${prefix}-val`);
@@ -893,6 +855,156 @@ function renderYearlyChart(allUnfiltered) {
   });
 }
 
+// ============ RÉPARTITION PAR SPORT (anneau) ============
+// Couleurs alignées sur les pastilles de sport (.sport-pill)
+const SPORT_CAT_COLORS = {
+  cyclisme: '#3b82f6', vtt: '#b45309', course: '#fc4c02', trail: '#15803d',
+  natation: '#06b6d4', musculation: '#ef4444', marche: '#84cc16', ski: '#93c5fd',
+  nautique: '#0284c7', football: '#22c55e', collectif: '#c026d3', raquette: '#eab308',
+  yoga: '#a78bfa', escalade: '#c2410c', combat: '#b91c1c', autre: '#9ca3af',
+};
+let _sportsChart = null;
+function renderSportBreakdown(allUnfiltered) {
+  const canvas = document.getElementById('chart-bilan-sports');
+  const wrap = document.getElementById('bilan-sports-wrap');
+  const emptyEl = document.getElementById('bilan-sports-empty');
+  const legendEl = document.getElementById('bilan-sports-legend');
+  const yearEl = document.getElementById('bilan-sports-year');
+  if (!canvas || !window.Chart) return;
+  if (yearEl) yearEl.textContent = _bilanYear;
+
+  const all = filterByHeaderActiveSports(allUnfiltered).filter(a => a.date.getFullYear() === _bilanYear);
+  // Regroupe les heures par catégorie de sport
+  const byCat = {};
+  for (const a of all) {
+    const key = window.activitySportColorKey ? window.activitySportColorKey(a) : (a.sport || 'autre');
+    const label = window.activitySportLabel ? window.activitySportLabel(a) : (a.sport || 'Autre');
+    if (!byCat[key]) byCat[key] = { hours: 0, label };
+    byCat[key].hours += (a.duration_min || 0) / 60;
+  }
+  const entries = Object.entries(byCat).filter(([, v]) => v.hours > 0).sort((a, b) => b[1].hours - a[1].hours);
+  const total = entries.reduce((s, [, v]) => s + v.hours, 0);
+
+  if (!entries.length || total === 0) {
+    if (wrap) wrap.style.display = 'none';
+    if (emptyEl) emptyEl.hidden = false;
+    if (_sportsChart) { _sportsChart.destroy(); _sportsChart = null; }
+    return;
+  }
+  if (wrap) wrap.style.display = '';
+  if (emptyEl) emptyEl.hidden = true;
+
+  const labels = entries.map(([k, v]) => v.label);
+  const data = entries.map(([, v]) => Math.round(v.hours * 10) / 10);
+  const colors = entries.map(([k]) => SPORT_CAT_COLORS[k] || '#9ca3af');
+
+  if (_sportsChart) { _sportsChart.destroy(); _sportsChart = null; }
+  _sportsChart = new window.Chart(canvas, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: '#141821', borderWidth: 2, cutout: '66%' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: (item) => `${item.label} : ${item.parsed} h (${Math.round(item.parsed / total * 100)}%)`,
+        }},
+      },
+    },
+  });
+
+  // Légende compacte : pastille + « Sport · % »
+  if (legendEl) {
+    legendEl.innerHTML = entries.map(([k, v]) => {
+      const pct = Math.round(v.hours / total * 100);
+      const h = Math.round(v.hours * 10) / 10;
+      const color = SPORT_CAT_COLORS[k] || '#9ca3af';
+      return `<div class="bilan-sport-leg" title="${fmtNum(h, 1)} h">
+        <span class="bilan-sport-dot" style="background:${color};"></span>
+        <span class="bilan-sport-name">${escapeHtml(v.label)} · ${pct}%</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ============ DURÉE PAR SPORT (barres journalières empilées) ============
+const SPORT_CAT_LABELS = {
+  cyclisme: 'Cyclisme', vtt: 'VTT', course: 'Course à pied', trail: 'Trail',
+  natation: 'Natation', musculation: 'Musculation', marche: 'Marche', ski: 'Ski',
+  nautique: 'Nautique', football: 'Football', collectif: 'Sports co.', raquette: 'Raquettes',
+  yoga: 'Yoga', escalade: 'Escalade', combat: 'Combat', autre: 'Autre',
+};
+let _durationChart = null;
+function renderDurationBySport(allUnfiltered) {
+  const canvas = document.getElementById('chart-bilan-duration');
+  if (!canvas || !window.Chart) return;
+  const year = _bilanYear;
+  const yEl = document.getElementById('bilan-duration-year');
+  if (yEl) yEl.textContent = year;
+
+  const all = filterByHeaderActiveSports(allUnfiltered).filter(a => a.date.getFullYear() === year);
+  const jan1 = new Date(year, 0, 1);
+  const now = new Date();
+  const lastDay = year === now.getFullYear() ? now : new Date(year, 11, 31);
+  const nDays = Math.floor((lastDay - jan1) / 86400000) + 1;
+
+  // Labels jj/mm
+  const labels = [];
+  for (let i = 0; i < nDays; i++) {
+    const d = new Date(year, 0, 1 + i);
+    labels.push(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+
+  // Regroupe les heures par catégorie de sport et par jour
+  const catInfo = {};
+  for (const a of all) {
+    const key = window.activitySportColorKey ? window.activitySportColorKey(a) : (a.sport || 'autre');
+    const idx = Math.floor((a.date - jan1) / 86400000);
+    if (idx < 0 || idx >= nDays) continue;
+    if (!catInfo[key]) {
+      catInfo[key] = {
+        label: SPORT_CAT_LABELS[key] || (window.activitySportLabel ? window.activitySportLabel(a) : key),
+        color: SPORT_CAT_COLORS[key] || '#9ca3af',
+        data: new Array(nDays).fill(0),
+      };
+    }
+    catInfo[key].data[idx] += (a.duration_min || 0) / 60;
+  }
+  // Tri des sports par volume total décroissant (les plus présents en bas de pile)
+  const cats = Object.values(catInfo).sort((a, b) =>
+    b.data.reduce((s, v) => s + v, 0) - a.data.reduce((s, v) => s + v, 0));
+  const r1 = v => Math.round(v * 10) / 10;
+  const datasets = cats.map(c => ({
+    label: c.label,
+    data: c.data.map(r1),
+    backgroundColor: c.color,
+    stack: 'dur',
+    borderWidth: 0,
+    categoryPercentage: 0.9,
+    barPercentage: 1.0,
+  }));
+
+  if (_durationChart) { _durationChart.destroy(); _durationChart = null; }
+  _durationChart = new window.Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#e6e9ef', font: { size: 11 }, boxWidth: 12, padding: 12 } },
+        tooltip: { mode: 'index', intersect: false, filter: (item) => item.parsed.y > 0, callbacks: {
+          label: (item) => `${item.dataset.label} : ${fmtDuration(Math.round(item.parsed.y * 60))}`,
+        }},
+      },
+      scales: {
+        x: { stacked: true, ticks: { color: '#8b94a8', maxRotation: 0, autoSkip: true, maxTicksLimit: 26 }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: '#8b94a8', callback: (v) => v + ' h' }, grid: { color: '#232a3a' }, beginAtZero: true },
+      },
+    },
+  });
+}
+
 // ============ CHART VOLUME PAR MOIS (année vs N-1) ============
 let _monthlyChart = null;
 function renderMonthlyVolumeChart(allUnfiltered) {
@@ -947,8 +1059,10 @@ function renderBilan() {
     renderKPIs(all);
     renderGoals(all);
     renderVolumeRecords(all);
-    renderPowerRecords();
-    setTimeout(() => { renderMonthlyVolumeChart(all); renderYearlyChart(all); }, 50);
+    // Records de puissance retirés de l'UI ; on peuple quand même le sélecteur
+    // de sport (partagé avec le Power Profile).
+    populatePowerSportSelect((window.DASHBOARD_DATA && window.DASHBOARD_DATA.power_by_sport) || {});
+    setTimeout(() => { renderSportBreakdown(all); renderMonthlyVolumeChart(all); renderYearlyChart(all); renderDurationBySport(all); }, 50);
   } catch (e) {
     console.error('[bilan] render error:', e);
   }

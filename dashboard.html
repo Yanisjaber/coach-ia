@@ -40,6 +40,8 @@
 <link rel="stylesheet" href="styles/power-profile.css">
 <link rel="stylesheet" href="styles/day-extras.css">
 <link rel="stylesheet" href="styles/bilan.css">
+<link rel="stylesheet" href="styles/library.css">
+<link rel="stylesheet" href="styles/opendossard.css">
 <link rel="stylesheet" href="styles/auth.css">
 <link rel="stylesheet" href="styles/profile-modal.css">
 
@@ -78,7 +80,9 @@
   <nav class="tabs sidebar-nav">
     <button class="tab active" data-panel="p1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg><span>Tableau de bord</span></button>
     <button class="tab" data-panel="p2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Calendrier</span></button>
+    <button class="tab" data-panel="p6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg><span>Compétitions</span></button>
     <button class="tab" data-panel="p3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Statistiques</span></button>
+    <button class="tab" data-panel="p4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M8.21 13.89 7 22l5-3 5 3-1.21-8.11"/></svg><span>Performance</span></button>
     <button class="tab" data-panel="p5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Termes</span></button>
   </nav>
   <div class="header-info sidebar-foot">
@@ -273,19 +277,11 @@
 
 <!-- PANEL 2: Calendrier -->
 <section class="panel" id="p2">
-  <!-- STUB IA : plan d'entraînement auto-suggéré -->
+  <!-- Coach IA : chat conversationnel + actions calendrier -->
   <div class="grid-1 card ia-only">
-    <div class="section-title">Plan suggéré par l'IA<span class="ia-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>IA</span></div>
-    <div class="section-subtitle">L'IA pré-remplit ton calendrier en fonction de tes objectifs et de ta forme</div>
-    <div class="ia-stub" id="plan-auto-stub">
-      <div class="ia-stub-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      </div>
-      <div class="ia-stub-body">
-        <strong>Génération de plan arrivera ici</strong>
-        L'IA proposera un plan d'entraînement sur 2-4 semaines, basé sur tes compétitions à venir, ta charge actuelle et tes zones (CTL/ATL/TSB). Tu pourras accepter, modifier ou refuser chaque séance suggérée.
-      </div>
-    </div>
+    <div class="section-title">Coach IA<span class="ia-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>IA</span></div>
+    <div class="section-subtitle">Discute avec ton coach : conseils, analyse, et il peut ajouter des séances ou des jours de repos à ton calendrier quand tu lui demandes.</div>
+    <div id="coach-chat"></div>
   </div>
 
   <!-- Compétitions à venir (les boutons d'ajout sont désormais dans le popover "+" de chaque jour) -->
@@ -308,7 +304,23 @@
       <button id="month-reset" class="reset">4 dernières semaines</button>
     </div>
 
-    <div class="week-calendar" id="week-calendar"></div>
+    <div class="calendar-layout">
+      <div class="week-calendar" id="week-calendar"></div>
+      <aside class="seance-library" id="seance-library">
+        <div class="lib-head">
+          <span class="lib-title">Bibliothèque</span>
+          <button class="lib-add" id="lib-add" type="button">+ Nouveau</button>
+        </div>
+        <div class="lib-hint">Glisse une séance sur un jour du calendrier.</div>
+        <div class="lib-search-wrap">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
+          <input type="text" id="lib-search" placeholder="Rechercher une séance…" autocomplete="off">
+        </div>
+        <div class="lib-filters" id="lib-filters"></div>
+        <div class="lib-body" id="lib-body"></div>
+        <div class="lib-empty" id="lib-empty" hidden>Aucune séance enregistrée. Clique « + Nouveau » pour créer ton premier modèle.</div>
+      </aside>
+    </div>
   </div>
 
   <!-- STUB IA : analyse post-séance de la dernière activité -->
@@ -391,72 +403,42 @@
       <div><span class="kpi-value" id="bilan-dist-val">—</span><span class="kpi-unit">km</span></div>
       <div class="kpi-trend bilan-diff" id="bilan-dist-diff">—</div>
       <div class="bilan-sub" id="bilan-dist-prev">—</div>
-      <svg class="bilan-spark" id="bilan-spark-dist" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true"></svg>
     </div>
     <div class="card bilan-kpi" data-metric="hours">
       <div class="kpi-label">Temps <span class="bilan-year-label" id="bilan-year-2">2026</span></div>
       <div><span class="kpi-value" id="bilan-hours-val">—</span><span class="kpi-unit">h</span></div>
       <div class="kpi-trend bilan-diff" id="bilan-hours-diff">—</div>
       <div class="bilan-sub" id="bilan-hours-prev">—</div>
-      <svg class="bilan-spark" id="bilan-spark-hours" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true"></svg>
     </div>
     <div class="card bilan-kpi" data-metric="sessions">
       <div class="kpi-label">Séances <span class="bilan-year-label" id="bilan-year-3">2026</span></div>
       <div><span class="kpi-value" id="bilan-sessions-val">—</span></div>
       <div class="kpi-trend bilan-diff" id="bilan-sessions-diff">—</div>
       <div class="bilan-sub" id="bilan-sessions-prev">—</div>
-      <svg class="bilan-spark" id="bilan-spark-sessions" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true"></svg>
     </div>
     <div class="card bilan-kpi" data-metric="tss">
       <div class="kpi-label">TSS cumulé <span class="bilan-year-label" id="bilan-year-4">2026</span></div>
       <div><span class="kpi-value" id="bilan-tss-val">—</span></div>
       <div class="kpi-trend bilan-diff" id="bilan-tss-diff">—</div>
       <div class="bilan-sub" id="bilan-tss-prev">—</div>
-      <svg class="bilan-spark" id="bilan-spark-tss" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true"></svg>
     </div>
   </section>
 
-  <!-- 2. Objectifs annuels personnels (templates par sport + UI repliable en mode Tout) -->
-  <div class="grid-1 card bilan-goals-card">
-    <div class="bilan-goals-header">
-      <div>
-        <div class="section-title">Objectifs <span id="bilan-goals-year" style="font-size:11px;color:var(--text-dim);font-weight:500;">2026</span></div>
-        <div class="section-subtitle">—</div>
-      </div>
-      <button class="bilan-goals-collapse-btn" id="bilan-goals-collapse" type="button" hidden>↓ Déplier</button>
-    </div>
-    <div class="bilan-goals-body">
-      <div class="bilan-goals" id="bilan-goals"></div>
-      <div class="bilan-goals-add">
-        <span class="bilan-goals-add-label">Ajouter :</span>
-        <div class="bilan-goals-add-btns" id="bilan-goals-add-btns"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Volume par mois (barres, année vs N-1) -->
-  <div class="grid-1 card">
-    <div class="section-title">Volume par mois</div>
-    <div class="section-subtitle">Heures d'entraînement · <span id="bilan-monthly-year">—</span> vs <span id="bilan-monthly-prev">—</span> (gris)</div>
-    <div class="chart-wrap" style="height:240px;"><canvas id="chart-bilan-monthly"></canvas></div>
-  </div>
-
-  <!-- 3. Records perso : volume + sport -->
-  <div class="grid-2">
+  <!-- Volume par mois + Répartition par sport (côte à côte) -->
+  <div class="bilan-vol-sport-grid">
     <div class="card">
-      <div class="section-title">Records de volume</div>
-      <div class="section-subtitle">Tes plus grosses journées tous sports confondus</div>
-      <div class="bilan-records" id="bilan-volume-records"></div>
+      <div class="section-title">Volume par mois</div>
+      <div class="section-subtitle">Heures d'entraînement · <span id="bilan-monthly-year">—</span> vs <span id="bilan-monthly-prev">—</span> (gris)</div>
+      <div class="chart-wrap" style="height:240px;"><canvas id="chart-bilan-monthly"></canvas></div>
     </div>
     <div class="card">
-      <div class="bilan-power-head">
-        <div>
-          <div class="section-title">Records de puissance</div>
-          <div class="section-subtitle">Tes meilleurs efforts par durée, pour le sport choisi</div>
-        </div>
-        <select id="power-sport-select" class="power-sport-select" aria-label="Sport"></select>
+      <div class="section-title">Répartition par sport</div>
+      <div class="section-subtitle">Volume horaire · <span id="bilan-sports-year">—</span></div>
+      <div class="bilan-sports-wrap" id="bilan-sports-wrap">
+        <div class="bilan-sports-chart"><canvas id="chart-bilan-sports"></canvas></div>
+        <div class="bilan-sports-legend" id="bilan-sports-legend"></div>
       </div>
-      <div class="bilan-records" id="bilan-power-records"></div>
+      <div class="bilan-empty" id="bilan-sports-empty" hidden>Aucune activité pour cette année.</div>
     </div>
   </div>
 
@@ -475,18 +457,11 @@
     <div class="chart-wrap" style="height:280px;"><canvas id="chart-bilan-yearly"></canvas></div>
   </div>
 
-  <!-- 5. Power Profile (conservé : c'est un type de record) -->
-  <div class="grid-1 card power-profile-card">
-    <div class="section-title">Power Profile (Mean Maximal Power)</div>
-    <div class="section-subtitle">
-      Tes records de puissance par durée d'effort, sur l'historique complet (vert) et les 90 derniers jours (bleu).
-      Calculé depuis les streams Strava. Augmente avec ton entraînement.
-    </div>
-    <div class="power-profile-summary" id="power-profile-summary"></div>
-    <div class="chart-wrap" style="height:320px;"><canvas id="chart-power-profile"></canvas></div>
-    <div class="power-profile-empty" id="power-profile-empty" hidden>
-      Aucun Power Profile disponible. Les streams Strava sont téléchargés progressivement à chaque mise à jour automatique (~30 activités par run). Reviens dans quelques heures.
-    </div>
+  <!-- Durée par sport (barres journalières empilées) -->
+  <div class="grid-1 card">
+    <div class="section-title">Durée par sport</div>
+    <div class="section-subtitle">Durée quotidienne par sport · <span id="bilan-duration-year">—</span></div>
+    <div class="chart-wrap" style="height:300px;"><canvas id="chart-bilan-duration"></canvas></div>
   </div>
 
   <!-- Compatibilité : anciens canvas cachés (le code legacy pointe encore dessus) -->
@@ -499,7 +474,69 @@
   </div>
 </section>
 
-<!-- PANEL 4 supprimé : Séances récentes déplacé dans Entraîneur (p2) -->
+<!-- PANEL 4: Performance (records + objectifs + Power Profile) -->
+<section class="panel" id="p4">
+  <div class="grid-2">
+    <!-- Records de volume -->
+    <div class="card">
+      <div class="section-title">Records de volume</div>
+      <div class="section-subtitle">Tes plus grosses journées tous sports confondus</div>
+      <div class="bilan-records" id="bilan-volume-records"></div>
+    </div>
+    <!-- Objectifs annuels personnels (templates par sport + UI repliable en mode Tout) -->
+    <div class="card bilan-goals-card">
+      <div class="bilan-goals-header">
+        <div>
+          <div class="section-title">Objectifs <span id="bilan-goals-year" style="font-size:11px;color:var(--text-dim);font-weight:500;">2026</span></div>
+          <div class="section-subtitle">—</div>
+        </div>
+        <button class="bilan-goals-collapse-btn" id="bilan-goals-collapse" type="button" hidden>↓ Déplier</button>
+      </div>
+      <div class="bilan-goals-body">
+        <div class="bilan-goals" id="bilan-goals"></div>
+        <div class="bilan-goals-add">
+          <span class="bilan-goals-add-label">Ajouter :</span>
+          <div class="bilan-goals-add-btns" id="bilan-goals-add-btns"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Power Profile (Mean Maximal Power) -->
+  <div class="grid-1 card power-profile-card">
+    <div class="bilan-power-head">
+      <div>
+        <div class="section-title">Power Profile (Mean Maximal Power)</div>
+        <div class="section-subtitle">
+          Tes records de puissance par durée d'effort, sur l'historique complet (vert) et les 90 derniers jours (bleu).
+          Calculé depuis les streams Strava. Augmente avec ton entraînement.
+        </div>
+      </div>
+      <select id="power-sport-select" class="power-sport-select" aria-label="Sport"></select>
+    </div>
+    <div class="power-profile-summary" id="power-profile-summary"></div>
+    <div class="chart-wrap" style="height:320px;"><canvas id="chart-power-profile"></canvas></div>
+    <div class="power-profile-empty" id="power-profile-empty" hidden>
+      Aucun Power Profile disponible. Les streams Strava sont téléchargés progressivement à chaque mise à jour automatique (~30 activités par run). Reviens dans quelques heures.
+    </div>
+  </div>
+</section>
+
+<!-- PANEL 6: Compétitions (récap palmarès + hero + frise + à venir + passées) -->
+<section class="panel" id="p6">
+  <div id="od-recap"></div>
+  <div id="comp-hero"></div>
+  <div id="comp-season"></div>
+  <div class="grid-1 card">
+    <div class="section-title">Compétitions à venir</div>
+    <div class="comp-list" id="comp-page-upcoming"></div>
+  </div>
+  <div class="grid-1 card">
+    <div class="section-title">Compétitions passées</div>
+    <div class="section-subtitle">Tes résultats, récupérés de l'activité du jour</div>
+    <div class="comp-results" id="comp-page-past"></div>
+  </div>
+</section>
 
 <!-- PANEL 5: Termes -->
 <section class="panel" id="p5">

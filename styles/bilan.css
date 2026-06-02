@@ -26,14 +26,6 @@
 
 /* === KPIs annuels (réutilise .hero existant + .bilan-kpi spécifique) === */
 .bilan-hero { margin-bottom: 18px; }
-/* Sparkline en bas de chaque carte KPI */
-.bilan-kpi { position: relative; overflow: hidden; }
-.bilan-spark {
-  display: block;
-  width: 100%;
-  height: 24px;
-  margin-top: 10px;
-}
 
 /* === Toggle métrique (Distance / Dénivelé) sur le cumul annuel === */
 .bilan-metric-toggle {
@@ -62,6 +54,55 @@
   background: rgba(74, 222, 128, 0.16);
   color: var(--accent);
 }
+
+/* === Volume par mois + Répartition par sport côte à côte === */
+.bilan-vol-sport-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.bilan-vol-sport-grid > .card:first-child { grid-column: span 3; }
+.bilan-vol-sport-grid > .card:last-child { grid-column: span 1; }
+@media (max-width: 900px) {
+  .bilan-vol-sport-grid { grid-template-columns: 1fr; }
+  .bilan-vol-sport-grid > .card { grid-column: auto; }
+}
+
+/* === Répartition par sport (anneau + légende compacte) === */
+.bilan-sports-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-around;
+  gap: 18px;
+  flex-wrap: wrap;
+  min-height: 260px;
+}
+.bilan-sports-chart {
+  position: relative;
+  width: 210px;
+  height: 210px;
+  flex: none;
+}
+.bilan-sports-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  font-size: 14px;
+}
+.bilan-sport-leg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.bilan-sport-dot {
+  width: 10px; height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.bilan-sport-name { color: var(--text); white-space: nowrap; }
 
 /* === Badge "nouveau" sur les records récents === */
 .bilan-record-new {

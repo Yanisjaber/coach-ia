@@ -244,6 +244,109 @@
   }
   .comp-del:hover { color: var(--danger); background: rgba(248, 113, 113, 0.12); }
 
+  /* Compétitions passées (page dédiée) */
+  .comp-item-past { opacity: 0.92; }
+  .comp-countdown.comp-past-result {
+    background: var(--bg-elev2);
+    color: var(--text-dim);
+    border-color: var(--border);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  /* === Page Compétitions : pastille générique === */
+  .comp-pill {
+    display: inline-block;
+    font-size: 10px; font-weight: 700;
+    padding: 3px 9px; border-radius: 999px;
+    letter-spacing: 0.02em;
+  }
+
+  /* === HERO : prochain objectif === */
+  .comp-hero {
+    position: relative;
+    background: linear-gradient(120deg, color-mix(in srgb, var(--pc) 9%, transparent), transparent 55%), var(--bg-elev);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--pc);
+    border-radius: 16px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.12s;
+  }
+  .comp-hero:hover { transform: translateY(-2px); }
+  .comp-hero-lbl { font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-mute); font-weight: 600; }
+  .comp-hero-body { display: flex; align-items: center; gap: 26px; flex-wrap: wrap; margin-top: 12px; }
+  .comp-hero-ring { position: relative; width: 108px; height: 108px; flex: none; }
+  .comp-hero-ring svg { width: 108px; height: 108px; }
+  .comp-hero-ring-txt { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .comp-hero-jx { font-size: 28px; font-weight: 800; line-height: 1; }
+  .comp-hero-jdate { font-size: 11px; color: var(--text-mute); margin-top: 2px; }
+  .comp-hero-main { flex: 1; min-width: 220px; }
+  .comp-hero-name { display: flex; align-items: center; gap: 9px; font-size: 20px; font-weight: 700; flex-wrap: wrap; }
+  .comp-hero-name .comp-trophy { flex: none; }
+  .comp-hero-sub { font-size: 13px; color: var(--text-dim); margin: 6px 0 14px; }
+  .comp-hero-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+  .comp-hero-prep { flex: 1; min-width: 220px; background: var(--bg-elev2); border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; }
+  .comp-prep-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; margin-top: 8px; }
+  .comp-prep-val { font-size: 18px; font-weight: 700; color: var(--text); line-height: 1; }
+  .comp-prep-k { font-size: 9px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.3px; margin-top: 3px; }
+  .comp-prep-reco { font-size: 11px; color: var(--text-dim); margin-top: 11px; line-height: 1.45; }
+
+  /* === FRISE DE SAISON === */
+  .comp-timeline { position: relative; height: 56px; margin: 14px 8px 4px; }
+  .comp-tl-axis { position: absolute; top: 28px; left: 0; right: 0; height: 2px; background: var(--border); }
+  .comp-tl-today { position: absolute; top: 22px; transform: translateX(-50%); }
+  .comp-tl-today::before { content: ""; display: block; width: 2px; height: 12px; background: var(--accent); margin: 0 auto; }
+  .comp-tl-today span { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--accent); }
+  .comp-tl-marker { position: absolute; top: 20px; transform: translateX(-50%); text-align: center; }
+  .comp-tl-marker.past { opacity: 0.6; }
+  .comp-tl-dot { display: block; width: 13px; height: 13px; border-radius: 50%; margin: 0 auto; }
+  .comp-tl-dot.big { width: 16px; height: 16px; border: 2px solid var(--bg-elev); }
+  .comp-tl-stem { position: absolute; left: 50%; transform: translateX(-50%); width: 1.5px; border-radius: 1px; opacity: 0.45; }
+  .comp-tl-cap { display: block; font-size: 9px; color: var(--text-mute); margin-top: 5px; white-space: nowrap; position: relative; }
+  .comp-season-stats { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 10px; }
+  .comp-ss-val { font-size: 18px; font-weight: 700; color: var(--text); }
+  .comp-ss-k { font-size: 11px; color: var(--text-mute); }
+
+  /* === Cartes résultat (passées enrichies) — format "résultat" === */
+  .comp-results { display: flex; flex-direction: column; gap: 10px; }
+  .comp-result-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--pc);
+    border-radius: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.12s;
+  }
+  .comp-result-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--pc) 45%, var(--border)); }
+  /* Médaille = résultat officiel */
+  .comp-res-medal {
+    flex: none; width: 74px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 7px 4px; border-radius: 10px; background: var(--bg);
+  }
+  .comp-res-medal-rank { font-size: 24px; font-weight: 800; color: var(--text-dim); line-height: 1; }
+  .comp-res-medal-rank sup { font-size: 11px; }
+  .comp-res-medal-cat { font-size: 9px; color: var(--text-mute); margin-top: 4px; white-space: nowrap; }
+  .comp-res-medal.podium { background: rgba(203, 210, 224, 0.10); }
+  .comp-res-medal.podium .comp-res-medal-rank { color: #d1d5db; }
+  .comp-res-medal.gold { background: rgba(251, 191, 36, 0.12); }
+  .comp-res-medal.gold .comp-res-medal-rank { color: #fbbf24; }
+  .comp-res-medal.none { background: transparent; width: auto; min-width: 38px; }
+  .comp-res-content { flex: 1; min-width: 0; }
+  .comp-res-top { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+  .comp-res-name { font-size: 16px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .comp-res-date { font-size: 12px; color: var(--text-mute); white-space: nowrap; }
+  .comp-res-metrics { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text); }
+  .comp-res-m { font-weight: 600; }
+  .comp-res-sep { color: var(--text-mute); }
+  .comp-res-nodata { color: var(--text-mute); font-style: italic; font-weight: 400; }
+
 
   /* === PILL SPORT — couleurs par catégorie (utilisé partout) === */
   .sport-pill {

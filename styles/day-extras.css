@@ -456,7 +456,7 @@
    (7 colonnes 1fr + 95px bilan) pour aligner exactement les bandes. */
 .phase-row {
   display: grid;
-  grid-template-columns: repeat(7, 1fr) 95px;
+  grid-template-columns: repeat(7, 1fr) 150px;
   gap: 6px;
   margin-bottom: 2px;
 }
@@ -498,7 +498,7 @@
 /* === BANDEAUX DE NOTE (même grille que .week-row-days, comme les cycles) === */
 .note-row {
   display: grid;
-  grid-template-columns: repeat(7, 1fr) 95px;
+  grid-template-columns: repeat(7, 1fr) 150px;
   gap: 6px;
   margin-bottom: 2px;
 }

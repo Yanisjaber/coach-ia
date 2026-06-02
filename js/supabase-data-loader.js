@@ -849,6 +849,9 @@ function triggerFullReload() {
     if (window.renderPowerProfile) window.renderPowerProfile();
     if (window.renderCalendar) window.renderCalendar();
     if (window.renderCompList) window.renderCompList();
+    if (window.renderCompetitionsPage) window.renderCompetitionsPage();
+    if (window.renderPostSession) window.renderPostSession();
+    if (window.renderPlanStub) window.renderPlanStub();
   }, 100);
   // Pour les KPI hero + charts du tableau de bord (qui sont dans le MAIN closure
   // et difficiles à re-trigger depuis l'extérieur), on émet un event que d'autres
