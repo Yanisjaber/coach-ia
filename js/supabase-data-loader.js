@@ -159,7 +159,7 @@ async function loadFromSupabase() {
       fetchAllPaged('power_profile', userId, 'duration_s'),
       fetchAllPaged('whoop_data', userId, 'iso_date'),
       sb.from('connexions_app').select(STRAVA_CONN_SAFE_COLS).eq('user_id', userId).eq('app', 'strava').maybeSingle(),
-      sb.from('connexions_app').select('user_id').eq('user_id', userId).eq('app', 'whoop').maybeSingle(),
+      sb.from('connexions_app').select('user_id, last_sync_at').eq('user_id', userId).eq('app', 'whoop').maybeSingle(),
     ]);
 
     // Si un import d'activités est en cours côté serveur (ex : rechargement pendant
@@ -206,6 +206,11 @@ async function loadFromSupabase() {
     // streams (ex : import interrompu par un rechargement), on relance la boucle
     // de lots de 40 + la barre, tout seul.
     maybeResumeStreams(stravaConnection, userId);
+
+    // Rafraîchissement auto de Whoop (pas de webhook côté Whoop, contrairement à
+    // Strava) : si connecté et dernière synchro ancienne, on relance un import
+    // SILENCIEUX en arrière-plan, une seule fois par session.
+    maybeRefreshWhoop(whoopConnection);
   } catch (e) {
     console.error('[sb-data] Erreur chargement Supabase:', e);
   } finally {
@@ -270,6 +275,21 @@ async function maybeResumeStreams(stravaConnection, userId) {
       window.startStravaStreams();
     }
   } catch (_) { /* silencieux */ }
+}
+
+// Rafraîchit Whoop en arrière-plan si la dernière synchro date de plus de 6h.
+// Une seule fois par session (et l'import met à jour last_sync_at → pas de boucle).
+let _whoopAutoRefreshed = false;
+function maybeRefreshWhoop(whoopConnection) {
+  if (!whoopConnection || _whoopAutoRefreshed || !window.startWhoopIngest) return;
+  const ageMs = whoopConnection.last_sync_at
+    ? Date.now() - new Date(whoopConnection.last_sync_at).getTime()
+    : Infinity;
+  if (ageMs < 6 * 60 * 60 * 1000) return; // déjà synchro récemment
+  _whoopAutoRefreshed = true;
+  console.log('[sb-data] Whoop : synchro auto en arrière-plan (dernière > 6h)');
+  // 14 jours suffisent pour un refresh courant (recovery/sommeil récents).
+  window.startWhoopIngest(14, { silent: true });
 }
 
 // ============ RECONSTITUTION FORMAT DASHBOARD_DATA ============
@@ -501,16 +521,19 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
   // 5) Power profile
   const ppAlltime = {};
   const ppRecent = {};
+  const ppDates = {}; // {duration_s: date iso du meilleur effort all-time}
   const durations = [];
   for (const p of powerProfile || []) {
     const k = String(p.duration_s);
     if (p.watts_alltime != null) ppAlltime[k] = p.watts_alltime;
     if (p.watts_90d != null) ppRecent[k] = p.watts_90d;
+    if (p.achieved_at_alltime) ppDates[k] = String(p.achieved_at_alltime).slice(0, 10);
     durations.push(k);
   }
   const power_profile = (powerProfile && powerProfile.length > 0) ? {
     alltime: ppAlltime,
     last_90d: ppRecent,
+    alltime_dates: ppDates,
     durations,
   } : null;
 

@@ -283,6 +283,14 @@
   flex-direction: column;
   gap: 12px;
 }
+/* Records de puissance : 2 colonnes (10 durées) */
+#bilan-power-records {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 560px) {
+  #bilan-power-records { grid-template-columns: 1fr; }
+}
 .bilan-record {
   background: var(--bg-elev2);
   border: 1px solid var(--border);
@@ -290,6 +298,8 @@
   border-radius: 8px;
   padding: 10px 14px;
 }
+.bilan-record[data-date] { cursor: pointer; transition: border-color .15s, background .15s; }
+.bilan-record[data-date]:hover { border-color: var(--accent); background: var(--bg-elev); }
 .bilan-record-label {
   font-size: 10px;
   color: var(--text-mute);

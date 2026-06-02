@@ -643,19 +643,28 @@ function renderVolumeRecords(allUnfiltered) {
   ].filter(Boolean);
 
   wrap.innerHTML = rows.map(r => `
-    <div class="bilan-record">
+    <div class="bilan-record"${r.date ? ` data-date="${r.date}"` : ''}>
       <div class="bilan-record-label">${r.label}</div>
       <div class="bilan-record-value">${r.value}</div>
       <div class="bilan-record-sub">${escapeHtml(r.sub || '—')}</div>
       <div class="bilan-record-date">${fmtFullDate(r.date)}</div>
     </div>
   `).join('');
+  wireRecordClicks(wrap);
 }
 
 // Affiche les records de puissance (Mean Maximal Power) depuis window.DASHBOARD_DATA.power_profile
 function renderPowerRecords() {
   const wrap = document.getElementById('bilan-power-records');
   if (!wrap) return;
+  // La puissance est une donnée vélo : on n'affiche les records que si le filtre
+  // sport est « Tout » ou inclut le cyclisme.
+  const active = window.activeSports;
+  const cyclingActive = !active || active.size === 0 || active.has('tout') || active.has('cyclisme');
+  if (!cyclingActive) {
+    wrap.innerHTML = `<p class="bilan-empty">Records de puissance disponibles pour le cyclisme.</p>`;
+    return;
+  }
   const data = window.DASHBOARD_DATA;
   const pp = data && data.power_profile;
   if (!pp || !pp.alltime || Object.keys(pp.alltime).length === 0) {
@@ -665,13 +674,19 @@ function renderPowerRecords() {
   // Durées clés à mettre en avant (secondes → label)
   const KEY_DURS = [
     { s: '5',    label: '5 secondes'  },
+    { s: '15',   label: '15 secondes' },
+    { s: '30',   label: '30 secondes' },
     { s: '60',   label: '1 minute'    },
+    { s: '120',  label: '2 minutes'   },
     { s: '300',  label: '5 minutes'   },
+    { s: '600',  label: '10 minutes'  },
     { s: '1200', label: '20 minutes'  },
+    { s: '1800', label: '30 minutes'  },
     { s: '3600', label: '1 heure'     },
   ];
   const alltime = pp.alltime || {};
   const recent = pp.last_90d || {};
+  const dates = pp.alltime_dates || {};
   const rows = KEY_DURS.map(k => {
     const at = alltime[k.s];
     const r = recent[k.s];
@@ -690,6 +705,7 @@ function renderPowerRecords() {
       label: k.label,
       value: Math.round(at) + ' W',
       sub: subParts.join(' · '),
+      date: dates[k.s] || null,
     };
   }).filter(Boolean);
   if (!rows.length) {
@@ -697,12 +713,25 @@ function renderPowerRecords() {
     return;
   }
   wrap.innerHTML = rows.map(r => `
-    <div class="bilan-record">
+    <div class="bilan-record"${r.date ? ` data-date="${r.date}"` : ''}>
       <div class="bilan-record-label">${escapeHtml(r.label)}</div>
       <div class="bilan-record-value">${r.value}</div>
       <div class="bilan-record-sub">${escapeHtml(r.sub)}</div>
     </div>
   `).join('');
+  wireRecordClicks(wrap);
+}
+
+// Rend cliquable chaque record ayant une date → ouvre la sortie dans le calendrier.
+function wireRecordClicks(wrap) {
+  wrap.querySelectorAll('.bilan-record[data-date]').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.title = 'Voir cette sortie dans le calendrier';
+    el.addEventListener('click', () => {
+      const iso = el.dataset.date;
+      if (iso && window.goToCalendarDay) window.goToCalendarDay(iso);
+    });
+  });
 }
 
 // ============ CHART CUMUL ANNUEL (respecte filtre header) ============

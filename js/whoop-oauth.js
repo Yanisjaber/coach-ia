@@ -56,13 +56,14 @@ async function checkWhoopReturn() {
 }
 
 // ============ INGESTION : appel à l'Edge Function whoop-ingest ============
-export async function startWhoopIngest(days = 365) {
+export async function startWhoopIngest(days = 365, opts = {}) {
+  const silent = !!opts.silent; // refresh auto en arrière-plan : pas de toast
   const sb = window.sb;
-  if (!sb) { showWhoopToast('Supabase non initialisé', 'error'); return; }
+  if (!sb) { if (!silent) showWhoopToast('Supabase non initialisé', 'error'); return; }
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) { showWhoopToast('Tu dois être connecté', 'error'); return; }
+  if (!session) { if (!silent) showWhoopToast('Tu dois être connecté', 'error'); return; }
 
-  showWhoopToast('Import Whoop en cours…', 'loading');
+  if (!silent) showWhoopToast('Import Whoop en cours…', 'loading');
   try {
     const cfg = window.SUPABASE_CONFIG;
     const res = await fetch(`${cfg.url}/functions/v1/whoop-ingest`, {
@@ -73,16 +74,16 @@ export async function startWhoopIngest(days = 365) {
     const data = await res.json();
     if (!res.ok) {
       if (data.error === 'no_whoop_connection') {
-        showWhoopToast('Aucun compte Whoop connecté', 'error');
+        if (!silent) showWhoopToast('Aucun compte Whoop connecté', 'error');
         return;
       }
-      showWhoopToast(`Erreur import Whoop : ${data.error || res.status}`, 'error');
+      if (!silent) showWhoopToast(`Erreur import Whoop : ${data.error || res.status}`, 'error');
       return;
     }
-    showWhoopToast(`Whoop importé : ${data.days_upserted || 0} jours (recovery ${data.recovery_records || 0}, sommeil ${data.sleep_records || 0})`, 'success');
+    if (!silent) showWhoopToast(`Whoop importé : ${data.days_upserted || 0} jours (recovery ${data.recovery_records || 0}, sommeil ${data.sleep_records || 0})`, 'success');
     if (window.reloadDataFromSupabase) setTimeout(() => window.reloadDataFromSupabase(), 600);
   } catch (e) {
-    showWhoopToast('Erreur réseau Whoop : ' + (e.message || e), 'error');
+    if (!silent) showWhoopToast('Erreur réseau Whoop : ' + (e.message || e), 'error');
     console.error('[whoop-ingest]', e);
   }
 }

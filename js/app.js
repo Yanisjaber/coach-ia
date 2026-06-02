@@ -352,15 +352,26 @@ document.getElementById('weekly-sessions').textContent = last7.filter(d => d.tss
 }
 
 // Dernière séance — bloc en haut à gauche du hero
-const lastSession = [...data].reverse().find(d => d.sessionType);
+// (on repère un jour avec activité réelle via sessionName, car le type a été retiré)
+const lastSession = [...data].reverse().find(d => d.sessionName || (d.activities && d.activities.length > 0));
 const dateEl = document.getElementById('last-session-date');
 const nameEl = document.getElementById('last-session-name');
 const metricsEl = document.getElementById('last-session-metrics');
+const lsCardEl = document.getElementById('last-session-card');
 if (!lastSession) {
   dateEl.textContent = '';
   nameEl.innerHTML = '<span class="ls-empty">Aucune séance dans la période</span>';
   metricsEl.innerHTML = '';
+  if (lsCardEl) { lsCardEl.style.cursor = ''; lsCardEl.onclick = null; lsCardEl.title = ''; }
 } else {
+  // Clic → va à la semaine de la séance dans le calendrier + ouvre l'activité.
+  if (lsCardEl) {
+    lsCardEl.style.cursor = 'pointer';
+    lsCardEl.title = 'Voir cette séance dans le calendrier';
+    lsCardEl.onclick = () => {
+      if (typeof goToCalendarDay === 'function') goToCalendarDay(toIsoDate(lastSession.date));
+    };
+  }
   const daysSince = Math.round((today - lastSession.date) / 86400000);
   const dateStr = daysSince === 0 ? "Aujourd'hui"
                 : daysSince === 1 ? "Hier"
@@ -584,18 +595,20 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
   options: {
     responsive: true, maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
-    onClick: (evt, elements) => {
-      let els = elements;
-      if ((!els || !els.length) && loadChart.getElementsAtEventForMode) {
-        els = loadChart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
-      }
+    onClick: (evt) => {
+      // N'ouvre le calendrier QUE si on clique réellement sur un rond d'activité
+      // (les jours sans activité ont un point de rayon 0 → non cliquables).
+      const els = loadChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, false);
       if (!els || !els.length) return;
       const d = loadChart._subset && loadChart._subset[els[0].index];
-      if (d && typeof goToCalendarDay === 'function') goToCalendarDay(toIsoDate(d.date));
+      if (!d || !dayHasActivity(d)) return;
+      if (typeof goToCalendarDay === 'function') goToCalendarDay(toIsoDate(d.date));
     },
-    onHover: (evt, elements) => {
+    onHover: (evt) => {
       const el = evt.native && evt.native.target;
-      if (el) el.style.cursor = (elements && elements.length) ? 'pointer' : 'default';
+      if (!el) return;
+      const hit = loadChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, false);
+      el.style.cursor = (hit && hit.length) ? 'pointer' : 'default';
     },
     plugins: {
       legend: { display: false },
@@ -668,6 +681,7 @@ function goToCalendarDay(iso) {
     if (typeof openSessionModal === 'function') openSessionModal(iso, 'realise');
   }, 300);
 }
+window.goToCalendarDay = goToCalendarDay;
 
 // Init : 30 derniers jours par défaut
 {
@@ -1659,6 +1673,10 @@ function attachCustomMonthDropdown(monthBox, fpInstance) {
   function buildBody(extraClass) {
     const panel = document.createElement('div');
     panel.className = 'fp-cs-panel-body ' + (extraClass || '');
+    // Le panneau est dans <body>, hors du calendrier Flatpickr : sans ça, le
+    // mousedown serait vu comme un "clic extérieur" et Flatpickr fermerait avant
+    // que le clic sur l'option n'aboutisse → la sélection mois/année serait perdue.
+    panel.addEventListener('mousedown', (e) => e.stopPropagation());
     document.body.appendChild(panel);
     return panel;
   }
@@ -1674,7 +1692,12 @@ function attachCustomMonthDropdown(monthBox, fpInstance) {
     it.dataset.month = i;
     it.addEventListener('click', (e) => {
       e.stopPropagation();
-      fpInstance.changeMonth(i, false);
+      // On garde le jour courant (borné au dernier jour du mois cible) et on
+      // VALIDE la date → le changement se sauvegarde sans avoir à cliquer un jour.
+      const cur = fpInstance.selectedDates[0] || new Date(fpInstance.currentYear, fpInstance.currentMonth, 1);
+      const maxDay = new Date(fpInstance.currentYear, i + 1, 0).getDate();
+      fpInstance.setDate(new Date(fpInstance.currentYear, i, Math.min(cur.getDate(), maxDay)), true);
+      syncLabels();
       closeAll();
     });
     mPanel.appendChild(it);
@@ -1699,7 +1722,10 @@ function attachCustomMonthDropdown(monthBox, fpInstance) {
       if (yy === fpInstance.currentYear) it.classList.add('selected');
       it.addEventListener('click', (e) => {
         e.stopPropagation();
-        fpInstance.changeYear(yy);
+        const cur = fpInstance.selectedDates[0] || new Date(fpInstance.currentYear, fpInstance.currentMonth, 1);
+        const maxDay = new Date(yy, fpInstance.currentMonth + 1, 0).getDate();
+        fpInstance.setDate(new Date(yy, fpInstance.currentMonth, Math.min(cur.getDate(), maxDay)), true);
+        syncLabels();
         closeAll();
       });
       yPanel.appendChild(it);
@@ -8593,7 +8619,7 @@ document.getElementById('alerts-list').innerHTML = alerts.map(a => `
 // ========= PANEL 4: SESSIONS =========
 let sessions = [];
 function renderSessionsTable() {
-  sessions = data.filter(d => d.sessionType).slice(-12).reverse();
+  sessions = data.filter(d => d.sessionName || (d.activities && d.activities.length > 0)).slice(-12).reverse();
   const tbody = document.getElementById('sessions-tbody');
   tbody.innerHTML = sessions.map((s, i) => {
     // Récup du sport Strava depuis la 1re activité du jour, sinon depuis la racine
@@ -8679,8 +8705,9 @@ document.getElementById('sessions-tbody').addEventListener('click', (e) => {
 // ========= TABS =========
 // ========= ONGLETS + routage par ancre (#entraineur, #bilan, #termes) =========
 // p1 (Tableau de bord) = pas de hash. #profil est géré par profile-modal.js.
-const PANEL_HASH = { p2: '#calendrier', p3: '#bilan', p5: '#termes' };
-const HASH_PANEL = { '#calendrier': 'p2', '#bilan': 'p3', '#termes': 'p5' };
+const PANEL_HASH = { p2: '#calendrier', p3: '#statistiques', p5: '#termes' };
+// '#bilan' conservé comme alias (anciens liens/favoris) → pointe toujours sur p3.
+const HASH_PANEL = { '#calendrier': 'p2', '#statistiques': 'p3', '#bilan': 'p3', '#termes': 'p5' };
 
 function activatePanel(panelId, updateHash = true) {
   const panelEl = document.getElementById(panelId);
