@@ -9,25 +9,40 @@
        · lier automatiquement (par date) le résultat officiel aux compétitions passées
    ============================================================ */
 
-const OD_LIC_KEY = 'coach_ia_od_licence_v1';
-const OD_CACHE_KEY = 'coach_ia_od_palmares_v1';
+// IMPORTANT : la licence et le palmarès sont propres à CHAQUE compte.
+// On scope les clés localStorage par identifiant utilisateur Supabase pour éviter
+// qu'une licence liée sur un compte n'apparaisse sur un autre (même navigateur).
+const OD_LIC_BASE = 'coach_ia_od_licence_v1';
+const OD_CACHE_BASE = 'coach_ia_od_palmares_v1';
+let _odUid = null; // défini à l'authentification
+
+function odKey(base) { return _odUid ? `${base}::${_odUid}` : null; }
+
+// Purge les anciennes clés NON scopées (legacy) : elles pouvaient fuiter entre comptes.
+function odPurgeLegacy() {
+  try { localStorage.removeItem(OD_LIC_BASE); localStorage.removeItem(OD_CACHE_BASE); } catch {}
+}
 
 let _odResults = [];
 let _odRecapYear = 'all';
 
 function odLoadCache() {
-  try { return JSON.parse(localStorage.getItem(OD_CACHE_KEY) || 'null'); } catch { return null; }
+  const k = odKey(OD_CACHE_BASE); if (!k) return null;
+  try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; }
 }
 function odSaveCache(results) {
-  try { localStorage.setItem(OD_CACHE_KEY, JSON.stringify(results || [])); } catch {}
+  const k = odKey(OD_CACHE_BASE); if (!k) return;
+  try { localStorage.setItem(k, JSON.stringify(results || [])); } catch {}
 }
 
 function odLoadLicence() {
-  try { return JSON.parse(localStorage.getItem(OD_LIC_KEY) || 'null'); } catch { return null; }
+  const k = odKey(OD_LIC_BASE); if (!k) return null; // pas d'utilisateur connu → on n'affiche rien
+  try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; }
 }
 function odSaveLicence(lic) {
-  if (lic) localStorage.setItem(OD_LIC_KEY, JSON.stringify(lic));
-  else localStorage.removeItem(OD_LIC_KEY);
+  const k = odKey(OD_LIC_BASE); if (!k) return;
+  if (lic) localStorage.setItem(k, JSON.stringify(lic));
+  else localStorage.removeItem(k);
 }
 window.odGetLicence = odLoadLicence;
 
@@ -274,6 +289,19 @@ if (document.readyState === 'loading') {
   odInit();
 }
 // La session Supabase n'est pas toujours prête au 1er rendu → recharge à l'auth.
+// On (re)définit l'utilisateur courant pour cloisonner les données par compte.
 window.addEventListener('coach-ia-auth', (e) => {
-  if (e.detail && e.detail.user) odRefresh();
+  const user = e.detail && e.detail.user;
+  const newUid = user ? user.id : null;
+  if (newUid !== _odUid) {
+    _odUid = newUid;
+    _odResults = [];          // on ne garde aucune donnée de l'ancien compte
+    odPurgeLegacy();          // supprime les anciennes clés globales (fuite possible)
+  }
+  if (_odUid) {
+    odApplyResults(odLoadCache() || []); // affiche d'abord le cache DU compte courant
+    odRefresh();                          // puis rafraîchit depuis le serveur
+  } else {
+    odApplyResults([]);       // déconnexion → on n'affiche rien
+  }
 });

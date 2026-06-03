@@ -81,6 +81,7 @@
     <button class="tab active" data-panel="p1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg><span>Tableau de bord</span></button>
     <button class="tab" data-panel="p2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Calendrier</span></button>
     <button class="tab" data-panel="p6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg><span>Compétitions</span></button>
+    <button class="tab ia-only" data-panel="p7"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 14l.7 1.8 1.8.7-1.8.7L19 19l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span>IA</span></button>
     <button class="tab" data-panel="p3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Statistiques</span></button>
     <button class="tab" data-panel="p4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M8.21 13.89 7 22l5-3 5 3-1.21-8.11"/></svg><span>Performance</span></button>
     <button class="tab" data-panel="p5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Termes</span></button>
@@ -163,20 +164,6 @@
     </div>
   </section>
 
-  <!-- STUB IA : recommandation quotidienne -->
-  <div class="grid-1 card ia-only">
-    <div class="section-title">Recommandation du jour<span class="ia-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>IA</span></div>
-    <div class="section-subtitle">Que faire aujourd'hui en fonction de ta forme et de ta charge</div>
-    <div class="ia-stub" id="daily-reco-stub">
-      <div class="ia-stub-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-      </div>
-      <div class="ia-stub-body">
-        <strong>Recommandation IA arrivera ici</strong>
-        L'IA analysera ton TSB, ton recovery Whoop, ta charge des 7 derniers jours et ton plan pour proposer la séance optimale du jour (endurance, repos, tempo, etc.). Branche-toi à l'API Claude pour activer.
-      </div>
-    </div>
-  </div>
 
   <div class="grid-1 card">
     <div class="chart-head">
@@ -277,12 +264,6 @@
 
 <!-- PANEL 2: Calendrier -->
 <section class="panel" id="p2">
-  <!-- Coach IA : chat conversationnel + actions calendrier -->
-  <div class="grid-1 card ia-only">
-    <div class="section-title">Coach IA<span class="ia-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>IA</span></div>
-    <div class="section-subtitle">Discute avec ton coach : conseils, analyse, et il peut ajouter des séances ou des jours de repos à ton calendrier quand tu lui demandes.</div>
-    <div id="coach-chat"></div>
-  </div>
 
   <!-- Compétitions à venir (les boutons d'ajout sont désormais dans le popover "+" de chaque jour) -->
   <div class="grid-1 card">
@@ -323,20 +304,6 @@
     </div>
   </div>
 
-  <!-- STUB IA : analyse post-séance de la dernière activité -->
-  <div class="grid-1 card ia-only">
-    <div class="section-title">Analyse post-séance<span class="ia-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>IA</span></div>
-    <div class="section-subtitle">Débrief intelligent de tes dernières sorties (qualité d'exécution, écart vs cible, suggestion)</div>
-    <div class="ia-stub" id="post-session-stub">
-      <div class="ia-stub-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      </div>
-      <div class="ia-stub-body">
-        <strong>Analyse de séance arrivera ici</strong>
-        Après chaque sortie, l'IA produira un débrief structuré : intensité réalisée vs cible, conformité, qualité d'exécution (variability index, dérive cardiaque), points forts/faibles et impact attendu sur la suite du plan.
-      </div>
-    </div>
-  </div>
 
   <!-- Recherche d'activité -->
   <div class="grid-1 card">
@@ -535,6 +502,48 @@
     <div class="section-title">Compétitions passées</div>
     <div class="section-subtitle">Tes résultats, récupérés de l'activité du jour</div>
     <div class="comp-results" id="comp-page-past"></div>
+  </div>
+</section>
+
+<!-- PANEL 7: IA (page dédiée — 4 sous-onglets) -->
+<section class="panel" id="p7">
+  <div class="ia-subtabs" id="ia-subtabs">
+    <button class="ia-subtab active" data-iatab="accueil" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/></svg><span>Accueil</span></button>
+    <button class="ia-subtab" data-iatab="planif" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Planification</span></button>
+    <button class="ia-subtab" data-iatab="analyse" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Analyse</span></button>
+    <button class="ia-subtab" data-iatab="discussion" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Discussion</span></button>
+  </div>
+
+  <div class="ia-subpanel" data-iapanel="accueil">
+    <div class="grid-1 card">
+      <div class="section-title">Bilan coureur</div>
+      <div class="section-subtitle">Niveau, type de coureur et préparation vs pic de forme — d'après tes séances réalisées</div>
+      <div class="ia-stub" id="ia-home-report"></div>
+    </div>
+  </div>
+
+  <div class="ia-subpanel" data-iapanel="planif" hidden>
+    <div class="grid-1 card">
+      <div class="section-title">Plan jusqu'à ta compétition</div>
+      <div class="section-subtitle">L'IA génère un plan périodisé que tu peux ajouter à ton calendrier</div>
+      <div id="ia-plan"></div>
+    </div>
+  </div>
+
+  <div class="ia-subpanel" data-iapanel="analyse" hidden>
+    <div class="grid-1 card">
+      <div class="section-title">Analyse de séance</div>
+      <div class="section-subtitle">Débrief de ta dernière sortie réalisée</div>
+      <div class="ia-stub" id="post-session-stub"></div>
+    </div>
+  </div>
+
+  <div class="ia-subpanel" data-iapanel="discussion" hidden>
+    <div class="grid-1 card">
+      <div class="section-title">Coach IA</div>
+      <div class="section-subtitle">Discute avec ton coach : conseils, et il peut ajouter des séances ou des jours de repos à ton calendrier.</div>
+      <div id="coach-chat"></div>
+    </div>
   </div>
 </section>
 

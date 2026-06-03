@@ -143,10 +143,11 @@ Deno.serve(async (req) => {
     const backfill = await backfillPowerCurves(sbAdmin, user.id, 100);
 
     // ===== 6) Recalculs power_profile (legacy) + power_profile_sport (par sport) =====
-    // Le recalcul par sport n'est fait qu'une fois le backfill terminé (sinon inutile
-    // de ré-agréger à chaque lot).
+    // On recalcule le profil par sport à CHAQUE passage : il s'appuie sur les power_curve
+    // déjà calculées, donc on obtient un profil partiel qui s'enrichit au fil du backfill
+    // (au lieu de n'afficher RIEN tant que tout n'est pas téléchargé).
     const ppRows = await recomputePowerProfile(sbAdmin, user.id);
-    const ppSportRows = backfill.remaining === 0 ? await recomputePowerProfileBySport(sbAdmin, user.id) : 0;
+    const ppSportRows = await recomputePowerProfileBySport(sbAdmin, user.id);
 
     // ===== 7) Combien d'activités restent sans streams ? =====
     const { count: remaining } = await sbAdmin
@@ -197,6 +198,29 @@ function computeMMP(wattsStream: any[]): Record<string, number> {
     if (best > 0) result[String(d)] = Math.round(best);
   }
   return result;
+}
+
+// MMP "tardive" : meilleure moyenne pour 5/20 min dont la fenêtre DÉMARRE après `afterSec`
+// (par défaut 2 h 30). Sert à mesurer la durabilité (résistance à la fatigue en fin de sortie).
+const DURABILITY_AFTER_SEC = 9000;        // 2 h 30
+const DURABILITY_DURS = [300, 1200];      // 5 min, 20 min
+function computeLateMMP(wattsStream: any[], afterSec = DURABILITY_AFTER_SEC): Record<string, number> {
+  if (!wattsStream || !wattsStream.length) return {};
+  const ws = wattsStream.map((w) => (w != null && w > 0 ? Math.round(w) : 0));
+  const n = ws.length;
+  if (n <= afterSec + DURABILITY_DURS[0]) return {}; // sortie trop courte
+  const cum = new Array(n + 1).fill(0);
+  for (let i = 0; i < n; i++) cum[i + 1] = cum[i] + ws[i];
+  const out: Record<string, number> = {};
+  for (const d of DURABILITY_DURS) {
+    let best = 0;
+    for (let i = afterSec; i + d <= n; i++) {   // fenêtre démarrant après afterSec
+      const avg = (cum[i + d] - cum[i]) / d;
+      if (avg > best) best = avg;
+    }
+    if (best > 0) out["late_" + d] = Math.round(best);
+  }
+  return out;
 }
 
 // Recalcule la table power_profile pour un user à partir des power_curve.
@@ -287,6 +311,8 @@ async function recomputePowerProfileBySport(sb: any, userId: string): Promise<nu
   const best: Record<string, Record<string, any>> = {};
   const count: Record<string, number> = {};
   const longest: Record<string, number> = {};
+  const nLong: Record<string, number> = {};   // nb de sorties > 2 h 30 (toutes)
+  const nLong90: Record<string, number> = {}; // idem sur les 90 derniers jours
 
   for (const a of acts) {
     const sport = a.sport || "autre";
@@ -296,6 +322,10 @@ async function recomputePowerProfileBySport(sb: any, userId: string): Promise<nu
     const durS = a.moving_time || a.elapsed_time || 0;
     count[sport] = (count[sport] || 0) + 1;
     if (durS > (longest[sport] || 0)) longest[sport] = durS;
+    if (pc.late_300 || pc.late_1200) {
+      nLong[sport] = (nLong[sport] || 0) + 1;
+      if (isRecent) nLong90[sport] = (nLong90[sport] || 0) + 1;
+    }
     best[sport] = best[sport] || {};
     for (const [dur, wattsRaw] of Object.entries(pc)) {
       const watts = Number(wattsRaw);
@@ -318,12 +348,43 @@ async function recomputePowerProfileBySport(sb: any, userId: string): Promise<nu
     const details: Record<string, any> = {};
     for (const [dur, b] of Object.entries(best[sport])) {
       const col = SEC_TO_COL[Number(dur)];
-      if (!col) continue;                       // durée hors plafond (>8h) ignorée
+      if (!col) continue;                       // durée hors plafond / clés "late_*" ignorées ici
       row[col] = Math.round((b as any).all);
       details[col] = {
         w90: (b as any).d90 ? Math.round((b as any).d90) : null,
         date: (b as any).allDate,
         activity_id: (b as any).allId,
+      };
+    }
+    // Durabilité : meilleure puissance 5/20 min APRÈS 2 h 30 vs meilleure "à froid".
+    const sb_ = best[sport];
+    const fresh5 = sb_['300'] ? sb_['300'].all : null;
+    const fresh20 = sb_['1200'] ? sb_['1200'].all : null;
+    const late5 = sb_['late_300'] ? sb_['late_300'].all : null;
+    const late20 = sb_['late_1200'] ? sb_['late_1200'].all : null;
+    // Versions 90 jours (forme actuelle)
+    const fresh5_90 = sb_['300'] ? sb_['300'].d90 : null;
+    const fresh20_90 = sb_['1200'] ? sb_['1200'].d90 : null;
+    const late5_90 = sb_['late_300'] ? sb_['late_300'].d90 : null;
+    const late20_90 = sb_['late_1200'] ? sb_['late_1200'].d90 : null;
+    const rr = (l: any, f: any) => (l && f) ? Math.round((l / f) * 100) / 100 : null;
+    if (late5 || late20 || late5_90 || late20_90) {
+      details.durability = {
+        after_sec: DURABILITY_AFTER_SEC,
+        // carrière (record)
+        late_5min: late5 ? Math.round(late5) : null,
+        late_20min: late20 ? Math.round(late20) : null,
+        fresh_5min: fresh5 ? Math.round(fresh5) : null,
+        fresh_20min: fresh20 ? Math.round(fresh20) : null,
+        ratio_5min: rr(late5, fresh5),
+        ratio_20min: rr(late20, fresh20),
+        n_long: nLong[sport] || 0,
+        // forme actuelle (90 jours)
+        ratio_5min_90: rr(late5_90, fresh5_90),
+        ratio_20min_90: rr(late20_90, fresh20_90),
+        late_20min_90: late20_90 ? Math.round(late20_90) : null,
+        fresh_20min_90: fresh20_90 ? Math.round(fresh20_90) : null,
+        n_long_90: nLong90[sport] || 0,
       };
     }
     row.details = details;
@@ -343,7 +404,7 @@ async function recomputePowerProfileBySport(sb: any, userId: string): Promise<nu
 // Recalcule la power_curve (avec les NOUVELLES durées) depuis les streams déjà
 // stockés, pour les activités dont la courbe est absente/obsolète. Lot limité
 // (idempotent, relançable). Renvoie { done, remaining }.
-const POWER_CURVE_VERSION = 2; // bump quand on change les durées (force un backfill)
+const POWER_CURVE_VERSION = 3; // bump quand on change les durées/calculs (force un re-backfill local)
 async function backfillPowerCurves(sb: any, userId: string, limit: number): Promise<{ done: number; remaining: number }> {
   // 1) Repère les activités obsolètes SANS charger les streams (power_curve est léger).
   const { data, error } = await sb
@@ -369,6 +430,7 @@ async function backfillPowerCurves(sb: any, userId: string, limit: number): Prom
       const jsonStr = await gunzipBase64(row.streams_gz);
       const watts = wattsFromStreamArray(JSON.parse(jsonStr));
       const pc: Record<string, number> = computeMMP(watts);
+      Object.assign(pc, computeLateMMP(watts)); // late_300 / late_1200 si sortie > 2 h 30
       pc.v = POWER_CURVE_VERSION; // marqueur de version (ignoré par l'agrégation)
       await sb.from("activities").update({ power_curve: pc }).eq("id", a.id);
       done++;

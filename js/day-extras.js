@@ -627,7 +627,7 @@ function attachAddButtons() {
 function injectPhaseBanners() {
   const root = document.getElementById('week-calendar');
   if (!root) return;
-  const allPhases = loadPhases();
+  const allPhases = loadPhases().filter(p => !window.coachModeKeep || window.coachModeKeep(p.ia));
   root.querySelectorAll('.week-row').forEach(row => {
     // Nettoyer un ancien container de phase si présent
     const old = row.querySelector('.phase-row');
@@ -708,7 +708,7 @@ function injectPhaseBanners() {
 function injectNoteBanners() {
   const root = document.getElementById('week-calendar');
   if (!root) return;
-  const allNotes = loadNotesV2();
+  const allNotes = loadNotesV2().filter(n => !window.coachModeKeep || window.coachModeKeep(n.ia));
   root.querySelectorAll('.week-row').forEach(row => {
     // Nettoyer d'anciennes lignes de note
     row.querySelectorAll('.note-row').forEach(el => el.remove());

@@ -202,9 +202,21 @@ scheduleMidnightRefresh();
 
 // Re-render des vues qui dépendent du mode IA/Manuel quand on bascule le toggle.
 // L'event 'appModeChange' est dispatché par js/app-mode.js à chaque applyAppMode().
-window.addEventListener('appModeChange', () => {
+window.addEventListener('appModeChange', (e) => {
   if (typeof renderCalendar === 'function') renderCalendar();
+  // L'onglet IA (p7) n'existe qu'en mode IA : si on repasse en Manuel dessus, on rebascule au tableau de bord.
+  const mode = e && e.detail && e.detail.mode;
+  if (mode === 'manual') {
+    const p7 = document.getElementById('p7');
+    if (p7 && p7.classList.contains('active') && typeof activatePanel === 'function') activatePanel('p1', true);
+  }
 });
+
+// Filtre planif selon le mode : Manuel => éléments non-IA ; IA => éléments IA.
+// (les activités RÉALISÉES ne passent jamais par ce filtre — toujours visibles)
+window.coachModeKeep = function (ia) {
+  return (window.APP_MODE === 'ia') ? (ia === true) : (ia !== true);
+};
 
 // Re-render complet quand le data loader Supabase remplace window.DASHBOARD_DATA
 // (après login + chargement depuis BDD)
@@ -1780,12 +1792,26 @@ window.coachGetPlanContext = function () {
 
   return {
     today: toIsoDate(today),
-    competition: next ? {
-      nom: next.name,
-      date: toIsoDate(next.dateObj),
-      joursAvant: Math.ceil((next.dateObj - today) / 86400000),
-      priorite: compPrio(next.priority).key,
-    } : null,
+    competition: next ? (() => {
+      const stagesList = Array.isArray(next.stagesList) ? next.stagesList : [];
+      const gpxPresent = !!(next.gpxContent || next.gpxName) || stagesList.some(s => s.gpxContent || s.gpxName);
+      const sumKm = stagesList.reduce((a, s) => a + (Number(s.km) || 0), 0);
+      const sumDplus = stagesList.reduce((a, s) => a + (Number(s.dplus) || 0), 0);
+      const km = Number(next.km) || sumKm || null;
+      const dplus = Number(next.dplus) || Number(next.course_dplus) || sumDplus || null;
+      return {
+        nom: next.name,
+        date: toIsoDate(next.dateObj),
+        joursAvant: Math.ceil((next.dateObj - today) / 86400000),
+        priorite: compPrio(next.priority).key,
+        parcours: {
+          gpx_present: gpxPresent,            // si false → ne PAS inventer le profil du parcours
+          distance_km: km,
+          denivele_m: dplus,
+          type: next.target || null,
+        },
+      };
+    })() : null,
     forme,
     volume_recent: {
       heures_par_semaine: Math.round((mins / 60 / 4) * 10) / 10,
@@ -3109,7 +3135,7 @@ function saveTrainFromModal() {
 // Insertion d'un modèle de la bibliothèque sur un jour (glisser-déposer).
 // mode 'prevu' → entraînement prévu ; mode 'realise' → activité manuelle réalisée.
 // Les deux passent par le système d'entraînements existant (sync Supabase incluse).
-window.coachInsertTemplate = function (iso, tpl, mode) {
+window.coachInsertTemplate = function (iso, tpl, mode, ia) {
   if (!iso || !tpl) return;
   const m = mode === 'realise' ? 'realise' : 'prevu';
   const entry = {
@@ -3123,6 +3149,7 @@ window.coachInsertTemplate = function (iso, tpl, mode) {
     notes: tpl.description || '',
     mode: m,
     structure: null,
+    ia: ia === true,
   };
   const arr = m === 'realise' ? loadRealisedTrainings() : loadTrainings();
   arr.push(entry);
@@ -3382,7 +3409,7 @@ function renderWeekPlan() {
         }
 
         // 2) Tous les entraînements prévus manuels pour ce jour
-        const manualTrainings = (typeof loadTrainings === 'function') ? loadTrainings() : [];
+        const manualTrainings = ((typeof loadTrainings === 'function') ? loadTrainings() : []).filter(t => !window.coachModeKeep || window.coachModeKeep(t.ia));
         const manualForToday = manualTrainings.filter(t => t.date === iso);
         for (const m of manualForToday) {
           items.push({
@@ -3396,19 +3423,12 @@ function renderWeekPlan() {
           });
         }
 
-        // 3) Aucun item réel pour ce jour.
-        //    Aujourd'hui ou futur → template IA (mode IA) ou repos forcé.
-        //    Jour passé sans donnée réelle → reste vide (plus de snapshot figé).
+        // 3) Aucun item réel pour ce jour → uniquement un repos forcé éventuel.
+        //    (Plus de séance auto-générée : la planification IA passe par le chat.)
         if (items.length === 0 && !isPast) {
-          const _isForcedRest = (typeof isTemplateRestDay === 'function') && isTemplateRestDay(iso);
+          const _isForcedRest = (typeof isRestDayForMode === 'function') && isRestDayForMode(iso);
           if (_isForcedRest) {
             items.push({ type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Repos forcé (override utilisateur)' });
-          } else if (window.APP_MODE === 'ia') {
-            const dayPhase = determinePhaseForDate(comps, d, todayData.tsb);
-            const tmpl = PLAN_TEMPLATES[dayPhase][dow];
-            let tmplProposal = { ...tmpl };
-            if (isToday) tmplProposal = adjustForRecovery(tmplProposal, todayData.recovery);
-            items.push(tmplProposal);
           }
         }
 
@@ -3891,7 +3911,7 @@ document.getElementById('week-calendar').addEventListener('click', (e) => {
     // On compte le nombre d'items pour ce jour (compés + manuels)
     const compsExp = (typeof loadCompetitionsExpanded === 'function') ? loadCompetitionsExpanded() : [];
     const nbComps = compsExp.filter(c => c.date === iso).length;
-    const manualTr = (typeof loadTrainings === 'function') ? loadTrainings() : [];
+    const manualTr = ((typeof loadTrainings === 'function') ? loadTrainings() : []).filter(t => !window.coachModeKeep || window.coachModeKeep(t.ia));
     const nbManual = manualTr.filter(t => t.date === iso).length;
     const total = nbComps + nbManual;
     if (total < 2) return;
@@ -7582,7 +7602,7 @@ function openSessionModal(iso, source) {
     // ============= Source = 'prevu' =============
     const compsAll = loadCompetitionsExpanded().map(c => ({ ...c, dateObj: new Date(c.date + 'T12:00:00') }));
     const compsForToday = compsAll.filter(c => toIsoDate(c.dateObj) === iso);
-    const manualTrainings = (typeof loadTrainings === 'function') ? loadTrainings() : [];
+    const manualTrainings = ((typeof loadTrainings === 'function') ? loadTrainings() : []).filter(t => !window.coachModeKeep || window.coachModeKeep(t.ia));
     const manualForToday = manualTrainings.filter(t => t.date === iso);
 
     // === Items affichables sur la day card (source de vérité pour la sélection clavier/flèches) ===
@@ -7620,21 +7640,13 @@ function openSessionModal(iso, source) {
       dayItems.forEach(it => items.push(it));
       curIdx = dayCurIdx;
     } else {
-      // Rien d'explicite : item template AI seul
-      // IMPORTANT : on doit suivre EXACTEMENT la même logique que renderPlanned (day card)
-      // sinon la modal contredit ce qui est affiché sur la carte.
-      const _isForcedRest = (typeof isTemplateRestDay === 'function') && isTemplateRestDay(iso);
-      const dayPhase = determinePhaseForDate(compsAll, date, todayData.tsb);
-      const dow = date.getDay();
-      // Détermine si c'est aujourd'hui (compare iso à la date locale du jour)
-      const _todayIso = toIsoDate(new Date());
-      const _isToday = iso === _todayIso;
-      const tmpl = _isForcedRest
+      // Rien d'explicite ce jour-là : pas de séance auto-générée (la planif IA
+      // passe par le chat). On affiche un repos forcé éventuel, sinon « rien ».
+      const _isForcedRest = (typeof isRestDayForMode === 'function') && isRestDayForMode(iso);
+      const proposal = _isForcedRest
         ? { type: 'rest', name: 'Repos', dur: 0, tss: 0, why: 'Repos forcé (override utilisateur)' }
-        : PLAN_TEMPLATES[dayPhase][dow];
-      let proposal = { ...tmpl };
-      if (_isToday && !_isForcedRest) proposal = adjustForRecovery(proposal, todayData.recovery);
-      items.push({ kind: 'template', data: proposal, phase: dayPhase });
+        : { type: 'libre', name: 'Aucune séance prévue', dur: 0, tss: 0, why: '' };
+      items.push({ kind: 'template', data: proposal, phase: null });
       curIdx = 0;
     }
     if (curIdx >= items.length) curIdx = 0;
@@ -8379,28 +8391,45 @@ function addStravaIgnored(id) {
 
 // ========= TEMPLATE IA OVERRIDES (marquer un jour en repos / personnalisation) =========
 const TEMPLATE_REST_KEY = 'coach_ia_template_rest_days_v1';
+const TEMPLATE_REST_IA_KEY = 'coach_ia_template_rest_days_ia_v1'; // sous-ensemble créé par l'IA
 function loadTemplateRestDays() {
   try { return JSON.parse(localStorage.getItem(TEMPLATE_REST_KEY) || '[]'); }
   catch { return []; }
 }
+function loadRestIaSet() {
+  try { return JSON.parse(localStorage.getItem(TEMPLATE_REST_IA_KEY) || '[]'); }
+  catch { return []; }
+}
 function isTemplateRestDay(iso) { return loadTemplateRestDays().includes(iso); }
-function addTemplateRestDay(iso) {
+// Repos visible dans le mode courant (Manuel => repos non-IA ; IA => repos IA).
+function isRestDayForMode(iso) {
+  if (!loadTemplateRestDays().includes(iso)) return false;
+  const isIa = loadRestIaSet().includes(iso);
+  return window.coachModeKeep ? window.coachModeKeep(isIa) : !isIa;
+}
+function addTemplateRestDay(iso, ia = false) {
   const arr = loadTemplateRestDays();
   if (!arr.includes(iso)) arr.push(iso);
   localStorage.setItem(TEMPLATE_REST_KEY, JSON.stringify(arr));
-  if (window.cloudSync) window.cloudSync.pushRestDay(iso, true);
+  if (ia) {
+    const iaArr = loadRestIaSet();
+    if (!iaArr.includes(iso)) iaArr.push(iso);
+    localStorage.setItem(TEMPLATE_REST_IA_KEY, JSON.stringify(iaArr));
+  }
+  if (window.cloudSync) window.cloudSync.pushRestDay(iso, true, ia);
 }
 function removeTemplateRestDay(iso) {
-  const arr = loadTemplateRestDays().filter(d => d !== iso);
-  localStorage.setItem(TEMPLATE_REST_KEY, JSON.stringify(arr));
+  localStorage.setItem(TEMPLATE_REST_KEY, JSON.stringify(loadTemplateRestDays().filter(d => d !== iso)));
+  localStorage.setItem(TEMPLATE_REST_IA_KEY, JSON.stringify(loadRestIaSet().filter(d => d !== iso)));
   if (window.cloudSync) window.cloudSync.pushRestDay(iso, false);
 }
 function toggleTemplateRestDay(iso) {
   if (isTemplateRestDay(iso)) removeTemplateRestDay(iso);
-  else addTemplateRestDay(iso);
+  else addTemplateRestDay(iso, window.APP_MODE === 'ia'); // toggle manuel en mode IA => repos IA
 }
 // Expose pour modules ES6 externes (day-extras.js)
 window.isTemplateRestDay = isTemplateRestDay;
+window.isRestDayForMode = isRestDayForMode;
 window.addTemplateRestDay = addTemplateRestDay;
 window.removeTemplateRestDay = removeTemplateRestDay;
 window.toggleTemplateRestDay = toggleTemplateRestDay;
@@ -9263,9 +9292,9 @@ try { renderSessionsTable(); } catch (e) { console.error('[renderSessionsTable]'
 // ========= TABS =========
 // ========= ONGLETS + routage par ancre (#entraineur, #bilan, #termes) =========
 // p1 (Tableau de bord) = pas de hash. #profil est géré par profile-modal.js.
-const PANEL_HASH = { p2: '#calendrier', p3: '#statistiques', p4: '#performance', p5: '#termes', p6: '#competitions' };
+const PANEL_HASH = { p2: '#calendrier', p3: '#statistiques', p4: '#performance', p5: '#termes', p6: '#competitions', p7: '#ia' };
 // '#bilan' conservé comme alias (anciens liens/favoris) → pointe toujours sur p3.
-const HASH_PANEL = { '#calendrier': 'p2', '#statistiques': 'p3', '#performance': 'p4', '#bilan': 'p3', '#termes': 'p5', '#competitions': 'p6' };
+const HASH_PANEL = { '#calendrier': 'p2', '#statistiques': 'p3', '#performance': 'p4', '#bilan': 'p3', '#termes': 'p5', '#competitions': 'p6', '#ia': 'p7' };
 
 function activatePanel(panelId, updateHash = true) {
   const panelEl = document.getElementById(panelId);

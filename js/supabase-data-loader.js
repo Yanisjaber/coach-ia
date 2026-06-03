@@ -299,7 +299,13 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
   // On n'affiche les données Whoop QUE si un compte Whoop est réellement connecté.
   // (Évite d'afficher d'anciennes données simulées encore présentes en base.)
   if (!whoopConnection) whoopData = [];
-  // 1) Athlete
+  // 1) Athlete (incl. sexe + âge depuis extras → pour W/kg & barèmes)
+  const _extras = (profile && profile.extras) || {};
+  let _age = null;
+  if (_extras.x_birth_date) {
+    const b = new Date(_extras.x_birth_date);
+    if (!isNaN(b)) { _age = Math.floor((Date.now() - b.getTime()) / (365.25 * 86400000)); }
+  }
   const athlete = {
     id: stravaConnection?.external_id ? String(stravaConnection.external_id) : '',
     name: profile?.display_name || stravaConnection?.athlete_name || 'Athlete',
@@ -307,6 +313,9 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
     hr_max: profile?.hr_max || 0,
     lthr: profile?.lthr || 0,
     weight: profile?.weight || 0,
+    sex: _extras.x_sex || null,          // 'M' | 'F'
+    birth_date: _extras.x_birth_date || null,
+    age: _age,                            // années (entier) ou null
   };
 
   // 2) Index activités par iso_date
@@ -850,8 +859,7 @@ function triggerFullReload() {
     if (window.renderCalendar) window.renderCalendar();
     if (window.renderCompList) window.renderCompList();
     if (window.renderCompetitionsPage) window.renderCompetitionsPage();
-    if (window.renderPostSession) window.renderPostSession();
-    if (window.renderPlanStub) window.renderPlanStub();
+    if (window.renderIaPage) window.renderIaPage();
   }, 100);
   // Pour les KPI hero + charts du tableau de bord (qui sont dans le MAIN closure
   // et difficiles à re-trigger depuis l'extérieur), on émet un event que d'autres

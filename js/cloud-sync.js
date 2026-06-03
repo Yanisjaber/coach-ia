@@ -29,8 +29,7 @@ window.addEventListener('coach-ia-auth', async (e) => {
         if (window.renderCompetitionsPage) window.renderCompetitionsPage();
         if (window.renderBilan) window.renderBilan();
         if (window.renderSeanceLibrary) window.renderSeanceLibrary();
-        if (window.renderPostSession) window.renderPostSession();
-        if (window.renderPlanStub) window.renderPlanStub();
+        if (window.renderIaPage) window.renderIaPage();
       }, 100);
     } catch (e) {
       console.error('[cloud-sync] Pull error:', e);
@@ -70,6 +69,7 @@ async function pullAllFromCloud() {
         color: r.color,
         from: r.from_date,
         to: r.to_date,
+        ia: r.created_by_ia === true,
       }));
       localStorage.setItem('coach_ia_notes_v2', JSON.stringify(arr));
     }
@@ -86,6 +86,7 @@ async function pullAllFromCloud() {
         from: r.from_date,
         to: r.to_date,
         name: r.name || undefined,
+        ia: r.created_by_ia === true,
       }));
       localStorage.setItem('coach_ia_phases_v1', JSON.stringify(arr));
     }
@@ -169,6 +170,7 @@ async function pullAllFromCloud() {
       name: r.name, date: r.date, sport: r.sport ?? null,
       duration: r.duration ?? 0, tss: r.tss ?? 0, notes: r.notes ?? '', mode: 'prevu',
       structure: r.structure ?? null,
+      ia: r.created_by_ia === true,
     }));
     localStorage.setItem('coach_ia_trainings_v1', JSON.stringify(prevu));
     localStorage.setItem('coach_ia_trainings_realise_v1', JSON.stringify([]));
@@ -178,8 +180,8 @@ async function pullAllFromCloud() {
   try {
     const { data } = await sb.from('rest_day').select('*').eq('user_id', userId);
     if (data) {
-      const arr = data.map(r => r.iso_date);
-      localStorage.setItem('coach_ia_template_rest_days_v1', JSON.stringify(arr));
+      localStorage.setItem('coach_ia_template_rest_days_v1', JSON.stringify(data.map(r => r.iso_date)));
+      localStorage.setItem('coach_ia_template_rest_days_ia_v1', JSON.stringify(data.filter(r => r.created_by_ia === true).map(r => r.iso_date)));
     }
   } catch (e) { console.warn('[pull rest days]', e); }
 
@@ -226,6 +228,7 @@ export async function pushNoteRange(note) {
       user_id: uid(), client_id: note.id,
       type: note.type, text: note.text ?? null, color: note.color ?? null,
       from_date: note.from, to_date: note.to,
+      created_by_ia: note.ia === true,
     };
     if (note._sbId) row.id = note._sbId;
     if (!row.id) row.id = await _resolveId('day_notes', note.id);
@@ -251,6 +254,7 @@ export async function pushPhase(phase) {
       user_id: uid(), client_id: phase.id,
       phase: phase.phase, from_date: phase.from, to_date: phase.to,
       name: phase.name ?? null,
+      created_by_ia: phase.ia === true,
     };
     if (phase._sbId) row.id = phase._sbId;
     const { data, error } = await window.sb.from('training_phases').upsert(row).select().single();
@@ -397,6 +401,7 @@ export async function pushTraining(training, mode) {
         name: training.name, date: training.date, sport: training.sport ?? null,
         duration: training.duration ?? 0, tss: training.tss ?? 0,
         notes: training.notes ?? '', structure: training.structure ?? null,
+        created_by_ia: training.ia === true,
       };
       if (training._sbId) row.id = training._sbId;
       if (!row.id) row.id = await _resolveId('activity_planned', training.id);
@@ -430,12 +435,12 @@ export async function deleteTraining(training) {
   } catch (e) { console.warn('[del training]', e.message); }
 }
 
-export async function pushRestDay(isoDate, isRest) {
+export async function pushRestDay(isoDate, isRest, ia) {
   if (!isAuthed()) return;
   try {
     if (isRest) {
       // passe/prevu n'est PAS stocké : c'est dérivé de la date à l'affichage.
-      await window.sb.from('rest_day').upsert({ user_id: uid(), iso_date: isoDate }, { onConflict: 'user_id,iso_date' });
+      await window.sb.from('rest_day').upsert({ user_id: uid(), iso_date: isoDate, created_by_ia: ia === true }, { onConflict: 'user_id,iso_date' });
     } else {
       await window.sb.from('rest_day').delete().eq('user_id', uid()).eq('iso_date', isoDate);
     }
