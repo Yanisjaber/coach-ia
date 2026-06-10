@@ -26,3 +26,7 @@ Thumbs.db
 # Les tokens Whoop sont publics — révocables via le portail dev Whoop si compromis.
 # Les clés API intervals.icu et Whoop client_secret restent dans les Secrets Actions.
 supabase/.temp/
+
+# App mobile (Capacitor)
+node_modules/
+dev-mobile-preview.html

@@ -27,14 +27,15 @@ class CoachIAHandler(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         # Anti-cache sur les data files pour voir les updates immédiatement
-        if any(self.path.endswith(s) for s in ('.js', '.json', '.html')):
+        if any(self.path.endswith(s) for s in ('.js', '.json', '.html', '.css')):
             self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         super().end_headers()
 
 
 def run(port=8000):
     os.chdir(ROOT)
-    server = HTTPServer(("localhost", port), CoachIAHandler)
+    # 0.0.0.0 : accessible aussi depuis l'émulateur Android (via 10.0.2.2)
+    server = HTTPServer(("0.0.0.0", port), CoachIAHandler)
     url = f"http://localhost:{port}/dashboard.html"
     print("=" * 60)
     print("Coach IA - Serveur local actif")

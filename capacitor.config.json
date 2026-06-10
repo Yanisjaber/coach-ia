@@ -1,0 +1,22 @@
+{
+  "appId": "com.yanisjaber.coachia",
+  "appName": "Coach IA",
+  "webDir": "www",
+  "server": {
+    "url": "https://jaberautomations.fr/",
+    "errorPath": "index.html",
+    "allowNavigation": [
+      "jaberautomations.fr",
+      "yanisjaber.github.io",
+      "*.strava.com",
+      "*.whoop.com",
+      "*.supabase.co"
+    ]
+  },
+  "android": {
+    "backgroundColor": "#0b0e14"
+  },
+  "ios": {
+    "backgroundColor": "#0b0e14"
+  }
+}

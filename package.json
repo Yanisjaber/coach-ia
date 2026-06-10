@@ -1,0 +1,20 @@
+{
+  "name": "coach-ia",
+  "version": "1.0.0",
+  "description": "Coach IA - Dashboard Entraînement & Récupération",
+  "private": true,
+  "scripts": {
+    "cap:sync": "cap sync",
+    "cap:android": "cap open android",
+    "cap:ios": "cap open ios",
+    "mode:dev": "node -e \"require('fs').copyFileSync('capacitor.config.dev.json','capacitor.config.json')\" && cap sync android",
+    "mode:prod": "node -e \"require('fs').copyFileSync('capacitor.config.prod.json','capacitor.config.json')\" && cap sync android",
+    "emu": "cap run android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/ios": "^6.2.1"
+  }
+}
