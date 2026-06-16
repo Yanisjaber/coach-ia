@@ -1,0 +1,160 @@
+/* ============================================================
+   coach.css - Vue entraineur : bouton lateral, page plein ecran, bandeau
+   ============================================================ */
+/* ---- Bouton bascule "Vue entraineur" / "Vue perso" (au-dessus du compte) ---- */
+.coach-side-btn {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: linear-gradient(90deg, rgba(96,165,250,0.14), rgba(96,165,250,0.04));
+  border: 1px solid rgba(96,165,250,0.32); color: var(--info);
+  border-radius: 12px; padding: 10px 12px; margin-bottom: 10px;
+  font-size: 13.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.coach-side-btn:hover { border-color: rgba(96,165,250,0.55); }
+.coach-side-btn.is-coach {
+  background: linear-gradient(90deg, rgba(74,222,128,0.16), rgba(74,222,128,0.05));
+  border-color: rgba(74,222,128,0.4); color: var(--accent);
+}
+.coach-side-btn svg { flex: none; }
+
+/* ============================================================
+   Onglets conditionnels en mode coach
+   ============================================================ */
+/* Onglets crees dynamiquement : caches par defaut */
+.tab[data-panel="p-athletes"], .tab[data-panel="p-chat"] { display: none; }
+
+/* En mode coach : onglet Athletes visible, onglets perso non pertinents caches */
+body.coach-mode .sidebar-nav .tab[data-panel="p-athletes"] { display: flex; }
+body.coach-mode .sidebar-nav .tab[data-panel="p3"],
+body.coach-mode .sidebar-nav .tab[data-panel="p4"],
+body.coach-mode .sidebar-nav .tab[data-panel="p5"],
+body.coach-mode .sidebar-nav .tab[data-panel="p7"] { display: none; }
+
+/* Forme(p1)/Calendrier(p2)/Competitions(p6)/Messagerie : seulement si un athlete est choisi */
+body.coach-mode .sidebar-nav .tab[data-panel="p1"],
+body.coach-mode .sidebar-nav .tab[data-panel="p2"],
+body.coach-mode .sidebar-nav .tab[data-panel="p6"] { display: none; }
+body.coach-mode.coach-has-athlete .sidebar-nav .tab[data-panel="p1"],
+body.coach-mode.coach-has-athlete .sidebar-nav .tab[data-panel="p2"],
+body.coach-mode.coach-has-athlete .sidebar-nav .tab[data-panel="p6"],
+body.coach-mode.coach-has-athlete .sidebar-nav .tab[data-panel="p-chat"] { display: flex; }
+
+/* ============================================================
+   Indicateur nom d'athlete dans la topbar
+   ============================================================ */
+.coach-ath-top { display: none; align-items: center; gap: 9px; margin-left: auto; }
+.coach-ath-top.on { display: flex; }
+.coach-ath-top .cat-av {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--info)); color: #0b0e14;
+  display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px;
+}
+.coach-ath-top .cat-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.coach-ath-top .cat-ro { font-size: 10px; color: var(--text-mute); }
+
+/* ============================================================
+   Panneau Athletes (#p-athletes)
+   ============================================================ */
+.coach-athletes-head { margin-bottom: 16px; }
+.coach-ath-h { font-size: 22px; font-weight: 800; color: var(--text); margin: 0; }
+.coach-ath-sub { font-size: 13px; color: var(--text-dim); margin-top: 3px; }
+
+.coach-add-row { display: flex; gap: 8px; margin-bottom: 6px; max-width: 640px; }
+.coach-add-input {
+  flex: 1; min-width: 0; background: var(--bg-elev2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 10px; padding: 11px 14px; font-size: 14px; font-family: inherit;
+}
+.coach-add-input:focus { outline: none; border-color: var(--accent); }
+.coach-add-btn {
+  flex: none; background: rgba(74,222,128,0.14); border: 1px solid rgba(74,222,128,0.4);
+  color: var(--accent); border-radius: 10px; padding: 0 18px; font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.coach-add-btn:hover { background: rgba(74,222,128,0.22); }
+.coach-add-msg { font-size: 12.5px; line-height: 1.4; padding: 2px; margin-bottom: 8px; }
+.coach-add-msg[data-kind="error"] { color: var(--danger); }
+.coach-add-msg[data-kind="ok"] { color: var(--accent); }
+.coach-add-msg[data-kind="info"] { color: var(--text-dim); }
+
+.coach-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; margin-top: 16px; }
+.coach-empty { grid-column: 1 / -1; text-align: center; color: var(--text-dim); font-size: 15px; padding: 50px 10px; line-height: 1.7; }
+.coach-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px; transition: border-color 0.15s; }
+.coach-card.selected { border-color: rgba(74,222,128,0.5); box-shadow: 0 0 0 1px rgba(74,222,128,0.3); }
+.coach-card-head { display: flex; align-items: center; gap: 12px; }
+.coach-card-avatar { width: 42px; height: 42px; flex: none; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--info)); color: #0b0e14; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; }
+.coach-card-name { font-size: 16px; font-weight: 600; color: var(--text); }
+.coach-card-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; }
+.coach-stat { background: var(--bg-elev2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 4px; display: flex; flex-direction: column; gap: 3px; }
+.cs-val { font-size: 18px; font-weight: 700; color: var(--text); line-height: 1.1; }
+.cs-val.ok { color: var(--accent); }
+.cs-val.warn { color: var(--warn); }
+.cs-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-mute); }
+.coach-card-last { font-size: 12.5px; color: var(--text-dim); line-height: 1.4; }
+.coach-open-btn { background: rgba(96,165,250,0.14); border: 1px solid rgba(96,165,250,0.4); color: var(--info); border-radius: 10px; padding: 11px 0; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.coach-open-btn:hover { background: rgba(96,165,250,0.22); }
+
+/* ============================================================
+   Panneau Messagerie (#p-chat)
+   ============================================================ */
+#p-chat .chat-wrap { display: flex; flex-direction: column; width: 100%; max-width: 760px; margin: 0 auto; height: calc(100vh - 160px); min-height: 360px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.chat-list { flex: 1; overflow-y: auto; padding: 18px clamp(12px,3vw,24px); display: flex; flex-direction: column; gap: 10px; }
+.chat-empty { margin: auto; color: var(--text-dim); font-size: 14px; text-align: center; }
+.chat-msg { display: flex; flex-direction: column; max-width: 76%; }
+.chat-msg.mine { align-self: flex-end; align-items: flex-end; }
+.chat-msg.theirs { align-self: flex-start; align-items: flex-start; }
+.chat-bubble { padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.4; word-break: break-word; }
+.chat-msg.mine .chat-bubble { background: linear-gradient(135deg, var(--accent), #16a34a); color: #0b0e14; border-bottom-right-radius: 4px; }
+.chat-msg.theirs .chat-bubble { background: var(--bg-elev2); border: 1px solid var(--border); color: var(--text); border-bottom-left-radius: 4px; }
+.chat-time { font-size: 10px; color: var(--text-mute); margin-top: 3px; }
+.chat-input-row { display: flex; gap: 8px; padding: 12px clamp(12px,3vw,24px); border-top: 1px solid var(--border); }
+.chat-input { flex: 1; background: var(--bg-elev2); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 11px 14px; font-size: 15px; font-family: inherit; }
+.chat-input:focus { outline: none; border-color: var(--accent); }
+.chat-send { flex: none; background: rgba(74,222,128,0.16); border: 1px solid rgba(74,222,128,0.4); color: var(--accent); border-radius: 10px; padding: 0 18px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.chat-send:hover { background: rgba(74,222,128,0.24); }
+
+@media (max-width: 860px) {
+  .coach-cards { grid-template-columns: 1fr; }
+  .coach-ath-top .cat-ro { display: none; }
+  #p-chat .chat-wrap { height: calc(100dvh - 200px); }
+}
+
+/* ---- Statut + actions sur les cartes athlete ---- */
+.coach-card-head { justify-content: flex-start; }
+.coach-card-head .coach-card-name { flex: 1; }
+.coach-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.coach-badge.ok { color: var(--accent); background: rgba(74,222,128,0.14); border: 1px solid rgba(74,222,128,0.35); }
+.coach-badge.warn { color: var(--warn); background: rgba(251,191,36,0.14); border: 1px solid rgba(251,191,36,0.35); }
+.coach-card-avatar.pend { background: linear-gradient(135deg, var(--warn), #b45309); }
+.coach-pending-note { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; }
+
+.coach-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.coach-card-actions button {
+  flex: 1; min-width: 90px;
+  background: var(--bg-elev2); border: 1px solid var(--border); color: var(--text-dim);
+  border-radius: 9px; padding: 8px 10px; font-size: 12.5px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: border-color 0.15s, color 0.15s;
+}
+.coach-card-actions button:hover { color: var(--text); border-color: var(--text-mute); }
+.coach-card-actions button.danger:hover { color: var(--danger); border-color: rgba(248,113,113,0.5); }
+.coach-card-actions button:disabled { opacity: 0.7; cursor: default; }
+
+/* ---- Modal d'invitation (cote athlete) ---- */
+.coach-invite-overlay {
+  position: fixed; inset: 0; z-index: 99500;
+  background: rgba(11,14,20,0.82); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.coach-invite-box {
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 18px;
+  max-width: 460px; width: 100%; padding: 26px; box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+}
+.coach-invite-box h2 { margin: 0 0 16px; font-size: 19px; }
+.coach-invite-row { border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+.ci-info { display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px; }
+.ci-info strong { font-size: 15px; color: var(--text); }
+.ci-info span { font-size: 13px; color: var(--text-dim); }
+.ci-actions { display: flex; gap: 8px; }
+.ci-accept, .ci-refuse { flex: 1; border-radius: 9px; padding: 9px 0; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.ci-accept { background: linear-gradient(135deg, var(--accent), #16a34a); color: #0b0e14; border: none; }
+.ci-refuse { background: var(--bg-elev2); border: 1px solid var(--border); color: var(--text-dim); }
+.ci-refuse:hover { color: var(--danger); border-color: rgba(248,113,113,0.5); }

@@ -17,6 +17,11 @@ let _currentUser = null;
 let _loadInProgress = false;
 let _loadedUserId = null;
 
+// Mode coach « voir en tant qu'athlète » : null = je vois MES données ;
+// sinon = UUID de l'athlète dont on affiche les données (lecture seule).
+// La RLS Supabase (is_coach_of) garantit l'accès côté serveur.
+let _viewingAthleteId = null;
+
 window.addEventListener('coach-ia-auth', async (e) => {
   _currentUser = e.detail.user || null;
   if (!_currentUser) { _loadedUserId = null; return; }
@@ -140,7 +145,8 @@ async function loadFromSupabase() {
   _loadInProgress = true;
   console.log('[sb-data] Chargement des données depuis Supabase…');
   const sb = window.sb;
-  const userId = _currentUser.id;
+  // En mode coach, on charge les données de l'athlète sélectionné (sinon les miennes)
+  const userId = _viewingAthleteId || _currentUser.id;
 
   try {
     // Charger les 6 sources en parallèle, avec pagination auto pour les grosses tables
@@ -638,6 +644,9 @@ function buildEmptyDataset(user, profile) {
 
 // ============ BANNIÈRE D'ONBOARDING (compte vide) ============
 function showOnboardingBanner(opts = {}) {
+  // En vue coach (on consulte un autre athlete), on n'a pas acces a SES tokens
+  // Strava/Whoop : ne pas afficher l'onboarding "Connecter un compte".
+  if (window.isViewingOtherAthlete && window.isViewingOtherAthlete()) { hideOnboardingBanner(); return; }
   const stravaConnected = !!opts.stravaConnected;
   let banner = document.getElementById('onboarding-banner');
   if (banner) banner.remove(); // on régénère pour refléter le bon état
@@ -869,3 +878,28 @@ function triggerFullReload() {
 
 // Expose pour debug
 window.reloadDataFromSupabase = loadFromSupabase;
+
+// ============ MODE COACH : voir en tant qu'athlète ============
+window.getViewingAthleteId = () => _viewingAthleteId;
+
+// True si on consulte les données de QUELQU'UN D'AUTRE (lecture seule).
+window.isViewingOtherAthlete = () =>
+  !!_viewingAthleteId && _viewingAthleteId !== (_currentUser && _currentUser.id);
+
+// Bascule vers un athlète (athleteId) ou revient à soi (null), puis recharge tout.
+window.viewAsAthlete = async (athleteId) => {
+  const target = athleteId || null;
+  if (target === _viewingAthleteId) return;
+  _viewingAthleteId = target;
+  _loadedUserId = null; // force un rechargement complet
+  if (window.applyReadOnlyBanner) window.applyReadOnlyBanner();
+  showLoadingOverlay();
+  try {
+    await loadFromSupabase();
+    // Recharge aussi les donnees "localStorage" (prevus, templates, competitions)
+    // pour la vue courante (athlete ou moi).
+    window.dispatchEvent(new CustomEvent('coach-view-changed'));
+  } finally {
+    hideLoadingOverlay();
+  }
+};

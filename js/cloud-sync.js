@@ -37,8 +37,32 @@ window.addEventListener('coach-ia-auth', async (e) => {
   }
 });
 
-function uid() { return _currentUser ? _currentUser.id : null; }
+window.addEventListener('coach-view-changed', async () => {
+  try {
+    await pullAllFromCloud();
+    setTimeout(() => {
+      if (window.renderCalendar) window.renderCalendar();
+      if (window.renderCompList) window.renderCompList();
+      if (window.renderCompetitionsPage) window.renderCompetitionsPage();
+      if (window.renderSeanceLibrary) window.renderSeanceLibrary();
+    }, 50);
+  } catch (e) { console.warn('[cloud-sync] view-changed', e); }
+});
+
+function uid() {
+  const v = (window.getViewingAthleteId && window.getViewingAthleteId());
+  if (v) return v;            // mode coach : ecrit pour l'athlete consulte
+  return _currentUser ? _currentUser.id : null;
+}
 function isAuthed() { return !!_currentUser && !!window.sb; }
+
+// Mode coach « lecture seule » : quand on consulte les données d'un AUTRE
+// athlète, toute écriture cloud est bloquée (on ne modifie jamais les données
+// de l'athlète depuis le compte coach). La RLS Supabase la refuserait de toute
+// façon ; ce garde évite des erreurs et des écritures localStorage parasites.
+function readOnly() {
+  return !!(window.isViewingOtherAthlete && window.isViewingOtherAthlete());
+}
 
 // ============ PULL DEPUIS SUPABASE ============
 // Télécharge tout et remplit localStorage (format identique à l'ancien)
@@ -192,6 +216,7 @@ async function pullAllFromCloud() {
 // Si erreur réseau, le localStorage garde la donnée et on log dans la console.
 
 export async function pushNote(isoDate, text) {
+  if (readOnly()) return;
   if (!isAuthed()) return;
   try {
     if (text && text.trim()) {
@@ -205,6 +230,7 @@ export async function pushNote(isoDate, text) {
 }
 
 export async function pushActivityEdit(activityId, data) {
+  if (readOnly()) return;
   if (!isAuthed()) return;
   try {
     await window.sb.from('activity_edits').upsert(
@@ -214,6 +240,7 @@ export async function pushActivityEdit(activityId, data) {
   } catch (e) { console.warn('[push activity override]', e.message); }
 }
 export async function deleteActivityEdit(activityId) {
+  if (readOnly()) return;
   if (!isAuthed()) return;
   try {
     await window.sb.from('activity_edits').delete().eq('user_id', uid()).eq('activity_id', String(activityId));
@@ -221,6 +248,7 @@ export async function deleteActivityEdit(activityId) {
 }
 
 export async function pushNoteRange(note) {
+  if (readOnly()) return;
   // note: {id, type, text, color, from, to, _sbId?}
   if (!isAuthed()) return;
   try {
@@ -239,6 +267,7 @@ export async function pushNoteRange(note) {
   } catch (e) { console.warn('[push note range]', e.message); }
 }
 export async function deleteNoteRange(note) {
+  if (readOnly()) return;
   if (!isAuthed()) return;
   try {
     if (note._sbId) await window.sb.from('day_notes').delete().eq('id', note._sbId).eq('user_id', uid());
@@ -274,6 +303,7 @@ export async function deletePhase(phase) {
 }
 
 export async function pushGoal(year, goal) {
+  if (readOnly()) return;
   if (!isAuthed()) return;
   try {
     const row = {
@@ -288,6 +318,7 @@ export async function pushGoal(year, goal) {
   } catch (e) { console.warn('[push goal]', e.message); }
 }
 export async function deleteGoal(goal) {
+  if (readOnly()) return;
   if (!isAuthed()) return;
   try {
     if (goal._sbId) await window.sb.from('yearly_goals').delete().eq('id', goal._sbId).eq('user_id', uid());
@@ -446,18 +477,3 @@ export async function pushRestDay(isoDate, isRest, ia) {
     }
   } catch (e) { console.warn('[push restday]', e.message); }
 }
-
-// Expose globalement pour faciliter l'usage depuis les modules non-ES6
-window.cloudSync = {
-  pushNote,
-  pushActivityEdit, deleteActivityEdit,
-  pushNoteRange, deleteNoteRange,
-  pushPhase, deletePhase,
-  pushGoal, deleteGoal,
-  pushTemplate, deleteTemplate,
-  pushCompetition, deleteCompetition,
-  pushCompetitionRegistry, deleteCompetitionByActivity,
-  pushTraining, deleteTraining,
-  pushRestDay,
-  pullAllFromCloud,
-};
