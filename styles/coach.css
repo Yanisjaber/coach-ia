@@ -284,3 +284,23 @@ body.coach-mode.coach-has-athlete .sidebar-nav .tab[data-panel="p-chat"] { displ
 #p-overview .co-kpi.ok .co-val { color: var(--accent); }
 #p-overview .co-kpi.warn .co-val { color: var(--warn); }
 #p-overview .co-kpi.bad .co-val { color: var(--danger); }
+
+/* ============================================================
+   Nom de l'athlete dans la barre laterale (au-dessus de "Athletes")
+   ============================================================ */
+.coach-ath-side { display: none; }
+.coach-ath-side.on {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 11px; margin-bottom: 10px;
+  background: linear-gradient(90deg, rgba(74,222,128,0.14), rgba(74,222,128,0.04));
+  border: 1px solid rgba(74,222,128,0.34); border-radius: 11px;
+}
+.coach-ath-side .cas-av {
+  width: 26px; height: 26px; flex: none; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--info)); color: #0b0e14;
+  display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px;
+}
+.coach-ath-side .cas-name {
+  font-size: 14px; font-weight: 700; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}

@@ -367,18 +367,33 @@ async function selectAthlete(id, name) {
 
 /* ---- Indicateur topbar ---- */
 function injectTopIndicator() {
-  if (document.getElementById('coach-ath-top')) return;
-  const topbar = document.querySelector('.topbar'); if (!topbar) return;
-  const ind = document.createElement('div'); ind.id = 'coach-ath-top'; ind.className = 'coach-ath-top';
-  topbar.appendChild(ind); updateTopIndicator();
+  // Nom de l'athlete dans la barre laterale, AU-DESSUS de l'onglet "Athletes".
+  const nav = document.querySelector('.sidebar-nav');
+  if (nav && !document.getElementById('coach-ath-side')) {
+    const side = document.createElement('div'); side.id = 'coach-ath-side'; side.className = 'coach-ath-side';
+    nav.insertBefore(side, nav.firstChild);
+  }
+  // Indicateur "lecture seule" dans la topbar.
+  if (!document.getElementById('coach-ath-top')) {
+    const topbar = document.querySelector('.topbar');
+    if (topbar) { const ind = document.createElement('div'); ind.id = 'coach-ath-top'; ind.className = 'coach-ath-top'; topbar.appendChild(ind); }
+  }
+  updateTopIndicator();
 }
 function updateTopIndicator() {
-  const ind = document.getElementById('coach-ath-top'); if (!ind) return;
-  if (window.coachState && document.body.classList.contains('coach-has-athlete')) {
-    const n = window.coachState.athleteName || 'Athlete';
-    ind.innerHTML = '<span class="cat-av">' + escapeHtml((n[0] || 'A').toUpperCase()) + '</span><span class="cat-name">' + escapeHtml(n) + '</span><span class="cat-ro">lecture seule (planif autorisee)</span>';
-    ind.classList.add('on');
-  } else { ind.innerHTML = ''; ind.classList.remove('on'); }
+  const has = !!(window.coachState && document.body.classList.contains('coach-has-athlete'));
+  const n = has ? (window.coachState.athleteName || 'Athlete') : '';
+  const initial = escapeHtml((n[0] || 'A').toUpperCase());
+  const ind = document.getElementById('coach-ath-top');
+  if (ind) {
+    if (has) { ind.innerHTML = '<span class="cat-av">' + initial + '</span><span class="cat-name">' + escapeHtml(n) + '</span><span class="cat-ro">lecture seule (planif autorisee)</span>'; ind.classList.add('on'); }
+    else { ind.innerHTML = ''; ind.classList.remove('on'); }
+  }
+  const side = document.getElementById('coach-ath-side');
+  if (side) {
+    if (has) { side.innerHTML = '<span class="cas-av">' + initial + '</span><span class="cas-name">' + escapeHtml(n) + '</span>'; side.classList.add('on'); }
+    else { side.innerHTML = ''; side.classList.remove('on'); }
+  }
 }
 window.applyReadOnlyBanner = updateTopIndicator;
 

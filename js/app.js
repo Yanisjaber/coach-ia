@@ -40,6 +40,9 @@ import './app-mode.js';
 // ========= WORKOUT BUILDER (séances structurées par blocs) =========
 // Sorti dans js/workout-builder.js. Expose window.getCurrentWorkoutStructure().
 import './workout-builder.js';
+// Editeur de seance structuree (style Nolio) pour la modale prevu. Doit etre importe
+// APRES workout-builder pour surcharger les 3 fonctions pivot.
+import './session-builder.js';
 
 // ========= POWER PROFILE (Mean Maximal Power) =========
 // Lit window.DASHBOARD_DATA.power_profile (généré par fetch_data.py).
@@ -2970,6 +2973,7 @@ function openTrainModal(mode) {
   const modal = document.getElementById('train-modal');
   if (!modal) return;
   trainModalMode = (mode === 'realise') ? 'realise' : 'prevu';
+  window._trainModalMode = trainModalMode;
   initFlatpickrAll(); // au cas où
   if (typeof _clearAllFieldErrors === 'function') _clearAllFieldErrors('#train-modal');
   // Reset mode édition par défaut (sera ré-activé par openTrainModalForEdit)
