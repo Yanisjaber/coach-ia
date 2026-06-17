@@ -225,9 +225,10 @@
   function hidePrevu() { var sb = R('sb-section'); var old = document.querySelector('.workout-structure-block'); if (sb) sb.hidden = true; if (old) old.style.display = ''; setRO(false); }
 
   // -------- override des 3 fonctions pivot (mode prevu) --------
-  var _get = window.getCurrentWorkoutStructure, _set = window.setWorkoutStructure, _reset = window.resetWorkoutStructure;
-  window.getCurrentWorkoutStructure = function () { if (window._trainModalMode === 'prevu') return getBlocks(); return _get ? _get() : null; };
-  window.setWorkoutStructure = function (s) { if (window._trainModalMode === 'prevu') { setBlocks(s); showPrevu(); } else { hidePrevu(); if (_set) _set(s); } };
-  window.resetWorkoutStructure = function () { if (window._trainModalMode === 'prevu') { reset(); showPrevu(); } else { hidePrevu(); if (_reset) _reset(); } };
+  // Nouvel editeur utilise pour les DEUX modes (prevu et realise) : remplace l'ancien
+  // builder partout. L'ancien reste charge mais n'est plus affiche.
+  window.getCurrentWorkoutStructure = function () { return getBlocks(); };
+  window.setWorkoutStructure = function (s) { setBlocks(s); showPrevu(); };
+  window.resetWorkoutStructure = function () { reset(); showPrevu(); };
   window.SessionBuilder = { getBlocks: getBlocks, setBlocks: setBlocks, reset: reset };
 })();
