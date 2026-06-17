@@ -54,7 +54,15 @@
   + '#sb-root .sb-line input,#sb-root .sb-line select{width:100%;background:var(--bg-elev,#141a23);border:1px solid var(--border2,#374256);color:var(--text,#e7ecf3);border-radius:8px;padding:8px 8px;font-size:12.5px;font-family:inherit}'
   + '#sb-root .sb-line input:focus,#sb-root .sb-line select:focus{outline:none;border-color:var(--accent,#4ade80)}'
   + '#sb-root .sb-eq{grid-column:1 / -1;font-size:11px;color:var(--text-mute,#6b7686);padding:4px 0 2px 46px;white-space:nowrap}'
-  + '#sb-root .sb-chip{width:13px;height:13px;border-radius:4px;display:inline-block;vertical-align:-2px;margin-right:5px}';
+  + '#sb-root .sb-chip{width:13px;height:13px;border-radius:4px;display:inline-block;vertical-align:-2px;margin-right:5px}'
+  + '#sb-root .sb-toggrow{display:flex;align-items:center;justify-content:space-between;padding:6px 0 12px}'
+  + '#sb-root .sb-toglab{font-size:13.5px;font-weight:700;color:var(--text,#e7ecf3)}'
+  + '#sb-root .sb-switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;color:var(--text-dim,#9aa6b6)}'
+  + '#sb-root .sb-switch input{display:none}'
+  + '#sb-root .sb-sw{width:40px;height:22px;border-radius:11px;background:var(--bg-elev,#141a23);border:1px solid var(--border2,#374256);position:relative;transition:.15s}'
+  + '#sb-root .sb-sw::after{content:\"\";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--text-mute,#6b7686);transition:.15s}'
+  + '#sb-root .sb-switch input:checked + .sb-sw{background:rgba(74,222,128,.25);border-color:var(--accent,#4ade80)}'
+  + '#sb-root .sb-switch input:checked + .sb-sw::after{transform:translateX(17px);background:var(--accent,#4ade80)}';
 
   var styleEl = document.createElement('style');
   styleEl.id = 'sb-style'; styleEl.textContent = CSS;
@@ -180,6 +188,8 @@
   }
 
   var TEMPLATE = ''
+    + '<div class="sb-toggrow"><span class="sb-toglab">Structure (intervalles)</span><label class="sb-switch"><input type="checkbox" id="sb-toggle"><span class="sb-sw"></span><span>Activer</span></label></div>'
+    + '<div id="sb-body" hidden>'
     + '<div class="sb-h" style="display:flex;justify-content:space-between;align-items:baseline">Profil de la seance <span id="sb-profhint" style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686)"></span></div>'
     + '<div class="sb-profile" id="sb-profile"></div>'
     + '<div class="sb-totals"><div class="sb-tc"><div class="v" id="sb-tdur" style="color:var(--info,#60a5fa)">0</div><div class="k">Duree</div></div>'
@@ -190,11 +200,13 @@
     + card('warmup', 't-warm', '&#9650;') + card('interval', 't-int', '&#9889;') + card('steady', 't-steady', '&#9473;') + card('recovery', 't-rec', '&#9176;') + card('cooldown', 't-cool', '&#9660;')
     + '</div>'
     + '<div class="sb-h">Structure <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686)">- mesure et unite par ligne, glisse les blocs sur le graphe pour reordonner</span></div>'
-    + '<div class="sb-blocks" id="sb-blocks"></div>';
+    + '<div class="sb-blocks" id="sb-blocks"></div>'
+    + '</div>';
   function card(type, cls, ico) { return '<button type="button" class="sb-card ' + cls + '" data-add="' + type + '"><span class="sb-cico">' + ico + '</span><span class="sb-ct"><b>' + NAME[type] + (type === 'interval' ? ' (Nx)' : '') + '</b><small>' + DESC[type] + '</small></span></button>'; }
 
   function wire() {
     var rootEl = R('sb-root'); if (!rootEl) return;
+    var tg = R('sb-toggle'); if (tg) tg.addEventListener('change', function () { setActive(tg.checked); });
     var bl = R('sb-blocks');
     bl.addEventListener('input', onEdit);
     bl.addEventListener('change', function (e) { var f = e.target.dataset.f; if (f === 'metric' || f === 'unit' || e.target.dataset.kind === 'zone') onEdit(e); });
@@ -217,18 +229,19 @@
   function ensureMount() { if (mounted) return; var r = R('sb-root'); if (!r) return; r.innerHTML = TEMPLATE; wire(); mounted = true; }
 
   // -------- API interne --------
-  function getBlocks() { return (blocks && blocks.length) ? JSON.parse(JSON.stringify(blocks)) : null; }
-  function setBlocks(st) { if (st && st.length && st[0] && st[0].work) blocks = JSON.parse(JSON.stringify(st)); else blocks = defaults(); ensureMount(); renderAll(); }
-  function reset() { blocks = defaults(); ensureMount(); renderAll(); }
+  function isOn() { var tg = R('sb-toggle'); return !!(tg && tg.checked); }
+  function getBlocks() { if (!isOn()) return null; return (blocks && blocks.length) ? JSON.parse(JSON.stringify(blocks)) : null; }
+  function setBlocks(st) { var has = !!(st && st.length && st[0] && st[0].work); if (has) blocks = JSON.parse(JSON.stringify(st)); ensureMount(); var tg = R('sb-toggle'); if (tg) tg.checked = has; setActive(has); }
+  function reset() { blocks = defaults(); ensureMount(); var tg = R('sb-toggle'); if (tg) tg.checked = false; setActive(false); }
   function setRO(ro) { ['train-modal-duration', 'train-modal-tss'].forEach(function (id) { var e = R(id); if (e) { e.readOnly = ro; e.style.opacity = ro ? '0.6' : ''; } }); }
-  function showPrevu() { var sb = R('sb-section'); var old = document.querySelector('.workout-structure-block'); if (sb) sb.hidden = false; if (old) old.style.display = 'none'; setRO(true); ensureMount(); renderAll(); }
-  function hidePrevu() { var sb = R('sb-section'); var old = document.querySelector('.workout-structure-block'); if (sb) sb.hidden = true; if (old) old.style.display = ''; setRO(false); }
+  function setActive(on) { ensureMount(); var body = R('sb-body'); if (body) body.hidden = !on; setRO(on); if (on) renderAll(); }
+  function showSection() { var sb = R('sb-section'); var old = document.querySelector('.workout-structure-block'); if (sb) sb.hidden = false; if (old) old.style.display = 'none'; ensureMount(); }
 
   // -------- override des 3 fonctions pivot (mode prevu) --------
   // Nouvel editeur utilise pour les DEUX modes (prevu et realise) : remplace l'ancien
   // builder partout. L'ancien reste charge mais n'est plus affiche.
   window.getCurrentWorkoutStructure = function () { return getBlocks(); };
-  window.setWorkoutStructure = function (s) { setBlocks(s); showPrevu(); };
-  window.resetWorkoutStructure = function () { reset(); showPrevu(); };
+  window.setWorkoutStructure = function (s) { showSection(); setBlocks(s); };
+  window.resetWorkoutStructure = function () { showSection(); reset(); };
   window.SessionBuilder = { getBlocks: getBlocks, setBlocks: setBlocks, reset: reset };
 })();
