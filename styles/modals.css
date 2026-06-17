@@ -885,3 +885,25 @@
     .form-field.form-col-2 { grid-column: 1; }
   }
 
+
+/* ============================================================
+   Fix hauteur modale d'ajout (entrainement/competition) :
+   l'editeur de seance structuree peut rendre la modale plus haute que
+   l'ecran. On plafonne la hauteur et on rend la zone formulaire defilable,
+   en gardant l'en-tete et le pied (Enregistrer) toujours visibles.
+   ============================================================ */
+.modal-overlay.add-modal { align-items: center; }
+.add-modal-content {
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+}
+.add-modal-content .modal-header { flex: 0 0 auto; }
+.add-modal-content .modal-footer { flex: 0 0 auto; }
+.add-modal-content .add-form-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
