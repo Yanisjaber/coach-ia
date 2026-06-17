@@ -54,7 +54,8 @@
   + '#sb-root .sb-mini{font-size:10px;color:var(--text-mute,#6b7686);display:block;margin-bottom:3px}'
   + '#sb-root .sb-line input,#sb-root .sb-line select{width:100%;background:var(--bg-elev,#141a23);border:1px solid var(--border2,#374256);color:var(--text,#e7ecf3);border-radius:8px;padding:8px 8px;font-size:12.5px;font-family:inherit}'
   + '#sb-root .sb-line input:focus,#sb-root .sb-line select:focus{outline:none;border-color:var(--accent,#4ade80)}'
-  + '#sb-root .sb-eq{grid-column:1 / -1;font-size:11px;color:var(--text-mute,#6b7686);padding:4px 0 2px 46px;white-space:nowrap}'
+  + '#sb-root .sb-eq{grid-column:1 / -1;display:flex;justify-content:flex-end;padding:6px 0 1px}'
+  + '#sb-root .sb-eqpill{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--text,#e7ecf3);background:var(--bg-elev,#141a23);border:1px solid var(--border2,#374256);border-left:3px solid var(--border2,#374256);border-radius:8px;padding:5px 11px;white-space:nowrap}'
   + '#sb-root .sb-chip{width:13px;height:13px;border-radius:4px;display:inline-block;vertical-align:-2px;margin-right:5px}'
   + '#sb-root .sb-toggrow{display:flex;align-items:center;justify-content:space-between;padding:6px 0 12px}'
   + '#sb-root .sb-toglab{font-size:13.5px;font-weight:700;color:var(--text,#e7ecf3)}'
@@ -146,7 +147,7 @@
       + '<div><span class="sb-mini">Mesure</span>' + metricSel(i, w, s) + '</div>'
       + '<div><span class="sb-mini">Unite</span>' + unitSel(i, w, s) + '</div>'
       + '<div><span class="sb-mini">Cible</span>' + targetInput(i, w, s) + '</div>'
-      + '<div class="sb-eq"><span class="sb-chip" style="background:' + ZC[zoneOf(s.int)] + '"></span>' + label(s.int, s.metric) + '</div>'
+      + '<div class="sb-eq"><span class="sb-eqpill" style="border-left-color:' + ZC[zoneOf(s.int)] + '"><span class="sb-chip" style="background:' + ZC[zoneOf(s.int)] + '"></span>' + label(s.int, s.metric) + '</span></div>'
       + '</div>';
   }
   function renderBlocks() {
