@@ -6,13 +6,11 @@
 //   supabase.functions.invoke('send-invite', { body: { email, acceptUrl, coachName } })
 //
 // Deploiement :
-//   1) Cree un compte gratuit sur https://resend.com et genere une API key.
+//   1) Compte gratuit sur https://resend.com + API key.
 //   2) supabase secrets set RESEND_API_KEY=re_xxx
-//      (optionnel) supabase secrets set INVITE_FROM="Coach IA <onboarding@resend.dev>"
+//      (optionnel) supabase secrets set INVITE_FROM="Coach IA <coach@jaberautomations.fr>"
 //   3) supabase functions deploy send-invite
-//
-// Sans domaine verifie, Resend autorise l'envoi depuis onboarding@resend.dev
-// (suffisant pour tester). Pour la prod, verifie ton domaine dans Resend.
+//   Domaine verifie dans Resend requis pour envoyer a n'importe quelle adresse.
 // ============================================================
 // deno-lint-ignore-file no-explicit-any
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
@@ -29,6 +27,53 @@ function esc(s: string) {
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as any)[c]);
 }
 
+function buildHtml(coach: string, url: string) {
+  const who = esc(coach || "Votre coach");
+  const u = esc(url);
+  return `<!DOCTYPE html>
+<html lang="fr">
+<body style="margin:0;padding:0;background:#eef0f4;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef0f4;padding:32px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e3e6ec;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;">
+        <!-- En-tete -->
+        <tr><td style="padding:30px 32px 16px;border-bottom:1px solid #f0f1f4;">
+          <span style="font-size:17px;font-weight:800;color:#16a34a;letter-spacing:-0.3px;">Coach IA</span>
+        </td></tr>
+        <!-- Corps -->
+        <tr><td style="padding:26px 32px 6px;">
+          <h1 style="margin:0 0 12px;font-size:19px;color:#11141b;">Vous avez recu une invitation</h1>
+          <p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#3a4150;">
+            <strong>${who}</strong> souhaite devenir votre coach sur Coach IA et suivre votre entrainement.
+          </p>
+        </td></tr>
+        <!-- Bouton -->
+        <tr><td style="padding:0 32px 8px;">
+          <a href="${u}" style="display:inline-block;background:#11141b;color:#ffffff;text-decoration:none;padding:13px 26px;border-radius:8px;font-size:14px;font-weight:700;">Accepter l'invitation &rarr;</a>
+        </td></tr>
+        <tr><td style="padding:14px 32px 6px;">
+          <p style="margin:0;font-size:12px;color:#9aa2b1;">Vous devrez vous connecter a votre compte pour confirmer.</p>
+        </td></tr>
+        <!-- Lien de secours -->
+        <tr><td style="padding:4px 32px 24px;">
+          <p style="margin:0;font-size:12px;line-height:1.5;color:#9aa2b1;word-break:break-all;">
+            Si le bouton ne fonctionne pas : <a href="${u}" style="color:#2563eb;">${u}</a>
+          </p>
+        </td></tr>
+        <!-- Pied -->
+        <tr><td style="background:#fafbfc;padding:14px 32px;border-top:1px solid #f0f1f4;">
+          <p style="margin:0;font-size:11px;line-height:1.5;color:#aab0bd;">
+            Coach IA &middot; suivi d'entrainement &amp; recuperation.<br>
+            Vous recevez cet email car votre adresse a ete invitee. Sinon, ignorez-le simplement.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -41,24 +86,20 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "email et acceptUrl requis" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const who = esc(coachName || "Ton coach");
-    const url = esc(acceptUrl);
-    const html =
-      '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#111">' +
-      '<h2 style="color:#16a34a">Coach IA - Invitation</h2>' +
-      '<p><strong>' + who + '</strong> souhaite devenir ton coach sur Coach IA et suivre ton entrainement.</p>' +
-      '<p>Clique ci-dessous pour accepter (tu devras te connecter a ton compte) :</p>' +
-      '<p style="text-align:center;margin:28px 0">' +
-      '<a href="' + url + '" style="background:#16a34a;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:bold">Accepter l\'invitation</a>' +
-      '</p>' +
-      '<p style="font-size:12px;color:#666">Ou copie ce lien : ' + url + '</p>' +
-      '<p style="font-size:12px;color:#999">Si tu n\'es pas concerne, ignore cet email.</p>' +
-      '</div>';
+    const html = buildHtml(coachName, acceptUrl);
+    const text = `${coachName || "Votre coach"} vous invite a rejoindre Coach IA en tant qu'athlete.\n\n` +
+      `Acceptez l'invitation : ${acceptUrl}\n\n` +
+      `Coach IA - plateforme de suivi d'entrainement.`;
 
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Authorization": "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: INVITE_FROM, to: [email], subject: "Invitation de coaching - Coach IA", html }),
+      body: JSON.stringify({
+        from: INVITE_FROM,
+        to: [email],
+        subject: (coachName ? coachName + " vous invite sur Coach IA" : "Invitation - Coach IA"),
+        html, text,
+      }),
     });
     if (!r.ok) {
       const t = await r.text();

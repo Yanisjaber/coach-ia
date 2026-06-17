@@ -343,14 +343,28 @@ async function init() {
   }
 
   // Listener changements d'état
-  sb.auth.onAuthStateChange((event, session) => {
-    if (session && session.user) {
+  // On mémorise le dernier user pour qui on a déjà émis 'coach-ia-auth', afin de
+  // NE PAS redéclencher un pull/import complet sur chaque TOKEN_REFRESHED / retour
+  // d'onglet / ré-émission du SDK (sinon : pulls en boucle + données dupliquées en mémoire).
+  let _lastAuthUserId = (session && session.user && session.user.id) || null;
+  sb.auth.onAuthStateChange((event, sess) => {
+    const newUserId = (sess && sess.user && sess.user.id) || null;
+
+    // Rafraîchissement de jeton / session initiale : pas de vrai changement d'utilisateur.
+    if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return;
+
+    if (sess && sess.user) {
       hideLoginModal();
-      injectLogoutButton(session.user);
-      window.dispatchEvent(new CustomEvent('coach-ia-auth', { detail: { user: session.user } }));
+      injectLogoutButton(sess.user);
+      // Meme utilisateur deja connu -> on rafraichit juste l'UI, sans reemettre l'event data.
+      if (newUserId && newUserId === _lastAuthUserId) return;
+      _lastAuthUserId = newUserId;
+      window.dispatchEvent(new CustomEvent('coach-ia-auth', { detail: { user: sess.user } }));
     } else {
+      if (_lastAuthUserId === null) return; // deja deconnecte, rien a faire
+      _lastAuthUserId = null;
       removeLogoutButton();
-      hideBootOverlay(); // si on se déconnecte, retirer l'overlay
+      hideBootOverlay(); // si on se deconnecte, retirer l'overlay
       showLoginModal();
       window.dispatchEvent(new CustomEvent('coach-ia-auth', { detail: { user: null } }));
     }

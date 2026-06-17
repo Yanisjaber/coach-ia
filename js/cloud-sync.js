@@ -14,10 +14,17 @@
    ============================================================ */
 
 let _currentUser = null;
+let _pulledUserId = null;     // dernier user pour qui le pull complet a déjà été fait
+let _pullInProgress = false;  // évite deux pulls concurrents
 
 window.addEventListener('coach-ia-auth', async (e) => {
   _currentUser = e.detail.user || null;
-  if (_currentUser) {
+  if (!_currentUser) { _pulledUserId = null; return; }  // logout : on réarme
+  // Déjà pull pour cet utilisateur (refresh jeton / retour d'onglet) → on ne re-pull PAS.
+  if (_currentUser.id === _pulledUserId || _pullInProgress) return;
+  _pulledUserId = _currentUser.id;
+  _pullInProgress = true;
+  {
     // Au login : sync complète depuis le cloud vers localStorage
     try {
       await pullAllFromCloud();
@@ -33,6 +40,9 @@ window.addEventListener('coach-ia-auth', async (e) => {
       }, 100);
     } catch (e) {
       console.error('[cloud-sync] Pull error:', e);
+      _pulledUserId = null; // échec : on autorise une nouvelle tentative au prochain event
+    } finally {
+      _pullInProgress = false;
     }
   }
 });
@@ -470,10 +480,28 @@ export async function pushRestDay(isoDate, isRest, ia) {
   if (!isAuthed()) return;
   try {
     if (isRest) {
-      // passe/prevu n'est PAS stocké : c'est dérivé de la date à l'affichage.
+      // passe/prevu n'est PAS stocke : derive de la date a l'affichage.
       await window.sb.from('rest_day').upsert({ user_id: uid(), iso_date: isoDate, created_by_ia: ia === true }, { onConflict: 'user_id,iso_date' });
     } else {
       await window.sb.from('rest_day').delete().eq('user_id', uid()).eq('iso_date', isoDate);
     }
   } catch (e) { console.warn('[push restday]', e.message); }
 }
+
+// ============================================================
+// Expose toutes les fonctions de sync sur window.cloudSync.
+// SANS cette ligne, window.cloudSync est undefined et TOUTES les ecritures
+// (activites manuelles, competitions, notes, repos, phases, objectifs, templates)
+// restent en localStorage sans jamais remonter dans Supabase.
+// ============================================================
+window.cloudSync = {
+  pushNote, pushActivityEdit, deleteActivityEdit,
+  pushNoteRange, deleteNoteRange,
+  pushPhase, deletePhase,
+  pushGoal, deleteGoal,
+  pushTemplate, deleteTemplate,
+  pushCompetition, deleteCompetition, pushCompetitionRegistry, deleteCompetitionByActivity,
+  pushTraining, deleteTraining,
+  pushRestDay,
+  pullAllFromCloud,
+};

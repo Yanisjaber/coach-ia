@@ -44,4 +44,6 @@ end;
 $$;
 
 -- PUBLIC couvre tous les roles (dont anon) : on retire l'execution par defaut
--- puis on l'accorde uniquement aux comptes c
+-- puis on l'accorde uniquement aux comptes connectes.
+revoke all on function public.add_athlete_by_email(text) from public;
+grant execute on function public.add_athlete_by_email(text) to authenticated;

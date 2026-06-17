@@ -81,6 +81,7 @@ function enterCoachMode() {
   if (span) { if (_origP1Label === null) _origP1Label = span.textContent; span.textContent = 'Forme'; }
   const btn = document.getElementById('coach-side-btn'); if (btn) setToggleLabel(btn, true);
   if (window.coachEnsureChat) window.coachEnsureChat();
+  if (window.coachEnsureOverview) window.coachEnsureOverview();
   showAthletesPanel();
   loadCards();
 }
@@ -355,11 +356,13 @@ function exitToAthletes() {
 /* ---- Selection ---- */
 async function selectAthlete(id, name) {
   window.coachState = { athleteId: id, athleteName: name };
-  if (window.viewAsAthlete) await window.viewAsAthlete(id);
   document.body.classList.add('coach-has-athlete');
   updateTopIndicator();
   document.querySelectorAll('.coach-card').forEach(c => c.classList.toggle('selected', c.dataset.id === id));
-  const t1 = document.querySelector('.tab[data-panel="p1"]'); if (t1) t1.click();
+  // Ouvre tout de suite la Vue d'ensemble ; elle se remplit au chargement des donnees.
+  if (window.coachEnsureOverview) window.coachEnsureOverview();
+  if (window.coachShowOverview) window.coachShowOverview();
+  if (window.viewAsAthlete) await window.viewAsAthlete(id);
 }
 
 /* ---- Indicateur topbar ---- */
@@ -408,7 +411,12 @@ async function addAthlete(email) {
 async function sendInviteEmail(email, acceptUrl) {
   try {
     const sb = window.sb; if (!sb || !sb.functions) return false;
-    const coachName = (_coachUser && (_coachUser.email || '')) || 'Ton coach';
+    let coachName = (_coachUser && (_coachUser.email || '')) || 'Votre coach';
+    // Prefere le nom affiche du coach (quand on n'est pas en train de consulter un athlete)
+    if (!document.body.classList.contains('coach-has-athlete') &&
+        window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && window.DASHBOARD_DATA.athlete.name) {
+      coachName = window.DASHBOARD_DATA.athlete.name;
+    }
     const { error } = await sb.functions.invoke('send-invite', { body: { email, acceptUrl, coachName } });
     return !error;
   } catch (e) { return false; }

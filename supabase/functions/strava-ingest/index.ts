@@ -105,6 +105,26 @@ Deno.serve(async (req) => {
     }
 
     // ===== 4) Fetch activités paginé =====
+    // Sync INCREMENTAL : si des activites existent deja, on ne recupere que celles
+    // posterieures a la plus recente (avec 7 jours de recouvrement pour les editions),
+    // sauf si le front demande un resync complet ({ full: true }).
+    let reqBody: any = {};
+    try { reqBody = await req.json(); } catch (_) { reqBody = {}; }
+    const fullResync = reqBody && reqBody.full === true;
+    let afterEpoch: number | null = null;
+    if (!fullResync) {
+      const { data: latestAct } = await sbAdmin
+        .from("activities")
+        .select("start_date_local")
+        .eq("user_id", user.id)
+        .order("start_date_local", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestAct && latestAct.start_date_local) {
+        afterEpoch = Math.floor(new Date(latestAct.start_date_local).getTime() / 1000) - 7 * 86400;
+      }
+    }
+    const afterParam = afterEpoch ? `&after=${afterEpoch}` : "";
     const all: any[] = [];
     let page = 1;
     while (page <= 50) { // garde-fou
@@ -112,7 +132,7 @@ Deno.serve(async (req) => {
       let res: Response;
       let attempt = 0;
       while (true) {
-        res = await fetch(`${STRAVA_API}/athlete/activities?page=${page}&per_page=${PER_PAGE}`, {
+        res = await fetch(`${STRAVA_API}/athlete/activities?page=${page}&per_page=${PER_PAGE}${afterParam}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         if (res.status < 500 || attempt >= 3) break;
@@ -208,19 +228,35 @@ Deno.serve(async (req) => {
     // Puis on calcule CTL/ATL/TSB via EWMA (Coggan)
     const DATE_FLOOR = ACT_DATE_FLOOR; // ignore les dates aberrantes (ex. epoch 1970)
     const dailyMap = new Map<string, { tss: number; duration: number; count: number; mainId: string | null; mainTss: number }>();
-    for (const r of rows) {
-      const iso = String(r.start_date_local || "").slice(0, 10);
-      // Date valide YYYY-MM-DD et plausible : sinon on ignore (évite d'ancrer la série en 1970).
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || iso < DATE_FLOOR) continue;
-      const existing = dailyMap.get(iso) || { tss: 0, duration: 0, count: 0, mainId: null, mainTss: -1 };
-      existing.tss += r.tss || 0;
-      existing.duration += Math.round((r.moving_time || r.elapsed_time || 0) / 60);
-      existing.count += 1;
-      if ((r.tss || 0) > existing.mainTss) {
-        existing.mainTss = r.tss || 0;
-        existing.mainId = r.strava_id; // on relinkera plus tard avec l'UUID
+    let totalActsInDb = 0;
+    {
+      // IMPORTANT : on recalcule les daily_metrics depuis TOUT l'historique en base
+      // (pas seulement les activites recuperees ce run), sinon un sync incremental
+      // casserait la continuite CTL/ATL. Lecture paginee (PostgREST plafonne a 1000).
+      const READ_PAGE = 1000;
+      let offset = 0;
+      while (true) {
+        const { data: chunk, error: readErr } = await sbAdmin
+          .from("activities")
+          .select("start_date_local, tss, moving_time, elapsed_time")
+          .eq("user_id", user.id)
+          .order("start_date_local", { ascending: true })
+          .range(offset, offset + READ_PAGE - 1);
+        if (readErr) { console.error("read activities for metrics:", readErr.message); break; }
+        if (!chunk || chunk.length === 0) break;
+        for (const r of chunk) {
+          const iso = String(r.start_date_local || "").slice(0, 10);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || iso < DATE_FLOOR) continue;
+          const existing = dailyMap.get(iso) || { tss: 0, duration: 0, count: 0, mainId: null, mainTss: -1 };
+          existing.tss += r.tss || 0;
+          existing.duration += Math.round((r.moving_time || r.elapsed_time || 0) / 60);
+          existing.count += 1;
+          dailyMap.set(iso, existing);
+        }
+        totalActsInDb += chunk.length;
+        if (chunk.length < READ_PAGE) break;
+        offset += READ_PAGE;
       }
-      dailyMap.set(iso, existing);
     }
 
     // Calcul CTL/ATL/TSB EWMA (continu, comble les trous)
@@ -276,7 +312,7 @@ Deno.serve(async (req) => {
       last_sync_status: "ok",
       last_sync_at: new Date().toISOString(),
       last_sync_error: null,
-      total_activities_synced: inserted,
+      total_activities_synced: totalActsInDb || inserted,
     }).eq("user_id", user.id).eq("app", "strava");
 
     return json({

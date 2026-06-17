@@ -8507,7 +8507,7 @@ if (_modalDelBtn) {
       saveCompetitions(remaining);
       closeSessionModal();
       if (typeof renderCalendar === 'function') renderCalendar();
-      if (typeof renderCompetitions === 'function') renderCompetitions();
+      if (typeof renderCompetitionsPage === 'function') renderCompetitionsPage();
     } else if (kind === 'training') {
       const id = _modalDelBtn.dataset.trainingId;
       const mode = _modalDelBtn.dataset.trainingMode || 'prevu';
