@@ -84,14 +84,7 @@
   };
   var SPORT_METRIC = { Ride: 'power', VirtualRide: 'power', cyclisme: 'power', Run: 'pace', course: 'pace', Swim: 'pace', natation: 'pace' };
 
-  function defaults() {
-    var m = curMetric();
-    return [
-      { type: 'warmup', name: 'Echauffement', reps: 1, work: { min: 15, int: 55, metric: m, unit: 'zone' } },
-      { type: 'interval', name: 'Bloc principal', reps: 3, work: { min: 5, int: 105, metric: m, unit: 'pct' }, rec: { min: 3, int: 55, metric: m, unit: 'zone' } },
-      { type: 'cooldown', name: 'Retour au calme', reps: 1, work: { min: 10, int: 50, metric: m, unit: 'zone' } }
-    ];
-  }
+  function defaults() { return []; } // demarre vide : l'utilisateur ajoute ses blocs
   var blocks = defaults();
   var mounted = false;
 
@@ -118,6 +111,7 @@
 
   function renderProfile() {
     var wrap = R('sb-profile'); if (!wrap) return; wrap.innerHTML = '';
+    if (!blocks.length) { wrap.innerHTML = '<div style="margin:auto;color:var(--text-mute,#6b7686);font-size:12.5px;text-align:center">Ajoute un bloc ci-dessous pour construire la seance.</div>'; var ph0 = R('sb-profhint'); if (ph0) ph0.textContent = ''; return; }
     var bmins = blocks.map(function (b) { return blockSegs(b).reduce(function (s, x) { return s + (+x.min || 0); }, 0); });
     var tot = bmins.reduce(function (a, b) { return a + b; }, 0) || 1;
     var mx = Math.max(120); allSegs().forEach(function (s) { mx = Math.max(mx, +s.int || 0); });
