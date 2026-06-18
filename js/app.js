@@ -7563,8 +7563,9 @@ function openSessionModal(iso, source) {
         const profileHTML = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutProfileHTML === 'function')
           ? `<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(_struct)}</div>`
           : '';
+        const _escNote = (x) => String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
         const notesHTML = (act.notes && String(act.notes).trim())
-          ? `<div class="modal-section"><div class="modal-section-title">Notes</div><div class="modal-info-box" style="white-space:pre-wrap;">${escapeHtml(String(act.notes))}</div></div>`
+          ? `<div class="modal-section"><div class="modal-section-title">Notes</div><div class="modal-info-box" style="white-space:pre-wrap;">${_escNote(act.notes)}</div></div>`
           : '';
         bodyEl.innerHTML = `
           ${switchHTML}
