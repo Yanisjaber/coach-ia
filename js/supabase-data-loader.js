@@ -354,7 +354,7 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
       moving_time: a.moving_time,
       start_date_local: a.start_date_local,
       distance_km: a.distance_km,
-      elevation_gain: a.total_elevation_gain,
+      elevation_gain: a.total_elevation_gain ?? a.course_dplus,
       elevation_loss: a.total_elevation_loss,
       avg_speed_kmh: a.avg_speed_kmh,
       max_speed_kmh: a.max_speed_kmh,
