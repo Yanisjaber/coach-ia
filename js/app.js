@@ -7326,14 +7326,71 @@ function openStageRaceBuilder(currentActivityId) {
   });
 }
 
+// Construit le jour REALISE fusionne (data Strava + masquage + seances manuelles +
+// competitions realisees), identique a ce qu'affiche le calendrier realise. Permet au
+// clic sur un jour d'ouvrir exactement les memes activites que la carte.
+function buildRealisedDay(iso) {
+  let realDay = (Array.isArray(data) ? data.find(d => toIsoDate(d.date) === iso) : null) || null;
+  if (realDay && realDay.activities && typeof isStravaIgnored === 'function') {
+    const filtered = realDay.activities.filter(a => {
+      if (a._manual) return true;
+      const aid = a.id || a.activityId;
+      return !aid || !isStravaIgnored(aid);
+    });
+    if (filtered.length !== realDay.activities.length) realDay = filtered.length ? { ...realDay, activities: filtered } : null;
+  }
+  const manualRealised = (typeof loadRealisedTrainings === 'function') ? loadRealisedTrainings().filter(t => t.date === iso) : [];
+  if (manualRealised.length > 0) {
+    if (!realDay) realDay = { date: iso, activities: [], sessionType: 'autre' };
+    else realDay = { ...realDay, activities: [...(realDay.activities || [])] };
+    for (const m of manualRealised) {
+      realDay.activities = realDay.activities.filter(x => x._manual || !(
+        (m._sbId && String(x._sbId) === String(m._sbId)) ||
+        (m.id && String(x.client_id) === String(m.id))
+      ));
+      const sportVal = m.sport || 'autre';
+      realDay.activities.push({
+        name: m.name, sport: sportVal, raw_type: sportVal,
+        type: m.type || 'endurance', sessionType: m.type || 'endurance', sessionName: m.name,
+        duration: m.duration || 0, tss: m.tss || 0,
+        distance_km: m.km || null, elevation_gain: m.dplus || null,
+        rpe: (m.rpe != null ? m.rpe : null), laps: (m.laps != null ? m.laps : null),
+        gpxName: m.gpxName || null, gpxContent: m.gpxContent || null, structure: m.structure || null,
+        _manual: true, _manualId: m.id, notes: m.notes || '',
+      });
+    }
+  }
+  const realisedComps = (typeof loadCompetitionsExpanded === 'function') ? loadCompetitionsExpanded().filter(compIsRealised) : [];
+  const compsToday = realisedComps.filter(c => c.date === iso);
+  if (compsToday.length > 0) {
+    if (!realDay) realDay = { date: iso, activities: [], sessionType: 'vo2' };
+    else realDay = { ...realDay, activities: [...(realDay.activities || [])] };
+    for (const c of compsToday) {
+      if (realDay.activities.some(x => x.category === 'competition' && String(x.name) === String(c.name))) continue;
+      const cDur = (typeof parseTimeToMin === 'function' ? parseTimeToMin(c.target) : 0) || 0;
+      realDay.activities.push({
+        name: c.name, sport: c.sport || 'Ride', raw_type: c.sport || 'Ride',
+        type: 'vo2', sessionType: 'vo2', sessionName: c.name,
+        duration: cDur, tss: cDur ? Math.round(cDur) : 0,
+        distance_km: c.km || null, elevation_gain: c.dplus || null, laps: c.laps || null,
+        category: 'competition', priority: c.priority || null,
+        _comp: true, _compId: c.id, notes: c.notes || '',
+      });
+    }
+  }
+  return realDay;
+}
 function openSessionModal(iso, source) {
   // Reconstruire la date depuis l'iso (les jours futurs ne sont PAS dans data)
   const date = new Date(iso + 'T12:00:00');
   if (isNaN(date.getTime())) return;
   const dateStr = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  // Lookup data uniquement pour le mode Réalisé (les jours futurs ne sont pas dedans)
-  const day = data.find(d => toIsoDate(d.date) === iso);
+  // Lookup data uniquement pour le mode Réalisé (les jours futurs ne sont pas dedans).
+  // En réalisé, on reconstruit le jour fusionné (manuelles + compétitions) comme la carte.
+  const day = (source === 'realise')
+    ? buildRealisedDay(iso)
+    : (Array.isArray(data) ? data.find(d => toIsoDate(d.date) === iso) : null);
 
   const titleEl = document.getElementById('modal-title');
   const metaEl = document.getElementById('modal-meta');
