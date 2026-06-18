@@ -6834,7 +6834,7 @@ function openActivityEditModal(activityId, iso) {
             <div class="add-sec-h plan">Détails</div>
             <div class="add-sec-grid g3">
               <label class="form-field"><span>Type</span><input type="text" id="_ae-type" placeholder="endurance, seuil…"></label>
-              <label class="form-field"><span>Sport</span><input type="text" id="_ae-sport"></label>
+              <label class="form-field"><span>Sport</span><select id="_ae-sport"></select></label>
             </div>
           </div>
           <div class="form-field form-col-2 add-sec">
@@ -6895,7 +6895,7 @@ function openActivityEditModal(activityId, iso) {
   // Pré-remplissage (via .value pour éviter les soucis d'échappement)
   document.getElementById('_ae-name').value = act.name || '';
   document.getElementById('_ae-type').value = act.type || '';
-  document.getElementById('_ae-sport').value = act.sport || '';
+  if (typeof populateSportSelect === 'function') populateSportSelect('_ae-sport', act.raw_type || act.sport_raw || act.sport || 'Ride');
   document.getElementById('_ae-dur').value = act.duration || 0;
   document.getElementById('_ae-dist').value = act.distance_km != null ? act.distance_km : '';
   document.getElementById('_ae-tss').value = act.tss || 0;
