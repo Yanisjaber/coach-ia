@@ -481,7 +481,8 @@ export async function pushTraining(training, mode) {
       // réalisé → activity manuelle
       const row = {
         user_id: uid(), source: 'manual', category: 'entrainement', client_id: training.id,
-        name: training.name, start_date_local: training.date + 'T12:00:00', sport: training.sport ?? null,
+        name: training.name, start_date_local: training.date + 'T12:00:00',
+        sport: training.sport ?? null,
         moving_time: (training.duration || 0) * 60, tss: training.tss ?? 0,
         user_notes: training.notes ?? null,
         distance_km: training.km ?? null, total_elevation_gain: training.dplus ?? null, rpe: training.rpe ?? null,

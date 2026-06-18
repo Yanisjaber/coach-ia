@@ -102,8 +102,16 @@ function hideLoadingOverlay() {
 // On EXCLUT volontairement streams_gz / streams_blob / gpx_blob / power_curve :
 // ces blobs sont lourds (Mo par activité) et chargés à la demande seulement
 // (voir loadStreams dans app.js). Charger tout d'un coup ferait des dizaines de Mo.
+// Categorie de sport derivee du type exact (Ride -> cyclisme). Tolere une categorie deja en clair.
+function _catOf(sp) {
+  if (!sp) return 'cyclisme';
+  const l = String(sp).toLowerCase();
+  if (['cyclisme', 'course', 'musculation', 'natation', 'autre', 'mobilite'].includes(l)) return l;
+  const e = (window.SPORTS_CATALOG && window.SPORTS_CATALOG[sp]) || null;
+  return e ? e.category : 'autre';
+}
 const ACTIVITY_LIGHT_COLS = [
-  'id', 'strava_id', 'name', 'sport', 'sport_raw', 'tss',
+  'id', 'strava_id', 'name', 'sport', 'tss',
   'moving_time', 'elapsed_time', 'start_date_local',
   'distance_km', 'total_elevation_gain', 'total_elevation_loss',
   'avg_speed_kmh', 'max_speed_kmh', 'max_speed_smooth_kmh',
@@ -352,8 +360,8 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
       stages: a.stages || null,
       event: a.event || null,
       name: a.name,
-      sport: a.sport,
-      raw_type: a.sport_raw,
+      sport: _catOf(a.sport),
+      raw_type: a.sport,
       tss: a.tss || 0,
       duration: a.moving_time ? Math.round(a.moving_time / 60) : (a.elapsed_time ? Math.round(a.elapsed_time / 60) : 0),
       elapsed_time: a.elapsed_time,

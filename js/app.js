@@ -3166,7 +3166,7 @@ function upsertManualInDashboard(entry) {
     source: 'manual', _manual: true, _manualId: entry.id,
     category: 'entrainement', client_id: entry.id,
     notes: entry.notes || '', name: entry.name,
-    sport: entry.sport, raw_type: entry.sport,
+    sport: entry.sportCategory || entry.sport, raw_type: entry.sport,
     tss: entry.tss || 0, duration: entry.duration || 0,
     moving_time: (entry.duration || 0) * 60,
     start_date_local: iso + 'T12:00:00',
@@ -3223,6 +3223,7 @@ function saveTrainFromModal() {
     name, date, sport, type, duration, tss, notes,
     rpe, km, dplus, laps, gpxName: _gpx.name, gpxContent: _gpx.content,
     exclPower, exclHr, exclDistance,
+    sportCategory: (typeof getSportCategory === 'function' ? getSportCategory(sport) : sport),
     mode: trainModalMode,
     structure, // [] | null | [{dur, target, reps}, ...]
   };
