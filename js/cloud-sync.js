@@ -204,6 +204,28 @@ async function pullAllFromCloud() {
       stagesList: Array.isArray(r.stages) ? r.stages.map(function (st) { return Object.assign({}, st, { target: parseTimeToMin(st.target) }); }) : null,
       activityIds: r.activity_ids ?? null,
     });
+    // Modele unifie : compet REALISEES = activities (category='competition'), dedoublonne par client_id.
+    {
+      const _seen = new Set(comps.map(c => String(c.id)));
+      const { data: ra } = await sb.from('activities')
+        .select('id, client_id, name, sport, start_date_local, priority, distance_km, course_dplus, target, laps, user_notes, gpx_name, stages, event')
+        .eq('user_id', userId).eq('category', 'competition');
+      for (const r of (ra || [])) {
+        const cid = String(r.client_id || r.id);
+        if (_seen.has(cid)) continue;
+        _seen.add(cid);
+        comps.push({
+          id: r.client_id || r.id, _sbId: r.id, _table: 'activity', realised: true,
+          name: r.name, date: r.start_date_local ? String(r.start_date_local).slice(0, 10) : null, sport: r.sport ?? null,
+          priority: r.priority ?? null, km: r.distance_km ?? null, dplus: r.course_dplus ?? null,
+          target: r.target ?? null, laps: r.laps ?? null, notes: r.user_notes ?? null,
+          gpxName: r.gpx_name ?? null,
+          stages: Array.isArray(r.stages) && r.stages.length > 0,
+          stagesList: Array.isArray(r.stages) ? r.stages.map(function (st) { return Object.assign({}, st, { target: parseTimeToMin(st.target) }); }) : null,
+          event: r.event ?? null,
+        });
+      }
+    }
     const { data: pc } = await sb.from('activity_planned').select('*').eq('user_id', userId).eq('category', 'competition');
     for (const r of (pc || [])) comps.push({
       id: r.client_id || r.id, _sbId: r.id, _table: 'planned', realised: false,
@@ -417,20 +439,21 @@ export async function pushCompetition(comp) {
       if (error) throw error;
       return data && data.id;
     } else {
-      // Compétition passée → registre competitions (relie une ou plusieurs activités)
+      // Compétition réalisée → table activities, category='competition' (modele unifie).
       const row = {
-        user_id: uid(), client_id: comp.id,
-        name: comp.name, date: comp.date, sport: comp.sport ?? null,
-        priority: comp.priority ?? null, km: comp.km ?? null, d_plus: comp.dplus ?? null,
-        duration: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
+        user_id: uid(), source: 'manual', category: 'competition', client_id: comp.id,
+        name: comp.name, start_date_local: comp.date + 'T12:00:00', sport: comp.sport ?? null,
+        priority: comp.priority ?? null, distance_km: comp.km ?? null, course_dplus: comp.dplus ?? null,
+        target: comp.target ?? null, moving_time: comp.target ? comp.target * 60 : null,
+        laps: comp.laps ?? null, user_notes: comp.notes ?? null,
         gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
         stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
-        activity_ids: comp.activityIds ?? [],
+        event: comp.event ?? null,
       };
-      if (comp._sbId && comp._table === 'competition') row.id = comp._sbId;
-      if (!row.id) row.id = await _resolveId('competitions', comp.id);
+      if (comp._sbId && (comp._table === 'activity' || comp._table === 'competition')) row.id = comp._sbId;
+      if (!row.id) row.id = await _resolveId('activities', comp.id);
       if (!row.id) delete row.id;
-      const { data, error } = await window.sb.from('competitions').upsert(row).select().single();
+      const { data, error } = await window.sb.from('activities').upsert(row).select().single();
       if (error) throw error;
       return data && data.id;
     }
@@ -439,7 +462,7 @@ export async function pushCompetition(comp) {
 export async function deleteCompetition(comp) {
   if (!isAuthed()) return;
   const realised = (comp.realised === true) || (comp._table === 'competition') || (comp._table === 'activity') || (comp.realised == null && comp._table == null && !((comp.date || '') > _todayIso()));
-  const table = realised ? 'competitions' : 'activity_planned';
+  const table = realised ? 'activities' : 'activity_planned';
   try {
     if (comp._sbId) await window.sb.from(table).delete().eq('id', comp._sbId).eq('user_id', uid());
     else if (comp.id) await window.sb.from(table).delete().eq('client_id', comp.id).eq('user_id', uid());
@@ -447,8 +470,10 @@ export async function deleteCompetition(comp) {
 }
 
 // Crée/maj une compétition (registre) reliant des activités, et supprime par activité.
-export async function pushCompetitionRegistry(comp) {
-  return await pushCompetition({ ...comp, _table: 'competition' });
+export async function pushCompetitionRegistry(_comp) {
+  // Modele unifie : "transformer en competition" = category='competition' sur l'activite
+  // (setActivityCategory). Plus de registre separe -> no-op (sinon doublon).
+  return null;
 }
 export async function deleteCompetitionByActivity(activityId) {
   if (!isAuthed()) return;

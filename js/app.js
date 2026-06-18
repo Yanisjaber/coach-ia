@@ -4018,7 +4018,7 @@ function renderRealiseCalendar() {
           if (!realDay) realDay = { date: iso, activities: [], sessionType: 'vo2' };
           else realDay = { ...realDay, activities: [...(realDay.activities || [])] };
           for (const c of compsRealisedToday) {
-            if (realDay.activities.some(x => x.category === 'competition' && String(x.name) === String(c.name))) continue;
+            if (realDay.activities.some(x => x._sbId && ((c._sbId && String(x._sbId) === String(c._sbId)) || (c.id && String(x.client_id) === String(c.id))))) continue;
             const cDur = (typeof parseTimeToMin === 'function' ? parseTimeToMin(c.target) : 0) || 0;
             realDay.activities.push({
               name: c.name, sport: c.sport || 'Ride', raw_type: c.sport || 'Ride',
@@ -7475,7 +7475,7 @@ function buildRealisedDay(iso) {
     if (!realDay) realDay = { date: iso, activities: [], sessionType: 'vo2' };
     else realDay = { ...realDay, activities: [...(realDay.activities || [])] };
     for (const c of compsToday) {
-      if (realDay.activities.some(x => x.category === 'competition' && String(x.name) === String(c.name))) continue;
+      if (realDay.activities.some(x => x._sbId && ((c._sbId && String(x._sbId) === String(c._sbId)) || (c.id && String(x.client_id) === String(c.id))))) continue;
       const cDur = (typeof parseTimeToMin === 'function' ? parseTimeToMin(c.target) : 0) || 0;
       realDay.activities.push({
         name: c.name, sport: c.sport || 'Ride', raw_type: c.sport || 'Ride',
