@@ -195,7 +195,7 @@ async function pullAllFromCloud() {
     {
       const _seen = new Set();
       const { data: ra } = await sb.from('activities')
-        .select('id, client_id, name, sport, start_date_local, priority, distance_km, course_dplus, target, laps, user_notes, gpx_name, stages, event')
+        .select('id, client_id, name, sport, start_date_local, priority, distance_km, course_dplus, target, laps, user_notes, gpx_name, stages, event, type')
         .eq('user_id', userId).eq('category', 'competition');
       for (const r of (ra || [])) {
         const cid = String(r.client_id || r.id);
@@ -209,7 +209,7 @@ async function pullAllFromCloud() {
           gpxName: r.gpx_name ?? null,
           stages: Array.isArray(r.stages) && r.stages.length > 0,
           stagesList: Array.isArray(r.stages) ? r.stages.map(function (st) { return Object.assign({}, st, { target: parseTimeToMin(st.target) }); }) : null,
-          event: r.event ?? null,
+          event: r.event ?? null, type: r.type ?? null,
         });
       }
     }
@@ -222,6 +222,7 @@ async function pullAllFromCloud() {
       gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null,
       stages: Array.isArray(r.stages) && r.stages.length > 0,
       stagesList: Array.isArray(r.stages) ? r.stages.map(function (st) { return Object.assign({}, st, { target: parseTimeToMin(st.target) }); }) : null,
+      event: r.event ?? null, type: r.type ?? null,
     });
     localStorage.setItem('coach_ia_competitions_v1', JSON.stringify(comps));
   } catch (e) { console.warn('[pull comps]', e); }
@@ -413,7 +414,7 @@ export async function pushCompetition(comp) {
       const row = {
         user_id: uid(), client_id: comp.id, category: 'competition',
         name: comp.name, date: comp.date, sport: comp.sport ?? null,
-        priority: comp.priority ?? null, km: comp.km ?? null, d_plus: comp.dplus ?? null,
+        priority: comp.priority ?? null, km: comp.km ?? null, d_plus: comp.dplus ?? null, type: comp.type ?? null,
         duration: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
         gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
         stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
@@ -430,7 +431,7 @@ export async function pushCompetition(comp) {
       const row = {
         user_id: uid(), source: 'manual', category: 'competition', client_id: comp.id,
         name: comp.name, start_date_local: comp.date + 'T12:00:00', sport: comp.sport ?? null,
-        priority: comp.priority ?? null, distance_km: comp.km ?? null, course_dplus: comp.dplus ?? null,
+        priority: comp.priority ?? null, distance_km: comp.km ?? null, course_dplus: comp.dplus ?? null, type: comp.type ?? null,
         target: comp.target ?? null, moving_time: comp.target ? comp.target * 60 : null,
         laps: comp.laps ?? null, user_notes: comp.notes ?? null,
         gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
