@@ -139,6 +139,9 @@ function applyActivityEditsToDays(days) {
       if (ov.duration != null) a.duration = ov.duration;
       if (ov.distance_km != null) a.distance_km = ov.distance_km;
       if (ov.tss != null) { a.tss = ov.tss; anyTss = true; }
+      if (ov.elevation_gain != null) a.elevation_gain = ov.elevation_gain;
+      if (ov.rpe != null) a.rpe = ov.rpe;
+      if (ov.laps != null) a.laps = ov.laps;
       if (ov.notes != null) a.notes = ov.notes;
       // Exclusion des records/stats : la donnée RESTE sur l'activité, on pose juste
       // des drapeaux pour que le power profile / les stats l'ignorent.
@@ -6816,7 +6819,7 @@ function openActivityEditModal(activityId, iso) {
   overlay.className = 'day-modal-overlay active';
   overlay.id = '_act-edit-modal';
   overlay.innerHTML = `
-    <div class="day-modal day-modal-note" style="width:600px;max-width:calc(100vw - 32px);">
+    <div class="day-modal day-modal-note" style="width:880px;max-width:calc(100vw - 32px);">
       <div class="day-modal-header">
         <h3>Modifier l'activité</h3>
         <button class="day-modal-close" type="button" title="Fermer">×</button>
@@ -6832,14 +6835,22 @@ function openActivityEditModal(activityId, iso) {
             <div class="add-sec-grid g3">
               <label class="form-field"><span>Type</span><input type="text" id="_ae-type" placeholder="endurance, seuil…"></label>
               <label class="form-field"><span>Sport</span><input type="text" id="_ae-sport"></label>
-              <label class="form-field"><span>Durée (min)</span><input type="number" id="_ae-dur" min="0"></label>
             </div>
           </div>
           <div class="form-field form-col-2 add-sec">
-            <div class="add-sec-h parc">Parcours &amp; charge</div>
+            <div class="add-sec-h charge">Charge</div>
             <div class="add-sec-grid g3">
-              <label class="form-field"><span>Distance (km)</span><input type="number" step="0.1" id="_ae-dist" min="0"></label>
-              <label class="form-field"><span>TSS</span><input type="number" id="_ae-tss" min="0"></label>
+              <label class="form-field"><span>Durée (min)</span><input type="number" id="_ae-dur" min="0" placeholder="minutes"></label>
+              <label class="form-field"><span>TSS</span><input type="number" id="_ae-tss" min="0" placeholder="TSS"></label>
+              <label class="form-field"><span>RPE ressenti (1-10)</span><input type="number" id="_ae-rpe" min="0" max="10" step="0.5" placeholder="1 à 10"></label>
+            </div>
+          </div>
+          <div class="form-field form-col-2 add-sec">
+            <div class="add-sec-h parc">Parcours</div>
+            <div class="add-sec-grid g3">
+              <label class="form-field"><span>Distance (km)</span><input type="number" step="0.1" id="_ae-dist" min="0" placeholder="km"></label>
+              <label class="form-field"><span>Dénivelé D+ (m)</span><input type="number" id="_ae-dplus" min="0" placeholder="mètres"></label>
+              <label class="form-field"><span>Nombre de tours</span><input type="number" id="_ae-laps" min="0" placeholder="tours"></label>
             </div>
           </div>
           <label class="form-field form-col-2">
@@ -6888,6 +6899,9 @@ function openActivityEditModal(activityId, iso) {
   document.getElementById('_ae-dur').value = act.duration || 0;
   document.getElementById('_ae-dist').value = act.distance_km != null ? act.distance_km : '';
   document.getElementById('_ae-tss').value = act.tss || 0;
+  document.getElementById('_ae-rpe').value = act.rpe != null ? act.rpe : '';
+  document.getElementById('_ae-dplus').value = (act.elevation_gain != null ? act.elevation_gain : (act.total_elevation_gain != null ? act.total_elevation_gain : ''));
+  document.getElementById('_ae-laps').value = act.laps != null ? act.laps : '';
   document.getElementById('_ae-notes').value = act.notes || ov.notes || '';
   overlay.querySelector('#_ae-stagerace')?.addEventListener('click', () => {
     close();
@@ -6925,12 +6939,18 @@ function openActivityEditModal(activityId, iso) {
     const distV = parseFloat(document.getElementById('_ae-dist').value);
     const tssV = parseInt(document.getElementById('_ae-tss').value, 10);
     const notesV = document.getElementById('_ae-notes').value.trim();
+    const rpeV = parseFloat(document.getElementById('_ae-rpe').value);
+    const dplusV = parseInt(document.getElementById('_ae-dplus').value, 10);
+    const lapsV = parseInt(document.getElementById('_ae-laps').value, 10);
     if (nameV) newOv.name = nameV;
     if (typeV) newOv.type = typeV;
     if (sportV) newOv.sport = sportV;
     if (!isNaN(durV)) newOv.duration = durV;
     if (!isNaN(distV)) newOv.distance_km = distV;
     if (!isNaN(tssV)) newOv.tss = tssV;
+    if (!isNaN(rpeV)) newOv.rpe = rpeV;
+    if (!isNaN(dplusV)) newOv.elevation_gain = dplusV;
+    if (!isNaN(lapsV)) newOv.laps = lapsV;
     if (notesV) newOv.notes = notesV;
     if (exclPower) newOv.excludePower = true;
     if (exclHr) newOv.excludeHr = true;
