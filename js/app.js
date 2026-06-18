@@ -7318,16 +7318,28 @@ function openSessionModal(iso, source) {
         const _editBtn2 = document.getElementById('modal-edit-btn');
         const _delBtn2 = document.getElementById('modal-delete-btn');
         if (act._manual) {
+          const _lsId = act._manualId || act.client_id || act.id;
+          // Copie locale presente dans ce navigateur ? -> edition complete ; sinon -> overrides.
+          const _hasTwin = (typeof loadRealisedTrainings === 'function') &&
+            loadRealisedTrainings().some(x => String(x.id) === String(_lsId) || (act._sbId && x._sbId === act._sbId));
           if (_editBtn2) {
             _editBtn2.hidden = false;
-            _editBtn2.dataset.kind = 'training';
-            _editBtn2.dataset.trainingId = act._manualId || act.id;
-            _editBtn2.dataset.trainingMode = 'realise';
+            if (_hasTwin) {
+              _editBtn2.dataset.kind = 'training';
+              _editBtn2.dataset.trainingId = _lsId;
+              _editBtn2.dataset.trainingMode = 'realise';
+            } else {
+              // Pas de copie locale (seance rechargee depuis la base) : on edite via le
+              // calque d'overrides, qui fonctionne toujours (au lieu de fermer la modale).
+              _editBtn2.dataset.kind = 'strava-edit';
+              _editBtn2.dataset.activityId = String(act.id || act.activityId || '');
+              _editBtn2.dataset.iso = iso;
+            }
           }
           if (_delBtn2) {
             _delBtn2.hidden = false;
             _delBtn2.dataset.kind = 'training';
-            _delBtn2.dataset.trainingId = act._manualId || act.client_id || act.id;
+            _delBtn2.dataset.trainingId = _lsId;
             _delBtn2.dataset.trainingMode = 'realise';
             _delBtn2.dataset.sbId = act._sbId || '';
           }
