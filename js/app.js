@@ -3109,9 +3109,8 @@ function openTrainModalForEdit(training, mode) {
         _ctrls.hidden = false;
         window._trainEditActId = String(training._sbId);
         window._trainEditIso = training.date;
-        const ov = (typeof getActivityEdit === 'function' ? getActivityEdit(window._trainEditActId) : null) || {};
         const _set = (m, on) => { const b = _ctrls.querySelector('.ae-metric-btn[data-m="' + m + '"]'); if (b) b.classList.toggle('active', !!on); };
-        _set('power', ov.excludePower); _set('hr', ov.excludeHr); _set('dist', ov.excludeDistance);
+        _set('power', training.exclPower); _set('hr', training.exclHr); _set('dist', training.exclDistance);
       } else {
         _ctrls.hidden = true;
         window._trainEditActId = null;
@@ -3175,6 +3174,8 @@ function upsertManualInDashboard(entry) {
     rpe: (entry.rpe != null ? entry.rpe : null),
     laps: (entry.laps != null ? entry.laps : null),
     structure: entry.structure || null,
+    type: entry.type || '',
+    _exclPower: !!entry.exclPower, _exclHr: !!entry.exclHr, _exclDistance: !!entry.exclDistance,
   };
   let day = window.DASHBOARD_DATA.days.find(d => String(d.date) === iso);
   if (!day) { day = { date: iso, activities: [] }; window.DASHBOARD_DATA.days.push(day); }
@@ -3214,10 +3215,14 @@ function saveTrainFromModal() {
   const structure = (typeof window.getCurrentWorkoutStructure === 'function')
     ? window.getCurrentWorkoutStructure()
     : null;
+  const _ac = document.getElementById('train-modal-act-controls');
+  const _exclOn = (mm) => !!(_ac && !_ac.hidden && _ac.querySelector('.ae-metric-btn[data-m="' + mm + '"].active'));
+  const exclPower = _exclOn('power'), exclHr = _exclOn('hr'), exclDistance = _exclOn('dist');
   const entry = {
     id: editingId || Date.now().toString(),
     name, date, sport, type, duration, tss, notes,
     rpe, km, dplus, laps, gpxName: _gpx.name, gpxContent: _gpx.content,
+    exclPower, exclHr, exclDistance,
     mode: trainModalMode,
     structure, // [] | null | [{dur, target, reps}, ...]
   };
@@ -3236,18 +3241,6 @@ function saveTrainFromModal() {
     }
   } else {
     arr.push(entry);
-  }
-  // Persiste les exclusions records (calque d'overrides) pour la seance realisee editee.
-  {
-    const _ctrls = document.getElementById('train-modal-act-controls');
-    if (trainModalMode === 'realise' && _ctrls && !_ctrls.hidden && window._trainEditActId && typeof setActivityEdit === 'function') {
-      const _on = (m) => !!_ctrls.querySelector('.ae-metric-btn[data-m="' + m + '"].active');
-      const _ov = Object.assign({}, (typeof getActivityEdit === 'function' ? getActivityEdit(window._trainEditActId) : null) || {});
-      if (_on('power')) _ov.excludePower = true; else delete _ov.excludePower;
-      if (_on('hr')) _ov.excludeHr = true; else delete _ov.excludeHr;
-      if (_on('dist')) _ov.excludeDistance = true; else delete _ov.excludeDistance;
-      setActivityEdit(window._trainEditActId, _ov);
-    }
   }
   saveFn(arr);
   window._editingTrainId = null;
@@ -3315,6 +3308,7 @@ function buildTrainingFromData(id) {
           rpe: (x.rpe != null ? x.rpe : null),
           laps: (x.laps != null ? x.laps : null),
           structure: x.structure || null,
+          exclPower: !!x._exclPower, exclHr: !!x._exclHr, exclDistance: !!x._exclDistance,
           mode: 'realise',
         };
       }
