@@ -341,6 +341,7 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
       target: a.target || null,
       course_dplus: a.course_dplus ?? null,
       laps: a.laps ?? null,
+      rpe: a.rpe ?? null,
       gpx_name: a.gpx_name || null,
       stages: a.stages || null,
       event: a.event || null,

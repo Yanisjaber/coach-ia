@@ -3829,7 +3829,12 @@ function renderRealiseCalendar() {
               sessionName: m.name,
               duration: m.duration || 0,
               tss: m.tss || 0,
-              distance_km: null,
+              distance_km: m.km || null,
+              elevation_gain: m.dplus || null,
+              rpe: (m.rpe != null ? m.rpe : null),
+              laps: (m.laps != null ? m.laps : null),
+              gpxName: m.gpxName || null,
+              gpxContent: m.gpxContent || null,
               _manual: true,
               _manualId: m.id, // id pour edit/delete depuis la modal
               notes: m.notes || '',
@@ -7437,14 +7442,19 @@ function openSessionModal(iso, source) {
           elapsedSub = `Élapsed ${eh}h${em}`;
         }
         const vMaxToShow = act.max_speed_smooth_kmh || act.max_speed_kmh;
+        // Fallbacks de cles : Strava (distance_km / elevation_gain) ou saisie manuelle (km / dplus).
+        const _distKm = act.distance_km || act.km;
+        const _dplusM = act.elevation_gain || act.total_elevation_gain || act.dplus;
         const syntheseHTML = section('Synthèse', [
           card('Durée', dur < 60 ? `${Math.round(dur)}<span style="font-size:14px;"> min</span>` : `${h}<span style="font-size:14px;">h</span>${m}`, '', elapsedSub),
-          act.distance_km && card('Distance', act.distance_km, 'km'),
-          act.elevation_gain && card('Dénivelé +', act.elevation_gain, 'm',
+          _distKm && card('Distance', _distKm, 'km'),
+          _dplusM && card('Dénivelé +', _dplusM, 'm',
             act.elevation_loss ? `D− ${act.elevation_loss} m` : ''),
           act.avg_speed_kmh && card('Vitesse moy', act.avg_speed_kmh, 'km/h',
             vMaxToShow ? `Max ${vMaxToShow} km/h` : ''),
           act.tss && card('TSS', act.tss, ''),
+          act.rpe && card('RPE', act.rpe, '/10'),
+          act.laps && card('Tours', act.laps, ''),
         ]);
 
         // --- 2. Puissance & FC : 4 cards moy/max sur une ligne ---
