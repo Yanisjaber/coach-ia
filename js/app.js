@@ -3220,20 +3220,28 @@ window.gpxEditTraining = function(id, mode) {
   const t = arr.find(x => x.id === id);
   if (t && typeof openTrainModalForEdit === 'function') openTrainModalForEdit(t, mode);
 };
-window.gpxDeleteTraining = async function(id, mode) {
+window.gpxDeleteTraining = async function(id, mode, sbId) {
   const arr = mode === 'realise' ? loadRealisedTrainings() : loadTrainings();
-  const t = arr.find(x => x.id === id);
-  if (!t) return;
+  const t = arr.find(x => x.id === id || (sbId && x._sbId === sbId));
+  const name = t ? t.name : 'cette séance';
   const ok = await appConfirm({
-    title: 'Supprimer cet entraînement',
-    html: `Supprimer <strong>${window._confirmEscape(t.name)}</strong> ?`,
+    title: 'Supprimer cette séance',
+    html: `Supprimer <strong>${window._confirmEscape(name)}</strong> ?`,
     confirmLabel: 'Supprimer',
     danger: true,
   });
   if (!ok) return;
-  const remaining = arr.filter(x => x.id !== id);
-  if (mode === 'realise') saveRealisedTrainings(remaining);
-  else saveTrainings(remaining);
+  // localStorage (si la séance y est présente sur ce navigateur)
+  if (t) {
+    const remaining = arr.filter(x => x !== t);
+    if (mode === 'realise') saveRealisedTrainings(remaining);
+    else saveTrainings(remaining);
+  }
+  // Base : supprime la ligne, sinon elle réapparaît au prochain pull cloud.
+  const effSbId = (t && t._sbId) || sbId || null;
+  if (window.cloudSync && window.cloudSync.deleteTraining) {
+    try { await window.cloudSync.deleteTraining({ mode, _sbId: effSbId, id: (t && t.id) || id }); } catch (_) {}
+  }
   if (typeof closeSessionModal === 'function') closeSessionModal();
   if (typeof renderCalendar === 'function') renderCalendar();
 };
@@ -7283,6 +7291,7 @@ function openSessionModal(iso, source) {
     delete _delBtn.dataset.trainingId;
     delete _delBtn.dataset.trainingMode;
     delete _delBtn.dataset.activityId;
+    delete _delBtn.dataset.sbId;
     delete _delBtn.dataset.kind;
   }
 
@@ -7318,8 +7327,9 @@ function openSessionModal(iso, source) {
           if (_delBtn2) {
             _delBtn2.hidden = false;
             _delBtn2.dataset.kind = 'training';
-            _delBtn2.dataset.trainingId = act._manualId || act.id;
+            _delBtn2.dataset.trainingId = act._manualId || act.client_id || act.id;
             _delBtn2.dataset.trainingMode = 'realise';
+            _delBtn2.dataset.sbId = act._sbId || '';
           }
         } else {
           // Activité Strava : éditable via calque d'overrides (le crayon ouvre l'éditeur).
@@ -8616,8 +8626,9 @@ if (_modalDelBtn) {
     } else if (kind === 'training') {
       const id = _modalDelBtn.dataset.trainingId;
       const mode = _modalDelBtn.dataset.trainingMode || 'prevu';
-      if (!id) return;
-      if (typeof window.gpxDeleteTraining === 'function') window.gpxDeleteTraining(id, mode);
+      const sbId = _modalDelBtn.dataset.sbId || '';
+      if (!id && !sbId) return;
+      if (typeof window.gpxDeleteTraining === 'function') window.gpxDeleteTraining(id, mode, sbId);
     } else if (kind === 'strava') {
       const aid = _modalDelBtn.dataset.activityId;
       if (!aid) return;

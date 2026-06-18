@@ -334,6 +334,8 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
       id: a.strava_id != null ? String(a.strava_id) : String(a.id),
       _sbId: a.id,                          // uuid (pour update/delete des manuelles)
       source: a.source || 'strava',
+      _manual: (a.source === 'manual'),
+      _manualId: a.client_id || String(a.id),
       category: a.category || 'entrainement',
       client_id: a.client_id || null,
       notes: a.user_notes || null,
