@@ -6816,47 +6816,60 @@ function openActivityEditModal(activityId, iso) {
   overlay.className = 'day-modal-overlay active';
   overlay.id = '_act-edit-modal';
   overlay.innerHTML = `
-    <div class="day-modal day-modal-note">
+    <div class="day-modal day-modal-note" style="width:600px;max-width:calc(100vw - 32px);">
       <div class="day-modal-header">
         <h3>Modifier l'activité</h3>
         <button class="day-modal-close" type="button" title="Fermer">×</button>
       </div>
       <div class="day-modal-body">
-        <label class="note-field-label">Nom</label>
-        <input type="text" id="_ae-name">
-        <div class="note-range-row">
-          <div><label class="note-field-label">Type</label><input type="text" id="_ae-type" placeholder="endurance, seuil…"></div>
-          <div><label class="note-field-label">Sport</label><input type="text" id="_ae-sport"></div>
-        </div>
-        <div class="note-range-row">
-          <div><label class="note-field-label">Durée (min)</label><input type="number" id="_ae-dur" min="0"></div>
-          <div><label class="note-field-label">Distance (km)</label><input type="number" step="0.1" id="_ae-dist" min="0"></div>
-        </div>
-        <label class="note-field-label">TSS</label>
-        <input type="number" id="_ae-tss" min="0">
-        <label class="note-field-label">Notes</label>
-        <textarea id="_ae-notes" rows="2" placeholder="Commentaire…"></textarea>
-        <label class="note-field-label">Retirer des records &amp; statistiques</label>
-        <div class="ae-field-hint">La donnée reste sur l'activité, mais n'est plus comptée dans les records / stats.</div>
-        <div class="ae-metric-btns">
-          <button type="button" class="ae-metric-btn${exclPower ? ' active' : ''}" data-m="power">Puissance</button>
-          <button type="button" class="ae-metric-btn${exclHr ? ' active' : ''}" data-m="hr">Cardio</button>
-          <button type="button" class="ae-metric-btn${exclDist ? ' active' : ''}" data-m="dist">Distance</button>
-        </div>
-        <button type="button" class="ae-transform-btn" id="_ae-transform">
-          ${act.category === 'competition'
-            ? 'Repasser en entraînement'
-            : `${trophySvg('#fbbf24', 15)} Transformer en compétition`}
-        </button>
-        <div id="_ae-event-wrap" style="${act.category === 'competition' ? '' : 'display:none;'}">
-          <label class="note-field-label">Priorité</label>
-          <div class="note-type-chips" id="_ae-prio">
-            <button type="button" class="note-type-chip${_curPrioKey === 'principal' ? ' active' : ''}" data-prio="principal">Objectif</button>
-            <button type="button" class="note-type-chip${_curPrioKey === 'secondaire' ? ' active' : ''}" data-prio="secondaire">Préparation</button>
+        <div class="add-form-grid">
+          <label class="form-field form-col-2">
+            <span>Nom</span>
+            <input type="text" id="_ae-name">
+          </label>
+          <div class="form-field form-col-2 add-sec">
+            <div class="add-sec-h plan">Détails</div>
+            <div class="add-sec-grid g3">
+              <label class="form-field"><span>Type</span><input type="text" id="_ae-type" placeholder="endurance, seuil…"></label>
+              <label class="form-field"><span>Sport</span><input type="text" id="_ae-sport"></label>
+              <label class="form-field"><span>Durée (min)</span><input type="number" id="_ae-dur" min="0"></label>
+            </div>
           </div>
-          ${_race
-            ? `<button type="button" class="ae-stagerace-btn" id="_ae-dissociate">Dissocier de « ${window._confirmEscape ? window._confirmEscape(_race.name) : _race.name} »</button>`
-            : `<button type="button" class="ae-stagerace-btn" id="_ae-stagerace">+ Ajouter à une course à étapes</button>`}
+          <div class="form-field form-col-2 add-sec">
+            <div class="add-sec-h parc">Parcours &amp; charge</div>
+            <div class="add-sec-grid g3">
+              <label class="form-field"><span>Distance (km)</span><input type="number" step="0.1" id="_ae-dist" min="0"></label>
+              <label class="form-field"><span>TSS</span><input type="number" id="_ae-tss" min="0"></label>
+            </div>
+          </div>
+          <label class="form-field form-col-2">
+            <span>Notes</span>
+            <textarea id="_ae-notes" rows="2" placeholder="Commentaire…"></textarea>
+          </label>
+          <div class="form-field form-col-2 add-sec">
+            <div class="add-sec-h charge">Retirer des records &amp; statistiques</div>
+            <div class="ae-field-hint">La donnée reste sur l'activité, mais n'est plus comptée dans les records / stats.</div>
+            <div class="ae-metric-btns">
+              <button type="button" class="ae-metric-btn${exclPower ? ' active' : ''}" data-m="power">Puissance</button>
+              <button type="button" class="ae-metric-btn${exclHr ? ' active' : ''}" data-m="hr">Cardio</button>
+              <button type="button" class="ae-metric-btn${exclDist ? ' active' : ''}" data-m="dist">Distance</button>
+            </div>
+            <button type="button" class="ae-transform-btn" id="_ae-transform" style="margin-top:12px">
+              ${act.category === 'competition'
+                ? 'Repasser en entraînement'
+                : `${trophySvg('#fbbf24', 15)} Transformer en compétition`}
+            </button>
+            <div id="_ae-event-wrap" style="${act.category === 'competition' ? 'margin-top:12px' : 'display:none;'}">
+              <label class="note-field-label">Priorité</label>
+              <div class="note-type-chips" id="_ae-prio">
+                <button type="button" class="note-type-chip${_curPrioKey === 'principal' ? ' active' : ''}" data-prio="principal">Objectif</button>
+                <button type="button" class="note-type-chip${_curPrioKey === 'secondaire' ? ' active' : ''}" data-prio="secondaire">Préparation</button>
+              </div>
+              ${_race
+                ? `<button type="button" class="ae-stagerace-btn" id="_ae-dissociate">Dissocier de « ${window._confirmEscape ? window._confirmEscape(_race.name) : _race.name} »</button>`
+                : `<button type="button" class="ae-stagerace-btn" id="_ae-stagerace">+ Ajouter à une course à étapes</button>`}
+            </div>
+          </div>
         </div>
       </div>
       <div class="day-modal-footer">
