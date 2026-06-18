@@ -7563,6 +7563,9 @@ function openSessionModal(iso, source) {
         const profileHTML = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutProfileHTML === 'function')
           ? `<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(_struct)}</div>`
           : '';
+        const notesHTML = (act.notes && String(act.notes).trim())
+          ? `<div class="modal-section"><div class="modal-section-title">Notes</div><div class="modal-info-box" style="white-space:pre-wrap;">${escapeHtml(String(act.notes))}</div></div>`
+          : '';
         bodyEl.innerHTML = `
           ${switchHTML}
           ${syntheseHTML}
@@ -7572,6 +7575,7 @@ function openSessionModal(iso, source) {
           ${mouvementHTML}
           ${zonesHTML}
           ${profileHTML}
+          ${notesHTML}
           <div class="modal-section">
             <div class="modal-section-title">Graphique</div>
             <div id="streams-section"></div>
