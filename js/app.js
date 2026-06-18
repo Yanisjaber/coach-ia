@@ -1383,6 +1383,17 @@ function loadCompetitions() {
   } catch (e) { return []; }
 }
 
+// Une competition appartient-elle au calendrier REALISE (vs prevu) ?
+// Ancre sur le drapeau realised (calendrier d'origine) ; repli sur la table/date pour l'existant.
+function compIsRealised(c) {
+  if (!c) return false;
+  if (c.realised === true) return true;
+  if (c.realised === false) return false;
+  if (c._table === 'competition' || c._table === 'activity') return true;
+  if (c._table === 'planned') return false;
+  try { return (c.date || '') <= toIsoDate(today); } catch (e) { return false; }
+}
+
 // Renvoie la liste des compés "à plat" : chaque course par étapes est expansée
 // en une entrée par étape (avec date/sport/km/etc de l'étape).
 // Les compés simples restent telles quelles. Sert au calendrier.
@@ -2865,6 +2876,7 @@ async function saveCompFromModal() {
   const comps = loadCompetitions();
   const newEntry = {
     id: window._editingCompId || Date.now().toString(),
+    realised: (window.coachCalendarMode ? window.coachCalendarMode() === 'realise' : false),
     name, date, time, priority, sport,
     type: typeEpr, km, dplus, target, laps, notes,
     stages,
@@ -2880,6 +2892,7 @@ async function saveCompFromModal() {
       // IMPORTANT : conserver l'id Supabase pour METTRE À JOUR la ligne existante
       // (sinon le push crée une nouvelle ligne et la modif est perdue au rechargement)
       if (old._sbId) newEntry._sbId = old._sbId;
+      if (old.realised != null) newEntry.realised = old.realised;
       if (!gpxContent && old.gpxContent) {
         newEntry.gpxName = old.gpxName;
         newEntry.gpxContent = old.gpxContent;
@@ -3456,7 +3469,7 @@ function renderWeekPlan() {
       // 1) Compétitions réelles de ce jour (étapes incluses) — passé / aujourd'hui / futur.
       //    Les jours passés lisent désormais la VRAIE compét depuis la base
       //    (et non plus un snapshot figé), donc les étapes restent correctes.
-        const compsForToday = comps.filter(c => toIsoDate(c.dateObj) === iso);
+        const compsForToday = comps.filter(c => toIsoDate(c.dateObj) === iso && !compIsRealised(c));
         for (const c of compsForToday) {
           // Si pas de temps cible saisi → on n'affiche PAS de durée par défaut
           // (on garde un fallback de 120 min en interne pour le calcul TSS)
@@ -3766,6 +3779,9 @@ function renderRealiseCalendar() {
   // Index data par ISO
   const dataByIso = {};
   data.forEach(d => { dataByIso[toIsoDate(d.date)] = d; });
+  // Competitions RÉALISÉES (créées depuis le calendrier réalisé) à injecter dans les jours.
+  const realisedComps = (typeof loadCompetitionsExpanded === 'function')
+    ? loadCompetitionsExpanded().filter(compIsRealised) : [];
 
   // Déterminer les semaines à afficher
   let weeksStarts = [];
@@ -3888,6 +3904,26 @@ function renderRealiseCalendar() {
           if (!realDay.tss) realDay.tss = realDay.activities.reduce((s, a) => s + (a.tss || 0), 0);
           if (!realDay.sessionType) realDay.sessionType = realDay.activities[0].type || 'endurance';
           if (!realDay.sessionName) realDay.sessionName = realDay.activities[0].name;
+        }
+        // Compétitions réalisées de ce jour -> injectées comme activités "course".
+        const compsRealisedToday = realisedComps.filter(c => c.date === iso);
+        if (compsRealisedToday.length > 0) {
+          if (!realDay) realDay = { date: iso, activities: [], sessionType: 'vo2' };
+          else realDay = { ...realDay, activities: [...(realDay.activities || [])] };
+          for (const c of compsRealisedToday) {
+            if (realDay.activities.some(x => x.category === 'competition' && String(x.name) === String(c.name))) continue;
+            const cDur = (typeof parseTimeToMin === 'function' ? parseTimeToMin(c.target) : 0) || 0;
+            realDay.activities.push({
+              name: c.name, sport: c.sport || 'Ride', raw_type: c.sport || 'Ride',
+              type: 'vo2', sessionType: 'vo2', sessionName: c.name,
+              duration: cDur, tss: cDur ? Math.round(cDur) : 0,
+              distance_km: c.km || null, elevation_gain: c.dplus || null, laps: c.laps || null,
+              category: 'competition', priority: c.priority || null,
+              _comp: true, _compId: c.id, notes: c.notes || '',
+            });
+          }
+          if (!realDay.sessionName && realDay.activities[0]) realDay.sessionName = realDay.activities[0].name;
+          if (!realDay.sessionType) realDay.sessionType = 'vo2';
         }
         // Mémorise le dernier jour avec CTL/ATL
         if (realDay && (realDay.ctl != null || realDay.atl != null)) {

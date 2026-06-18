@@ -193,9 +193,9 @@ async function pullAllFromCloud() {
     const comps = [];
     const _todayIso = new Date().toISOString().slice(0, 10);
     // competitions = registre des PASSÉES uniquement (les futures sont dans activity_planned)
-    const { data: reg } = await sb.from('competitions').select('*').eq('user_id', userId).lte('date', _todayIso);
+    const { data: reg } = await sb.from('competitions').select('*').eq('user_id', userId);
     for (const r of (reg || [])) comps.push({
-      id: r.client_id || r.id, _sbId: r.id, _table: 'competition',
+      id: r.client_id || r.id, _sbId: r.id, _table: 'competition', realised: true,
       name: r.name, date: r.date, sport: r.sport ?? null,
       priority: r.priority ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
       target: (r.duration != null ? r.duration : parseTimeToMin(r.target)), laps: r.laps ?? null, notes: r.notes ?? null,
@@ -206,7 +206,7 @@ async function pullAllFromCloud() {
     });
     const { data: pc } = await sb.from('activity_planned').select('*').eq('user_id', userId).eq('category', 'competition');
     for (const r of (pc || [])) comps.push({
-      id: r.client_id || r.id, _sbId: r.id, _table: 'planned',
+      id: r.client_id || r.id, _sbId: r.id, _table: 'planned', realised: false,
       name: r.name, date: r.date, sport: r.sport ?? null,
       priority: r.priority ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
       target: (r.duration != null ? r.duration : parseTimeToMin(r.target)), laps: r.laps ?? null, notes: r.notes ?? null,
@@ -398,8 +398,9 @@ async function _resolveId(table, clientId) {
 export async function pushCompetition(comp) {
   if (!isAuthed()) return;
   try {
-    const future = (comp.date || '') > _todayIso();
-    if (future) {
+    // Routage par calendrier d'origine (realised) plutot que par date.
+    const isRealised = (comp.realised === true) || (comp.realised == null && !((comp.date || '') > _todayIso()));
+    if (!isRealised) {
       const row = {
         user_id: uid(), client_id: comp.id, category: 'competition',
         name: comp.name, date: comp.date, sport: comp.sport ?? null,
@@ -437,7 +438,8 @@ export async function pushCompetition(comp) {
 }
 export async function deleteCompetition(comp) {
   if (!isAuthed()) return;
-  const table = comp._table === 'planned' ? 'activity_planned' : 'competitions';
+  const realised = (comp.realised === true) || (comp._table === 'competition') || (comp._table === 'activity') || (comp.realised == null && comp._table == null && !((comp.date || '') > _todayIso()));
+  const table = realised ? 'competitions' : 'activity_planned';
   try {
     if (comp._sbId) await window.sb.from(table).delete().eq('id', comp._sbId).eq('user_id', uid());
     else if (comp.id) await window.sb.from(table).delete().eq('client_id', comp.id).eq('user_id', uid());
