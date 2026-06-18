@@ -85,9 +85,9 @@
   var NAME = { warmup: 'Echauffement', interval: 'Intervalles', steady: 'Bloc continu', recovery: 'Recuperation', cooldown: 'Retour au calme' };
   var DESC = { warmup: 'Montee progressive', interval: 'Serie effort / recup', steady: 'Effort soutenu', recovery: 'Entre les efforts', cooldown: 'Descente progressive' };
   var ZONES = {
-    power: { labels: ['Z1 Recup', 'Z2 Endurance', 'Z3 Tempo', 'Z4 Seuil', 'Z5 VO2max', 'Z6 Anaerobie', 'Z7 Sprint'], mid: [50, 65, 83, 98, 113, 135, 170] },
-    hr: { labels: ['Z1 Recup', 'Z2 Aerobie', 'Z3 Tempo', 'Z4 Seuil', 'Z5 VO2max'], mid: [60, 70, 82, 93, 102] },
-    pace: { labels: ['Z1 Footing', 'Z2 Endurance', 'Z3 Marathon', 'Z4 Seuil', 'Z5 VO2max'], mid: [70, 80, 90, 100, 112] }
+    power: { labels: ['Z1 Recup', 'Z2 Endurance', 'Z3 Tempo', 'Z4 Seuil', 'Z5 VO2max', 'Z6 Anaerobie', 'Z7 Sprint'], mid: [50, 65, 83, 98, 113, 135, 170], lo: [40, 56, 76, 91, 106, 121, 151], hi: [55, 75, 90, 105, 120, 150, 200] },
+    hr: { labels: ['Z1 Recup', 'Z2 Aerobie', 'Z3 Tempo', 'Z4 Seuil', 'Z5 VO2max'], mid: [60, 70, 82, 93, 102], lo: [50, 60, 71, 83, 94], hi: [60, 70, 82, 93, 106] },
+    pace: { labels: ['Z1 Footing', 'Z2 Endurance', 'Z3 Marathon', 'Z4 Seuil', 'Z5 VO2max'], mid: [70, 80, 90, 100, 112], lo: [60, 75, 85, 95, 106], hi: [75, 85, 95, 106, 125] }
   };
   var SPORT_GROUP = { Ride: 'cyclisme', VirtualRide: 'cyclisme', MountainBikeRide: 'cyclisme', GravelRide: 'cyclisme', EBikeRide: 'cyclisme', EMountainBikeRide: 'cyclisme', cyclisme: 'cyclisme', Run: 'course', TrailRun: 'course', VirtualRun: 'course', course: 'course', Swim: 'natation', OpenWaterSwim: 'natation', natation: 'natation' };
   var METRICS = { cyclisme: [['power', 'Puissance'], ['hr', 'FC']], course: [['pace', 'Allure'], ['hr', 'FC']], natation: [['pace', 'Allure'], ['hr', 'FC']] };
@@ -114,9 +114,9 @@
       return fmtPace(lo) + ' ' + paceUnit() + ' . ' + z;
     }
     var a = Math.min(lo, hi), c = Math.max(lo, hi);
-    if (m === 'power') return Math.round(FTP() * a / 100) + '-' + Math.round(FTP() * c / 100) + ' W . ' + Math.round(a) + '-' + Math.round(c) + '% FTP';
-    if (m === 'hr') return Math.round(HRMAX() * a / 100) + '-' + Math.round(HRMAX() * c / 100) + ' bpm';
-    return fmtPace(c) + '-' + fmtPace(a) + ' ' + paceUnit();
+    if (m === 'power') return Math.round(FTP() * a / 100) + '-' + Math.round(FTP() * c / 100) + ' W . ' + Math.round(a) + '-' + Math.round(c) + '% FTP . ' + z;
+    if (m === 'hr') return Math.round(HRMAX() * a / 100) + '-' + Math.round(HRMAX() * c / 100) + ' bpm . ' + z;
+    return fmtPace(c) + '-' + fmtPace(a) + ' ' + paceUnit() + ' . ' + z;
   }
   function blockSegs(b) { var o = []; var n = Math.max(1, b.reps | 0); for (var i = 0; i < n; i++) { o.push(b.work); if (b.type === 'interval' && b.rec) o.push(b.rec); } return o; }
   function allSegs() { var o = []; blocks.forEach(function (b) { blockSegs(b).forEach(function (x) { o.push(x); }); }); return o; }
@@ -171,7 +171,7 @@
   function unitSel(idx, b) { var o = [['zone', 'Zones'], ['pct', '%'], ['raw', 'Valeurs']].map(function (a) { return '<option value="' + a[0] + '"' + (b.unit === a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join(''); return '<select class="sb-csel" data-i="' + idx + '" data-f="unit">' + o + '</select>'; }
   function targetInput(idx, which, b) {
     var seg = b[which]; var d = 'data-i="' + idx + '" data-seg="' + which + '"';
-    if (b.unit === 'zone') { var op = ZONES[b.metric].labels.map(function (l, zi) { return '<option value="' + zi + '"' + (zi === zIdx(seg.int, b.metric) ? ' selected' : '') + '>' + l + '</option>'; }).join(''); return '<select ' + d + ' data-f="int" data-kind="zone">' + op + '</select>'; }
+    if (b.unit === 'zone') { var op = ZONES[b.metric].labels.map(function (l, zi) { return '<option value="' + zi + '"' + (zi === zIdx(midOf(seg), b.metric) ? ' selected' : '') + '>' + l + '</option>'; }).join(''); return '<select ' + d + ' data-f="int" data-kind="zone">' + op + '</select>'; }
     var kind = b.unit === 'pct' ? 'pct' : (b.metric === 'pace' ? 'rawpace' : 'rawnum');
     var toRaw = function (i) { return b.metric === 'power' ? Math.round(FTP() * i / 100) : Math.round(HRMAX() * i / 100); };
     var loVal, hiVal;
@@ -218,9 +218,12 @@
   }
   function onEdit(e) {
     var t = e.target, i = t.dataset.i; if (i == null) return; var b = blocks[i], f = t.dataset.f, seg = t.dataset.seg;
-    if (seg && (f === 'int' || f === 'intHi')) { var raw = String(t.value).trim(); if (f === 'intHi' && raw === '') b[seg].intHi = null; else b[seg][f] = convVal(b, t.dataset.kind, t.value); if (t.dataset.kind === 'zone') renderAll(); else lightRefresh(); }
+    if (seg && (f === 'int' || f === 'intHi')) {
+      if (t.dataset.kind === 'zone') { var zi = +t.value; b[seg].int = ZONES[b.metric].lo[zi]; b[seg].intHi = ZONES[b.metric].hi[zi]; renderAll(); }
+      else { var raw = String(t.value).trim(); if (f === 'intHi' && raw === '') b[seg].intHi = null; else b[seg][f] = convVal(b, t.dataset.kind, t.value); lightRefresh(); }
+    }
     else if (seg && f === 'min') { b[seg].min = +t.value; lightRefresh(); }
-    else if (!seg && (f === 'metric' || f === 'unit')) { b[f] = t.value; if (b.unit === 'zone') { if (b.work) b.work.intHi = null; if (b.rec) b.rec.intHi = null; } renderAll(); }
+    else if (!seg && (f === 'metric' || f === 'unit')) { b[f] = t.value; if (b.unit === 'zone') { ['work', 'rec'].forEach(function (w) { var sg = b[w]; if (!sg) return; var zi = zIdx(midOf(sg), b.metric); sg.int = ZONES[b.metric].lo[zi]; sg.intHi = ZONES[b.metric].hi[zi]; }); } renderAll(); }
     else if (f === 'reps') { b.reps = +t.value; renderProfile(); renderTotals(); fillFields(); }
     else if (f === 'name') { b.name = t.value; var pl = document.querySelectorAll('#sb-profile .sb-plab')[i]; if (pl) pl.textContent = t.value; }
   }
@@ -256,6 +259,7 @@
       var m = curMetric();
       var b = { type: type, name: NAME[type], reps: type === 'interval' ? 4 : 1, metric: m, unit: 'zone', work: { min: def.min, int: def.int } };
       if (type === 'interval') b.rec = { min: 3, int: 55 };
+      [b.work, b.rec].forEach(function (sg) { if (!sg) return; var zi = zIdx(sg.int, m); sg.int = ZONES[m].lo[zi]; sg.intHi = ZONES[m].hi[zi]; });
       blocks.push(b); renderAll();
     });
     // drag & drop sur le graphe
