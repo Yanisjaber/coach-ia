@@ -3871,7 +3871,7 @@ function renderRealiseCalendar() {
           for (const m of manualRealised) {
             // Dedoublonnage : si la meme seance est deja presente via DASHBOARD_DATA (DB),
             // on retire la version DB et on garde la version locale (valeurs a jour).
-            realDay.activities = realDay.activities.filter(x => x._manual || !(
+            realDay.activities = realDay.activities.filter(x => !(
               (m._sbId && String(x._sbId) === String(m._sbId)) ||
               (m.id && String(x.client_id) === String(m.id))
             ));
@@ -7344,7 +7344,7 @@ function buildRealisedDay(iso) {
     if (!realDay) realDay = { date: iso, activities: [], sessionType: 'autre' };
     else realDay = { ...realDay, activities: [...(realDay.activities || [])] };
     for (const m of manualRealised) {
-      realDay.activities = realDay.activities.filter(x => x._manual || !(
+      realDay.activities = realDay.activities.filter(x => !(
         (m._sbId && String(x._sbId) === String(m._sbId)) ||
         (m.id && String(x.client_id) === String(m.id))
       ));
