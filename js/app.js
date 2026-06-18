@@ -7567,6 +7567,11 @@ function openSessionModal(iso, source) {
         const notesHTML = (act.notes && String(act.notes).trim())
           ? `<div class="modal-section"><div class="modal-section-title">Notes</div><div class="modal-info-box" style="white-space:pre-wrap;">${_escNote(act.notes)}</div></div>`
           : '';
+        // Sections Strava : on n'affiche Graphique / Lien que s'il y a une vraie activite
+        // Strava (sinon on n'affiche pas de cases vides).
+        const _hasStrava = !!(stravaId && /^\d+$/.test(stravaId));
+        const graphHTML = _hasStrava ? `<div class="modal-section"><div class="modal-section-title">Graphique</div><div id="streams-section"></div></div>` : '';
+        const lienHTML = _hasStrava ? `<div class="modal-section"><div class="modal-section-title">Lien activité</div>${intervalsLink}</div>` : '';
         bodyEl.innerHTML = `
           ${switchHTML}
           ${syntheseHTML}
@@ -7577,14 +7582,8 @@ function openSessionModal(iso, source) {
           ${zonesHTML}
           ${profileHTML}
           ${notesHTML}
-          <div class="modal-section">
-            <div class="modal-section-title">Graphique</div>
-            <div id="streams-section"></div>
-          </div>
-          <div class="modal-section">
-            <div class="modal-section-title">Lien activité</div>
-            ${intervalsLink || '<div class="modal-placeholder">Pas d\'ID Strava disponible pour cette activité.</div>'}
-          </div>
+          ${graphHTML}
+          ${lienHTML}
         `;
         // Wire switch buttons (avant le chargement async des streams)
         bodyEl.querySelectorAll('.modal-activity-switch button').forEach(btn => {
@@ -7720,11 +7719,11 @@ function openSessionModal(iso, source) {
           }
         }, 0);
         // Lancer le chargement des streams en async (la modal est déjà visible)
-        const streamId = act.id || act.activityId || day.activityId;
-        if (streamId) {
-          renderStreamsSection(document.getElementById('streams-section'), streamId);
-        } else {
-          document.getElementById('streams-section').innerHTML = '<div class="modal-placeholder">Pas d\'ID activité disponible pour cette séance.</div>';
+        const _streamsEl = document.getElementById('streams-section');
+        if (_streamsEl) {
+          const streamId = act.id || act.activityId || day.activityId;
+          if (streamId) renderStreamsSection(_streamsEl, streamId);
+          else _streamsEl.innerHTML = '<div class="modal-placeholder">Pas d\'ID activité disponible pour cette séance.</div>';
         }
       }
       renderModalActivity(0);
