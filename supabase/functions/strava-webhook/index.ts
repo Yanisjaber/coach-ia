@@ -443,7 +443,6 @@ function stravaToRow(a: any, userId: string, ftp: number | null, lthr: number | 
     name: a.name || "Activité",
     sport,
     sport_raw: sportRaw,
-    type: classifyType(a.name, intensity, sport),
     start_date_local: a.start_date_local || a.start_date,
     elapsed_time: a.elapsed_time != null ? Math.round(a.elapsed_time) : null,
     moving_time: a.moving_time != null ? Math.round(a.moving_time) : null,
