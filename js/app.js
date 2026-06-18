@@ -3406,6 +3406,16 @@ function renderWeekPlan() {
   const dataByIso = {};
   data.forEach(d => { dataByIso[toIsoDate(d.date)] = d; });
 
+  // Dedoublonnage prevu/realise : une seance presente dans les DEUX stocks (meme id /
+  // _sbId) ne doit pas apparaitre aussi en prevu -> on masque la copie prevu (le realise prime).
+  const _realisedKeySet = new Set();
+  try {
+    (typeof loadRealisedTrainings === 'function' ? loadRealisedTrainings() : []).forEach(t => {
+      if (t && t.id != null) _realisedKeySet.add(String(t.id));
+      if (t && t._sbId) _realisedKeySet.add(String(t._sbId));
+    });
+  } catch (e) {}
+
   // Mode Prévu : TOUJOURS 4 semaines glissantes en ORDRE CHRONOLOGIQUE
   // (semaine courante / 1ère du mois en haut, semaines suivantes vers le bas)
   let weeksStarts = [];
@@ -3480,7 +3490,7 @@ function renderWeekPlan() {
 
         // 2) Tous les entraînements prévus manuels pour ce jour
         const manualTrainings = ((typeof loadTrainings === 'function') ? loadTrainings() : []).filter(t => !window.coachModeKeep || window.coachModeKeep(t.ia));
-        const manualForToday = manualTrainings.filter(t => t.date === iso);
+        const manualForToday = manualTrainings.filter(t => t.date === iso && !_realisedKeySet.has(String(t.id)) && !(t._sbId && _realisedKeySet.has(String(t._sbId))));
         for (const m of manualForToday) {
           items.push({
             type: m.type || 'endurance',
