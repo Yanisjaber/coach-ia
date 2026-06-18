@@ -3041,6 +3041,7 @@ function openTrainModal(mode) {
     const el = document.getElementById('train-modal-' + k);
     if (el) el.value = '';
   });
+  { const _c = document.getElementById('train-modal-act-controls'); if (_c) _c.hidden = true; }
   if (window.resetTrainGpx) window.resetTrainGpx();
   // Reset structure (mode création)
   if (typeof window.resetWorkoutStructure === 'function') window.resetWorkoutStructure();
@@ -3099,6 +3100,23 @@ function openTrainModalForEdit(training, mode) {
   // Charger la structure si présente (mode édition)
   if (typeof window.setWorkoutStructure === 'function') {
     window.setWorkoutStructure(training.structure || []);
+  }
+  // Controles "activite" (mode realise edite) : exclusions records + transformer en compet
+  {
+    const _ctrls = document.getElementById('train-modal-act-controls');
+    if (_ctrls) {
+      if (mode === 'realise' && training._sbId) {
+        _ctrls.hidden = false;
+        window._trainEditActId = String(training._sbId);
+        window._trainEditIso = training.date;
+        const ov = (typeof getActivityEdit === 'function' ? getActivityEdit(window._trainEditActId) : null) || {};
+        const _set = (m, on) => { const b = _ctrls.querySelector('.ae-metric-btn[data-m="' + m + '"]'); if (b) b.classList.toggle('active', !!on); };
+        _set('power', ov.excludePower); _set('hr', ov.excludeHr); _set('dist', ov.excludeDistance);
+      } else {
+        _ctrls.hidden = true;
+        window._trainEditActId = null;
+      }
+    }
   }
   // Adapter titre + bouton + affiche poubelle
   const titleEl = document.getElementById('train-modal-title');
@@ -3219,6 +3237,18 @@ function saveTrainFromModal() {
   } else {
     arr.push(entry);
   }
+  // Persiste les exclusions records (calque d'overrides) pour la seance realisee editee.
+  {
+    const _ctrls = document.getElementById('train-modal-act-controls');
+    if (trainModalMode === 'realise' && _ctrls && !_ctrls.hidden && window._trainEditActId && typeof setActivityEdit === 'function') {
+      const _on = (m) => !!_ctrls.querySelector('.ae-metric-btn[data-m="' + m + '"].active');
+      const _ov = Object.assign({}, (typeof getActivityEdit === 'function' ? getActivityEdit(window._trainEditActId) : null) || {});
+      if (_on('power')) _ov.excludePower = true; else delete _ov.excludePower;
+      if (_on('hr')) _ov.excludeHr = true; else delete _ov.excludeHr;
+      if (_on('dist')) _ov.excludeDistance = true; else delete _ov.excludeDistance;
+      setActivityEdit(window._trainEditActId, _ov);
+    }
+  }
   saveFn(arr);
   window._editingTrainId = null;
   window._editingTrainMode = null;
@@ -3337,6 +3367,21 @@ window.gpxDeleteTraining = async function(id, mode, sbId) {
   else if (typeof renderCalendar === 'function') renderCalendar();
 };
 
+// Cablage (une fois) des controles activite de la modale entrainement.
+{
+  const _c = document.getElementById('train-modal-act-controls');
+  if (_c) _c.querySelectorAll('.ae-metric-btn').forEach(b => b.addEventListener('click', () => b.classList.toggle('active')));
+  const _tb = document.getElementById('train-modal-transform');
+  if (_tb) _tb.addEventListener('click', async () => {
+    const id = window._trainEditActId, iso = window._trainEditIso;
+    if (!id) return;
+    const act = { _sbId: id, category: 'entrainement',
+      name: (document.getElementById('train-modal-name').value || 'Competition'),
+      sport: document.getElementById('train-modal-sport').value };
+    if (typeof closeTrainModal === 'function') closeTrainModal();
+    if (typeof setActivityCategory === 'function') await setActivityCategory(act, 'competition', iso);
+  });
+}
 const openTrainBtn = document.getElementById('open-train-modal');
 if (openTrainBtn) openTrainBtn.addEventListener('click', () => openTrainModal('prevu'));
 const openTrainRealiseBtn = document.getElementById('open-train-realise-modal');
