@@ -907,3 +907,32 @@
   overflow-x: hidden;
   padding-right: 4px;
 }
+
+/* ============================================================
+   Modale d'ajout : sections groupees (design "Sections") + champ GPX
+   ============================================================ */
+.add-form-grid .add-sec {
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 13px 14px;
+}
+.add-sec-h {
+  font-size: 11px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+  margin: 0 0 11px; color: var(--info);
+}
+.add-sec-h.charge { color: var(--accent); }
+.add-sec-h.parc { color: var(--warn); }
+.add-sec-grid { display: grid; gap: 12px; }
+.add-sec-grid.g3 { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
+.add-sec input, .add-sec select, .add-sec textarea { background: var(--bg); }
+.gpx-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gpx-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(96,165,250,.14); border: 1px solid rgba(96,165,250,.4);
+  color: var(--info); border-radius: 9px; padding: 8px 13px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.gpx-btn:hover { background: rgba(96,165,250,.22); }
+.gpx-name { font-size: 12.5px; color: var(--text-dim); }
+.gpx-clear { background: transparent; border: none; color: var(--danger); font-size: 12px; cursor: pointer; text-decoration: underline; }

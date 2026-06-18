@@ -997,45 +997,49 @@
         <span>Nom de la séance</span>
         <input type="text" id="train-modal-name" placeholder="Nom de la séance">
       </label>
-      <label class="form-field">
-        <span>Date</span>
-        <input type="date" id="train-modal-date">
-      </label>
-      <label class="form-field">
-        <span>Sport</span>
-        <select id="train-modal-sport"></select>
-      </label>
-      <label class="form-field">
-        <span>Type</span>
-        <select id="train-modal-type">
-          <option value="endurance">Endurance</option>
-          <option value="tempo">Tempo / Sweet Spot</option>
-          <option value="seuil">Seuil</option>
-          <option value="vo2">VO2max</option>
-          <option value="recup">Récup active</option>
-          <option value="rest">Repos</option>
-        </select>
-      </label>
-      <label class="form-field">
-        <span>Durée (min)</span>
-        <input type="number" id="train-modal-duration" min="0" placeholder="Durée en minutes">
-      </label>
-      <label class="form-field">
-        <span>TSS estimé</span>
-        <input type="number" id="train-modal-tss" min="0" placeholder="TSS estimé">
-      </label>
-      <label class="form-field">
-        <span id="train-modal-rpe-label">RPE estimé (1-10)</span>
-        <input type="number" id="train-modal-rpe" min="0" max="10" step="0.5" placeholder="1 à 10">
-      </label>
-      <label class="form-field">
-        <span>Distance (km)</span>
-        <input type="number" id="train-modal-km" min="0" step="0.1" placeholder="km">
-      </label>
-      <label class="form-field">
-        <span>Dénivelé D+ (m)</span>
-        <input type="number" id="train-modal-dplus" min="0" placeholder="mètres">
-      </label>
+
+      <div class="form-field form-col-2 add-sec">
+        <div class="add-sec-h plan">Planning</div>
+        <div class="add-sec-grid g3">
+          <label class="form-field"><span>Date</span><input type="date" id="train-modal-date"></label>
+          <label class="form-field"><span>Sport</span><select id="train-modal-sport"></select></label>
+          <label class="form-field"><span>Type</span><select id="train-modal-type">
+            <option value="endurance">Endurance</option>
+            <option value="tempo">Tempo / Sweet Spot</option>
+            <option value="seuil">Seuil</option>
+            <option value="vo2">VO2max</option>
+            <option value="recup">Récup active</option>
+            <option value="rest">Repos</option>
+          </select></label>
+        </div>
+      </div>
+
+      <div class="form-field form-col-2 add-sec">
+        <div class="add-sec-h charge">Charge</div>
+        <div class="add-sec-grid g3">
+          <label class="form-field"><span>Durée (min)</span><input type="number" id="train-modal-duration" min="0" placeholder="minutes"></label>
+          <label class="form-field"><span>TSS estimé</span><input type="number" id="train-modal-tss" min="0" placeholder="TSS"></label>
+          <label class="form-field"><span id="train-modal-rpe-label">RPE estimé (1-10)</span><input type="number" id="train-modal-rpe" min="0" max="10" step="0.5" placeholder="1 à 10"></label>
+        </div>
+      </div>
+
+      <div class="form-field form-col-2 add-sec">
+        <div class="add-sec-h parc">Parcours</div>
+        <div class="add-sec-grid g3">
+          <label class="form-field"><span>Distance (km)</span><input type="number" id="train-modal-km" min="0" step="0.1" placeholder="km"></label>
+          <label class="form-field"><span>Dénivelé D+ (m)</span><input type="number" id="train-modal-dplus" min="0" placeholder="mètres"></label>
+          <label class="form-field"><span>Nombre de tours</span><input type="number" id="train-modal-laps" min="0" placeholder="tours"></label>
+        </div>
+        <label class="form-field" style="margin-top:11px">
+          <span>Trace GPX</span>
+          <div class="gpx-row">
+            <label class="gpx-btn"><input type="file" id="train-modal-gpx" accept=".gpx,.GPX" hidden> Choisir un fichier GPX</label>
+            <span id="train-modal-gpx-name" class="gpx-name">Aucun fichier</span>
+            <button type="button" id="train-modal-gpx-clear" class="gpx-clear" hidden>Retirer</button>
+          </div>
+        </label>
+      </div>
+
       <label class="form-field form-col-2">
         <span>Notes</span>
         <textarea id="train-modal-notes" rows="2" placeholder="Intentions, ressenti, contexte..."></textarea>
