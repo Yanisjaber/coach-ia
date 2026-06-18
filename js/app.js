@@ -2710,6 +2710,8 @@ function openCompModal() {
   // Cache le bouton poubelle par défaut (sera affiché par openCompModalForEdit)
   const delBtn = document.getElementById('comp-modal-delete');
   if (delBtn) delBtn.hidden = true;
+  { const _tt = document.getElementById('comp-modal-to-training'); if (_tt) _tt.hidden = true; }
+  window._compToTrainingAct = null; window._compToTrainingIso = null;
   // Reset form (sauf "time" qui est géré par le stepper)
   ['name','date','type','km','dplus','target','laps','notes','event'].forEach(k => {
     const el = document.getElementById('comp-modal-' + k);
@@ -2931,6 +2933,13 @@ const compModalCancel = document.getElementById('comp-modal-cancel');
 if (compModalCancel) compModalCancel.addEventListener('click', closeCompModal);
 const compModalSave = document.getElementById('comp-modal-save');
 if (compModalSave) compModalSave.addEventListener('click', saveCompFromModal);
+const _compToTrainingBtn = document.getElementById('comp-modal-to-training');
+if (_compToTrainingBtn) _compToTrainingBtn.addEventListener('click', async () => {
+  const act = window._compToTrainingAct, iso = window._compToTrainingIso;
+  if (!act || !act._sbId) return;
+  if (typeof closeCompModal === 'function') closeCompModal();
+  if (typeof setActivityCategory === 'function') await setActivityCategory(act, 'entrainement', iso);
+});
 const compModalOverlay = document.getElementById('comp-modal');
 if (compModalOverlay) compModalOverlay.addEventListener('click', (e) => {
   if (e.target === compModalOverlay) closeCompModal();
@@ -7511,7 +7520,20 @@ function openSessionModal(iso, source) {
         // Boutons d'action : seulement pour les activités manuelles (Strava est read-only)
         const _editBtn2 = document.getElementById('modal-edit-btn');
         const _delBtn2 = document.getElementById('modal-delete-btn');
-        if (act._manual) {
+        if (act.category === 'competition') {
+          // Competition = activite avec category='competition' : edition via la modale competition.
+          const _compId = String(act.client_id || act._sbId || act.id || '');
+          if (_editBtn2) {
+            _editBtn2.hidden = false;
+            _editBtn2.dataset.kind = 'comp';
+            _editBtn2.dataset.compId = _compId;
+          }
+          if (_delBtn2) {
+            _delBtn2.hidden = false;
+            _delBtn2.dataset.kind = 'comp';
+            _delBtn2.dataset.compId = _compId;
+          }
+        } else if (act._manual) {
           const _lsId = act._manualId || act.client_id || act.id;
           // Entrainement manuel : TOUJOURS la modale complete (tous les champs + structure).
           // Si pas de copie locale, gpxEditTraining reconstruit la seance depuis la base.
@@ -8965,6 +8987,14 @@ function openCompModalForEdit(comp) {
   // Affiche le bouton poubelle (uniquement en édition)
   const delBtn = document.getElementById('comp-modal-delete');
   if (delBtn) delBtn.hidden = false;
+  // Bouton "Transformer en entrainement" : uniquement pour une compet REALISEE (activite en base).
+  const _toTrain = document.getElementById('comp-modal-to-training');
+  if (_toTrain) {
+    const _isRealisedAct = !!(comp._sbId && (comp._table === 'activity' || comp.realised === true));
+    _toTrain.hidden = !_isRealisedAct;
+    window._compToTrainingAct = _isRealisedAct ? { _sbId: comp._sbId, category: 'competition', name: comp.name, sport: comp.sport } : null;
+    window._compToTrainingIso = comp.date || null;
+  }
 }
 
 // Handler suppression compé depuis la modal d'édition
