@@ -7180,47 +7180,9 @@ async function setActivityCategory(act, category, iso) {
         }
       }
     }
-    // Maintenir le registre competitions : 1 compét reliant cette activité
-    if (window.cloudSync) {
-      if (category === 'competition' && window.cloudSync.pushCompetitionRegistry) {
-        await window.cloudSync.pushCompetitionRegistry({
-          id: 'act-' + act._sbId, name: act.name || 'Compétition',
-          date: iso, sport: act.sport || null, activityIds: [act._sbId],
-        });
-      } else if (category !== 'competition') {
-        // L'activité quitte sa/ses compétition(s). On RETIRE juste cette étape :
-        //  • ≥2 étapes restantes → la course continue (date = étape la + ancienne) ;
-        //  • 1 restante → la course devient une compétition simple ;
-        //  • 0 → on supprime la ligne (compét d'un jour ou ancienne migrée).
-        try {
-          const { data: allComps } = await window.sb.from('competitions').select('id,name,date,activity_ids');
-          const sid = String(act._sbId);
-          for (const r of (allComps || [])) {
-            const ids = Array.isArray(r.activity_ids) ? r.activity_ids.map(String) : [];
-            const linked = ids.includes(sid);
-            const legacySameDay = ids.length === 0 && String(r.date) === String(iso);
-            if (!linked && !legacySameDay) continue;
-            const remaining = ids.filter(id => id !== sid);
-            if (remaining.length >= 2) {
-              // La course continue : date = étape la plus ancienne, on garde le nom du tour
-              const dates = remaining.map(id => (_findActBySbId(id) || {}).iso).filter(Boolean).sort();
-              await window.sb.from('competitions').update({ activity_ids: remaining, date: dates[0] || r.date }).eq('id', r.id);
-            } else if (remaining.length === 1) {
-              // Devient une compétition simple : nom = celui de l'activité restante
-              const f = _findActBySbId(remaining[0]);
-              await window.sb.from('competitions').update({
-                activity_ids: remaining,
-                name: f ? (f.act.name || r.name) : r.name,
-                date: f ? f.iso : r.date,
-              }).eq('id', r.id);
-            } else {
-              await window.sb.from('competitions').delete().eq('id', r.id);
-            }
-          }
-        } catch (e2) { console.warn('[unset comp]', e2.message || e2); }
-      }
-    }
-    if (window.cloudSync && window.cloudSync.pullAllFromCloud) await window.cloudSync.pullAllFromCloud();
+// Modele unifie : changer category sur l'activite SUFFIT (la compet EST l'activite).
+    // Rien d'autre a faire (plus de registre competitions separe -> plus de doublon).
+        if (window.cloudSync && window.cloudSync.pullAllFromCloud) await window.cloudSync.pullAllFromCloud();
     if (window.__applyOverridesAndRerender) window.__applyOverridesAndRerender(); // rebuild data depuis DASHBOARD_DATA mis à jour
     if (typeof renderCompList === 'function') renderCompList();
   } catch (e) {
