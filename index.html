@@ -895,75 +895,69 @@
       </div>
 
       <!-- Priorité + Sport : infos GLOBALES de la compé (ne changent pas par étape) -->
-      <label class="form-field">
-        <span>Priorité</span>
-        <select id="comp-modal-priority">
-          <option value="principal">Objectif</option>
-          <option value="secondaire">Préparation</option>
-        </select>
-      </label>
-      <label class="form-field">
-        <span>Sport</span>
-        <select id="comp-modal-sport"></select>
-      </label>
+      <div class="form-field form-col-2 add-sec">
+        <div class="add-sec-h plan">Compétition</div>
+        <div class="add-sec-grid g3">
+          <label class="form-field"><span>Priorité</span>
+            <select id="comp-modal-priority">
+              <option value="principal">Objectif</option>
+              <option value="secondaire">Préparation</option>
+            </select></label>
+          <label class="form-field"><span>Sport</span><select id="comp-modal-sport"></select></label>
+        </div>
+      </div>
 
       <!-- Tabs des étapes (visible uniquement si toggle "Course par étapes" activé) -->
       <div class="stages-tabs form-col-2" id="comp-stages-tabs" hidden>
         <div class="stage-tabs-list" id="comp-stage-tabs-list"></div>
         <button type="button" class="stage-tab-add" id="comp-stage-tab-add" title="Ajouter une étape">+</button>
       </div>
-      <label class="form-field">
-        <span>Date</span>
-        <input type="date" id="comp-modal-date">
-      </label>
-      <div class="form-field">
-        <span>Heure de départ</span>
-        <div class="time-stepper" data-target="comp-modal-time">
-          <div class="time-part">
-            <button type="button" class="time-arrow ts-left" data-part="hour" data-dir="-1" title="-1h" aria-label="Heure -1"></button>
-            <div class="time-val" data-part="hour">12</div>
-            <button type="button" class="time-arrow ts-right" data-part="hour" data-dir="1" title="+1h" aria-label="Heure +1"></button>
+
+      <div class="form-field form-col-2 add-sec">
+        <div class="add-sec-h charge">Quand</div>
+        <div class="add-sec-grid g3">
+          <label class="form-field"><span>Date</span><input type="date" id="comp-modal-date"></label>
+          <div class="form-field"><span>Heure de départ</span>
+            <div class="time-stepper" data-target="comp-modal-time">
+              <div class="time-part">
+                <button type="button" class="time-arrow ts-left" data-part="hour" data-dir="-1" title="-1h" aria-label="Heure -1"></button>
+                <div class="time-val" data-part="hour">12</div>
+                <button type="button" class="time-arrow ts-right" data-part="hour" data-dir="1" title="+1h" aria-label="Heure +1"></button>
+              </div>
+              <span class="time-sep">:</span>
+              <div class="time-part">
+                <button type="button" class="time-arrow ts-left" data-part="min" data-dir="-1" title="-5 min" aria-label="Minutes -5"></button>
+                <div class="time-val" data-part="min">00</div>
+                <button type="button" class="time-arrow ts-right" data-part="min" data-dir="1" title="+5 min" aria-label="Minutes +5"></button>
+              </div>
+            </div>
+            <input type="hidden" id="comp-modal-time" value="12:00">
           </div>
-          <span class="time-sep">:</span>
-          <div class="time-part">
-            <button type="button" class="time-arrow ts-left" data-part="min" data-dir="-1" title="-5 min" aria-label="Minutes -5"></button>
-            <div class="time-val" data-part="min">00</div>
-            <button type="button" class="time-arrow ts-right" data-part="min" data-dir="1" title="+5 min" aria-label="Minutes +5"></button>
-          </div>
-        </div>
-        <input type="hidden" id="comp-modal-time" value="12:00">
-      </div>
-      <label class="form-field">
-        <span>Type d'épreuve</span>
-        <select id="comp-modal-type"></select>
-      </label>
-      <label class="form-field">
-        <span>Distance (km)</span>
-        <input type="number" id="comp-modal-km" step="0.1" min="0" placeholder="Distance en km">
-      </label>
-      <label class="form-field">
-        <span>Dénivelé + (m)</span>
-        <input type="number" id="comp-modal-dplus" min="0" placeholder="Dénivelé positif en mètres">
-      </label>
-      <label class="form-field">
-        <span>Temps cible</span>
-        <input type="text" id="comp-modal-target" placeholder="Temps cible (ex : 3h45)">
-      </label>
-      <div class="form-field">
-        <span>Trace GPX</span>
-        <div class="file-picker" data-target="comp-modal-gpx">
-          <input type="file" id="comp-modal-gpx" accept=".gpx" hidden>
-          <button type="button" class="file-picker-btn">
-            <span class="file-picker-icon"></span>
-            <span class="file-picker-label">Choisir un fichier GPX</span>
-          </button>
-          <button type="button" class="file-picker-clear" title="Retirer le fichier" hidden>×</button>
+          <label class="form-field"><span>Type d'épreuve</span><select id="comp-modal-type"></select></label>
         </div>
       </div>
-      <label class="form-field">
-        <span>Nombre de tours</span>
-        <input type="number" id="comp-modal-laps" min="1" step="1" placeholder="Nombre de tours">
-      </label>
+
+      <div class="form-field form-col-2 add-sec">
+        <div class="add-sec-h parc">Parcours &amp; épreuve</div>
+        <div class="add-sec-grid g3">
+          <label class="form-field"><span>Distance (km)</span><input type="number" id="comp-modal-km" step="0.1" min="0" placeholder="km"></label>
+          <label class="form-field"><span>Dénivelé + (m)</span><input type="number" id="comp-modal-dplus" min="0" placeholder="mètres"></label>
+          <label class="form-field"><span>Temps cible</span><input type="text" id="comp-modal-target" placeholder="ex : 3h45"></label>
+          <label class="form-field"><span>Nombre de tours</span><input type="number" id="comp-modal-laps" min="1" step="1" placeholder="tours"></label>
+        </div>
+        <div class="form-field" style="margin-top:11px">
+          <span>Trace GPX</span>
+          <div class="file-picker" data-target="comp-modal-gpx">
+            <input type="file" id="comp-modal-gpx" accept=".gpx" hidden>
+            <button type="button" class="file-picker-btn">
+              <span class="file-picker-icon"></span>
+              <span class="file-picker-label">Choisir un fichier GPX</span>
+            </button>
+            <button type="button" class="file-picker-clear" title="Retirer le fichier" hidden>×</button>
+          </div>
+        </div>
+      </div>
+
       <label class="form-field form-col-2">
         <span>Notes</span>
         <textarea id="comp-modal-notes" rows="3" placeholder="Stratégie, observations, objectifs..."></textarea>
