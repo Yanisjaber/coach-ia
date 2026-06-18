@@ -530,4 +530,5 @@ window.cloudSync = {
   pushCompetition, deleteCompetition, pushCompetitionRegistry, deleteCompetitionByActivity,
   pushTraining, deleteTraining,
   pushRestDay,
-  pullAllFromCl
+  pullAllFromCloud,
+};
