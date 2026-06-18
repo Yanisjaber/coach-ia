@@ -3138,6 +3138,36 @@ if (_trainModalDelBtn) {
   });
 }
 
+// Met a jour DASHBOARD_DATA (source d'affichage) avec une seance manuelle realisee,
+// pour qu'une creation/edition apparaisse IMMEDIATEMENT sans attendre un re-pull cloud.
+function upsertManualInDashboard(entry) {
+  if (!window.DASHBOARD_DATA || !Array.isArray(window.DASHBOARD_DATA.days) || !entry || !entry.date) return;
+  const iso = entry.date;
+  const row = {
+    id: entry._sbId || ('local-' + entry.id),
+    _sbId: entry._sbId || null,
+    source: 'manual', _manual: true, _manualId: entry.id,
+    category: 'entrainement', client_id: entry.id,
+    notes: entry.notes || '', name: entry.name,
+    sport: entry.sport, raw_type: entry.sport,
+    tss: entry.tss || 0, duration: entry.duration || 0,
+    moving_time: (entry.duration || 0) * 60,
+    start_date_local: iso + 'T12:00:00',
+    distance_km: entry.km || null, elevation_gain: entry.dplus || null,
+    rpe: (entry.rpe != null ? entry.rpe : null),
+    laps: (entry.laps != null ? entry.laps : null),
+    structure: entry.structure || null,
+  };
+  let day = window.DASHBOARD_DATA.days.find(d => String(d.date) === iso);
+  if (!day) { day = { date: iso, activities: [] }; window.DASHBOARD_DATA.days.push(day); }
+  if (!Array.isArray(day.activities)) day.activities = [];
+  day.activities = day.activities.filter(x => !(
+    (entry._sbId && String(x._sbId) === String(entry._sbId)) ||
+    (String(x.client_id) === String(entry.id))
+  ));
+  day.activities.push(row);
+}
+
 function saveTrainFromModal() {
   if (typeof _clearAllFieldErrors === 'function') _clearAllFieldErrors('#train-modal');
   const name = document.getElementById('train-modal-name').value.trim();
@@ -3193,7 +3223,13 @@ function saveTrainFromModal() {
   window._editingTrainId = null;
   window._editingTrainMode = null;
   closeTrainModal();
-  renderCalendar();
+  if (trainModalMode === 'realise') {
+    upsertManualInDashboard(entry);
+    if (typeof window.__applyOverridesAndRerender === 'function') window.__applyOverridesAndRerender();
+    else renderCalendar();
+  } else {
+    renderCalendar();
+  }
 }
 
 // Insertion d'un modèle de la bibliothèque sur un jour (glisser-déposer).
@@ -3871,11 +3907,13 @@ function renderRealiseCalendar() {
           for (const m of manualRealised) {
             // Dedoublonnage : si la meme seance est deja presente via DASHBOARD_DATA (DB),
             // on retire la version DB et on garde la version locale (valeurs a jour).
-            realDay.activities = realDay.activities.filter(x => !(
+            // Source unique = base : si la version DB de cette seance est deja la,
+            // on l'affiche (la version localStorage ne sert que de tampon non-synchronise).
+            const _dbTwin = realDay.activities.some(x => (
               (m._sbId && String(x._sbId) === String(m._sbId)) ||
               (m.id && String(x.client_id) === String(m.id))
             ));
-            // Le sport peut être un raw_type Strava (Ride, WeightTraining...) OU une catégorie
+            if (_dbTwin) continue;
             const sportVal = m.sport || 'autre';
             realDay.activities.push({
               name: m.name,
@@ -7344,10 +7382,11 @@ function buildRealisedDay(iso) {
     if (!realDay) realDay = { date: iso, activities: [], sessionType: 'autre' };
     else realDay = { ...realDay, activities: [...(realDay.activities || [])] };
     for (const m of manualRealised) {
-      realDay.activities = realDay.activities.filter(x => !(
+      const _dbTwin = realDay.activities.some(x => (
         (m._sbId && String(x._sbId) === String(m._sbId)) ||
         (m.id && String(x.client_id) === String(m.id))
       ));
+      if (_dbTwin) continue;
       const sportVal = m.sport || 'autre';
       realDay.activities.push({
         name: m.name, sport: sportVal, raw_type: sportVal,

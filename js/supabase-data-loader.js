@@ -113,6 +113,7 @@ const ACTIVITY_LIGHT_COLS = [
   // Modèle unifié : catégorie + source + champs manuels/compétition
   'category', 'source', 'client_id', 'user_notes',
   'priority', 'target', 'course_dplus', 'laps', 'gpx_name', 'stages', 'event',
+  'rpe', 'structure',
 ].join(',');
 
 // Colonnes "safe" de strava_connections : SURTOUT PAS les tokens.
@@ -344,6 +345,7 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
       course_dplus: a.course_dplus ?? null,
       laps: a.laps ?? null,
       rpe: a.rpe ?? null,
+      structure: a.structure ?? null,
       gpx_name: a.gpx_name || null,
       stages: a.stages || null,
       event: a.event || null,

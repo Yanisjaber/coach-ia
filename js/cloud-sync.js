@@ -486,6 +486,7 @@ export async function pushTraining(training, mode) {
         user_notes: training.notes ?? null,
         distance_km: training.km ?? null, total_elevation_gain: training.dplus ?? null, rpe: training.rpe ?? null,
         laps: training.laps ?? null, gpx_name: training.gpxName ?? null, gpx_content: training.gpxContent ?? null,
+        structure: training.structure ?? null,
       };
       if (training._sbId) row.id = training._sbId;
       if (!row.id) row.id = await _resolveId('activities', training.id);
