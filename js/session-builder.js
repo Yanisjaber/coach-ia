@@ -148,6 +148,24 @@
     var ph = R('sb-profhint'); if (ph) ph.textContent = blocks.length + ' blocs . glisse pour reordonner';
   }
   function renderTotals() { var t = totals(); var a = R('sb-tdur'); if (a) a.textContent = fmtDur(t.dur); var b = R('sb-ttss'); if (b) b.textContent = t.tss; }
+  // Met a jour pastilles + couleurs SANS reconstruire les champs (sinon on perd le focus en saisie)
+  function refreshPills() {
+    var els = document.querySelectorAll('#sb-blocks .sb-blk');
+    els.forEach(function (el, bi) {
+      var b = blocks[bi]; if (!b) return;
+      el.style.borderLeftColor = ZC[zoneOf(midOf(b.work))];
+      var order = ['work']; if (b.type === 'interval' && b.rec) order.push('rec');
+      var lines = el.querySelectorAll('.sb-line');
+      lines.forEach(function (ln, k) {
+        var seg = b[order[k]]; if (!seg) return;
+        var pill = ln.querySelector('.sb-eqpill'); if (!pill) return;
+        var col = ZC[zoneOf(midOf(seg))];
+        pill.style.borderLeftColor = col;
+        pill.innerHTML = '<span class="sb-chip" style="background:' + col + '"></span>' + label(seg, b.metric);
+      });
+    });
+  }
+  function lightRefresh() { refreshPills(); renderProfile(); renderTotals(); fillFields(); }
 
   function metricSel(idx, b) { var o = METRICS[grp()].map(function (a) { return '<option value="' + a[0] + '"' + (b.metric === a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join(''); return '<select class="sb-csel" data-i="' + idx + '" data-f="metric">' + o + '</select>'; }
   function unitSel(idx, b) { var o = [['zone', 'Zones'], ['pct', '%'], ['raw', 'Valeurs']].map(function (a) { return '<option value="' + a[0] + '"' + (b.unit === a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join(''); return '<select class="sb-csel" data-i="' + idx + '" data-f="unit">' + o + '</select>'; }
@@ -200,8 +218,8 @@
   }
   function onEdit(e) {
     var t = e.target, i = t.dataset.i; if (i == null) return; var b = blocks[i], f = t.dataset.f, seg = t.dataset.seg;
-    if (seg && (f === 'int' || f === 'intHi')) { var raw = String(t.value).trim(); if (f === 'intHi' && raw === '') b[seg].intHi = null; else b[seg][f] = convVal(b, t.dataset.kind, t.value); renderAll(); }
-    else if (seg && f === 'min') { b[seg].min = +t.value; renderProfile(); renderTotals(); fillFields(); }
+    if (seg && (f === 'int' || f === 'intHi')) { var raw = String(t.value).trim(); if (f === 'intHi' && raw === '') b[seg].intHi = null; else b[seg][f] = convVal(b, t.dataset.kind, t.value); if (t.dataset.kind === 'zone') renderAll(); else lightRefresh(); }
+    else if (seg && f === 'min') { b[seg].min = +t.value; lightRefresh(); }
     else if (!seg && (f === 'metric' || f === 'unit')) { b[f] = t.value; if (b.unit === 'zone') { if (b.work) b.work.intHi = null; if (b.rec) b.rec.intHi = null; } renderAll(); }
     else if (f === 'reps') { b.reps = +t.value; renderProfile(); renderTotals(); fillFields(); }
     else if (f === 'name') { b.name = t.value; var pl = document.querySelectorAll('#sb-profile .sb-plab')[i]; if (pl) pl.textContent = t.value; }
