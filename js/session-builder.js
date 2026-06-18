@@ -49,7 +49,10 @@
   + '#sb-root .sb-del{width:26px;height:26px;border:none;background:var(--bg-elev,#141a23);color:var(--text-dim,#9aa6b6);border-radius:7px;cursor:pointer;font-size:13px}'
   + '#sb-root .sb-del:hover{color:var(--danger,#f87171)}'
   + '#sb-root .sb-lines{margin-top:9px;display:flex;flex-direction:column;gap:6px}'
-  + '#sb-root .sb-line{display:grid;grid-template-columns:46px 1fr 1fr;gap:10px;align-items:end}'
+  + '#sb-root .sb-line{display:grid;grid-template-columns:46px 0.7fr 1.3fr;gap:10px;align-items:end}'
+  + '#sb-root .sb-range{display:flex;align-items:center;gap:5px}'
+  + '#sb-root .sb-range input{flex:1;min-width:0;text-align:center}'
+  + '#sb-root .sb-dash{color:var(--text-mute,#6b7686);flex:none}'
   + '#sb-root .sb-cmode{display:flex;align-items:center;gap:8px;margin:9px 0 2px;font-size:12px;color:var(--text-dim,#9aa6b6)}'
   + '#sb-root .sb-csel{padding:6px 9px;font-size:12.5px;font-weight:600;color:var(--text,#e7ecf3);background:var(--bg-elev,#141a23);border:1px solid var(--border2,#374256);border-radius:8px}'
   + '#sb-root .sb-role{font-size:11px;color:var(--text-mute,#6b7686);text-transform:uppercase;letter-spacing:.4px}'
@@ -101,14 +104,23 @@
   function pad(n) { return String(n).padStart(2, '0'); }
   function fmtPace(i) { var s = Math.round(paceBase() * 100 / i); return Math.floor(s / 60) + ':' + pad(s % 60); }
   function zIdx(i, m) { var a = ZONES[m].mid, bi = 0, bd = 1e9; a.forEach(function (v, k) { var d = Math.abs(v - i); if (d < bd) { bd = d; bi = k; } }); return bi; }
-  function label(i, m) {
-    if (m === 'power') return Math.round(FTP() * i / 100) + ' W . ' + i + '% FTP . ' + ZONES.power.labels[zIdx(i, 'power')].split(' ')[0];
-    if (m === 'hr') return Math.round(HRMAX() * i / 100) + ' bpm . ' + ZONES.hr.labels[zIdx(i, 'hr')].split(' ')[0];
-    return fmtPace(i) + ' ' + paceUnit() + ' . ' + ZONES.pace.labels[zIdx(i, 'pace')].split(' ')[0];
+  function midOf(s) { return (s.intHi != null && +s.intHi > 0) ? ((+s.int + +s.intHi) / 2) : (+s.int || 0); }
+  function label(seg, m) {
+    var lo = +seg.int || 0, hi = (seg.intHi != null && +seg.intHi > 0) ? +seg.intHi : null;
+    var z = ZONES[m].labels[zIdx(midOf(seg), m)].split(' ')[0];
+    if (hi == null) {
+      if (m === 'power') return Math.round(FTP() * lo / 100) + ' W . ' + lo + '% FTP . ' + z;
+      if (m === 'hr') return Math.round(HRMAX() * lo / 100) + ' bpm . ' + z;
+      return fmtPace(lo) + ' ' + paceUnit() + ' . ' + z;
+    }
+    var a = Math.min(lo, hi), c = Math.max(lo, hi);
+    if (m === 'power') return Math.round(FTP() * a / 100) + '-' + Math.round(FTP() * c / 100) + ' W . ' + a + '-' + c + '% FTP';
+    if (m === 'hr') return Math.round(HRMAX() * a / 100) + '-' + Math.round(HRMAX() * c / 100) + ' bpm';
+    return fmtPace(c) + '-' + fmtPace(a) + ' ' + paceUnit();
   }
   function blockSegs(b) { var o = []; var n = Math.max(1, b.reps | 0); for (var i = 0; i < n; i++) { o.push(b.work); if (b.type === 'interval' && b.rec) o.push(b.rec); } return o; }
   function allSegs() { var o = []; blocks.forEach(function (b) { blockSegs(b).forEach(function (x) { o.push(x); }); }); return o; }
-  function totals() { var dur = 0, tss = 0; allSegs().forEach(function (s) { dur += (+s.min || 0); var f = (+s.int || 0) / 100; tss += ((+s.min || 0) / 60) * f * f * 100; }); return { dur: dur, tss: Math.round(tss) }; }
+  function totals() { var dur = 0, tss = 0; allSegs().forEach(function (s) { dur += (+s.min || 0); var f = midOf(s) / 100; tss += ((+s.min || 0) / 60) * f * f * 100; }); return { dur: dur, tss: Math.round(tss) }; }
   function fmtDur(min) { var h = Math.floor(min / 60), m = Math.round(min % 60); return h ? h + 'h' + pad(m) : m + ' min'; }
 
   function R(id) { return document.getElementById(id); }
@@ -123,13 +135,13 @@
     if (!blocks.length) { wrap.innerHTML = '<div style="margin:auto;color:var(--text-mute,#6b7686);font-size:12.5px;text-align:center">Ajoute un bloc ci-dessous pour construire la seance.</div>'; var ph0 = R('sb-profhint'); if (ph0) ph0.textContent = ''; return; }
     var bmins = blocks.map(function (b) { return blockSegs(b).reduce(function (s, x) { return s + (+x.min || 0); }, 0); });
     var tot = bmins.reduce(function (a, b) { return a + b; }, 0) || 1;
-    var mx = Math.max(120); allSegs().forEach(function (s) { mx = Math.max(mx, +s.int || 0); });
+    var mx = Math.max(120); allSegs().forEach(function (s) { mx = Math.max(mx, midOf(s)); });
     blocks.forEach(function (b, bi) {
       var segs = blockSegs(b), bmin = bmins[bi] || 0;
       var grp = document.createElement('div'); grp.className = 'sb-pblock'; grp.draggable = true; grp.dataset.bi = bi;
       grp.style.flex = Math.max(0.06, bmin / tot); grp.title = (b.name || NAME[b.type]) + ' - ' + fmtDur(bmin);
       var inner = document.createElement('div'); inner.className = 'sb-bars'; var it = bmin || 1;
-      segs.forEach(function (s) { var bar = document.createElement('div'); bar.className = 'sb-bar'; bar.style.flex = Math.max(0.05, (+s.min || 0) / it); bar.style.height = Math.max(8, ((+s.int || 0) / mx) * 100) + '%'; bar.style.background = ZC[zoneOf(+s.int || 0)]; inner.appendChild(bar); });
+      segs.forEach(function (s) { var bar = document.createElement('div'); bar.className = 'sb-bar'; bar.style.flex = Math.max(0.05, (+s.min || 0) / it); bar.style.height = Math.max(8, (midOf(s) / mx) * 100) + '%'; bar.style.background = ZC[zoneOf(midOf(s))]; inner.appendChild(bar); });
       var lab = document.createElement('div'); lab.className = 'sb-plab'; lab.textContent = b.name || NAME[b.type];
       grp.appendChild(inner); grp.appendChild(lab); wrap.appendChild(grp);
     });
@@ -140,12 +152,19 @@
   function metricSel(idx, b) { var o = METRICS[grp()].map(function (a) { return '<option value="' + a[0] + '"' + (b.metric === a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join(''); return '<select class="sb-csel" data-i="' + idx + '" data-f="metric">' + o + '</select>'; }
   function unitSel(idx, b) { var o = [['zone', 'Zones'], ['pct', '%'], ['raw', 'Valeurs']].map(function (a) { return '<option value="' + a[0] + '"' + (b.unit === a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join(''); return '<select class="sb-csel" data-i="' + idx + '" data-f="unit">' + o + '</select>'; }
   function targetInput(idx, which, b) {
-    var seg = b[which]; var base = 'data-i="' + idx + '" data-seg="' + which + '" data-f="int"';
-    if (b.unit === 'zone') { var op = ZONES[b.metric].labels.map(function (l, zi) { return '<option value="' + zi + '"' + (zi === zIdx(seg.int, b.metric) ? ' selected' : '') + '>' + l + '</option>'; }).join(''); return '<select ' + base + ' data-kind="zone">' + op + '</select>'; }
-    if (b.unit === 'pct') return '<input type="number" ' + base + ' data-kind="pct" value="' + seg.int + '">';
-    if (b.metric === 'pace') return '<input type="text" ' + base + ' data-kind="rawpace" value="' + fmtPace(seg.int) + '" placeholder="m:ss">';
-    var raw = b.metric === 'power' ? Math.round(FTP() * seg.int / 100) : Math.round(HRMAX() * seg.int / 100);
-    return '<input type="number" ' + base + ' data-kind="rawnum" value="' + raw + '">';
+    var seg = b[which]; var d = 'data-i="' + idx + '" data-seg="' + which + '"';
+    if (b.unit === 'zone') { var op = ZONES[b.metric].labels.map(function (l, zi) { return '<option value="' + zi + '"' + (zi === zIdx(seg.int, b.metric) ? ' selected' : '') + '>' + l + '</option>'; }).join(''); return '<select ' + d + ' data-f="int" data-kind="zone">' + op + '</select>'; }
+    var kind = b.unit === 'pct' ? 'pct' : (b.metric === 'pace' ? 'rawpace' : 'rawnum');
+    var toRaw = function (i) { return b.metric === 'power' ? Math.round(FTP() * i / 100) : Math.round(HRMAX() * i / 100); };
+    var loVal, hiVal;
+    if (kind === 'pct') { loVal = seg.int; hiVal = (seg.intHi != null && +seg.intHi > 0) ? seg.intHi : ''; }
+    else if (kind === 'rawpace') { loVal = fmtPace(seg.int); hiVal = (seg.intHi != null && +seg.intHi > 0) ? fmtPace(seg.intHi) : ''; }
+    else { loVal = toRaw(seg.int); hiVal = (seg.intHi != null && +seg.intHi > 0) ? toRaw(seg.intHi) : ''; }
+    var typ = (kind === 'rawpace') ? 'text' : 'number';
+    var phLo = (kind === 'rawpace') ? ' placeholder="m:ss"' : '';
+    var lo = '<input type="' + typ + '" ' + d + ' data-f="int" data-kind="' + kind + '" value="' + loVal + '"' + phLo + '>';
+    var hi = '<input type="' + typ + '" ' + d + ' data-f="intHi" data-kind="' + kind + '" value="' + hiVal + '" placeholder="max">';
+    return '<div class="sb-range">' + lo + '<span class="sb-dash">-</span>' + hi + '</div>';
   }
   function line(idx, which, role, b) {
     var seg = b[which];
@@ -153,13 +172,13 @@
       + '<span class="sb-role">' + role + '</span>'
       + '<div><span class="sb-mini">Duree (min)</span><input type="number" min="0" step="0.5" data-i="' + idx + '" data-seg="' + which + '" data-f="min" value="' + seg.min + '"></div>'
       + '<div><span class="sb-mini">Cible</span>' + targetInput(idx, which, b) + '</div>'
-      + '<div class="sb-eq"><span class="sb-eqpill" style="border-left-color:' + ZC[zoneOf(seg.int)] + '"><span class="sb-chip" style="background:' + ZC[zoneOf(seg.int)] + '"></span>' + label(seg.int, b.metric) + '</span></div>'
+      + '<div class="sb-eq"><span class="sb-eqpill" style="border-left-color:' + ZC[zoneOf(midOf(seg))] + '"><span class="sb-chip" style="background:' + ZC[zoneOf(midOf(seg))] + '"></span>' + label(seg, b.metric) + '</span></div>'
       + '</div>';
   }
   function renderBlocks() {
     var wrap = R('sb-blocks'); if (!wrap) return; wrap.innerHTML = '';
     blocks.forEach(function (b, idx) {
-      var el = document.createElement('div'); el.className = 'sb-blk'; el.style.borderLeftColor = ZC[zoneOf(b.work.int)];
+      var el = document.createElement('div'); el.className = 'sb-blk'; el.style.borderLeftColor = ZC[zoneOf(midOf(b.work))];
       var isInt = b.type === 'interval';
       el.innerHTML = '<div class="sb-blk-top">'
         + '<span class="sb-bico">' + (ICO[b.type] || '&#9473;') + '</span>'
@@ -173,19 +192,17 @@
   }
   function renderAll() { normalizeMetrics(); renderBlocks(); renderProfile(); renderTotals(); fillFields(); }
 
-  function applyTarget(seg, b, t) {
-    var k = t.dataset.kind, v = seg.int;
-    if (k === 'pct') v = +t.value;
-    else if (k === 'zone') v = ZONES[b.metric].mid[+t.value];
-    else if (k === 'rawnum') v = b.metric === 'power' ? Math.round((+t.value) / FTP() * 100) : Math.round((+t.value) / HRMAX() * 100);
-    else if (k === 'rawpace') { var p = String(t.value).split(':'); var sec = (+p[0] || 0) * 60 + (+p[1] || 0); v = sec ? Math.round(paceBase() * 100 / sec) : 0; }
-    seg.int = v;
+  function convVal(b, kind, val) {
+    if (kind === 'pct') return +val;
+    if (kind === 'zone') return ZONES[b.metric].mid[+val];
+    if (kind === 'rawpace') { var p = String(val).split(':'); var sec = (+p[0] || 0) * 60 + (+p[1] || 0); return sec ? Math.round(paceBase() * 100 / sec) : 0; }
+    return b.metric === 'power' ? Math.round((+val) / FTP() * 100) : Math.round((+val) / HRMAX() * 100);
   }
   function onEdit(e) {
     var t = e.target, i = t.dataset.i; if (i == null) return; var b = blocks[i], f = t.dataset.f, seg = t.dataset.seg;
-    if (seg && f === 'int') { applyTarget(b[seg], b, t); renderAll(); }
+    if (seg && (f === 'int' || f === 'intHi')) { var raw = String(t.value).trim(); if (f === 'intHi' && raw === '') b[seg].intHi = null; else b[seg][f] = convVal(b, t.dataset.kind, t.value); renderAll(); }
     else if (seg && f === 'min') { b[seg].min = +t.value; renderProfile(); renderTotals(); fillFields(); }
-    else if (!seg && (f === 'metric' || f === 'unit')) { b[f] = t.value; renderAll(); }
+    else if (!seg && (f === 'metric' || f === 'unit')) { b[f] = t.value; if (b.unit === 'zone') { if (b.work) b.work.intHi = null; if (b.rec) b.rec.intHi = null; } renderAll(); }
     else if (f === 'reps') { b.reps = +t.value; renderProfile(); renderTotals(); fillFields(); }
     else if (f === 'name') { b.name = t.value; var pl = document.querySelectorAll('#sb-profile .sb-plab')[i]; if (pl) pl.textContent = t.value; }
   }
