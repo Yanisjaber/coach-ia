@@ -3242,8 +3242,21 @@ window.gpxDeleteTraining = async function(id, mode, sbId) {
   if (window.cloudSync && window.cloudSync.deleteTraining) {
     try { await window.cloudSync.deleteTraining({ mode, _sbId: effSbId, id: (t && t.id) || id }); } catch (_) {}
   }
+  // Retire l'activité de DASHBOARD_DATA en mémoire pour qu'elle disparaisse IMMÉDIATEMENT
+  // (sinon le prochain rebuild la réaffiche jusqu'au refresh).
+  if (window.DASHBOARD_DATA && window.DASHBOARD_DATA.days) {
+    for (const d of window.DASHBOARD_DATA.days) {
+      if (!d.activities) continue;
+      d.activities = d.activities.filter(x => !(
+        (effSbId && String(x._sbId) === String(effSbId)) ||
+        (id && String(x.client_id) === String(id)) ||
+        (id && String(x.id) === String(id))
+      ));
+    }
+  }
   if (typeof closeSessionModal === 'function') closeSessionModal();
-  if (typeof renderCalendar === 'function') renderCalendar();
+  if (typeof window.__applyOverridesAndRerender === 'function') window.__applyOverridesAndRerender();
+  else if (typeof renderCalendar === 'function') renderCalendar();
 };
 
 const openTrainBtn = document.getElementById('open-train-modal');
