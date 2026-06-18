@@ -2983,12 +2983,14 @@ function openTrainModal(mode) {
   if (titleEl) titleEl.textContent = (trainModalMode === 'realise')
     ? 'Ajouter un entraînement réalisé'
     : 'Ajouter un entraînement prévu';
+  const _rpeLab = document.getElementById('train-modal-rpe-label');
+  if (_rpeLab) _rpeLab.textContent = (trainModalMode === 'realise') ? 'RPE ressenti (1-10)' : 'RPE estimé (1-10)';
   const saveBtn = document.getElementById('train-modal-save');
   if (saveBtn) saveBtn.textContent = 'Enregistrer';
   // Poubelle cachée par défaut (visible seulement en édition)
   const delBtn = document.getElementById('train-modal-delete');
   if (delBtn) delBtn.hidden = true;
-  ['name','date','duration','tss','notes'].forEach(k => {
+  ['name','date','duration','tss','notes','rpe','km','dplus'].forEach(k => {
     const el = document.getElementById('train-modal-' + k);
     if (el) el.value = '';
   });
@@ -3042,6 +3044,9 @@ function openTrainModalForEdit(training, mode) {
   document.getElementById('train-modal-duration').value = training.duration != null ? training.duration : '';
   document.getElementById('train-modal-tss').value = training.tss != null ? training.tss : '';
   document.getElementById('train-modal-notes').value = training.notes || '';
+  document.getElementById('train-modal-rpe').value = training.rpe != null ? training.rpe : '';
+  document.getElementById('train-modal-km').value = training.km != null ? training.km : '';
+  document.getElementById('train-modal-dplus').value = training.dplus != null ? training.dplus : '';
   // Charger la structure si présente (mode édition)
   if (typeof window.setWorkoutStructure === 'function') {
     window.setWorkoutStructure(training.structure || []);
@@ -3102,6 +3107,9 @@ function saveTrainFromModal() {
   const duration = parseInt(document.getElementById('train-modal-duration').value, 10) || 0;
   const tss = parseInt(document.getElementById('train-modal-tss').value, 10) || 0;
   const notes = document.getElementById('train-modal-notes').value.trim();
+  const rpe = parseFloat(document.getElementById('train-modal-rpe').value) || null;
+  const km = parseFloat(document.getElementById('train-modal-km').value) || null;
+  const dplus = parseInt(document.getElementById('train-modal-dplus').value, 10) || null;
   const editingId = window._editingTrainId;
   // Structure (intervalles) si activée dans la modal — null sinon
   const structure = (typeof window.getCurrentWorkoutStructure === 'function')
@@ -3110,6 +3118,7 @@ function saveTrainFromModal() {
   const entry = {
     id: editingId || Date.now().toString(),
     name, date, sport, type, duration, tss, notes,
+    rpe, km, dplus,
     mode: trainModalMode,
     structure, // [] | null | [{dur, target, reps}, ...]
   };

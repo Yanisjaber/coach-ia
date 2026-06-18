@@ -204,6 +204,7 @@ async function pullAllFromCloud() {
       name: r.name, date: r.date, sport: r.sport ?? null,
       duration: r.duration ?? 0, tss: r.tss ?? 0, notes: r.notes ?? '', mode: 'prevu',
       structure: r.structure ?? null,
+      rpe: r.rpe ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
       ia: r.created_by_ia === true,
     }));
     localStorage.setItem('coach_ia_trainings_v1', JSON.stringify(prevu));
@@ -442,6 +443,7 @@ export async function pushTraining(training, mode) {
         name: training.name, date: training.date, sport: training.sport ?? null,
         duration: training.duration ?? 0, tss: training.tss ?? 0,
         notes: training.notes ?? '', structure: training.structure ?? null,
+        km: training.km ?? null, d_plus: training.dplus ?? null, rpe: training.rpe ?? null,
         created_by_ia: training.ia === true,
       };
       if (training._sbId) row.id = training._sbId;
@@ -457,6 +459,7 @@ export async function pushTraining(training, mode) {
         name: training.name, start_date_local: training.date + 'T12:00:00', sport: training.sport ?? null,
         moving_time: (training.duration || 0) * 60, tss: training.tss ?? 0,
         user_notes: training.notes ?? null,
+        distance_km: training.km ?? null, course_dplus: training.dplus ?? null, rpe: training.rpe ?? null,
       };
       if (training._sbId) row.id = training._sbId;
       if (!row.id) row.id = await _resolveId('activities', training.id);
