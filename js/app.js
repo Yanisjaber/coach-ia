@@ -2809,6 +2809,44 @@ function _clearAllFieldErrors(modalSel) {
   document.querySelectorAll(`${modalSel} .field-error-msg`).forEach(m => m.remove());
 }
 
+// Compet REALISEE = activite (category='competition') dans DASHBOARD_DATA. Ces helpers
+// mettent a jour DASHBOARD_DATA en memoire pour un affichage IMMEDIAT (edition/suppression).
+function removeCompFromDashboard(comp) {
+  if (!window.DASHBOARD_DATA || !Array.isArray(window.DASHBOARD_DATA.days) || !comp) return;
+  for (const d of window.DASHBOARD_DATA.days) {
+    if (!d.activities) continue;
+    d.activities = d.activities.filter(x => !(
+      (comp._sbId && String(x._sbId) === String(comp._sbId)) ||
+      (comp.id && String(x.client_id) === String(comp.id))
+    ));
+  }
+}
+function upsertCompInDashboard(comp) {
+  if (!window.DASHBOARD_DATA || !Array.isArray(window.DASHBOARD_DATA.days) || !comp || !comp.date) return;
+  const iso = comp.date;
+  const row = {
+    id: comp._sbId || ('local-' + comp.id),
+    _sbId: comp._sbId || null,
+    source: 'manual', category: 'competition', client_id: comp.id,
+    name: comp.name,
+    sport: (typeof getSportCategory === 'function' ? getSportCategory(comp.sport) : comp.sport),
+    raw_type: comp.sport,
+    start_date_local: iso + 'T12:00:00',
+    distance_km: comp.km || null, elevation_gain: comp.dplus || null, course_dplus: comp.dplus || null,
+    target: comp.target || null, moving_time: comp.target ? comp.target * 60 : null,
+    duration: comp.target || 0,
+    priority: comp.priority || null, laps: comp.laps || null,
+    notes: comp.notes || '', type: comp.type || null, event: comp.event || null, tss: 0,
+  };
+  let day = window.DASHBOARD_DATA.days.find(d => String(d.date) === iso);
+  if (!day) { day = { date: iso, activities: [] }; window.DASHBOARD_DATA.days.push(day); }
+  if (!Array.isArray(day.activities)) day.activities = [];
+  day.activities = day.activities.filter(x => !(
+    (comp._sbId && String(x._sbId) === String(comp._sbId)) ||
+    (String(x.client_id) === String(comp.id))
+  ));
+  day.activities.push(row);
+}
 async function saveCompFromModal() {
   _clearAllFieldErrors('#comp-modal');
   const name = document.getElementById('comp-modal-name').value.trim();
@@ -2921,7 +2959,13 @@ async function saveCompFromModal() {
   saveCompetitions(comps);
   closeCompModal();
   renderCompList();
-  renderCalendar();
+  if (newEntry.realised) {
+    upsertCompInDashboard(newEntry);
+    if (typeof window.__applyOverridesAndRerender === 'function') window.__applyOverridesAndRerender();
+    else renderCalendar();
+  } else {
+    renderCalendar();
+  }
 }
 
 // Wire up modal triggers (défensif)
@@ -8847,8 +8891,10 @@ if (_modalDelBtn) {
       if (!ok) return;
       const remaining = loadCompetitions().filter(c => c.id !== compId);
       saveCompetitions(remaining);
+      if (comp) removeCompFromDashboard(comp);
       closeSessionModal();
-      if (typeof renderCalendar === 'function') renderCalendar();
+      if (typeof window.__applyOverridesAndRerender === 'function') window.__applyOverridesAndRerender();
+      else if (typeof renderCalendar === 'function') renderCalendar();
       if (typeof renderCompetitionsPage === 'function') renderCompetitionsPage();
     } else if (kind === 'training') {
       const id = _modalDelBtn.dataset.trainingId;
