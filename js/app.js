@@ -3037,7 +3037,7 @@ function openTrainModal(mode) {
   // Poubelle cachée par défaut (visible seulement en édition)
   const delBtn = document.getElementById('train-modal-delete');
   if (delBtn) delBtn.hidden = true;
-  ['name','date','duration','tss','notes','rpe','km','dplus','laps'].forEach(k => {
+  ['name','date','duration','tss','notes','rpe','km','dplus'].forEach(k => {
     const el = document.getElementById('train-modal-' + k);
     if (el) el.value = '';
   });
@@ -3095,7 +3095,6 @@ function openTrainModalForEdit(training, mode) {
   document.getElementById('train-modal-rpe').value = training.rpe != null ? training.rpe : '';
   document.getElementById('train-modal-km').value = training.km != null ? training.km : '';
   document.getElementById('train-modal-dplus').value = training.dplus != null ? training.dplus : '';
-  document.getElementById('train-modal-laps').value = training.laps != null ? training.laps : '';
   if (window.setTrainGpx) window.setTrainGpx(training.gpxName || null, training.gpxContent || null);
   // Charger la structure si présente (mode édition)
   if (typeof window.setWorkoutStructure === 'function') {
@@ -3160,7 +3159,7 @@ function saveTrainFromModal() {
   const rpe = parseFloat(document.getElementById('train-modal-rpe').value) || null;
   const km = parseFloat(document.getElementById('train-modal-km').value) || null;
   const dplus = parseInt(document.getElementById('train-modal-dplus').value, 10) || null;
-  const laps = parseInt(document.getElementById('train-modal-laps').value, 10) || null;
+  const laps = null; // champ 'nombre de tours' retire des entrainements (garde pour les competitions)
   const _gpx = (window.getTrainGpx ? window.getTrainGpx() : { name: null, content: null });
   const editingId = window._editingTrainId;
   // Structure (intervalles) si activée dans la modal — null sinon
