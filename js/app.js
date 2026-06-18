@@ -1812,7 +1812,7 @@ window.coachGetPlanContext = function () {
           gpx_present: gpxPresent,            // si false → ne PAS inventer le profil du parcours
           distance_km: km,
           denivele_m: dplus,
-          type: next.target || null,
+          type: fmtMinToTime(next.target) || null,
         },
       };
     })() : null,
@@ -2402,6 +2402,26 @@ let stagesData = []; // [{name, date, time, sport, type, km, dplus, target, laps
 let activeStageIdx = 0;
 
 // Champs gérés par les étapes (tout sauf le nom global qui reste partagé)
+// Helpers temps <-> minutes (le "temps cible" compet est desormais stocke en minutes, comme duration)
+function parseTimeToMin(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number') return Math.round(v);
+  var s = String(v).trim().toLowerCase();
+  if (/^\d+(\.\d+)?$/.test(s)) return Math.round(+s);
+  var m = s.match(/(\d+)\s*[h:]\s*(\d{0,2})/);
+  if (m) return (+m[1]) * 60 + (m[2] ? +m[2] : 0);
+  var m2 = s.match(/(\d+)\s*min/);
+  if (m2) return +m2[1];
+  var n = parseInt(s, 10);
+  return isNaN(n) ? null : n;
+}
+function fmtMinToTime(min) {
+  if (min == null || min === '') return '';
+  min = Math.round(+min);
+  if (isNaN(min) || min <= 0) return '';
+  var h = Math.floor(min / 60), m = min % 60;
+  return h > 0 ? (h + 'h' + String(m).padStart(2, '0')) : (m + ' min');
+}
 const STAGE_FIELDS = ['date','time','type','km','dplus','target','laps','notes','sport','priority','gpx'];
 
 // Priority et Sport sont GLOBAUX à la compé (ne changent pas par étape)
@@ -2413,7 +2433,7 @@ function readFormToStage() {
   stage.type = document.getElementById('comp-modal-type').value || '';
   stage.km = document.getElementById('comp-modal-km').value || '';
   stage.dplus = document.getElementById('comp-modal-dplus').value || '';
-  stage.target = document.getElementById('comp-modal-target').value || '';
+  stage.target = parseTimeToMin(document.getElementById('comp-modal-target').value);
   stage.laps = document.getElementById('comp-modal-laps').value || '';
   stage.notes = document.getElementById('comp-modal-notes').value || '';
   const gpxInput = document.getElementById('comp-modal-gpx');
@@ -2450,7 +2470,7 @@ function writeStageToForm(stage) {
   }
   document.getElementById('comp-modal-km').value = effKm || '';
   document.getElementById('comp-modal-dplus').value = effDplus || '';
-  document.getElementById('comp-modal-target').value = stage.target || '';
+  document.getElementById('comp-modal-target').value = fmtMinToTime(stage.target);
   document.getElementById('comp-modal-laps').value = stage.laps || '';
   document.getElementById('comp-modal-notes').value = stage.notes || '';
   // Time stepper
@@ -2781,7 +2801,7 @@ async function saveCompFromModal() {
   const typeEpr = document.getElementById('comp-modal-type').value.trim();
   const km = parseFloat(document.getElementById('comp-modal-km').value) || null;
   const dplus = parseInt(document.getElementById('comp-modal-dplus').value, 10) || null;
-  const target = document.getElementById('comp-modal-target').value.trim();
+  const target = parseTimeToMin(document.getElementById('comp-modal-target').value);
   const laps = parseInt(document.getElementById('comp-modal-laps').value, 10) || null;
   const notes = document.getElementById('comp-modal-notes').value.trim();
   const stagesEl = document.getElementById('comp-modal-stages-toggle');
@@ -3398,12 +3418,9 @@ function renderWeekPlan() {
           // (on garde un fallback de 120 min en interne pour le calcul TSS)
           let raceDur = null;
           let raceDurForTss = 120;
-          if (c.target) {
-            const m = c.target.match(/(\d+)\s*h\s*(\d{0,2})/i);
-            if (m) {
-              raceDur = parseInt(m[1], 10) * 60 + (parseInt(m[2], 10) || 0);
-              raceDurForTss = raceDur;
-            }
+          {
+            const _rm = parseTimeToMin(c.target);
+            if (_rm) { raceDur = _rm; raceDurForTss = _rm; }
           }
           const raceTss = Math.round(raceDurForTss * 1.0);
           let raceName, stageInfo = '';
@@ -7729,11 +7746,7 @@ function openSessionModal(iso, source) {
       metaEl.innerHTML = `${_dateStr}${timeStr}${sportPill}`;
 
       // Parse target → minutes
-      let raceMinutes = null;
-      if (c.target) {
-        const m = c.target.match(/(\d+)\s*h\s*(\d{0,2})/i);
-        if (m) raceMinutes = parseInt(m[1], 10) * 60 + (parseInt(m[2], 10) || 0);
-      }
+      let raceMinutes = parseTimeToMin(c.target);
 
       // Calcule l'allure si km + target dispo (adapté au sport)
       let allure = null, allureLabel = 'Allure';
@@ -7792,7 +7805,7 @@ function openSessionModal(iso, source) {
       // Ordre demandé : Temps cible → Distance → Dénivelé → Allure
       // Type d'épreuve en titre texte. Tours en complément.
       const cards = [];
-      if (c.target) cards.push({ label: 'Temps cible', value: c.target, unit: '' });
+      if (c.target != null && c.target !== '') cards.push({ label: 'Temps cible', value: fmtMinToTime(c.target), unit: '' });
       if (effectiveKm != null) cards.push({ label: 'Distance', value: effectiveKm, unit: 'km' });
       // Si GPX → D+ visible dans la barre stats du profil → on ne le montre pas en gros
       if (effectiveDplus != null && !gpxStats) cards.push({ label: 'Dénivelé +', value: effectiveDplus, unit: 'm' });
@@ -8623,7 +8636,7 @@ function openCompModalForEdit(comp) {
   }
   document.getElementById('comp-modal-km').value = effKm != null ? effKm : '';
   document.getElementById('comp-modal-dplus').value = effDplus != null ? effDplus : '';
-  document.getElementById('comp-modal-target').value = comp.target || '';
+  document.getElementById('comp-modal-target').value = fmtMinToTime(comp.target);
   document.getElementById('comp-modal-laps').value = comp.laps != null ? comp.laps : '';
   document.getElementById('comp-modal-notes').value = comp.notes || '';
   // Toggle stages + remplissage stagesData si applicable
@@ -8637,7 +8650,7 @@ function openCompModalForEdit(comp) {
         type: s.type || '',
         km: s.km != null ? String(s.km) : '',
         dplus: s.dplus != null ? String(s.dplus) : '',
-        target: s.target || '',
+        target: s.target != null ? s.target : null,
         laps: s.laps != null ? String(s.laps) : '',
         notes: s.notes || '',
         gpxName: s.gpxName || null,

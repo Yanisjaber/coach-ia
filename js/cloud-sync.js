@@ -65,6 +65,27 @@ function uid() {
   return _currentUser ? _currentUser.id : null;
 }
 function isAuthed() { return !!_currentUser && !!window.sb; }
+// Helpers temps <-> minutes (le "temps cible" compet est desormais stocke en minutes, comme duration)
+function parseTimeToMin(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number') return Math.round(v);
+  var s = String(v).trim().toLowerCase();
+  if (/^\d+(\.\d+)?$/.test(s)) return Math.round(+s);
+  var m = s.match(/(\d+)\s*[h:]\s*(\d{0,2})/);
+  if (m) return (+m[1]) * 60 + (m[2] ? +m[2] : 0);
+  var m2 = s.match(/(\d+)\s*min/);
+  if (m2) return +m2[1];
+  var n = parseInt(s, 10);
+  return isNaN(n) ? null : n;
+}
+function fmtMinToTime(min) {
+  if (min == null || min === '') return '';
+  min = Math.round(+min);
+  if (isNaN(min) || min <= 0) return '';
+  var h = Math.floor(min / 60), m = min % 60;
+  return h > 0 ? (h + 'h' + String(m).padStart(2, '0')) : (m + ' min');
+}
+
 
 // Mode coach « lecture seule » : quand on consulte les données d'un AUTRE
 // athlète, toute écriture cloud est bloquée (on ne modifie jamais les données
@@ -177,10 +198,10 @@ async function pullAllFromCloud() {
       id: r.client_id || r.id, _sbId: r.id, _table: 'competition',
       name: r.name, date: r.date, sport: r.sport ?? null,
       priority: r.priority ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
-      target: r.target ?? null, laps: r.laps ?? null, notes: r.notes ?? null,
+      target: (r.duration != null ? r.duration : parseTimeToMin(r.target)), laps: r.laps ?? null, notes: r.notes ?? null,
       gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null,
       stages: Array.isArray(r.stages) && r.stages.length > 0,
-      stagesList: Array.isArray(r.stages) ? r.stages : null,
+      stagesList: Array.isArray(r.stages) ? r.stages.map(function (st) { return Object.assign({}, st, { target: parseTimeToMin(st.target) }); }) : null,
       activityIds: r.activity_ids ?? null,
     });
     const { data: pc } = await sb.from('activity_planned').select('*').eq('user_id', userId).eq('category', 'competition');
@@ -188,10 +209,10 @@ async function pullAllFromCloud() {
       id: r.client_id || r.id, _sbId: r.id, _table: 'planned',
       name: r.name, date: r.date, sport: r.sport ?? null,
       priority: r.priority ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
-      target: r.target ?? null, laps: r.laps ?? null, notes: r.notes ?? null,
+      target: (r.duration != null ? r.duration : parseTimeToMin(r.target)), laps: r.laps ?? null, notes: r.notes ?? null,
       gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null,
       stages: Array.isArray(r.stages) && r.stages.length > 0,
-      stagesList: Array.isArray(r.stages) ? r.stages : null,
+      stagesList: Array.isArray(r.stages) ? r.stages.map(function (st) { return Object.assign({}, st, { target: parseTimeToMin(st.target) }); }) : null,
     });
     localStorage.setItem('coach_ia_competitions_v1', JSON.stringify(comps));
   } catch (e) { console.warn('[pull comps]', e); }
@@ -383,7 +404,7 @@ export async function pushCompetition(comp) {
         user_id: uid(), client_id: comp.id, category: 'competition',
         name: comp.name, date: comp.date, sport: comp.sport ?? null,
         priority: comp.priority ?? null, km: comp.km ?? null, d_plus: comp.dplus ?? null,
-        target: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
+        duration: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
         gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
         stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
         event: comp.event ?? null,
@@ -400,7 +421,7 @@ export async function pushCompetition(comp) {
         user_id: uid(), client_id: comp.id,
         name: comp.name, date: comp.date, sport: comp.sport ?? null,
         priority: comp.priority ?? null, km: comp.km ?? null, d_plus: comp.dplus ?? null,
-        target: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
+        duration: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
         gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
         stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
         activity_ids: comp.activityIds ?? [],
