@@ -3839,9 +3839,17 @@ function renderRealiseCalendar() {
         // Si on a des manuels et pas de realDay Strava, on en crée un virtuel
         // Si on a déjà un realDay Strava, on merge les activités manuelles dedans
         if (manualRealised.length > 0) {
+          // Clone pour NE PAS muter l'objet partage de `data` (sinon les seances
+          // manuelles s'accumulent a chaque rendu -> doublons).
           if (!realDay) realDay = { date: iso, activities: [], sessionType: 'autre' };
-          if (!realDay.activities) realDay.activities = [];
+          else realDay = { ...realDay, activities: [...(realDay.activities || [])] };
           for (const m of manualRealised) {
+            // Dedoublonnage : si la meme seance est deja presente via DASHBOARD_DATA (DB),
+            // on retire la version DB et on garde la version locale (valeurs a jour).
+            realDay.activities = realDay.activities.filter(x => x._manual || !(
+              (m._sbId && String(x._sbId) === String(m._sbId)) ||
+              (m.id && String(x.client_id) === String(m.id))
+            ));
             // Le sport peut être un raw_type Strava (Ride, WeightTraining...) OU une catégorie
             const sportVal = m.sport || 'autre';
             realDay.activities.push({
