@@ -7723,6 +7723,7 @@ function openSessionModal(iso, source) {
         }
         const syntheseHTML = section('Synthèse', [
           card('Durée', dur < 60 ? `${Math.round(dur)}<span style="font-size:14px;"> min</span>` : `${h}<span style="font-size:14px;">h</span>${m}`, '', elapsedSub),
+          (act.category === 'competition' && act.target != null && act.target !== '') && card('Temps cible', fmtMinToTime(act.target), ''),
           _distKm && card('Distance', _distKm, 'km'),
           _dplusM && card('Dénivelé +', _dplusM, 'm',
             act.elevation_loss ? `D− ${act.elevation_loss} m` : ''),
