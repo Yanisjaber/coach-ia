@@ -3263,9 +3263,39 @@ window.coachCalendarMode = function () {
 };
 
 // Helpers globaux pour edit/delete depuis n'importe où
+// Reconstruit un objet "entrainement" depuis DASHBOARD_DATA (pour editer une seance
+// presente en base mais pas dans le localStorage de ce navigateur).
+function buildTrainingFromData(id) {
+  if (!Array.isArray(data)) return null;
+  for (const d of data) {
+    for (const x of (d.activities || [])) {
+      if (String(x._manualId) === String(id) || String(x.client_id) === String(id) || String(x.id) === String(id)) {
+        return {
+          id: x._manualId || x.client_id || x.id,
+          _sbId: x._sbId || null,
+          name: x.name || '',
+          date: (x.start_date_local ? String(x.start_date_local).slice(0, 10) : toIsoDate(d.date)),
+          sport: x.raw_type || x.sport || 'Ride',
+          type: x.type || '',
+          duration: x.duration || 0,
+          tss: x.tss || 0,
+          notes: x.notes || '',
+          km: (x.distance_km != null ? x.distance_km : null),
+          dplus: (x.elevation_gain != null ? x.elevation_gain : null),
+          rpe: (x.rpe != null ? x.rpe : null),
+          laps: (x.laps != null ? x.laps : null),
+          structure: x.structure || null,
+          mode: 'realise',
+        };
+      }
+    }
+  }
+  return null;
+}
 window.gpxEditTraining = function(id, mode) {
   const arr = mode === 'realise' ? loadRealisedTrainings() : loadTrainings();
-  const t = arr.find(x => x.id === id);
+  let t = arr.find(x => x.id === id);
+  if (!t) t = buildTrainingFromData(id); // pas de copie locale -> reconstruit depuis la base
   if (t && typeof openTrainModalForEdit === 'function') openTrainModalForEdit(t, mode);
 };
 window.gpxDeleteTraining = async function(id, mode, sbId) {
@@ -7481,22 +7511,13 @@ function openSessionModal(iso, source) {
         const _delBtn2 = document.getElementById('modal-delete-btn');
         if (act._manual) {
           const _lsId = act._manualId || act.client_id || act.id;
-          // Copie locale presente dans ce navigateur ? -> edition complete ; sinon -> overrides.
-          const _hasTwin = (typeof loadRealisedTrainings === 'function') &&
-            loadRealisedTrainings().some(x => String(x.id) === String(_lsId) || (act._sbId && x._sbId === act._sbId));
+          // Entrainement manuel : TOUJOURS la modale complete (tous les champs + structure).
+          // Si pas de copie locale, gpxEditTraining reconstruit la seance depuis la base.
           if (_editBtn2) {
             _editBtn2.hidden = false;
-            if (_hasTwin) {
-              _editBtn2.dataset.kind = 'training';
-              _editBtn2.dataset.trainingId = _lsId;
-              _editBtn2.dataset.trainingMode = 'realise';
-            } else {
-              // Pas de copie locale (seance rechargee depuis la base) : on edite via le
-              // calque d'overrides, qui fonctionne toujours (au lieu de fermer la modale).
-              _editBtn2.dataset.kind = 'strava-edit';
-              _editBtn2.dataset.activityId = String(act.id || act.activityId || '');
-              _editBtn2.dataset.iso = iso;
-            }
+            _editBtn2.dataset.kind = 'training';
+            _editBtn2.dataset.trainingId = _lsId;
+            _editBtn2.dataset.trainingMode = 'realise';
           }
           if (_delBtn2) {
             _delBtn2.hidden = false;
