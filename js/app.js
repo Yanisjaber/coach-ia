@@ -7568,7 +7568,10 @@ function openSessionModal(iso, source) {
         const dur = act.duration || 0;
         const h = Math.floor(dur / 60);
         const m = (dur % 60).toString().padStart(2, '0');
-        titleEl.innerHTML = `${act.name || act.sessionName || 'Séance'}`;
+        // Compétition : meme look que la fiche prevu (trophee + couleur de priorite).
+        titleEl.innerHTML = (act.category === 'competition')
+          ? `${trophySvg(compPrio(act.priority).color, 18)} ${act.name || 'Compétition'}`
+          : `${act.name || act.sessionName || 'Séance'}`;
         // Nom de sport Strava exact + clé couleur pour la pill
         const sportLabel = window.activitySportLabel(act);
         const sportCat = window.activitySportColorKey ? window.activitySportColorKey(act) : 'autre';
