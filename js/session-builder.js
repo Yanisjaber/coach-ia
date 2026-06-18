@@ -283,6 +283,29 @@
   // -------- override des 3 fonctions pivot (mode prevu) --------
   // Nouvel editeur utilise pour les DEUX modes (prevu et realise) : remplace l'ancien
   // builder partout. L'ancien reste charge mais n'est plus affiche.
+  // Rendu LECTURE SEULE du profil depuis un tableau de blocs (pour les fiches detail).
+  // Reutilise blockSegs / midOf / zoneOf / NAME / fmtDur. Couleurs en dur (hors #sb-root).
+  window.renderWorkoutProfileHTML = function (blks) {
+    if (!Array.isArray(blks) || !blks.length) return '';
+    var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
+    var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var bmins = blks.map(function (b) { return blockSegs(b).reduce(function (a, x) { return a + (+x.min || 0); }, 0); });
+    var tot = bmins.reduce(function (a, b) { return a + b; }, 0) || 1;
+    var mx = 120; blks.forEach(function (b) { blockSegs(b).forEach(function (s) { mx = Math.max(mx, midOf(s)); }); });
+    var html = '<div style="background:var(--bg-elev2,#1b2230);border:1px solid var(--border,#2a3444);border-radius:12px;padding:12px;display:flex;align-items:stretch;gap:2px;height:140px;overflow:hidden">';
+    blks.forEach(function (b, bi) {
+      var segs = blockSegs(b), bmin = bmins[bi] || 0, it = bmin || 1;
+      html += '<div title="' + esc((b.name || NAME[b.type] || '') + ' - ' + fmtDur(bmin)) + '" style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(0.06, bmin / tot) + '">';
+      html += '<div style="flex:1;display:flex;align-items:flex-end;gap:0;min-height:0">';
+      segs.forEach(function (s) {
+        var hgt = Math.max(8, (midOf(s) / mx) * 100);
+        html += '<div style="flex:' + Math.max(0.05, (+s.min || 0) / it) + ';height:' + hgt + '%;background:' + ZHEX[zoneOf(midOf(s))] + ';border-radius:2px 2px 0 0;min-width:1px;opacity:.95"></div>';
+      });
+      html += '</div><div style="height:15px;line-height:15px;font-size:9px;color:var(--text-mute,#6b7686);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px">' + esc(b.name || NAME[b.type] || '') + '</div></div>';
+    });
+    html += '</div>';
+    return html;
+  };
   window.getCurrentWorkoutStructure = function () { return getBlocks(); };
   window.setWorkoutStructure = function (s) { showSection(); setBlocks(s); };
   window.resetWorkoutStructure = function () { showSection(); reset(); };

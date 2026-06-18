@@ -3838,6 +3838,7 @@ function renderRealiseCalendar() {
               laps: (m.laps != null ? m.laps : null),
               gpxName: m.gpxName || null,
               gpxContent: m.gpxContent || null,
+              structure: m.structure || null,
               _manual: true,
               _manualId: m.id, // id pour edit/delete depuis la modal
               notes: m.notes || '',
@@ -7478,6 +7479,16 @@ function openSessionModal(iso, source) {
         // Fallbacks de cles : Strava (distance_km / elevation_gain) ou saisie manuelle (km / dplus).
         const _distKm = act.distance_km || act.km;
         const _dplusM = act.elevation_gain || act.total_elevation_gain || act.dplus;
+        // Allure (course/natation) ou vitesse (cyclisme) calculee depuis distance + duree,
+        // si Strava ne fournit pas deja la vitesse moyenne.
+        let _allureCard = '';
+        if (_distKm && dur && !act.avg_speed_kmh) {
+          const _cat = (typeof getSportCategory === 'function') ? getSportCategory(act.raw_type || act.sport_raw || act.sport || '') : 'cyclisme';
+          const _fmtPace = (secPer) => Math.floor(secPer / 60) + ':' + String(Math.round(secPer % 60)).padStart(2, '0');
+          if (_cat === 'course') _allureCard = card('Allure', _fmtPace((dur * 60) / _distKm), '/km');
+          else if (_cat === 'natation') _allureCard = card('Allure', _fmtPace((dur * 60) / (_distKm * 10)), '/100m');
+          else _allureCard = card('Vitesse moy', (+(_distKm / (dur / 60)).toFixed(1)), 'km/h');
+        }
         const syntheseHTML = section('Synthèse', [
           card('Durée', dur < 60 ? `${Math.round(dur)}<span style="font-size:14px;"> min</span>` : `${h}<span style="font-size:14px;">h</span>${m}`, '', elapsedSub),
           _distKm && card('Distance', _distKm, 'km'),
@@ -7485,6 +7496,7 @@ function openSessionModal(iso, source) {
             act.elevation_loss ? `D− ${act.elevation_loss} m` : ''),
           act.avg_speed_kmh && card('Vitesse moy', act.avg_speed_kmh, 'km/h',
             vMaxToShow ? `Max ${vMaxToShow} km/h` : ''),
+          _allureCard,
           act.tss && card('TSS', act.tss, ''),
           act.rpe && card('RPE', act.rpe, '/10'),
           act.laps && card('Tours', act.laps, ''),
@@ -7525,6 +7537,10 @@ function openSessionModal(iso, source) {
           <div style="font-size:11px;color:var(--text-mute);margin-top:6px;">ID activité : <code>${stravaId}</code></div>
         ` : '';
 
+        const _struct = act.structure;
+        const profileHTML = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutProfileHTML === 'function')
+          ? `<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(_struct)}</div>`
+          : '';
         bodyEl.innerHTML = `
           ${switchHTML}
           ${syntheseHTML}
@@ -7533,6 +7549,7 @@ function openSessionModal(iso, source) {
           ${cardioHTML}
           ${mouvementHTML}
           ${zonesHTML}
+          ${profileHTML}
           <div class="modal-section">
             <div class="modal-section-title">Graphique</div>
             <div id="streams-section"></div>
@@ -8213,6 +8230,9 @@ function openSessionModal(iso, source) {
       if (t.type) cards.push({ label: 'Type', value: t.type, unit: '', isText: true });
 
       const sections = [];
+      if (Array.isArray(t.structure) && t.structure.length && typeof window.renderWorkoutProfileHTML === 'function') {
+        sections.push(`<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(t.structure)}</div>`);
+      }
       if (t.notes) {
         sections.push(`<div class="modal-section">
           <div class="modal-section-title">Notes / Structure</div>
