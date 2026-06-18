@@ -73,7 +73,7 @@
   // -------- config depuis le profil --------
   function FTP() { try { var a = window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete; return (a && +a.ftp) || 250; } catch (e) { return 250; } }
   function HRMAX() { try { var a = window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete; return (a && (+a.hr_max || +a.hrMax)) || 190; } catch (e) { return 190; } }
-  var PACEBASE = 300;
+  var PACE = { course: { base: 240, unit: '/km' }, natation: { base: 100, unit: '/100m' } };
   var ZC = ['var(--z1)', 'var(--z2)', 'var(--z3)', 'var(--z4)', 'var(--z5)', 'var(--z6)'];
   function zoneOf(p) { if (p < 60) return 0; if (p < 76) return 1; if (p < 90) return 2; if (p < 105) return 3; if (p < 120) return 4; return 5; }
   var ICO = { warmup: '&#9650;', interval: '&#9889;', steady: '&#9473;', recovery: '&#9176;', cooldown: '&#9660;' };
@@ -84,20 +84,25 @@
     hr: { labels: ['Z1 Recup', 'Z2 Aerobie', 'Z3 Tempo', 'Z4 Seuil', 'Z5 VO2max'], mid: [60, 70, 82, 93, 102] },
     pace: { labels: ['Z1 Footing', 'Z2 Endurance', 'Z3 Marathon', 'Z4 Seuil', 'Z5 VO2max'], mid: [70, 80, 90, 100, 112] }
   };
-  var SPORT_METRIC = { Ride: 'power', VirtualRide: 'power', cyclisme: 'power', Run: 'pace', course: 'pace', Swim: 'pace', natation: 'pace' };
+  var SPORT_GROUP = { Ride: 'cyclisme', VirtualRide: 'cyclisme', MountainBikeRide: 'cyclisme', GravelRide: 'cyclisme', EBikeRide: 'cyclisme', EMountainBikeRide: 'cyclisme', cyclisme: 'cyclisme', Run: 'course', TrailRun: 'course', VirtualRun: 'course', course: 'course', Swim: 'natation', OpenWaterSwim: 'natation', natation: 'natation' };
+  var METRICS = { cyclisme: [['power', 'Puissance'], ['hr', 'FC']], course: [['pace', 'Allure'], ['hr', 'FC']], natation: [['pace', 'Allure'], ['hr', 'FC']] };
+  function grp() { var s = document.getElementById('train-modal-sport'); return (s && SPORT_GROUP[s.value]) || 'cyclisme'; }
+  function paceBase() { var g = grp(); return (PACE[g] && PACE[g].base) || 240; }
+  function paceUnit() { var g = grp(); return (PACE[g] && PACE[g].unit) || '/km'; }
+  function normalizeMetrics() { var gm = METRICS[grp()].map(function (a) { return a[0]; }); blocks.forEach(function (b) { [b.work, b.rec].forEach(function (seg) { if (seg && gm.indexOf(seg.metric) < 0) seg.metric = gm[0]; }); }); }
 
   function defaults() { return []; } // demarre vide : l'utilisateur ajoute ses blocs
   var blocks = defaults();
   var mounted = false;
 
-  function curMetric() { var s = document.getElementById('train-modal-sport'); return (s && SPORT_METRIC[s.value]) || 'power'; }
+  function curMetric() { return METRICS[grp()][0][0]; }
   function pad(n) { return String(n).padStart(2, '0'); }
-  function fmtPace(i) { var s = Math.round(PACEBASE * 100 / i); return Math.floor(s / 60) + ':' + pad(s % 60); }
+  function fmtPace(i) { var s = Math.round(paceBase() * 100 / i); return Math.floor(s / 60) + ':' + pad(s % 60); }
   function zIdx(i, m) { var a = ZONES[m].mid, bi = 0, bd = 1e9; a.forEach(function (v, k) { var d = Math.abs(v - i); if (d < bd) { bd = d; bi = k; } }); return bi; }
   function label(i, m) {
     if (m === 'power') return Math.round(FTP() * i / 100) + ' W . ' + i + '% FTP . ' + ZONES.power.labels[zIdx(i, 'power')].split(' ')[0];
     if (m === 'hr') return Math.round(HRMAX() * i / 100) + ' bpm . ' + ZONES.hr.labels[zIdx(i, 'hr')].split(' ')[0];
-    return fmtPace(i) + ' /km . ' + ZONES.pace.labels[zIdx(i, 'pace')].split(' ')[0];
+    return fmtPace(i) + ' ' + paceUnit() + ' . ' + ZONES.pace.labels[zIdx(i, 'pace')].split(' ')[0];
   }
   function blockSegs(b) { var o = []; var n = Math.max(1, b.reps | 0); for (var i = 0; i < n; i++) { o.push(b.work); if (b.type === 'interval' && b.rec) o.push(b.rec); } return o; }
   function allSegs() { var o = []; blocks.forEach(function (b) { blockSegs(b).forEach(function (x) { o.push(x); }); }); return o; }
@@ -130,7 +135,7 @@
   }
   function renderTotals() { var t = totals(); var a = R('sb-tdur'); if (a) a.textContent = fmtDur(t.dur); var b = R('sb-ttss'); if (b) b.textContent = t.tss; }
 
-  function metricSel(i, w, s) { var o = [['power', 'Puissance'], ['hr', 'FC'], ['pace', 'Allure']].map(function (a) { return '<option value="' + a[0] + '"' + (s.metric === a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join(''); return '<select data-i="' + i + '" data-seg="' + w + '" data-f="metric">' + o + '</select>'; }
+  function metricSel(i, w, s) { var o = METRICS[grp()].map(function (a) { return '<option value="' + a[0] + '"' + (s.metric === a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join(''); return '<select data-i="' + i + '" data-seg="' + w + '" data-f="metric">' + o + '</select>'; }
   function unitSel(i, w, s) { var o = [['zone', 'Zones'], ['pct', '%'], ['raw', 'Valeurs']].map(function (a) { return '<option value="' + a[0] + '"' + (s.unit === a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join(''); return '<select data-i="' + i + '" data-seg="' + w + '" data-f="unit">' + o + '</select>'; }
   function targetInput(i, w, s) {
     var base = 'data-i="' + i + '" data-seg="' + w + '" data-f="int"';
@@ -164,14 +169,14 @@
       wrap.appendChild(el);
     });
   }
-  function renderAll() { renderBlocks(); renderProfile(); renderTotals(); fillFields(); }
+  function renderAll() { normalizeMetrics(); renderBlocks(); renderProfile(); renderTotals(); fillFields(); }
 
   function applyTarget(seg, t) {
     var k = t.dataset.kind, v = seg.int;
     if (k === 'pct') v = +t.value;
     else if (k === 'zone') v = ZONES[seg.metric].mid[+t.value];
     else if (k === 'rawnum') v = seg.metric === 'power' ? Math.round((+t.value) / FTP() * 100) : Math.round((+t.value) / HRMAX() * 100);
-    else if (k === 'rawpace') { var p = String(t.value).split(':'); var sec = (+p[0] || 0) * 60 + (+p[1] || 0); v = sec ? Math.round(PACEBASE * 100 / sec) : 0; }
+    else if (k === 'rawpace') { var p = String(t.value).split(':'); var sec = (+p[0] || 0) * 60 + (+p[1] || 0); v = sec ? Math.round(paceBase() * 100 / sec) : 0; }
     seg.int = v;
   }
   function onEdit(e) {
@@ -203,6 +208,7 @@
   function wire() {
     var rootEl = R('sb-root'); if (!rootEl) return;
     var tg = R('sb-toggle'); if (tg) tg.addEventListener('change', function () { setActive(tg.checked); });
+    var sp = document.getElementById('train-modal-sport'); if (sp) sp.addEventListener('change', function () { normalizeMetrics(); renderAll(); });
     var bl = R('sb-blocks');
     bl.addEventListener('input', onEdit);
     bl.addEventListener('change', function (e) { var f = e.target.dataset.f; if (f === 'metric' || f === 'unit' || e.target.dataset.kind === 'zone') onEdit(e); });
