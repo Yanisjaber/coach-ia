@@ -124,6 +124,12 @@ function applyActivityEditsToDays(days) {
   let anyTss = false;
   for (const d of days) {
     if (!d.activities || !d.activities.length) continue;
+    // Activites Strava masquees (poubelle "masquer") : on les retire completement
+    // -> elles disparaissent de l'affichage ET des stats/charge (TSS + CTL/ATL recalcules sans elles).
+    d.activities = d.activities.filter(a => {
+      const ovh = overrides[String(a.id)];
+      return !(ovh && ovh.hidden);
+    });
     for (const a of d.activities) {
       const ov = overrides[String(a.id)];
       if (!ov) continue;
@@ -147,6 +153,10 @@ function applyActivityEditsToDays(days) {
     if (main) {
       d.sessionName = main.name; d.sessionType = main.type; d.sport = main.sport;
       d.np = main.np || 0; d.avgW = main.avg_watts || 0; d.hr = main.hr || 0; d.ftpPct = main.ftpPct || 0;
+    } else {
+      // Plus aucune activite (toutes masquees) : on vide le resume du jour.
+      d.sessionName = ''; d.sessionType = null;
+      d.np = 0; d.avgW = 0; d.hr = 0; d.ftpPct = 0;
     }
   }
   // Recalcul PMC depuis les TSS (toujours), ancré sur le 1er jour — reflète les
