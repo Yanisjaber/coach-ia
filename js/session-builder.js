@@ -109,12 +109,12 @@
     var lo = +seg.int || 0, hi = (seg.intHi != null && +seg.intHi > 0) ? +seg.intHi : null;
     var z = ZONES[m].labels[zIdx(midOf(seg), m)].split(' ')[0];
     if (hi == null) {
-      if (m === 'power') return Math.round(FTP() * lo / 100) + ' W . ' + lo + '% FTP . ' + z;
+      if (m === 'power') return Math.round(FTP() * lo / 100) + ' W . ' + Math.round(lo) + '% FTP . ' + z;
       if (m === 'hr') return Math.round(HRMAX() * lo / 100) + ' bpm . ' + z;
       return fmtPace(lo) + ' ' + paceUnit() + ' . ' + z;
     }
     var a = Math.min(lo, hi), c = Math.max(lo, hi);
-    if (m === 'power') return Math.round(FTP() * a / 100) + '-' + Math.round(FTP() * c / 100) + ' W . ' + a + '-' + c + '% FTP';
+    if (m === 'power') return Math.round(FTP() * a / 100) + '-' + Math.round(FTP() * c / 100) + ' W . ' + Math.round(a) + '-' + Math.round(c) + '% FTP';
     if (m === 'hr') return Math.round(HRMAX() * a / 100) + '-' + Math.round(HRMAX() * c / 100) + ' bpm';
     return fmtPace(c) + '-' + fmtPace(a) + ' ' + paceUnit();
   }
@@ -175,7 +175,7 @@
     var kind = b.unit === 'pct' ? 'pct' : (b.metric === 'pace' ? 'rawpace' : 'rawnum');
     var toRaw = function (i) { return b.metric === 'power' ? Math.round(FTP() * i / 100) : Math.round(HRMAX() * i / 100); };
     var loVal, hiVal;
-    if (kind === 'pct') { loVal = seg.int; hiVal = (seg.intHi != null && +seg.intHi > 0) ? seg.intHi : ''; }
+    if (kind === 'pct') { loVal = Math.round(seg.int); hiVal = (seg.intHi != null && +seg.intHi > 0) ? Math.round(seg.intHi) : ''; }
     else if (kind === 'rawpace') { loVal = fmtPace(seg.int); hiVal = (seg.intHi != null && +seg.intHi > 0) ? fmtPace(seg.intHi) : ''; }
     else { loVal = toRaw(seg.int); hiVal = (seg.intHi != null && +seg.intHi > 0) ? toRaw(seg.intHi) : ''; }
     var typ = (kind === 'rawpace') ? 'text' : 'number';
@@ -213,8 +213,8 @@
   function convVal(b, kind, val) {
     if (kind === 'pct') return +val;
     if (kind === 'zone') return ZONES[b.metric].mid[+val];
-    if (kind === 'rawpace') { var p = String(val).split(':'); var sec = (+p[0] || 0) * 60 + (+p[1] || 0); return sec ? Math.round(paceBase() * 100 / sec) : 0; }
-    return b.metric === 'power' ? Math.round((+val) / FTP() * 100) : Math.round((+val) / HRMAX() * 100);
+    if (kind === 'rawpace') { var p = String(val).split(':'); var sec = (+p[0] || 0) * 60 + (+p[1] || 0); return sec ? (paceBase() * 100 / sec) : 0; }
+    return b.metric === 'power' ? ((+val) / FTP() * 100) : ((+val) / HRMAX() * 100);
   }
   function onEdit(e) {
     var t = e.target, i = t.dataset.i; if (i == null) return; var b = blocks[i], f = t.dataset.f, seg = t.dataset.seg;
