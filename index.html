@@ -886,7 +886,7 @@
       <div class="form-field form-col-2">
         <div class="form-field-header">
           <span>Nom de la compétition</span>
-          <label class="toggle-switch" title="Course par étapes (Tour de France, Vuelta, etc.)">
+          <label class="toggle-switch" hidden title="Course par étapes (retire - une compet = un jour)">
             <input type="checkbox" id="comp-modal-stages-toggle">
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
             <span class="toggle-label">Course par étapes</span>
@@ -905,6 +905,7 @@
               <option value="secondaire">Préparation</option>
             </select></label>
           <label class="form-field"><span>Sport</span><select id="comp-modal-sport"></select></label>
+          <label class="form-field"><span>Événement (optionnel)</span><input type="text" id="comp-modal-event" placeholder="ex. Tour du Coin"></label>
         </div>
       </div>
 

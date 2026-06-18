@@ -2711,7 +2711,7 @@ function openCompModal() {
   const delBtn = document.getElementById('comp-modal-delete');
   if (delBtn) delBtn.hidden = true;
   // Reset form (sauf "time" qui est géré par le stepper)
-  ['name','date','type','km','dplus','target','laps','notes'].forEach(k => {
+  ['name','date','type','km','dplus','target','laps','notes','event'].forEach(k => {
     const el = document.getElementById('comp-modal-' + k);
     if (el) el.value = '';
   });
@@ -2828,6 +2828,7 @@ async function saveCompFromModal() {
   const target = parseTimeToMin(document.getElementById('comp-modal-target').value);
   const laps = parseInt(document.getElementById('comp-modal-laps').value, 10) || null;
   const notes = document.getElementById('comp-modal-notes').value.trim();
+  const event = document.getElementById('comp-modal-event') ? document.getElementById('comp-modal-event').value.trim() : '';
   const stagesEl = document.getElementById('comp-modal-stages-toggle');
   const stages = !!(stagesEl && stagesEl.checked);
 
@@ -2878,7 +2879,7 @@ async function saveCompFromModal() {
     id: window._editingCompId || Date.now().toString(),
     realised: (window.coachCalendarMode ? window.coachCalendarMode() === 'realise' : false),
     name, date, time, priority, sport,
-    type: typeEpr, km, dplus, target, laps, notes,
+    type: typeEpr, km, dplus, target, laps, notes, event,
     stages,
     stagesList,
     gpxName, gpxContent
@@ -8962,6 +8963,7 @@ function openCompModalForEdit(comp) {
   document.getElementById('comp-modal-target').value = fmtMinToTime(comp.target);
   document.getElementById('comp-modal-laps').value = comp.laps != null ? comp.laps : '';
   document.getElementById('comp-modal-notes').value = comp.notes || '';
+  { const _ev = document.getElementById('comp-modal-event'); if (_ev) _ev.value = comp.event || ''; }
   // Toggle stages + remplissage stagesData si applicable
   const stagesToggle = document.getElementById('comp-modal-stages-toggle');
   if (stagesToggle) {
