@@ -49,7 +49,9 @@
   + '#sb-root .sb-del{width:26px;height:26px;border:none;background:var(--bg-elev,#141a23);color:var(--text-dim,#9aa6b6);border-radius:7px;cursor:pointer;font-size:13px}'
   + '#sb-root .sb-del:hover{color:var(--danger,#f87171)}'
   + '#sb-root .sb-lines{margin-top:9px;display:flex;flex-direction:column;gap:6px}'
-  + '#sb-root .sb-line{display:grid;grid-template-columns:46px 0.85fr 1fr 0.95fr 1.05fr;gap:8px;align-items:end}'
+  + '#sb-root .sb-line{display:grid;grid-template-columns:46px 1fr 1fr;gap:10px;align-items:end}'
+  + '#sb-root .sb-cmode{display:flex;align-items:center;gap:8px;margin:9px 0 2px;font-size:12px;color:var(--text-dim,#9aa6b6)}'
+  + '#sb-root .sb-csel{padding:6px 9px;font-size:12.5px;font-weight:600;color:var(--text,#e7ecf3);background:var(--bg-elev,#141a23);border:1px solid var(--border2,#374256);border-radius:8px}'
   + '#sb-root .sb-role{font-size:11px;color:var(--text-mute,#6b7686);text-transform:uppercase;letter-spacing:.4px}'
   + '#sb-root .sb-mini{font-size:10px;color:var(--text-mute,#6b7686);display:block;margin-bottom:3px}'
   + '#sb-root .sb-line input,#sb-root .sb-line select{width:100%;background:var(--bg-elev,#141a23);border:1px solid var(--border2,#374256);color:var(--text,#e7ecf3);border-radius:8px;padding:8px 8px;font-size:12.5px;font-family:inherit}'
@@ -89,7 +91,7 @@
   function grp() { var s = document.getElementById('train-modal-sport'); return (s && SPORT_GROUP[s.value]) || 'cyclisme'; }
   function paceBase() { var g = grp(); return (PACE[g] && PACE[g].base) || 240; }
   function paceUnit() { var g = grp(); return (PACE[g] && PACE[g].unit) || '/km'; }
-  function normalizeMetrics() { var gm = METRICS[grp()].map(function (a) { return a[0]; }); blocks.forEach(function (b) { [b.work, b.rec].forEach(function (seg) { if (seg && gm.indexOf(seg.metric) < 0) seg.metric = gm[0]; }); }); }
+  function normalizeMetrics() { var gm = METRICS[grp()].map(function (a) { return a[0]; }); blocks.forEach(function (b) { if (!b.metric && b.work && b.work.metric) b.metric = b.work.metric; if (!b.unit && b.work && b.work.unit) b.unit = b.work.unit; if (!b.metric || gm.indexOf(b.metric) < 0) b.metric = gm[0]; if (!b.unit) b.unit = 'zone'; }); }
 
   function defaults() { return []; } // demarre vide : l'utilisateur ajoute ses blocs
   var blocks = defaults();
@@ -135,24 +137,23 @@
   }
   function renderTotals() { var t = totals(); var a = R('sb-tdur'); if (a) a.textContent = fmtDur(t.dur); var b = R('sb-ttss'); if (b) b.textContent = t.tss; }
 
-  function metricSel(i, w, s) { var o = METRICS[grp()].map(function (a) { return '<option value="' + a[0] + '"' + (s.metric === a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join(''); return '<select data-i="' + i + '" data-seg="' + w + '" data-f="metric">' + o + '</select>'; }
-  function unitSel(i, w, s) { var o = [['zone', 'Zones'], ['pct', '%'], ['raw', 'Valeurs']].map(function (a) { return '<option value="' + a[0] + '"' + (s.unit === a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join(''); return '<select data-i="' + i + '" data-seg="' + w + '" data-f="unit">' + o + '</select>'; }
-  function targetInput(i, w, s) {
-    var base = 'data-i="' + i + '" data-seg="' + w + '" data-f="int"';
-    if (s.unit === 'zone') { var op = ZONES[s.metric].labels.map(function (l, zi) { return '<option value="' + zi + '"' + (zi === zIdx(s.int, s.metric) ? ' selected' : '') + '>' + l + '</option>'; }).join(''); return '<select ' + base + ' data-kind="zone">' + op + '</select>'; }
-    if (s.unit === 'pct') return '<input type="number" ' + base + ' data-kind="pct" value="' + s.int + '">';
-    if (s.metric === 'pace') return '<input type="text" ' + base + ' data-kind="rawpace" value="' + fmtPace(s.int) + '" placeholder="m:ss">';
-    var raw = s.metric === 'power' ? Math.round(FTP() * s.int / 100) : Math.round(HRMAX() * s.int / 100);
+  function metricSel(idx, b) { var o = METRICS[grp()].map(function (a) { return '<option value="' + a[0] + '"' + (b.metric === a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join(''); return '<select class="sb-csel" data-i="' + idx + '" data-f="metric">' + o + '</select>'; }
+  function unitSel(idx, b) { var o = [['zone', 'Zones'], ['pct', '%'], ['raw', 'Valeurs']].map(function (a) { return '<option value="' + a[0] + '"' + (b.unit === a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join(''); return '<select class="sb-csel" data-i="' + idx + '" data-f="unit">' + o + '</select>'; }
+  function targetInput(idx, which, b) {
+    var seg = b[which]; var base = 'data-i="' + idx + '" data-seg="' + which + '" data-f="int"';
+    if (b.unit === 'zone') { var op = ZONES[b.metric].labels.map(function (l, zi) { return '<option value="' + zi + '"' + (zi === zIdx(seg.int, b.metric) ? ' selected' : '') + '>' + l + '</option>'; }).join(''); return '<select ' + base + ' data-kind="zone">' + op + '</select>'; }
+    if (b.unit === 'pct') return '<input type="number" ' + base + ' data-kind="pct" value="' + seg.int + '">';
+    if (b.metric === 'pace') return '<input type="text" ' + base + ' data-kind="rawpace" value="' + fmtPace(seg.int) + '" placeholder="m:ss">';
+    var raw = b.metric === 'power' ? Math.round(FTP() * seg.int / 100) : Math.round(HRMAX() * seg.int / 100);
     return '<input type="number" ' + base + ' data-kind="rawnum" value="' + raw + '">';
   }
-  function line(i, w, role, s) {
+  function line(idx, which, role, b) {
+    var seg = b[which];
     return '<div class="sb-line">'
       + '<span class="sb-role">' + role + '</span>'
-      + '<div><span class="sb-mini">Duree (min)</span><input type="number" min="0" step="0.5" data-i="' + i + '" data-seg="' + w + '" data-f="min" value="' + s.min + '"></div>'
-      + '<div><span class="sb-mini">Mesure</span>' + metricSel(i, w, s) + '</div>'
-      + '<div><span class="sb-mini">Unite</span>' + unitSel(i, w, s) + '</div>'
-      + '<div><span class="sb-mini">Cible</span>' + targetInput(i, w, s) + '</div>'
-      + '<div class="sb-eq"><span class="sb-eqpill" style="border-left-color:' + ZC[zoneOf(s.int)] + '"><span class="sb-chip" style="background:' + ZC[zoneOf(s.int)] + '"></span>' + label(s.int, s.metric) + '</span></div>'
+      + '<div><span class="sb-mini">Duree (min)</span><input type="number" min="0" step="0.5" data-i="' + idx + '" data-seg="' + which + '" data-f="min" value="' + seg.min + '"></div>'
+      + '<div><span class="sb-mini">Cible</span>' + targetInput(idx, which, b) + '</div>'
+      + '<div class="sb-eq"><span class="sb-eqpill" style="border-left-color:' + ZC[zoneOf(seg.int)] + '"><span class="sb-chip" style="background:' + ZC[zoneOf(seg.int)] + '"></span>' + label(seg.int, b.metric) + '</span></div>'
       + '</div>';
   }
   function renderBlocks() {
@@ -165,25 +166,26 @@
         + '<div class="sb-bname"><input data-i="' + idx + '" data-f="name" value="' + (b.name || NAME[b.type]) + '"></div>'
         + (isInt ? '<span class="sb-reps">Repeter <input type="number" min="1" data-i="' + idx + '" data-f="reps" value="' + b.reps + '"> x</span>' : '')
         + '<button class="sb-del" data-del="' + idx + '" title="Supprimer">&#10005;</button></div>'
-        + '<div class="sb-lines">' + line(idx, 'work', isInt ? 'Effort' : 'Bloc', b.work) + (isInt ? line(idx, 'rec', 'Recup', b.rec) : '') + '</div>';
+        + '<div class="sb-cmode">Cibles en ' + metricSel(idx, b) + unitSel(idx, b) + '</div>'
+        + '<div class="sb-lines">' + line(idx, 'work', isInt ? 'Effort' : 'Bloc', b) + (isInt ? line(idx, 'rec', 'Recup', b) : '') + '</div>';
       wrap.appendChild(el);
     });
   }
   function renderAll() { normalizeMetrics(); renderBlocks(); renderProfile(); renderTotals(); fillFields(); }
 
-  function applyTarget(seg, t) {
+  function applyTarget(seg, b, t) {
     var k = t.dataset.kind, v = seg.int;
     if (k === 'pct') v = +t.value;
-    else if (k === 'zone') v = ZONES[seg.metric].mid[+t.value];
-    else if (k === 'rawnum') v = seg.metric === 'power' ? Math.round((+t.value) / FTP() * 100) : Math.round((+t.value) / HRMAX() * 100);
+    else if (k === 'zone') v = ZONES[b.metric].mid[+t.value];
+    else if (k === 'rawnum') v = b.metric === 'power' ? Math.round((+t.value) / FTP() * 100) : Math.round((+t.value) / HRMAX() * 100);
     else if (k === 'rawpace') { var p = String(t.value).split(':'); var sec = (+p[0] || 0) * 60 + (+p[1] || 0); v = sec ? Math.round(paceBase() * 100 / sec) : 0; }
     seg.int = v;
   }
   function onEdit(e) {
     var t = e.target, i = t.dataset.i; if (i == null) return; var b = blocks[i], f = t.dataset.f, seg = t.dataset.seg;
-    if (seg && f === 'int') { applyTarget(b[seg], t); renderAll(); }
+    if (seg && f === 'int') { applyTarget(b[seg], b, t); renderAll(); }
     else if (seg && f === 'min') { b[seg].min = +t.value; renderProfile(); renderTotals(); fillFields(); }
-    else if (seg && (f === 'metric' || f === 'unit')) { b[seg][f] = t.value; renderAll(); }
+    else if (!seg && (f === 'metric' || f === 'unit')) { b[f] = t.value; renderAll(); }
     else if (f === 'reps') { b.reps = +t.value; renderProfile(); renderTotals(); fillFields(); }
     else if (f === 'name') { b.name = t.value; var pl = document.querySelectorAll('#sb-profile .sb-plab')[i]; if (pl) pl.textContent = t.value; }
   }
@@ -200,7 +202,7 @@
     + '<div class="sb-addbar">'
     + card('warmup', 't-warm', '&#9650;') + card('interval', 't-int', '&#9889;') + card('steady', 't-steady', '&#9473;') + card('recovery', 't-rec', '&#9176;') + card('cooldown', 't-cool', '&#9660;')
     + '</div>'
-    + '<div class="sb-h">Structure <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686)">- mesure et unite par ligne, glisse les blocs sur le graphe pour reordonner</span></div>'
+    + '<div class="sb-h">Structure <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686)">- mesure et unite par bloc, glisse les blocs sur le graphe pour reordonner</span></div>'
     + '<div class="sb-blocks" id="sb-blocks"></div>'
     + '</div>';
   function card(type, cls, ico) { return '<button type="button" class="sb-card ' + cls + '" data-add="' + type + '" title="' + DESC[type] + '"><span class="sb-cico">' + ico + '</span><span class="sb-ct"><b>' + NAME[type] + (type === 'interval' ? ' (Nx)' : '') + '</b><small>' + DESC[type] + '</small></span></button>'; }
@@ -217,8 +219,8 @@
       var c = e.target.closest('[data-add]'); if (!c) return; var type = c.dataset.add;
       var def = { warmup: { min: 15, int: 55 }, interval: { min: 4, int: 108 }, steady: { min: 30, int: 75 }, recovery: { min: 10, int: 50 }, cooldown: { min: 10, int: 50 } }[type];
       var m = curMetric();
-      var b = { type: type, name: NAME[type], reps: type === 'interval' ? 4 : 1, work: { min: def.min, int: def.int, metric: m, unit: 'zone' } };
-      if (type === 'interval') b.rec = { min: 3, int: 55, metric: m, unit: 'zone' };
+      var b = { type: type, name: NAME[type], reps: type === 'interval' ? 4 : 1, metric: m, unit: 'zone', work: { min: def.min, int: def.int } };
+      if (type === 'interval') b.rec = { min: 3, int: 55 };
       blocks.push(b); renderAll();
     });
     // drag & drop sur le graphe
@@ -233,7 +235,7 @@
   // -------- API interne --------
   function isOn() { var tg = R('sb-toggle'); return !!(tg && tg.checked); }
   function getBlocks() { if (!isOn()) return null; return (blocks && blocks.length) ? JSON.parse(JSON.stringify(blocks)) : null; }
-  function setBlocks(st) { var has = !!(st && st.length && st[0] && st[0].work); if (has) blocks = JSON.parse(JSON.stringify(st)); ensureMount(); var tg = R('sb-toggle'); if (tg) tg.checked = has; setActive(has); }
+  function setBlocks(st) { var has = !!(st && st.length && st[0] && st[0].work); if (has) { blocks = JSON.parse(JSON.stringify(st)); blocks.forEach(function (b) { if (!b.metric && b.work && b.work.metric) b.metric = b.work.metric; if (!b.unit && b.work && b.work.unit) b.unit = b.work.unit; }); } ensureMount(); var tg = R('sb-toggle'); if (tg) tg.checked = has; setActive(has); }
   function reset() { blocks = defaults(); ensureMount(); var tg = R('sb-toggle'); if (tg) tg.checked = false; setActive(false); }
   function setRO(ro) { ['train-modal-duration', 'train-modal-tss'].forEach(function (id) { var e = R(id); if (e) { e.readOnly = ro; e.style.opacity = ro ? '0.6' : ''; } }); }
   function setActive(on) { ensureMount(); var body = R('sb-body'); if (body) body.hidden = !on; setRO(on); if (on) renderAll(); }
