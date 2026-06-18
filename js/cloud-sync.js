@@ -191,22 +191,9 @@ async function pullAllFromCloud() {
   // ----- compétitions → registre competitions (passées) + activity_planned (futures) -----
   try {
     const comps = [];
-    const _todayIso = new Date().toISOString().slice(0, 10);
-    // competitions = registre des PASSÉES uniquement (les futures sont dans activity_planned)
-    const { data: reg } = await sb.from('competitions').select('*').eq('user_id', userId);
-    for (const r of (reg || [])) comps.push({
-      id: r.client_id || r.id, _sbId: r.id, _table: 'competition', realised: true,
-      name: r.name, date: r.date, sport: r.sport ?? null,
-      priority: r.priority ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
-      target: (r.duration != null ? r.duration : parseTimeToMin(r.target)), laps: r.laps ?? null, notes: r.notes ?? null,
-      gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null,
-      stages: Array.isArray(r.stages) && r.stages.length > 0,
-      stagesList: Array.isArray(r.stages) ? r.stages.map(function (st) { return Object.assign({}, st, { target: parseTimeToMin(st.target) }); }) : null,
-      activityIds: r.activity_ids ?? null,
-    });
-    // Modele unifie : compet REALISEES = activities (category='competition'), dedoublonne par client_id.
+    // Compet REALISEES = activities (category='competition'). La table `competitions` n'existe plus.
     {
-      const _seen = new Set(comps.map(c => String(c.id)));
+      const _seen = new Set();
       const { data: ra } = await sb.from('activities')
         .select('id, client_id, name, sport, start_date_local, priority, distance_km, course_dplus, target, laps, user_notes, gpx_name, stages, event')
         .eq('user_id', userId).eq('category', 'competition');
@@ -475,11 +462,10 @@ export async function pushCompetitionRegistry(_comp) {
   // (setActivityCategory). Plus de registre separe -> no-op (sinon doublon).
   return null;
 }
-export async function deleteCompetitionByActivity(activityId) {
-  if (!isAuthed()) return;
-  try {
-    await window.sb.from('competitions').delete().eq('user_id', uid()).contains('activity_ids', [String(activityId)]);
-  } catch (e) { console.warn('[del comp by act]', e.message); }
+export async function deleteCompetitionByActivity(_activityId) {
+  // Modele unifie : "repasser en entrainement" = category='entrainement' sur l'activite
+  // (setActivityCategory). Plus de table competitions -> no-op.
+  return;
 }
 
 export async function pushTraining(training, mode) {

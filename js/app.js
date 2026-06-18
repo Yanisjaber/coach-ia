@@ -7142,9 +7142,8 @@ function openActivityEditModal(activityId, iso) {
     setActivityEdit(activityId, newOv);
     // Priorité de la compétition (course à étapes → la course ; sinon la compét d'un jour)
     if (act.category === 'competition' && window.sb && _aePrio !== _curPrioKey) {
-      const base = window.sb.from('competitions').update({ priority: _aePrio });
-      const q = _race ? base.eq('id', _race._sbId) : base.eq('client_id', 'act-' + act._sbId);
-      q.then(() => {
+      // Modele unifie : la priorite est sur la ligne activities (la compet EST l'activite).
+      window.sb.from('activities').update({ priority: _aePrio }).eq('id', act._sbId).then(() => {
         if (window.cloudSync && window.cloudSync.pullAllFromCloud) window.cloudSync.pullAllFromCloud().then(() => {
           if (typeof renderCalendar === 'function') renderCalendar();
           if (typeof renderCompList === 'function') renderCompList();
