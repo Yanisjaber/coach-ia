@@ -482,7 +482,7 @@ export async function pushTraining(training, mode) {
         name: training.name, start_date_local: training.date + 'T12:00:00', sport: training.sport ?? null,
         moving_time: (training.duration || 0) * 60, tss: training.tss ?? 0,
         user_notes: training.notes ?? null,
-        distance_km: training.km ?? null, course_dplus: training.dplus ?? null, rpe: training.rpe ?? null,
+        distance_km: training.km ?? null, total_elevation_gain: training.dplus ?? null, rpe: training.rpe ?? null,
         laps: training.laps ?? null, gpx_name: training.gpxName ?? null, gpx_content: training.gpxContent ?? null,
       };
       if (training._sbId) row.id = training._sbId;
@@ -530,5 +530,4 @@ window.cloudSync = {
   pushCompetition, deleteCompetition, pushCompetitionRegistry, deleteCompetitionByActivity,
   pushTraining, deleteTraining,
   pushRestDay,
-  pullAllFromCloud,
-};
+  pullAllFromCl
