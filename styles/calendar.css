@@ -234,6 +234,27 @@
   .day-card:not(.rest)[data-sport-cat="escalade"]::before     { background: #c2410c; }
   .day-card:not(.rest)[data-sport-cat="combat"]::before       { background: #b91c1c; }
   .day-card:not(.rest)[data-sport-cat="autre"]::before        { background: #9ca3af; }
+
+  /* Jour multi-activites : colonnes pleine hauteur (1 par activite) */
+  .day-card--multi { display: flex; flex-direction: column; }
+  .day-card--multi::before { display: none; }
+  .day-multi-grid {
+    flex: 1; display: flex; gap: 5px; margin-top: 8px; min-height: 92px;
+  }
+  .day-multi-col {
+    flex: 1; min-width: 0; display: flex; flex-direction: column;
+    border-radius: 7px; overflow: hidden; cursor: pointer;
+    transition: filter 0.12s, transform 0.1s;
+  }
+  .day-multi-col:hover { filter: brightness(1.35); }
+  .day-multi-col:active { transform: scale(0.96); }
+  .dmc-bar { height: 3px; flex: none; }
+  .dmc-body {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 6px; padding: 6px 2px;
+  }
+  .dmc-time { font-size: 11px; font-weight: 600; color: var(--text-dim); }
+
   .day-card-name {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -577,19 +598,4 @@
     font-weight: 500;
   }
   .pill.endurance { background: rgba(96, 165, 250, 0.15); color: var(--info); }
-  .pill.tempo { background: rgba(167, 139, 250, 0.15); color: var(--purple); }
-  .pill.seuil { background: rgba(251, 191, 36, 0.15); color: var(--warn); }
-  .pill.vo2 { background: rgba(248, 113, 113, 0.15); color: var(--danger); }
-  .pill.recup { background: rgba(74, 222, 128, 0.15); color: var(--accent); }
-
-  .session-detail {
-    background: var(--bg-elev2);
-    border-radius: 10px;
-    padding: 18px;
-    margin-top: 14px;
-  }
-  .session-detail-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; }
-  .session-detail h3 { font-size: 16px; margin-bottom: 4px; }
-  .session-detail .meta { font-size: 12px; color: var(--text-dim); }
-  .metric-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-  .mini-metric { background: var(--bg); padding: 10px 12px; border-radius: 6px; }
+  .pill.tempo { background

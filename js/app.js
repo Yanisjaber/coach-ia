@@ -3852,6 +3852,30 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   const dur = act.duration || 0;
 
   const hasMulti = total > 1;
+
+  // Jour multi-activites : on divise la 2e partie de la case en colonnes pleine
+  // hauteur (1 par activite : liisere couleur du sport + glyph + duree). Clic = ouvre l'activite.
+  if (hasMulti) {
+    const _acts = (realDay && realDay.activities && realDay.activities.length) ? realDay.activities : [act];
+    const cols = _acts.map((a, i) => {
+      const isComp = a.category === 'competition';
+      const hex = isComp ? compPrio(a.priority).color : (window.sportColor ? window.sportColor(a.raw_type || a.sport) : '#9ca3af');
+      const g = isComp ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(a.raw_type || a.sport, 22) : '');
+      const t = a.duration ? fmtDur(a.duration) : (a.distance_km ? Math.round(a.distance_km) + ' km' : '');
+      return `<div class="day-multi-col" data-iso="${iso}" data-source="realise" data-actidx="${i}" style="background:${hex}1a">`
+        + `<div class="dmc-bar" style="background:${hex}"></div>`
+        + `<div class="dmc-body">${g ? `<span class="dmc-glyph" style="line-height:0">${g}</span>` : ''}${t ? `<span class="dmc-time">${t}</span>` : ''}</div>`
+        + `</div>`;
+    }).join('');
+    return `
+    <div class="day-card past${isToday ? ' today' : ''} day-card--multi" data-iso="${iso}" data-source="realise">
+      <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
+      <div class="day-card-date">${d.getDate()}</div>
+      <div class="day-multi-grid">${cols}</div>
+    </div>
+  `;
+  }
+
   const dateRow = hasMulti ? `
     <div class="day-card-date-row">
       <div class="day-card-date">${d.getDate()}</div>
@@ -4222,6 +4246,14 @@ document.getElementById('week-calendar').addEventListener('click', (e) => {
     renderCalendar();
     return;
   }
+  // Clic sur une colonne (jour multi-activites) -> ouvre l'activite ciblee
+  const _mcol = e.target.closest('.day-multi-col');
+  if (_mcol) {
+    e.stopPropagation();
+    window.__openActIdx = parseInt(_mcol.dataset.actidx, 10) || 0;
+    openSessionModal(_mcol.dataset.iso, _mcol.dataset.source || 'realise');
+    return;
+  }
   // Clic sur la carte → ouvrir la modal (sauf si c'est une carte totaux)
   const card = e.target.closest('.day-card');
   if (!card) return;
@@ -4551,6 +4583,8 @@ window.sportGlyph = function (v, size) {
   const inner = _SPORT_ICON_SVG[_SPORT_ICON_GROUP[cat] || 'dot'];
   return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:' + color + ';display:inline-block;vertical-align:-2px;flex:none">' + inner + '</svg>';
 };
+// Couleur (hex) du sport — meme palette que les barres laterales.
+window.sportColor = function (v) { return SPORT_CAT_COLOR[_sportCatKey(v)] || '#9ca3af'; };
 
 // Helper unique : renvoie le nom Strava FR exact à afficher
 //  Priorité : raw_type Strava traduit → catégorie traduite → 'Activité'
@@ -8041,7 +8075,9 @@ function openSessionModal(iso, source) {
           else _streamsEl.innerHTML = '<div class="modal-placeholder">Pas d\'ID activité disponible pour cette séance.</div>';
         }
       }
-      renderModalActivity(0);
+      const _startIdx = (window.__openActIdx != null && window.__openActIdx < acts.length) ? window.__openActIdx : 0;
+      window.__openActIdx = null;
+      renderModalActivity(_startIdx);
       // Sélecteur d'étapes si l'activité fait partie d'une course à étapes
       try { _injectRealisedStageTabs(iso, acts); } catch (e) { /* ignore */ }
     }
