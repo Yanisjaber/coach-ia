@@ -4535,13 +4535,13 @@ const _SPORT_ICON_GROUP = {
   yoga: 'dot', autre: 'dot',
 };
 const _SPORT_ICON_SVG = {
-  bike: '<circle cx="6" cy="16.5" r="3.3"/><circle cx="18" cy="16.5" r="3.3"/><path d="M6 16.5 11 8h4"/><path d="M9.5 8H15l3 8.5"/><path d="M13.5 8 12.5 5H10.5"/>',
-  run: '<circle cx="13.5" cy="4.5" r="2"/><path d="M12.8 7.2 9 9.8"/><path d="M12.8 7.2 16.2 8.6l1.6 2.6"/><path d="M12.8 7.2 11 13l-3 5.2"/><path d="M11 13l4 1.6 1 4"/>',
-  walk: '<circle cx="12.5" cy="4.5" r="2"/><path d="M12 7.2v5.6"/><path d="M12 9 8.6 11"/><path d="M12 9l3.4 1.6"/><path d="M12 12.8l-2 5.6"/><path d="M12 12.8l2.6 5.6"/>',
+  bike: '<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/>',
+  run: '<circle cx="13" cy="4" r="1.4"/><path d="M4 17l5 1 .9-1.6"/><path d="M15 21v-4.5l-4-3 1-6"/><path d="M7 12V9l5-1 3 3 3 1"/>',
+  walk: '<circle cx="13" cy="4" r="1.4"/><path d="M7 21l3-4"/><path d="M16 21l-2-4-3-3 1-6"/><path d="M6 12l2-3 4-1 3 3 3 1"/>',
   swim: '<path d="M2 8c1 .8 2 .8 3 0s2-.8 3 0 2 .8 3 0 2-.8 3 0 2 .8 3 0 2-.8 3 0"/><path d="M2 13c1 .8 2 .8 3 0s2-.8 3 0 2 .8 3 0 2-.8 3 0 2 .8 3 0 2-.8 3 0"/><path d="M2 18c1 .8 2 .8 3 0s2-.8 3 0 2 .8 3 0 2-.8 3 0 2 .8 3 0 2-.8 3 0"/>',
-  gym: '<rect x="2" y="9.5" width="3" height="5" rx="1" fill="currentColor" stroke="none"/><rect x="19" y="9.5" width="3" height="5" rx="1" fill="currentColor" stroke="none"/><rect x="5" y="10.8" width="14" height="2.4" rx="1" fill="currentColor" stroke="none"/>',
-  mountain: '<path d="M3 19 9.5 7l3.5 6 2.5-4L21 19Z"/>',
-  ball: '<circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16"/>',
+  gym: '<rect x="1.6" y="8" width="2.6" height="8" rx="1" fill="currentColor" stroke="none"/><rect x="4.4" y="9.6" width="2" height="4.8" rx="0.6" fill="currentColor" stroke="none"/><rect x="6.4" y="11" width="11.2" height="2" fill="currentColor" stroke="none"/><rect x="17.6" y="9.6" width="2" height="4.8" rx="0.6" fill="currentColor" stroke="none"/><rect x="19.8" y="8" width="2.6" height="8" rx="1" fill="currentColor" stroke="none"/>',
+  mountain: '<path d="M2 19 8 8l3.5 6 2.5-4.5L22 19Z"/>',
+  ball: '<circle cx="12" cy="12" r="8"/><path d="M4.6 9.4c4.9 3 9.9 3 14.8 0"/><path d="M4.6 14.6c4.9-3 9.9-3 14.8 0"/>',
   dot: '<circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/>',
 };
 window.sportGlyph = function (v, size) {
