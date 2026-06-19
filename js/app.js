@@ -7975,8 +7975,9 @@ function openSessionModal(iso, source) {
         ` : '';
 
         const _struct = act.structure;
+        const _structDet = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(_struct) : '';
         const profileHTML = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutProfileHTML === 'function')
-          ? `<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(_struct)}</div>`
+          ? `<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(_struct)}${_structDet}</div>`
           : '';
         const _escNote = (x) => String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
         const notesHTML = (act.notes && String(act.notes).trim())
@@ -8684,7 +8685,8 @@ function openSessionModal(iso, source) {
 
       const sections = [];
       if (Array.isArray(t.structure) && t.structure.length && typeof window.renderWorkoutProfileHTML === 'function') {
-        sections.push(`<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(t.structure)}</div>`);
+        const _det = (typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(t.structure) : '';
+        sections.push(`<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(t.structure)}${_det}</div>`);
       }
       if (t.notes) {
         sections.push(`<div class="modal-section">

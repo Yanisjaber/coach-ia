@@ -315,6 +315,38 @@
     html += '</div>';
     return html;
   };
+  // Detail texte des intervalles sous le profil : 1 ligne par bloc avec la vraie
+  // donnee (duree + watts/bpm/allure + % + zone via label()).
+  window.renderWorkoutDetailHTML = function (blks) {
+    if (!Array.isArray(blks) || !blks.length) return '';
+    var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
+    var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var rows = blks.map(function (b) {
+      var m = (b.metric) || (b.work && b.work.metric) || 'power';
+      if (!ZONES[m]) m = 'power';
+      var nm = b.name || NAME[b.type] || 'Bloc';
+      var isInt = b.type === 'interval' && b.rec;
+      var reps = Math.max(1, b.reps | 0);
+      var bmin = blockSegs(b).reduce(function (a, x) { return a + (+x.min || 0); }, 0);
+      var col = ZHEX[zoneOf(midOf(b.work || {}))];
+      var detail;
+      if (isInt) {
+        detail = reps + ' × ( ' + fmtDur(+b.work.min || 0) + ' à ' + label(b.work, m)
+          + '  /  ' + fmtDur(+b.rec.min || 0) + ' récup à ' + label(b.rec, m) + ' )';
+      } else {
+        detail = fmtDur((b.work && +b.work.min) || 0) + ' à ' + label(b.work || {}, m);
+      }
+      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--border,#2a3444)">'
+        + '<div style="width:3px;align-self:stretch;border-radius:2px;background:' + col + ';flex:none"></div>'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-weight:600;font-size:13px;color:var(--text,#e7ecf3)">' + esc(nm) + '</div>'
+        +   '<div style="font-size:12px;color:var(--text-dim,#9aa6b6);margin-top:2px;line-height:1.4">' + esc(detail) + '</div>'
+        + '</div>'
+        + '<div style="font-size:12px;color:var(--text-mute,#6b7686);white-space:nowrap;padding-top:1px">' + fmtDur(bmin) + '</div>'
+        + '</div>';
+    }).join('');
+    return '<div style="margin-top:6px">' + rows + '</div>';
+  };
   window.getCurrentWorkoutStructure = function () { return getBlocks(); };
   window.setWorkoutStructure = function (s) { showSection(); setBlocks(s); };
   window.resetWorkoutStructure = function () { showSection(); reset(); };
