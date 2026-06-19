@@ -360,7 +360,7 @@
       }
       return bar(b.work || {}, m, nm);
     }).join('');
-    return '<div style="margin-top:8px">' + out + '</div>';
+    return '<div style="margin-top:18px">' + out + '</div>';
   };
   window.getCurrentWorkoutStructure = function () { return getBlocks(); };
   window.setWorkoutStructure = function (s) { showSection(); setBlocks(s); };
