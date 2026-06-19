@@ -3759,10 +3759,9 @@ function renderWeekPlan() {
         <div class="day-card${isRest ? ' rest' : ''}${todayClass}${pastClass}${raceClass}" data-iso="${iso}" data-source="prevu"${raceAttr}>
           <div class="day-card-dow">${dowFr[dow]}${dowSuffix}</div>
           ${dateRow}
-          <div class="day-card-name">${isRace ? trophySvg(compPrio(proposal.priority).color, 13) : ''}<span class="dc-name-text">${proposal.name}</span></div>
+          <div class="day-card-name">${isRace ? trophySvg(compPrio(proposal.priority).color, 13) : ''}${(() => { const e = window.sportEmoji ? window.sportEmoji(proposal.sport) : ''; return e ? `<span class="dc-sport-emoji" style="margin-right:5px">${e}</span>` : ''; })()}<span class="dc-name-text">${proposal.name}</span></div>
           ${stageInfoLine}
           <div class="day-card-meta">${metaLine}</div>
-          ${sportBlock}
           ${(proposal && Array.isArray(proposal.structure) && proposal.structure.length && window.renderWorkoutProfileHTML) ? `<div class="day-card-profile" style="margin-top:8px;">${window.renderWorkoutProfileHTML(proposal.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>` : ''}
           ${isRest ? REST_COUCH_SVG : ''}
           ${counter}
@@ -3903,13 +3902,13 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
     ? `<div class="day-card-profile" style="margin-top:8px;">${window.renderWorkoutProfileHTML(act.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>`
     : '';
 
+  const _sportEmoji = window.sportEmoji ? window.sportEmoji(act.raw_type || act.sport) : '';
   return `
     <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass}" data-iso="${iso}" data-source="realise"${raceAttr}>
       <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
       ${dateRow}
-      <div class="day-card-name">${isCompAct ? trophySvg(compPrio(compToday ? compToday.priority : null).color, 13) : ''}<span class="dc-name-text">${aName}</span></div>
+      <div class="day-card-name">${isCompAct ? trophySvg(compPrio(compToday ? compToday.priority : null).color, 13) : ''}${_sportEmoji ? `<span class="dc-sport-emoji" style="margin-right:5px">${_sportEmoji}</span>` : ''}<span class="dc-name-text">${aName}</span></div>
       <div class="day-card-meta">${metaLine}</div>
-      ${sportBlock}
       ${_miniProfile}
       ${counter}
     </div>
@@ -4517,6 +4516,15 @@ window.sportFr = (rawTypeOrCategory) => {
   if (entry) return entry.fr;
   if (SPORT_CATEGORY_FR[rawTypeOrCategory]) return SPORT_CATEGORY_FR[rawTypeOrCategory];
   return rawTypeOrCategory; // type Strava inconnu : on le montre brut
+};
+
+// Helper : emoji du sport (accepte un raw_type Strava OU une categorie interne)
+const SPORT_CATEGORY_EMOJI = { cyclisme: '🚴', course: '🏃', natation: '🏊', musculation: '🏋️', autre: '🏅' };
+window.sportEmoji = (rawTypeOrCategory) => {
+  if (!rawTypeOrCategory) return '';
+  const entry = window.SPORTS_CATALOG[rawTypeOrCategory];
+  if (entry && entry.icon) return entry.icon;
+  return SPORT_CATEGORY_EMOJI[rawTypeOrCategory] || '';
 };
 
 // Helper qui prend une activité complète et renvoie le nom de sport à afficher
