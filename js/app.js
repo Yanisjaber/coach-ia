@@ -3759,7 +3759,7 @@ function renderWeekPlan() {
         <div class="day-card${isRest ? ' rest' : ''}${todayClass}${pastClass}${raceClass}" data-iso="${iso}" data-source="prevu"${raceAttr}>
           <div class="day-card-dow">${dowFr[dow]}${dowSuffix}</div>
           ${dateRow}
-          <div class="day-card-name">${isRace ? trophySvg(compPrio(proposal.priority).color, 13) : ''}${(() => { const e = window.sportEmoji ? window.sportEmoji(proposal.sport) : ''; return e ? `<span class="dc-sport-emoji" style="margin-right:5px">${e}</span>` : ''; })()}<span class="dc-name-text">${proposal.name}</span></div>
+          <div class="day-card-name">${isRace ? trophySvg(compPrio(proposal.priority).color, 13) : ''}${(() => { const e = window.sportGlyph ? window.sportGlyph(proposal.sport) : ''; return e ? `<span class="dc-sport-emoji" style="margin-right:5px;line-height:0">${e}</span>` : ''; })()}<span class="dc-name-text">${proposal.name}</span></div>
           ${stageInfoLine}
           <div class="day-card-meta">${metaLine}</div>
           ${(proposal && Array.isArray(proposal.structure) && proposal.structure.length && window.renderWorkoutProfileHTML) ? `<div class="day-card-profile" style="margin-top:8px;">${window.renderWorkoutProfileHTML(proposal.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>` : ''}
@@ -3902,12 +3902,12 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
     ? `<div class="day-card-profile" style="margin-top:8px;">${window.renderWorkoutProfileHTML(act.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>`
     : '';
 
-  const _sportEmoji = window.sportEmoji ? window.sportEmoji(act.raw_type || act.sport) : '';
+  const _sportEmoji = window.sportGlyph ? window.sportGlyph(act.raw_type || act.sport) : '';
   return `
     <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass}" data-iso="${iso}" data-source="realise"${raceAttr}>
       <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
       ${dateRow}
-      <div class="day-card-name">${isCompAct ? trophySvg(compPrio(compToday ? compToday.priority : null).color, 13) : ''}${_sportEmoji ? `<span class="dc-sport-emoji" style="margin-right:5px">${_sportEmoji}</span>` : ''}<span class="dc-name-text">${aName}</span></div>
+      <div class="day-card-name">${isCompAct ? trophySvg(compPrio(compToday ? compToday.priority : null).color, 13) : ''}${_sportEmoji ? `<span class="dc-sport-emoji" style="margin-right:5px;line-height:0">${_sportEmoji}</span>` : ''}<span class="dc-name-text">${aName}</span></div>
       <div class="day-card-meta">${metaLine}</div>
       ${_miniProfile}
       ${counter}
@@ -4506,6 +4506,50 @@ const SPORT_COLOR_FROM_CATEGORY = {
   natation: 'natation',
   musculation: 'musculation',
   autre: 'autre',
+};
+
+// ============================================================
+// Icone "dessin" coloree du sport (petit SVG trait, teinte = couleur du sport).
+// Accepte un raw_type Strava (Ride, TrailRun...) OU une categorie interne.
+// ============================================================
+const SPORT_CAT_COLOR = {
+  cyclisme: '#3b82f6', vtt: '#b45309', course: '#fc4c02', trail: '#15803d',
+  natation: '#06b6d4', musculation: '#ef4444', marche: '#65a30d', ski: '#60a5fa',
+  nautique: '#0284c7', football: '#22c55e', collectif: '#c026d3', raquette: '#eab308',
+  yoga: '#a78bfa', escalade: '#c2410c', combat: '#b91c1c', autre: '#9ca3af',
+};
+function _sportCatKey(v) {
+  if (!v) return 'autre';
+  if (SPORT_COLOR_KEY[v]) return SPORT_COLOR_KEY[v];                 // raw_type -> categorie
+  if (SPORT_CAT_COLOR[v]) return v;                                  // deja une categorie
+  if (SPORT_COLOR_FROM_CATEGORY[v]) return SPORT_COLOR_FROM_CATEGORY[v];
+  return 'autre';
+}
+const _SPORT_ICON_GROUP = {
+  cyclisme: 'bike', vtt: 'bike',
+  course: 'run', trail: 'run', marche: 'walk',
+  natation: 'swim', nautique: 'swim',
+  musculation: 'gym',
+  ski: 'mountain', escalade: 'mountain',
+  football: 'ball', collectif: 'ball', raquette: 'ball', combat: 'ball',
+  yoga: 'dot', autre: 'dot',
+};
+const _SPORT_ICON_SVG = {
+  bike: '<circle cx="6" cy="16.5" r="3.3"/><circle cx="18" cy="16.5" r="3.3"/><path d="M6 16.5 11 8h4"/><path d="M9.5 8H15l3 8.5"/><path d="M13.5 8 12.5 5H10.5"/>',
+  run: '<circle cx="13.5" cy="4.5" r="2"/><path d="M12.8 7.2 9 9.8"/><path d="M12.8 7.2 16.2 8.6l1.6 2.6"/><path d="M12.8 7.2 11 13l-3 5.2"/><path d="M11 13l4 1.6 1 4"/>',
+  walk: '<circle cx="12.5" cy="4.5" r="2"/><path d="M12 7.2v5.6"/><path d="M12 9 8.6 11"/><path d="M12 9l3.4 1.6"/><path d="M12 12.8l-2 5.6"/><path d="M12 12.8l2.6 5.6"/>',
+  swim: '<path d="M2 8c1 .8 2 .8 3 0s2-.8 3 0 2 .8 3 0 2-.8 3 0 2 .8 3 0 2-.8 3 0"/><path d="M2 13c1 .8 2 .8 3 0s2-.8 3 0 2 .8 3 0 2-.8 3 0 2 .8 3 0 2-.8 3 0"/><path d="M2 18c1 .8 2 .8 3 0s2-.8 3 0 2 .8 3 0 2-.8 3 0 2 .8 3 0 2-.8 3 0"/>',
+  gym: '<rect x="2" y="9.5" width="3" height="5" rx="1" fill="currentColor" stroke="none"/><rect x="19" y="9.5" width="3" height="5" rx="1" fill="currentColor" stroke="none"/><rect x="5" y="10.8" width="14" height="2.4" rx="1" fill="currentColor" stroke="none"/>',
+  mountain: '<path d="M3 19 9.5 7l3.5 6 2.5-4L21 19Z"/>',
+  ball: '<circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16"/>',
+  dot: '<circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/>',
+};
+window.sportGlyph = function (v, size) {
+  size = size || 15;
+  const cat = _sportCatKey(v);
+  const color = SPORT_CAT_COLOR[cat] || '#9ca3af';
+  const inner = _SPORT_ICON_SVG[_SPORT_ICON_GROUP[cat] || 'dot'];
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:' + color + ';display:inline-block;vertical-align:-2px;flex:none">' + inner + '</svg>';
 };
 
 // Helper unique : renvoie le nom Strava FR exact à afficher
