@@ -8666,7 +8666,10 @@ function openSessionModal(iso, source) {
       const dur = t.duration || 0;
       const cards = [];
       if (dur) cards.push({ label: 'Durée', value: fmtDur(dur), unit: '' });
+      if (t.km) cards.push({ label: 'Distance', value: Math.round(t.km) + ' km', unit: '' });
+      if (t.dplus) cards.push({ label: 'Dénivelé', value: Math.round(t.dplus) + ' m', unit: '' });
       if (t.tss) cards.push({ label: 'TSS', value: t.tss, unit: '' });
+      if (t.rpe != null && t.rpe !== '') cards.push({ label: 'RPE', value: t.rpe, unit: '' });
       if (t.type) cards.push({ label: 'Type', value: t.type, unit: '', isText: true });
 
       const sections = [];
