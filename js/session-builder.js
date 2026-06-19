@@ -285,14 +285,21 @@
   // builder partout. L'ancien reste charge mais n'est plus affiche.
   // Rendu LECTURE SEULE du profil depuis un tableau de blocs (pour les fiches detail).
   // Reutilise blockSegs / midOf / zoneOf / NAME / fmtDur. Couleurs en dur (hors #sb-root).
-  window.renderWorkoutProfileHTML = function (blks) {
+  window.renderWorkoutProfileHTML = function (blks, opts) {
     if (!Array.isArray(blks) || !blks.length) return '';
+    opts = opts || {};
+    var H = opts.height || 140;
+    var showLabels = opts.labels !== false;
+    var pad = (opts.padding != null) ? opts.padding : 12;
+    var bg = (opts.bg != null) ? opts.bg : 'var(--bg-elev2,#1b2230)';
+    var brd = (opts.border != null) ? opts.border : '1px solid var(--border,#2a3444)';
+    var radius = (opts.radius != null) ? opts.radius : 12;
     var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
     var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
     var bmins = blks.map(function (b) { return blockSegs(b).reduce(function (a, x) { return a + (+x.min || 0); }, 0); });
     var tot = bmins.reduce(function (a, b) { return a + b; }, 0) || 1;
     var mx = 120; blks.forEach(function (b) { blockSegs(b).forEach(function (s) { mx = Math.max(mx, midOf(s)); }); });
-    var html = '<div style="background:var(--bg-elev2,#1b2230);border:1px solid var(--border,#2a3444);border-radius:12px;padding:12px;display:flex;align-items:stretch;gap:2px;height:140px;overflow:hidden">';
+    var html = '<div style="background:' + bg + ';border:' + brd + ';border-radius:' + radius + 'px;padding:' + pad + 'px;display:flex;align-items:stretch;gap:2px;height:' + H + 'px;overflow:hidden">';
     blks.forEach(function (b, bi) {
       var segs = blockSegs(b), bmin = bmins[bi] || 0, it = bmin || 1;
       html += '<div title="' + esc((b.name || NAME[b.type] || '') + ' - ' + fmtDur(bmin)) + '" style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(0.06, bmin / tot) + '">';
@@ -301,7 +308,9 @@
         var hgt = Math.max(8, (midOf(s) / mx) * 100);
         html += '<div style="flex:' + Math.max(0.05, (+s.min || 0) / it) + ';height:' + hgt + '%;background:' + ZHEX[zoneOf(midOf(s))] + ';border-radius:2px 2px 0 0;min-width:1px;opacity:.95"></div>';
       });
-      html += '</div><div style="height:15px;line-height:15px;font-size:9px;color:var(--text-mute,#6b7686);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px">' + esc(b.name || NAME[b.type] || '') + '</div></div>';
+      html += '</div>';
+      if (showLabels) html += '<div style="height:15px;line-height:15px;font-size:9px;color:var(--text-mute,#6b7686);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px">' + esc(b.name || NAME[b.type] || '') + '</div>';
+      html += '</div>';
     });
     html += '</div>';
     return html;

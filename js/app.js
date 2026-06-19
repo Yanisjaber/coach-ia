@@ -3671,6 +3671,7 @@ function renderWeekPlan() {
             tss: m.tss || 0,
             sport: m.sport || 'Ride',
             why: m.notes || 'Séance ajoutée manuellement',
+            structure: m.structure || null,
             _manual: true,
           });
         }
@@ -3762,6 +3763,7 @@ function renderWeekPlan() {
           ${stageInfoLine}
           <div class="day-card-meta">${metaLine}</div>
           ${sportBlock}
+          ${(proposal && Array.isArray(proposal.structure) && proposal.structure.length && window.renderWorkoutProfileHTML) ? `<div class="day-card-profile" style="margin-top:8px;">${window.renderWorkoutProfileHTML(proposal.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>` : ''}
           ${isRest ? REST_COUCH_SVG : ''}
           ${counter}
         </div>
@@ -3896,6 +3898,11 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
     ? `<div class="day-card-sport"><span class="sport-pill" data-sport-cat="${sportCat}">${sportLabel}</span></div>`
     : '';
 
+  // Mini-profil d'intervalles dans la carte (si la seance a une structure).
+  const _miniProfile = (act && Array.isArray(act.structure) && act.structure.length && window.renderWorkoutProfileHTML)
+    ? `<div class="day-card-profile" style="margin-top:8px;">${window.renderWorkoutProfileHTML(act.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>`
+    : '';
+
   return `
     <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass}" data-iso="${iso}" data-source="realise"${raceAttr}>
       <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
@@ -3903,6 +3910,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
       <div class="day-card-name">${isCompAct ? trophySvg(compPrio(compToday ? compToday.priority : null).color, 13) : ''}<span class="dc-name-text">${aName}</span></div>
       <div class="day-card-meta">${metaLine}</div>
       ${sportBlock}
+      ${_miniProfile}
       ${counter}
     </div>
   `;
