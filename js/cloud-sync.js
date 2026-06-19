@@ -232,7 +232,7 @@ async function pullAllFromCloud() {
     const { data } = await sb.from('activity_planned').select('*').eq('user_id', userId).eq('category', 'entrainement');
     const prevu = (data || []).map(r => ({
       id: r.client_id || r.id, _sbId: r.id,
-      name: r.name, date: r.date, sport: r.sport ?? null,
+      name: r.name, date: r.date, time: r.start_time ?? null, sport: r.sport ?? null,
       duration: r.duration ?? 0, tss: r.tss ?? 0, notes: r.notes ?? '', mode: 'prevu',
       structure: r.structure ?? null,
       rpe: r.rpe ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
@@ -476,7 +476,7 @@ export async function pushTraining(training, mode) {
     if (mode === 'prevu') {
       const row = {
         user_id: uid(), client_id: training.id, category: 'entrainement',
-        name: training.name, date: training.date, sport: training.sport ?? null,
+        name: training.name, date: training.date, start_time: training.time || null, sport: training.sport ?? null,
         duration: training.duration ?? 0, tss: training.tss ?? 0,
         notes: training.notes ?? '', structure: training.structure ?? null,
         km: training.km ?? null, d_plus: training.dplus ?? null, rpe: training.rpe ?? null,
@@ -493,7 +493,7 @@ export async function pushTraining(training, mode) {
       // réalisé → activity manuelle
       const row = {
         user_id: uid(), source: 'manual', category: 'entrainement', client_id: training.id,
-        name: training.name, start_date_local: training.date + 'T12:00:00',
+        name: training.name, start_date_local: training.date + 'T' + (training.time || '12:00') + ':00',
         sport: training.sport ?? null,
         moving_time: (training.duration || 0) * 60, tss: training.tss ?? 0,
         user_notes: training.notes ?? null,

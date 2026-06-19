@@ -3091,7 +3091,7 @@ function openTrainModal(mode) {
   // Poubelle cachée par défaut (visible seulement en édition)
   const delBtn = document.getElementById('train-modal-delete');
   if (delBtn) delBtn.hidden = true;
-  ['name','date','duration','tss','notes','rpe','km','dplus'].forEach(k => {
+  ['name','date','time','duration','tss','notes','rpe','km','dplus'].forEach(k => {
     const el = document.getElementById('train-modal-' + k);
     if (el) el.value = '';
   });
@@ -3133,6 +3133,7 @@ function openTrainModalForEdit(training, mode) {
   trainModalMode = mode;
   document.getElementById('train-modal-name').value = training.name || '';
   document.getElementById('train-modal-date').value = training.date || '';
+  { const _tt = document.getElementById('train-modal-time'); if (_tt) _tt.value = training.time || ''; }
   if (document.getElementById('train-modal-date')._flatpickr && training.date) {
     document.getElementById('train-modal-date')._flatpickr.setDate(training.date, false);
   }
@@ -3254,6 +3255,7 @@ function saveTrainFromModal() {
     }
     return;
   }
+  const time = (document.getElementById('train-modal-time') || {}).value || '';
   const sport = document.getElementById('train-modal-sport').value;
   const type = document.getElementById('train-modal-type').value;
   const duration = parseInt(document.getElementById('train-modal-duration').value, 10) || 0;
@@ -3274,7 +3276,7 @@ function saveTrainFromModal() {
   const exclPower = _exclOn('power'), exclHr = _exclOn('hr'), exclDistance = _exclOn('dist');
   const entry = {
     id: editingId || Date.now().toString(),
-    name, date, sport, type, duration, tss, notes,
+    name, date, time, sport, type, duration, tss, notes,
     rpe, km, dplus, laps, gpxName: _gpx.name, gpxContent: _gpx.content,
     exclPower, exclHr, exclDistance,
     sportCategory: (typeof getSportCategory === 'function' ? getSportCategory(sport) : sport),
@@ -3353,6 +3355,7 @@ function buildTrainingFromData(id) {
           _sbId: x._sbId || null,
           name: x.name || '',
           date: (x.start_date_local ? String(x.start_date_local).slice(0, 10) : toIsoDate(d.date)),
+          time: (x.start_date_local ? ((String(x.start_date_local).match(/T(\d{2}:\d{2})/) || [])[1] || '') : ''),
           sport: x.raw_type || x.sport || 'Ride',
           type: x.type || '',
           duration: x.duration || 0,
