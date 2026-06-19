@@ -217,17 +217,25 @@
     text-align: center;
   }
   .day-card .day-card-meta:empty { display: none; }
-  .day-card:has(.sport-pill[data-sport-cat="cyclisme"])    .day-card-meta { background: #3b82f6; }
-  .day-card:has(.sport-pill[data-sport-cat="vtt"])         .day-card-meta { background: #b45309; }
-  .day-card:has(.sport-pill[data-sport-cat="course"])      .day-card-meta { background: #fc4c02; }
-  .day-card:has(.sport-pill[data-sport-cat="trail"])       .day-card-meta { background: #15803d; }
-  .day-card:has(.sport-pill[data-sport-cat="natation"])    .day-card-meta { background: #06b6d4; }
-  .day-card:has(.sport-pill[data-sport-cat="musculation"]) .day-card-meta { background: #ef4444; }
-  .day-card:has(.sport-pill[data-sport-cat="marche"])      .day-card-meta { background: #65a30d; }
-  .day-card:has(.sport-pill[data-sport-cat="ski"])         .day-card-meta { background: #60a5fa; }
+  .day-card[data-sport-cat="cyclisme"]    .day-card-meta { background: #3b82f6; }
+  .day-card[data-sport-cat="vtt"]         .day-card-meta { background: #b45309; }
+  .day-card[data-sport-cat="course"]      .day-card-meta { background: #fc4c02; }
+  .day-card[data-sport-cat="trail"]       .day-card-meta { background: #15803d; }
+  .day-card[data-sport-cat="natation"]    .day-card-meta { background: #06b6d4; }
+  .day-card[data-sport-cat="musculation"] .day-card-meta { background: #ef4444; }
+  .day-card[data-sport-cat="marche"]      .day-card-meta { background: #65a30d; }
+  .day-card[data-sport-cat="ski"]         .day-card-meta { background: #60a5fa; }
+  .day-card[data-sport-cat="nautique"]    .day-card-meta { background: #0284c7; }
+  .day-card[data-sport-cat="football"]    .day-card-meta { background: #22c55e; }
+  .day-card[data-sport-cat="collectif"]   .day-card-meta { background: #c026d3; }
+  .day-card[data-sport-cat="raquette"]    .day-card-meta { background: #eab308; }
+  .day-card[data-sport-cat="yoga"]        .day-card-meta { background: #a78bfa; }
+  .day-card[data-sport-cat="escalade"]    .day-card-meta { background: #c2410c; }
+  .day-card[data-sport-cat="combat"]      .day-card-meta { background: #b91c1c; }
+  .day-card[data-sport-cat="autre"]       .day-card-meta { background: #9ca3af; }
 
   /* La vignette colorée remplace la barre verte latérale */
-  .day-card:not(.rest):has(.sport-pill)::before { display: none; }
+  .day-card:not(.rest)[data-sport-cat]::before { display: none; }
 
   /* Compétitions : trophée seul, sans le nom (illisible en petit) */
   .day-card.race .day-card-name { display: flex; justify-content: center; margin: 0; }
@@ -281,17 +289,4 @@
     padding: 0 6px;
     max-width: 420px;
   }
-  .auth-logo { justify-content: center; flex-direction: column; gap: 10px; text-align: center; margin-bottom: 28px; }
-  .auth-field input { padding: 13px 14px; font-size: 16px; } /* 16px = pas de zoom auto iOS */
-  .auth-submit { padding: 14px 0; font-size: 15px; }
-
-  /* ===== Cibles tactiles minimales ===== */
-  .subtab, .preset, .chart-reset { min-height: 36px; }
-  button { touch-action: manipulation; } /* supprime le délai double-tap */
-}
-
-/* ===== Très petits écrans ===== */
-@media (max-width: 380px) {
-  .hero { grid-template-columns: 1fr; }
-  .sidebar .sidebar-nav .tab { font-size: 9px; }
-}
+  .auth-logo { justify-content: center; flex-direction: column; gap: 10px; text-align: 
