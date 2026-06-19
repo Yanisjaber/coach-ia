@@ -3655,6 +3655,7 @@ function renderWeekPlan() {
             tss: raceTss,
             sport: c.sport || 'Ride',
             km: c.km || null,
+            dplus: c.dplus || null,
             priority: c.priority,
             why: `Compétition · ${compPrio(c.priority).label}${c.km ? ' · ' + Math.round(c.km) + ' km' : ''}`,
           });
@@ -3672,6 +3673,9 @@ function renderWeekPlan() {
             sport: m.sport || 'Ride',
             why: m.notes || 'Séance ajoutée manuellement',
             structure: m.structure || null,
+            km: m.km || null,
+            dplus: m.dplus || null,
+            rpe: (m.rpe != null ? m.rpe : null),
             _manual: true,
           });
         }
@@ -3733,7 +3737,9 @@ function renderWeekPlan() {
       }
       const kmStr = proposal.km ? Math.round(proposal.km) + ' km' : '';
       const durStr = proposal.dur ? fmtDur(proposal.dur) : '';
-      const metaLine = [durStr, kmStr].filter(Boolean).join(' · ');
+      const dplusStr = proposal.dplus ? Math.round(proposal.dplus) + ' m D+' : '';
+      const rpeStr = (proposal.rpe != null && proposal.rpe !== '') ? 'RPE ' + proposal.rpe : '';
+      const metaLine = [durStr, kmStr, dplusStr, rpeStr].filter(Boolean).join(' · ');
       const sportBlock = sportLabel
         ? `<div class="day-card-sport"><span class="sport-pill" data-sport-cat="${sportCat}">${sportLabel}</span></div>`
         : '';
@@ -3942,6 +3948,8 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   if (dur) metaParts.push(fmtDur(dur));
   if (km) metaParts.push(km);
   else if (act.tss) metaParts.push(act.tss + ' TSS'); // pas de km → on met TSS
+  if (act.elevation_gain) metaParts.push(Math.round(act.elevation_gain) + ' m D+');
+  if (act.rpe != null && act.rpe !== '') metaParts.push('RPE ' + act.rpe);
   const metaLine = metaParts.join(' · ');
 
   // Marqueur si TOUTES les activités du jour sont manuelles (= pas tracké par Strava)
