@@ -3862,7 +3862,8 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
       const hex = isComp ? compPrio(a.priority).color : (window.sportColor ? window.sportColor(a.raw_type || a.sport) : '#9ca3af');
       const g = isComp ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(a.raw_type || a.sport, 22) : '');
       const t = a.duration ? fmtDur(a.duration) : (a.distance_km ? Math.round(a.distance_km) + ' km' : '');
-      return `<div class="day-multi-col" data-iso="${iso}" data-source="realise" data-actidx="${i}" style="background:${hex}1a">`
+      const _nm = a.name || a.sessionName || 'Séance';
+      return `<div class="day-multi-col" data-iso="${iso}" data-source="realise" data-actidx="${i}" title="${String(_nm).replace(/"/g, '&quot;')}" style="background:${hex}1a">`
         + `<div class="dmc-bar" style="background:${hex}"></div>`
         + `<div class="dmc-body">${g ? `<span class="dmc-glyph" style="line-height:0">${g}</span>` : ''}${t ? `<span class="dmc-time">${t}</span>` : ''}</div>`
         + `</div>`;
@@ -3941,7 +3942,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
     <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass} day-card--single" data-iso="${iso}" data-source="realise"${raceAttr}>
       <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
       <div class="day-card-date">${d.getDate()}</div>
-      <div class="day-single-tile" style="background:${_hex}1a">
+      <div class="day-single-tile" style="background:${_hex}1a" title="${String(aName).replace(/"/g, '&quot;')}">
         <div class="dmc-bar" style="background:${_hex}"></div>
         <div class="dst-body">
           <div class="dst-head">
