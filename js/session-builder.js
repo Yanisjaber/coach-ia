@@ -315,37 +315,46 @@
     html += '</div>';
     return html;
   };
-  // Detail texte des intervalles sous le profil : 1 ligne par bloc avec la vraie
-  // donnee (duree + watts/bpm/allure + % + zone via label()).
+  // Detail des intervalles facon "builder" : 1 pill par segment (duree + point de
+  // zone + Zone N + plage watts/bpm/allure) ; les series encadrees avec un badge "Nx".
   window.renderWorkoutDetailHTML = function (blks) {
     if (!Array.isArray(blks) || !blks.length) return '';
     var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
     var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
-    var rows = blks.map(function (b) {
+    function valStr(seg, m) {
+      var lo = +seg.int || 0, hi = (seg.intHi != null && +seg.intHi > 0) ? +seg.intHi : null;
+      var a = hi == null ? lo : Math.min(lo, hi), c = hi == null ? lo : Math.max(lo, hi);
+      if (m === 'power') { var w1 = Math.round(FTP() * a / 100), w2 = Math.round(FTP() * c / 100); return hi == null ? (w1 + ' W') : (w1 + ' - ' + w2 + ' W'); }
+      if (m === 'hr') { var b1 = Math.round(HRMAX() * a / 100), b2 = Math.round(HRMAX() * c / 100); return hi == null ? (b1 + ' bpm') : (b1 + ' - ' + b2 + ' bpm'); }
+      return hi == null ? (fmtPace(a) + ' ' + paceUnit()) : (fmtPace(c) + ' - ' + fmtPace(a) + ' ' + paceUnit());
+    }
+    function pill(seg, m, nameRight) {
+      var zi = zoneOf(midOf(seg)); var col = ZHEX[zi];
+      return '<div style="display:flex;align-items:center;gap:10px;margin:6px 0;flex-wrap:wrap">'
+        + '<span style="display:inline-flex;align-items:center;gap:9px;background:' + col + '22;border-radius:999px;padding:5px 13px 5px 11px">'
+        +   '<b style="font-size:12px;color:var(--text,#e7ecf3);font-weight:700;white-space:nowrap">' + fmtDur(+seg.min || 0) + '</b>'
+        +   '<span style="width:9px;height:9px;border-radius:50%;background:' + col + ';flex:none"></span>'
+        +   '<span style="font-size:12.5px;font-weight:700;color:var(--text,#e7ecf3);white-space:nowrap">Zone ' + (zi + 1) + '</span>'
+        +   '<span style="font-size:12px;color:var(--text-mute,#7c8698);white-space:nowrap">' + esc(valStr(seg, m)) + '</span>'
+        + '</span>'
+        + (nameRight ? '<span style="font-size:12.5px;color:var(--text-dim,#9aa6b6)">' + esc(nameRight) + '</span>' : '')
+        + '</div>';
+    }
+    var out = blks.map(function (b) {
       var m = (b.metric) || (b.work && b.work.metric) || 'power';
       if (!ZONES[m]) m = 'power';
       var nm = b.name || NAME[b.type] || 'Bloc';
-      var isInt = b.type === 'interval' && b.rec;
-      var reps = Math.max(1, b.reps | 0);
-      var bmin = blockSegs(b).reduce(function (a, x) { return a + (+x.min || 0); }, 0);
-      var col = ZHEX[zoneOf(midOf(b.work || {}))];
-      var detail;
-      if (isInt) {
-        detail = reps + ' × ( ' + fmtDur(+b.work.min || 0) + ' à ' + label(b.work, m)
-          + '  /  ' + fmtDur(+b.rec.min || 0) + ' récup à ' + label(b.rec, m) + ' )';
-      } else {
-        detail = fmtDur((b.work && +b.work.min) || 0) + ' à ' + label(b.work || {}, m);
+      if (b.type === 'interval' && b.rec) {
+        var reps = Math.max(1, b.reps | 0);
+        return '<div style="position:relative;border:1px solid #33406a;border-radius:12px;padding:15px 12px 9px;margin:14px 0 10px">'
+          + '<span style="position:absolute;top:-11px;left:13px;background:#22305a;color:#9dc0f5;font-size:12px;font-weight:700;border-radius:8px;padding:2px 11px">' + reps + 'x</span>'
+          + pill(b.work, m, '')
+          + pill(b.rec, m, b.rec.name || 'Récupération')
+          + '</div>';
       }
-      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--border,#2a3444)">'
-        + '<div style="width:3px;align-self:stretch;border-radius:2px;background:' + col + ';flex:none"></div>'
-        + '<div style="flex:1;min-width:0">'
-        +   '<div style="font-weight:600;font-size:13px;color:var(--text,#e7ecf3)">' + esc(nm) + '</div>'
-        +   '<div style="font-size:12px;color:var(--text-dim,#9aa6b6);margin-top:2px;line-height:1.4">' + esc(detail) + '</div>'
-        + '</div>'
-        + '<div style="font-size:12px;color:var(--text-mute,#6b7686);white-space:nowrap;padding-top:1px">' + fmtDur(bmin) + '</div>'
-        + '</div>';
+      return pill(b.work || {}, m, nm);
     }).join('');
-    return '<div style="margin-top:6px">' + rows + '</div>';
+    return '<div style="margin-top:8px">' + out + '</div>';
   };
   window.getCurrentWorkoutStructure = function () { return getBlocks(); };
   window.setWorkoutStructure = function (s) { showSection(); setBlocks(s); };
