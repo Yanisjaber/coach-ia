@@ -3926,15 +3926,34 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
     ? `<div class="day-card-profile" style="margin-top:8px;">${window.renderWorkoutProfileHTML(act.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>`
     : '';
 
-  const _sportEmoji = window.sportGlyph ? window.sportGlyph(act.raw_type || act.sport) : '';
+  // Mono-activite : meme look "tuile" que le multi, mais une seule tuile pleine largeur.
+  // Glyph en debut de ligne (gagne de la hauteur) + profil d'intervalles toute largeur.
+  const _hex = isCompAct
+    ? compPrio(compToday ? compToday.priority : null).color
+    : (window.sportColor ? window.sportColor(act.raw_type || act.sport) : '#9ca3af');
+  const _headGlyph = isCompAct
+    ? trophySvg(_hex, 18)
+    : (window.sportGlyph ? window.sportGlyph(act.raw_type || act.sport, 20) : '');
+  const _fullProfile = (act && Array.isArray(act.structure) && act.structure.length && window.renderWorkoutProfileHTML)
+    ? `<div class="dst-profile">${window.renderWorkoutProfileHTML(act.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>`
+    : '';
   return `
-    <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass}" data-iso="${iso}" data-source="realise"${sportLabel ? ` data-sport-cat="${sportCat}"` : ''}${raceAttr}>
+    <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass} day-card--single" data-iso="${iso}" data-source="realise"${raceAttr}>
       <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
-      ${dateRow}
-      <div class="day-card-name">${isCompAct ? trophySvg(compPrio(compToday ? compToday.priority : null).color, 13) : ''}${_sportEmoji ? `<span class="dc-sport-emoji" style="margin-right:5px;line-height:0">${_sportEmoji}</span>` : ''}<span class="dc-name-text">${aName}</span></div>
-      <div class="day-card-meta">${metaLine}</div>
-      ${_miniProfile}
-      ${counter}
+      <div class="day-card-date">${d.getDate()}</div>
+      <div class="day-single-tile" style="background:${_hex}1a">
+        <div class="dmc-bar" style="background:${_hex}"></div>
+        <div class="dst-body">
+          <div class="dst-head">
+            ${_headGlyph ? `<span class="dst-glyph" style="line-height:0">${_headGlyph}</span>` : ''}
+            <div class="dst-text">
+              <span class="dst-name">${aName}</span>
+              ${metaLine ? `<span class="dst-meta">${metaLine}</span>` : ''}
+            </div>
+          </div>
+          ${_fullProfile}
+        </div>
+      </div>
     </div>
   `;
 }
