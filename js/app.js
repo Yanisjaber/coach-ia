@@ -3756,7 +3756,7 @@ function renderWeekPlan() {
       ` : `<div class="day-card-date">${d.getDate()}</div>`;
       const counter = hasMulti ? `<div class="day-card-counter">${curItemIdx + 1}/${totalItems}</div>` : '';
       cardHTML = `
-        <div class="day-card${isRest ? ' rest' : ''}${todayClass}${pastClass}${raceClass}" data-iso="${iso}" data-source="prevu"${raceAttr}>
+        <div class="day-card${isRest ? ' rest' : ''}${todayClass}${pastClass}${raceClass}" data-iso="${iso}" data-source="prevu"${(!isRest && sportLabel) ? ` data-sport-cat="${sportCat}"` : ''}${raceAttr}>
           <div class="day-card-dow">${dowFr[dow]}${dowSuffix}</div>
           ${dateRow}
           <div class="day-card-name">${isRace ? trophySvg(compPrio(proposal.priority).color, 13) : ''}${(() => { const e = window.sportGlyph ? window.sportGlyph(proposal.sport) : ''; return e ? `<span class="dc-sport-emoji" style="margin-right:5px;line-height:0">${e}</span>` : ''; })()}<span class="dc-name-text">${proposal.name}</span></div>
@@ -3904,7 +3904,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
 
   const _sportEmoji = window.sportGlyph ? window.sportGlyph(act.raw_type || act.sport) : '';
   return `
-    <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass}" data-iso="${iso}" data-source="realise"${raceAttr}>
+    <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass}" data-iso="${iso}" data-source="realise"${sportLabel ? ` data-sport-cat="${sportCat}"` : ''}${raceAttr}>
       <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
       ${dateRow}
       <div class="day-card-name">${isCompAct ? trophySvg(compPrio(compToday ? compToday.priority : null).color, 13) : ''}${_sportEmoji ? `<span class="dc-sport-emoji" style="margin-right:5px;line-height:0">${_sportEmoji}</span>` : ''}<span class="dc-name-text">${aName}</span></div>
