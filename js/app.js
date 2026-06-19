@@ -3741,32 +3741,64 @@ function renderWeekPlan() {
       const stageInfoLine = (proposal.stageInfo)
         ? `<div class="day-card-stage">${proposal.stageInfo}</div>`
         : '';
-      // Multi-items : flèches ‹ › + compteur, comme pour Réalisé
+      // Meme langage visuel que le Realise : tuile mono / colonnes multi / repos.
       const totalItems = proposal._totalItems || 1;
-      const curItemIdx = proposal._itemIdx || 0;
       const hasMulti = totalItems > 1;
-      const dateRow = hasMulti ? `
-        <div class="day-card-date-row">
-          <div class="day-card-date">${d.getDate()}</div>
-          <div class="day-card-arrows-wrapper">
-            <button class="day-card-arrow-inline arrow-prev-prevu" data-iso="${iso}" title="Activité précédente">‹</button>
-            <button class="day-card-arrow-inline arrow-next-prevu" data-iso="${iso}" title="Activité suivante">›</button>
+      const _dow = `<div class="day-card-dow">${dowFr[dow]}${dowSuffix}</div>`;
+      const _date = `<div class="day-card-date">${d.getDate()}</div>`;
+
+      if (hasMulti) {
+        const cols = items.map((it, i) => {
+          const _r = !!it.isRace;
+          const hex = _r ? compPrio(it.priority).color : (window.sportColor ? window.sportColor(it.sport) : '#9ca3af');
+          const g = _r ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(it.sport, 22) : '');
+          const t = it.dur ? fmtDur(it.dur) : (it.km ? Math.round(it.km) + ' km' : '');
+          const nm = it.name || 'Séance';
+          return `<div class="day-multi-col" data-iso="${iso}" data-source="prevu" data-actidx="${i}" title="${String(nm).replace(/\"/g, '&quot;')}" style="background:${hex}1a">`
+            + `<div class="dmc-bar" style="background:${hex}"></div>`
+            + `<div class="dmc-body">${g ? `<span class="dmc-glyph" style="line-height:0">${g}</span>` : ''}${t ? `<span class="dmc-time">${t}</span>` : ''}</div>`
+            + `</div>`;
+        }).join('');
+        cardHTML = `
+        <div class="day-card${todayClass}${pastClass} day-card--multi" data-iso="${iso}" data-source="prevu">
+          ${_dow}
+          ${_date}
+          <div class="day-multi-grid">${cols}</div>
+        </div>`;
+      } else if (isRest) {
+        cardHTML = `
+        <div class="day-card rest${todayClass}${pastClass}" data-iso="${iso}" data-source="prevu">
+          ${_dow}
+          ${_date}
+          ${REST_COUCH_SVG}
+        </div>`;
+      } else {
+        const _hex = isRace ? compPrio(proposal.priority).color : (window.sportColor ? window.sportColor(proposal.sport) : '#9ca3af');
+        const _headGlyph = isRace ? trophySvg(_hex, 18) : (window.sportGlyph ? window.sportGlyph(proposal.sport, 20) : '');
+        const _fullProfile = (proposal && Array.isArray(proposal.structure) && proposal.structure.length && window.renderWorkoutProfileHTML)
+          ? `<div class="dst-profile">${window.renderWorkoutProfileHTML(proposal.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>`
+          : '';
+        const _nm = proposal.name || 'Séance';
+        cardHTML = `
+        <div class="day-card${todayClass}${pastClass}${raceClass} day-card--single" data-iso="${iso}" data-source="prevu"${raceAttr}>
+          ${_dow}
+          ${_date}
+          <div class="day-single-tile" style="background:${_hex}1a" title="${String(_nm).replace(/\"/g, '&quot;')}">
+            <div class="dmc-bar" style="background:${_hex}"></div>
+            <div class="dst-body">
+              <div class="dst-head">
+                ${_headGlyph ? `<span class="dst-glyph" style="line-height:0">${_headGlyph}</span>` : ''}
+                <div class="dst-text">
+                  <span class="dst-name">${_nm}</span>
+                  ${metaLine ? `<span class="dst-meta">${metaLine}</span>` : ''}
+                </div>
+              </div>
+              ${stageInfoLine}
+              ${_fullProfile}
+            </div>
           </div>
-        </div>
-      ` : `<div class="day-card-date">${d.getDate()}</div>`;
-      const counter = hasMulti ? `<div class="day-card-counter">${curItemIdx + 1}/${totalItems}</div>` : '';
-      cardHTML = `
-        <div class="day-card${isRest ? ' rest' : ''}${todayClass}${pastClass}${raceClass}" data-iso="${iso}" data-source="prevu"${(!isRest && sportLabel) ? ` data-sport-cat="${sportCat}"` : ''}${raceAttr}>
-          <div class="day-card-dow">${dowFr[dow]}${dowSuffix}</div>
-          ${dateRow}
-          <div class="day-card-name">${isRace ? trophySvg(compPrio(proposal.priority).color, 13) : ''}${(() => { const e = window.sportGlyph ? window.sportGlyph(proposal.sport) : ''; return e ? `<span class="dc-sport-emoji" style="margin-right:5px;line-height:0">${e}</span>` : ''; })()}<span class="dc-name-text">${proposal.name}</span></div>
-          ${stageInfoLine}
-          <div class="day-card-meta">${metaLine}</div>
-          ${(proposal && Array.isArray(proposal.structure) && proposal.structure.length && window.renderWorkoutProfileHTML) ? `<div class="day-card-profile" style="margin-top:8px;">${window.renderWorkoutProfileHTML(proposal.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>` : ''}
-          ${isRest ? REST_COUCH_SVG : ''}
-          ${counter}
-        </div>
-      `;
+        </div>`;
+      }
       dayCards.push(cardHTML);
 
       // Détermine si la semaine est passée, en cours ou future
@@ -4270,8 +4302,11 @@ document.getElementById('week-calendar').addEventListener('click', (e) => {
   const _mcol = e.target.closest('.day-multi-col');
   if (_mcol) {
     e.stopPropagation();
-    window.__openActIdx = parseInt(_mcol.dataset.actidx, 10) || 0;
-    openSessionModal(_mcol.dataset.iso, _mcol.dataset.source || 'realise');
+    const _ci = parseInt(_mcol.dataset.actidx, 10) || 0;
+    const _csrc = _mcol.dataset.source || 'realise';
+    if (_csrc === 'prevu') dayPrevuIndex[_mcol.dataset.iso] = _ci;
+    else window.__openActIdx = _ci;
+    openSessionModal(_mcol.dataset.iso, _csrc);
     return;
   }
   // Clic sur la carte → ouvrir la modal (sauf si c'est une carte totaux)
