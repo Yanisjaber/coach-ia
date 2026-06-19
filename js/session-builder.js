@@ -315,8 +315,8 @@
     html += '</div>';
     return html;
   };
-  // Detail des intervalles facon "builder" : 1 pill par segment (duree + point de
-  // zone + Zone N + plage watts/bpm/allure) ; les series encadrees avec un badge "Nx".
+  // Detail des intervalles : barres proportionnelles a la duree (largeur = duree),
+  // colorees par zone, texte en surimpression (toujours lisible) ; series encadrees "xN".
   window.renderWorkoutDetailHTML = function (blks) {
     if (!Array.isArray(blks) || !blks.length) return '';
     var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
@@ -324,20 +324,26 @@
     function valStr(seg, m) {
       var lo = +seg.int || 0, hi = (seg.intHi != null && +seg.intHi > 0) ? +seg.intHi : null;
       var a = hi == null ? lo : Math.min(lo, hi), c = hi == null ? lo : Math.max(lo, hi);
-      if (m === 'power') { var w1 = Math.round(FTP() * a / 100), w2 = Math.round(FTP() * c / 100); return hi == null ? (w1 + ' W') : (w1 + ' - ' + w2 + ' W'); }
-      if (m === 'hr') { var b1 = Math.round(HRMAX() * a / 100), b2 = Math.round(HRMAX() * c / 100); return hi == null ? (b1 + ' bpm') : (b1 + ' - ' + b2 + ' bpm'); }
-      return hi == null ? (fmtPace(a) + ' ' + paceUnit()) : (fmtPace(c) + ' - ' + fmtPace(a) + ' ' + paceUnit());
+      if (m === 'power') { var w1 = Math.round(FTP() * a / 100), w2 = Math.round(FTP() * c / 100); return hi == null ? (w1 + ' W') : (w1 + '-' + w2 + ' W'); }
+      if (m === 'hr') { var b1 = Math.round(HRMAX() * a / 100), b2 = Math.round(HRMAX() * c / 100); return hi == null ? (b1 + ' bpm') : (b1 + '-' + b2 + ' bpm'); }
+      return hi == null ? (fmtPace(a) + ' ' + paceUnit()) : (fmtPace(c) + '-' + fmtPace(a) + ' ' + paceUnit());
     }
-    function pill(seg, m, nameRight) {
+    // Reference = plus longue duree de segment unitaire (1 rep)
+    var maxMin = 1;
+    blks.forEach(function (b) {
+      if (b.work && +b.work.min > maxMin) maxMin = +b.work.min;
+      if (b.type === 'interval' && b.rec && +b.rec.min > maxMin) maxMin = +b.rec.min;
+    });
+    function bar(seg, m, leftLabel) {
       var zi = zoneOf(midOf(seg)); var col = ZHEX[zi];
-      return '<div style="display:flex;align-items:center;gap:10px;margin:6px 0;flex-wrap:wrap">'
-        + '<span style="display:inline-flex;align-items:center;gap:9px;background:' + col + '22;border-radius:999px;padding:5px 13px 5px 11px">'
-        +   '<b style="font-size:12px;color:var(--text,#e7ecf3);font-weight:700;white-space:nowrap">' + fmtDur(+seg.min || 0) + '</b>'
-        +   '<span style="width:9px;height:9px;border-radius:50%;background:' + col + ';flex:none"></span>'
-        +   '<span style="font-size:12.5px;font-weight:700;color:var(--text,#e7ecf3);white-space:nowrap">Zone ' + (zi + 1) + '</span>'
-        +   '<span style="font-size:12px;color:var(--text-mute,#7c8698);white-space:nowrap">' + esc(valStr(seg, m)) + '</span>'
-        + '</span>'
-        + (nameRight ? '<span style="font-size:12.5px;color:var(--text-dim,#9aa6b6)">' + esc(nameRight) + '</span>' : '')
+      var pct = Math.max(10, Math.min(100, Math.round((+seg.min || 0) / maxMin * 100)));
+      var txt = fmtDur(+seg.min || 0) + ' · Z' + (zi + 1) + ' · ' + valStr(seg, m);
+      return '<div style="display:flex;align-items:center;gap:10px;margin:7px 0">'
+        + '<span style="font-size:12px;color:var(--text-dim,#9aa6b6);width:92px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(leftLabel) + '</span>'
+        + '<div style="flex:1;position:relative;background:var(--bg-elev,#1e2636);border-radius:6px;height:26px;overflow:hidden">'
+        +   '<div style="position:absolute;left:0;top:0;bottom:0;width:' + pct + '%;background:' + col + '4d;border-left:3px solid ' + col + '"></div>'
+        +   '<div style="position:relative;line-height:26px;padding-left:10px;font-size:11.5px;color:var(--text,#dfe5ef);white-space:nowrap">' + esc(txt) + '</div>'
+        + '</div>'
         + '</div>';
     }
     var out = blks.map(function (b) {
@@ -346,13 +352,13 @@
       var nm = b.name || NAME[b.type] || 'Bloc';
       if (b.type === 'interval' && b.rec) {
         var reps = Math.max(1, b.reps | 0);
-        return '<div style="position:relative;border:1px solid #33406a;border-radius:12px;padding:15px 12px 9px;margin:14px 0 10px">'
-          + '<span style="position:absolute;top:-11px;left:13px;background:#22305a;color:#9dc0f5;font-size:12px;font-weight:700;border-radius:8px;padding:2px 11px">' + reps + 'x</span>'
-          + pill(b.work, m, '')
-          + pill(b.rec, m, b.rec.name || 'Récupération')
+        return '<div style="position:relative;border:1px solid #33406a;border-radius:10px;padding:13px 10px 7px;margin:13px 0 9px">'
+          + '<span style="position:absolute;top:-10px;left:12px;background:#22305a;color:#9dc0f5;font-size:11px;font-weight:700;border-radius:6px;padding:2px 9px">×' + reps + '</span>'
+          + bar(b.work, m, 'Effort')
+          + bar(b.rec, m, b.rec.name || 'Récup')
           + '</div>';
       }
-      return pill(b.work || {}, m, nm);
+      return bar(b.work || {}, m, nm);
     }).join('');
     return '<div style="margin-top:8px">' + out + '</div>';
   };
