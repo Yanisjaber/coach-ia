@@ -8186,43 +8186,55 @@ function openSessionModal(iso, source) {
           else if (_cat === 'natation') _allureCard = card('Allure', _fmtPace((dur * 60) / (_distKm * 10)), '/100m');
           else _allureCard = card('Vitesse moy', (+(_distKm / (dur / 60)).toFixed(1)), 'km/h');
         }
-        const syntheseHTML = section('Synthèse', [
-          card('Durée', dur < 60 ? `${Math.round(dur)}<span style="font-size:14px;"> min</span>` : `${h}<span style="font-size:14px;">h</span>${m}`, '', elapsedSub),
-          (act.category === 'competition' && act.target != null && act.target !== '') && card('Temps cible', fmtMinToTime(act.target), ''),
-          _distKm && card('Distance', _distKm, 'km'),
-          _dplusM && card('Dénivelé +', _dplusM, 'm',
-            act.elevation_loss ? `D− ${act.elevation_loss} m` : ''),
-          act.avg_speed_kmh && card('Vitesse moy', act.avg_speed_kmh, 'km/h',
-            vMaxToShow ? `Max ${vMaxToShow} km/h` : ''),
-          _allureCard,
-          act.tss && card('TSS', act.tss, ''),
-          act.rpe && card('RPE', act.rpe, '/10'),
-          act.laps && card('Tours', act.laps, ''),
-        ]);
+        // === Bloc stats : 3 heros (Duree, Distance, Vitesse) + sous-stats teintees par categorie ===
+        const _svgClock = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+        const _svgRoute = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg>';
+        const _svgSpeed = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14" r="2"/><path d="M13.4 12.6 19 7"/><path d="M3.6 19a9 9 0 1 1 16.8 0"/></svg>';
+        const _durStr = dur < 60 ? `${Math.round(dur)}<span style="font-size:13px"> min</span>` : `${h}<span style="font-size:13px">h</span>${m}`;
+        let _speedHero = null;
+        if (act.avg_speed_kmh) _speedHero = { val: act.avg_speed_kmh, unit: 'km/h', lab: 'Vitesse moy' };
+        else if (_distKm && dur) {
+          const _cat = (typeof getSportCategory === 'function') ? getSportCategory(act.raw_type || act.sport || '') : 'cyclisme';
+          const _fp = (s) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
+          if (_cat === 'course') _speedHero = { val: _fp((dur * 60) / _distKm), unit: '/km', lab: 'Allure' };
+          else if (_cat === 'natation') _speedHero = { val: _fp((dur * 60) / (_distKm * 10)), unit: '/100m', lab: 'Allure' };
+          else _speedHero = { val: +(_distKm / (dur / 60)).toFixed(1), unit: 'km/h', lab: 'Vitesse moy' };
+        }
+        const heroCard = (svg, val, unit, lab, color) =>
+          `<div style="flex:1;min-width:0;background:var(--bg-elev2,#1b2230);border-radius:11px;padding:13px;display:flex;align-items:center;gap:11px;">`
+          + `<span style="color:${color};flex:none;line-height:0">${svg}</span>`
+          + `<div style="min-width:0"><div style="font-size:22px;font-weight:700;color:var(--text,#fff);line-height:1;white-space:nowrap">${val}${unit ? `<span style="font-size:12px;color:var(--text-mute,#7c879c)"> ${unit}</span>` : ''}</div>`
+          + `<div style="font-size:10px;color:var(--text-mute,#7c879c);text-transform:uppercase;letter-spacing:.4px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lab}</div></div></div>`;
+        const _heroes = [heroCard(_svgClock, _durStr, '', elapsedSub ? ('Durée · ' + elapsedSub) : 'Durée', '#60a5fa')];
+        if (_distKm) _heroes.push(heroCard(_svgRoute, _distKm, 'km', 'Distance', '#22d3ee'));
+        if (_speedHero) _heroes.push(heroCard(_svgSpeed, _speedHero.val, _speedHero.unit, _speedHero.lab, '#34d399'));
+        if (_heroes.length < 3 && act.np) _heroes.push(heroCard(_svgSpeed, act.np, 'W', 'NP', '#fbbf24'));
+        if (_heroes.length < 3 && act.tss) _heroes.push(heroCard(_svgClock, act.tss, '', 'TSS', '#fbbf24'));
+        const _heroRow = _heroes.length ? `<div style="display:flex;gap:11px;margin-bottom:11px;flex-wrap:wrap">${_heroes.slice(0, 3).join('')}</div>` : '';
 
-        // --- 2. Puissance & FC : 4 cards moy/max sur une ligne ---
-        const puissanceFcHTML = section('Puissance & FC', [
-          act.avg_watts && card('Puissance moy', act.avg_watts, 'W'),
-          act.max_watts && card('Puissance max', act.max_watts, 'W'),
-          act.hr && card('FC moy', act.hr, 'bpm'),
-          act.max_hr && card('FC max', act.max_hr, 'bpm'),
-        ]);
-
-        // --- 3. Effort (intensité, énergie, cadence) ---
-        const effortHTML = section('Effort', [
-          act.np && card('NP', act.np, 'W',
-            `IF ${act.intensity || '—'} · ${act.ftpPct || 0}% FTP`),
-          act.cadence && card('Cadence', act.cadence, 'rpm',
-            act.max_cadence ? `Max ${act.max_cadence} rpm` : ''),
-          act.kj && card('Énergie', act.kj, 'kJ',
-            act.calories ? `${act.calories} kcal` : ''),
-        ]);
-
-        // Section Cardio supprimée (intégrée à Puissance & FC)
-        const cardioHTML = '';
-
-        // Section Mouvement supprimée (intégrée à Synthèse + Effort)
-        const mouvementHTML = '';
+        const _mut = 'var(--text-mute,#7c879c)';
+        const tile = (lab, valHTML, color) =>
+          `<div style="background:${color}17;border-radius:9px;padding:9px 12px;">`
+          + `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:${color}">${lab}</div>`
+          + `<div style="font-size:14px;font-weight:600;color:var(--text,#e7ebf3);margin-top:2px">${valHTML}</div></div>`;
+        const _tiles = [];
+        if (act.category === 'competition' && act.target != null && act.target !== '') _tiles.push(tile('Temps cible', fmtMinToTime(act.target), '#c084fc'));
+        if (act.avg_watts) {
+          let pv = `${act.avg_watts} moy`;
+          if (act.max_watts) pv += ` · ${act.max_watts} max`;
+          if (act.np) pv += ` · NP ${act.np}`;
+          if (act.intensity || act.ftpPct) pv += ` <span style="font-weight:400;color:${_mut};font-size:11px">(IF ${act.intensity || '—'} · ${act.ftpPct || 0}% FTP)</span>`;
+          _tiles.push(tile('Puissance', pv, '#f59e0b'));
+        } else if (act.np) {
+          _tiles.push(tile('Puissance', `NP ${act.np} W` + (act.intensity ? ` <span style="font-weight:400;color:${_mut};font-size:11px">(IF ${act.intensity})</span>` : ''), '#f59e0b'));
+        }
+        if (act.hr) _tiles.push(tile('Cardio', `${act.hr} moy` + (act.max_hr ? ` · ${act.max_hr} max` : '') + ` <span style="font-weight:400;color:${_mut};font-size:11px">bpm</span>`, '#f87171'));
+        if (act.cadence) _tiles.push(tile('Cadence', `${act.cadence}` + (act.max_cadence ? ` · ${act.max_cadence} max` : '') + ` <span style="font-weight:400;color:${_mut};font-size:11px">rpm</span>`, '#a78bfa'));
+        if (_dplusM) _tiles.push(tile('Dénivelé', `${_dplusM} m D+` + (act.elevation_loss ? ` · ${act.elevation_loss} D−` : ''), '#4ade80'));
+        if (vMaxToShow) _tiles.push(tile('Vitesse max', `${vMaxToShow} km/h`, '#22d3ee'));
+        { let chg = []; if (act.tss) chg.push(`${act.tss} TSS`); if (act.kj) chg.push(`${act.kj} kJ`); if (act.calories) chg.push(`${act.calories} kcal`); if (act.rpe) chg.push(`RPE ${act.rpe}`); if (act.laps) chg.push(`${act.laps} tours`); if (chg.length) _tiles.push(tile('Charge', chg.join(' · '), '#9ca3af')); }
+        const _tileGrid = _tiles.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">${_tiles.join('')}</div>` : '';
+        const statsHTML = (_heroRow || _tileGrid) ? `<div class="modal-section">${_heroRow}${_tileGrid}</div>` : '';
 
         // --- Lien Strava ---
         const aId = act.id || act.activityId || day.activityId;
@@ -8252,12 +8264,8 @@ function openSessionModal(iso, source) {
         const lienHTML = '';
         bodyEl.innerHTML = `
           ${switchHTML}
-          ${syntheseHTML}
+          ${statsHTML}
           ${comparHTML}
-          ${puissanceFcHTML}
-          ${effortHTML}
-          ${cardioHTML}
-          ${mouvementHTML}
           ${zonesHTML}
           ${profileHTML}
           ${notesHTML}
