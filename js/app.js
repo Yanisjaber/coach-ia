@@ -7835,10 +7835,23 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
         + (targetPct != null ? '<div style="position:absolute;left:' + targetPct + '%;top:-2px;width:2px;height:11px;background:#cdd5e5"></div>' : '')
         + '</div></div>';
     }
+    // kJ prevu : pas stocke -> estime depuis la structure planifiee (watts cibles x duree)
+    var _ftp = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && +window.DASHBOARD_DATA.athlete.ftp) || 250;
+    var _estKj = function (blks) {
+      if (!Array.isArray(blks) || !blks.length) return null;
+      var total = 0;
+      blks.forEach(function (b) {
+        var reps = Math.max(1, b.reps | 0);
+        var segs = [b.work]; if (b.type === 'interval' && b.rec) segs.push(b.rec);
+        for (var r = 0; r < reps; r++) segs.forEach(function (s) { if (!s) return; var mid = (s.intHi != null && +s.intHi > 0) ? ((+s.int + +s.intHi) / 2) : (+s.int || 0); total += (_ftp * mid / 100) * ((+s.min || 0) * 60); });
+      });
+      return total / 1000;
+    };
+    var _pKj = (p.structure && p.structure.length) ? _estKj(p.structure) : null;
     var bars = ''
       + barRow('Durée', p.duration, act.duration, function (x) { return fmtD(x); })
       + barRow('Distance', p.km, act.distance_km, function (x) { return Math.round(x) + ' km'; })
-      + barRow('Énergie', null, act.kj, function (x) { return Math.round(x) + ' kJ'; })
+      + barRow('Énergie', (_pKj != null ? Math.round(_pKj) : null), act.kj, function (x) { return Math.round(x) + ' kJ'; })
       + barRow('TSS', p.tss, act.tss, function (x) { return '' + Math.round(x); });
     if (!bars) return '';
     var structHTML = '';
