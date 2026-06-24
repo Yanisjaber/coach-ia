@@ -5083,64 +5083,78 @@ window.detectRideSequences = function (watts, ftp) {
   try {
     ftp = +ftp || 250;
     if (!watts || !watts.length) return [];
-    var W = []; for (var i = 0; i < watts.length; i++) { var v = watts[i]; W.push((v == null || isNaN(v)) ? 0 : +v); }
-    var n = W.length; if (n < 180) return [];   // < 3 min : pas d'analyse
+    var raw = []; for (var i = 0; i < watts.length; i++) { var v = watts[i]; raw.push((v == null || isNaN(v)) ? 0 : +v); }
+    var n = raw.length; if (n < 180) return [];
+    // Lissage ~15 s pour stabiliser la "base" (sinon la puissance bruitee sur-segmente)
+    function sm(arr, win) { var m = arr.length, o = new Array(m), s = 0, c = 0; for (var x = 0; x <= win && x < m; x++) { s += arr[x]; c++; } for (var x2 = 0; x2 < m; x2++) { if (x2 > 0 && x2 + win < m) { s += arr[x2 + win]; c++; } if (x2 - win - 1 >= 0) { s -= arr[x2 - win - 1]; c--; } o[x2] = c > 0 ? s / c : 0; } return o; }
+    var sw = sm(raw, 7);   // +/-7 s = ~15 s
     var zoneOf = function (w) { var p = w / ftp * 100; if (p < 60) return 0; if (p < 76) return 1; if (p < 90) return 2; if (p < 105) return 3; if (p < 120) return 4; return 5; };
-    // 1) Binning 10 s
-    var BIN = 10, bins = [];
-    for (var s = 0; s < n; s += BIN) { var sum = 0, c = 0; for (var k = s; k < Math.min(n, s + BIN); k++) { sum += W[k]; c++; } var w = c ? sum / c : 0; bins.push({ w: w, dur: c, z: zoneOf(w) }); }
-    // 2) Fusion bins meme zone -> segments
+    var classOf = function (z) { return z >= 4 ? 'hard' : (z <= 1 ? 'rec' : 'base'); };  // 3 classes larges
+    // Binning 5 s
+    var BIN = 5, bins = [];
+    for (var s2 = 0; s2 < n; s2 += BIN) { var sum = 0, c2 = 0; for (var k = s2; k < Math.min(n, s2 + BIN); k++) { sum += sw[k]; c2++; } var w = c2 ? sum / c2 : 0; var z = zoneOf(w); bins.push({ w: w, dur: c2, z: z, c: classOf(z) }); }
+    // Segments par classe
     var segs = [];
-    bins.forEach(function (bn) { var L = segs[segs.length - 1]; if (L && L.z === bn.z) { L.dur += bn.dur; L._sw += bn.w * bn.dur; } else segs.push({ z: bn.z, dur: bn.dur, _sw: bn.w * bn.dur }); });
-    segs.forEach(function (g) { g.w = g._sw / Math.max(1, g.dur); });
-    // 3) Lissage : absorber segments < 30 s dans le voisin de zone la plus proche
-    var MIN = 30, changed = true, guard = 0;
-    while (changed && segs.length > 1 && guard++ < 500) {
+    bins.forEach(function (bn) { var L = segs[segs.length - 1]; if (L && L.c === bn.c) { L.dur += bn.dur; L._sw += bn.w * bn.dur; L._zs += bn.z * bn.dur; } else segs.push({ c: bn.c, dur: bn.dur, _sw: bn.w * bn.dur, _zs: bn.z * bn.dur }); });
+    var recalc = function () { segs.forEach(function (g) { g.w = g._sw / Math.max(1, g.dur); g.z = Math.round(g._zs / Math.max(1, g.dur)); }); };
+    recalc();
+    // Absorption : effort court < 15 s absorbe ; base/recup < 90 s absorbe SAUF si recup entre 2 efforts (intervalle)
+    var minOf = function (cl) { return cl === 'hard' ? 15 : 90; };
+    var guard = 0, changed = true;
+    while (changed && segs.length > 1 && guard++ < 800) {
       changed = false;
+      // segment le plus court a absorber
+      var bi = -1, bd = 1e9;
       for (var q = 0; q < segs.length; q++) {
-        if (segs[q].dur < MIN) {
-          var prev = segs[q - 1], next = segs[q + 1], into = (!prev) ? next : (!next ? prev : (Math.abs(prev.z - segs[q].z) <= Math.abs(next.z - segs[q].z) ? prev : next));
-          if (into) { into.dur += segs[q].dur; into._sw += segs[q].w * segs[q].dur; into.w = into._sw / into.dur; segs.splice(q, 1); changed = true; break; }
-        }
+        if (segs[q].dur >= minOf(segs[q].c)) continue;
+        var prev = segs[q - 1], next = segs[q + 1];
+        var protectedRecup = (segs[q].c !== 'hard') && prev && next && prev.c === 'hard' && next.c === 'hard';
+        if (protectedRecup) continue;
+        if (segs[q].dur < bd) { bd = segs[q].dur; bi = q; }
       }
+      if (bi === -1) break;
+      var p0 = segs[bi - 1], n0 = segs[bi + 1];
+      var into = (!p0) ? n0 : (!n0 ? p0 : (Math.abs(p0.w - segs[bi].w) <= Math.abs(n0.w - segs[bi].w) ? p0 : n0));
+      if (!into) break;
+      into.dur += segs[bi].dur; into._sw += segs[bi]._sw; into._zs += segs[bi]._zs; segs.splice(bi, 1); recalc();
+      // re-fusion eventuelle avec voisins meme classe
+      var s3 = []; segs.forEach(function (g) { var L = s3[s3.length - 1]; if (L && L.c === g.c) { L.dur += g.dur; L._sw += g._sw; L._zs += g._zs; } else s3.push(g); }); segs = s3; recalc();
+      changed = true;
     }
-    // re-fusion adjacents meme zone
-    var s2 = [];
-    segs.forEach(function (g) { var L = s2[s2.length - 1]; if (L && L.z === g.z) { L.dur += g.dur; L._sw += g.w * g.dur; L.w = L._sw / L.dur; } else s2.push({ z: g.z, dur: g.dur, _sw: g.w * g.dur, w: g.w }); });
-    segs = s2;
     if (!segs.length) return [];
-    // 4) Series d'intervalles : motif [haut(z>=4), bas(z<=2)] repete >= 2 fois
+    // Construction des blocs + groupement des series d'efforts
     var pctFtp = function (w) { return Math.round(w / ftp * 100); };
     var avgWD = function (arr) { var s = 0, d = 0; arr.forEach(function (x) { s += x.w * x.dur; d += x.dur; }); return d ? s / d : 0; };
     var medDur = function (arr) { var d = arr.map(function (x) { return x.dur; }).sort(function (p, q) { return p - q; }); return d.length ? d[Math.floor(d.length / 2)] : 0; };
-    var isHigh = function (g) { return g.z >= 4; }, isLow = function (g) { return g.z <= 2; };
     var blocks = [], idx = 0;
+    var isHigh = function (g) { return g.c === 'hard'; };
     while (idx < segs.length) {
-      if (isHigh(segs[idx]) && idx + 1 < segs.length && isLow(segs[idx + 1])) {
-        var work = [], rec = [], j = idx;
-        while (j + 1 < segs.length && isHigh(segs[j]) && isLow(segs[j + 1])) { work.push(segs[j]); rec.push(segs[j + 1]); j += 2; }
-        if (j < segs.length && isHigh(segs[j])) { work.push(segs[j]); j += 1; }
+      if (isHigh(segs[idx]) && idx + 1 < segs.length && !isHigh(segs[idx + 1])) {
+        var work = [], rec = [], jj = idx;
+        while (jj + 1 < segs.length && isHigh(segs[jj]) && !isHigh(segs[jj + 1]) && (jj + 2 >= segs.length || isHigh(segs[jj + 2]))) { work.push(segs[jj]); rec.push(segs[jj + 1]); jj += 2; }
+        if (jj < segs.length && isHigh(segs[jj])) { work.push(segs[jj]); jj += 1; }
         if (work.length >= 2) {
-          blocks.push({ type: 'interval', name: 'Intervalles', reps: work.length, metric: 'power', unit: 'percent',
-            work: { min: Math.round(medDur(work) / 60 * 10) / 10, int: pctFtp(avgWD(work)), metric: 'power' },
-            rec: { min: Math.round(medDur(rec) / 60 * 10) / 10, int: pctFtp(rec.length ? avgWD(rec) : 0), metric: 'power' } });
-          idx = j; continue;
+          var wS = medDur(work), nm = (wS <= 50 ? 'Sprints' : 'Intervalles');
+          blocks.push({ type: 'interval', name: nm, reps: work.length, metric: 'power', unit: 'percent',
+            work: { min: Math.round(wS / 60 * 100) / 100, int: pctFtp(avgWD(work)), metric: 'power' },
+            rec: { min: Math.round(medDur(rec) / 60 * 100) / 100, int: pctFtp(rec.length ? avgWD(rec) : 0), metric: 'power' } });
+          idx = jj; continue;
         }
       }
       var g0 = segs[idx];
-      blocks.push({ type: 'steady', name: null, _z: g0.z, metric: 'power', unit: 'percent', work: { min: Math.round(g0.dur / 60 * 10) / 10, int: pctFtp(g0.w), metric: 'power' } });
+      blocks.push({ type: 'steady', name: null, _z: g0.z, _c: g0.c, _durS: g0.dur, metric: 'power', unit: 'percent', work: { min: Math.round(g0.dur / 60 * 100) / 100, int: pctFtp(g0.w), metric: 'power' } });
       idx++;
     }
-    // 5) Nommage
+    // Nommage deduit
     var ZN = ['Récupération', 'Endurance', 'Tempo', 'Seuil', 'VO2max', 'Anaérobie'];
-    blocks.forEach(function (bl, bi) {
+    blocks.forEach(function (bl, bi2) {
       if (bl.type === 'interval') return;
-      if (bi === 0 && bl._z <= 2) { bl.name = 'Échauffement'; return; }
-      if (bi === blocks.length - 1 && bl._z <= 2) { bl.name = 'Retour au calme'; return; }
+      if (bi2 === 0 && bl._z <= 2) { bl.name = 'Échauffement'; return; }
+      if (bi2 === blocks.length - 1 && bl._z <= 2) { bl.name = 'Retour au calme'; return; }
+      if (bl._c === 'hard') { bl.name = (bl._durS <= 50 ? 'Sprint' : (bl._z === 4 ? 'Seuil' : 'VO2max')); return; }
       bl.name = ZN[bl._z] || 'Bloc';
     });
-    // filtre blocs residuels trop courts
-    blocks = blocks.filter(function (bl) { var d = (bl.work ? bl.work.min : 0) * 60 * (bl.reps || 1) + (bl.rec ? bl.rec.min * 60 * (bl.reps || 1) : 0); return d >= 25; });
+    blocks = blocks.filter(function (bl) { var d = (bl.work ? bl.work.min : 0) * 60 * (bl.reps || 1) + (bl.rec ? bl.rec.min * 60 * (bl.reps || 1) : 0); return d >= 20; });
     return blocks;
   } catch (e) { console.warn('[detect sequences]', e && e.message); return []; }
 };
