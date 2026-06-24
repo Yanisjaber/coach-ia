@@ -7763,19 +7763,25 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
 // Bouton/selecteur de lien dans le HEADER de la modale (a cote des "...").
 window.__setupModalLinkSelect = function (act, iso) {
   var wrap = document.getElementById('modal-link-wrap');
-  var sel = document.getElementById('modal-link-select');
+  var menu = document.getElementById('modal-link-menu');
   var btn = document.getElementById('modal-link-btn');
-  if (!wrap || !sel) return;
+  if (!wrap || !menu) return;
   if (!act || act.category === 'competition' || !act._sbId) { wrap.hidden = true; return; }
   var mm = window.__plannedMatch(act, iso);
   if (!mm.planned.length) { wrap.hidden = true; return; }
   var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
-  sel.innerHTML = '<option value="none">Aucune</option>' + mm.planned.map(function (pp) {
+  var opt = function (val, label, sel) { return '<button class="pvr-opt' + (sel ? ' sel' : '') + '" type="button" data-val="' + esc(val) + '">' + label + '<span class="pvr-check">✓</span></button>'; };
+  var html = opt('none', 'Aucune', !mm.matched);
+  if (mm.planned.length) html += '<div class="pvr-sep"></div>';
+  html += mm.planned.map(function (pp) {
     var lab = (pp.name || 'Séance') + ' · ' + ((typeof fmtDur === 'function') ? fmtDur(+pp.duration || 0) : ((+pp.duration || 0) + ' min'));
-    return '<option value="' + esc(pp._sbId) + '">' + esc(lab) + '</option>';
+    var seld = (mm.matched && String(mm.matched._sbId) === String(pp._sbId));
+    return opt(pp._sbId, esc(lab), seld);
   }).join('');
-  sel.value = mm.matched ? String(mm.matched._sbId) : 'none';
-  sel.dataset.sbid = act._sbId;
+  menu.innerHTML = html;
+  menu.dataset.sbid = act._sbId;
+  menu.hidden = true;
+  wrap.classList.remove('open');
   wrap.hidden = false;
   if (btn) btn.style.color = mm.matched ? 'var(--accent)' : '';
   wrap.title = mm.matched ? ('Séance prévue liée : ' + (mm.matched.name || '')) : 'Aucune séance prévue liée';
@@ -7792,16 +7798,34 @@ window.__setActPlannedLink = function (sbId, val) {
   }
 };
 
-// Selecteur de rapprochement Prevu vs Realise : choisir / changer / delier le lien
-document.addEventListener('change', function (e) {
-  var sel = e.target.closest ? e.target.closest('.pvr-picker') : null;
-  if (!sel) return;
-  var sbid = sel.dataset.sbid;
-  var val = sel.value;                   // 'none' (aucune/delier) ou uuid de la seance prevue choisie
-  if (typeof window.__setActPlannedLink === 'function') window.__setActPlannedLink(sbid, val);
-  if (window.cloudSync && window.cloudSync.linkActivityPlanned) window.cloudSync.linkActivityPlanned(sbid, val);
-  if (typeof window.__modalActIdx === 'number') window.__openActIdx = window.__modalActIdx;
-  if (window.__currentModalIso && typeof openSessionModal === 'function') openSessionModal(window.__currentModalIso, window.__currentModalSource || 'realise');
+// Menu custom du lien Prevu<->Realise : ouvrir / choisir / fermer
+document.addEventListener('click', function (e) {
+  var trg = e.target;
+  var menu = document.getElementById('modal-link-menu');
+  var wrap = document.getElementById('modal-link-wrap');
+  var hitBtn = trg.closest ? trg.closest('#modal-link-btn') : null;
+  if (hitBtn && menu) {
+    e.preventDefault(); e.stopPropagation();
+    menu.hidden = !menu.hidden;
+    if (wrap) wrap.classList.toggle('open', !menu.hidden);
+    return;
+  }
+  var opt = trg.closest ? trg.closest('.pvr-opt') : null;
+  if (opt && menu) {
+    e.preventDefault(); e.stopPropagation();
+    var sbid = menu.dataset.sbid, val = opt.dataset.val;
+    menu.hidden = true; if (wrap) wrap.classList.remove('open');
+    if (sbid) {
+      if (typeof window.__setActPlannedLink === 'function') window.__setActPlannedLink(sbid, val);
+      if (window.cloudSync && window.cloudSync.linkActivityPlanned) window.cloudSync.linkActivityPlanned(sbid, val);
+      if (typeof window.__modalActIdx === 'number') window.__openActIdx = window.__modalActIdx;
+      if (window.__currentModalIso && typeof openSessionModal === 'function') openSessionModal(window.__currentModalIso, window.__currentModalSource || 'realise');
+    }
+    return;
+  }
+  if (menu && !menu.hidden && !(trg.closest && trg.closest('#modal-link-wrap'))) {
+    menu.hidden = true; if (wrap) wrap.classList.remove('open');
+  }
 });
 
 function openSessionModal(iso, source) {
