@@ -322,7 +322,7 @@
     });
     html += '</div>';
     if (readout) {
-      return '<div class="wp-wrap"><div class="wp-readout" style="min-height:18px;font-size:12px;color:var(--text-mute,#6b7686);margin-bottom:9px;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--text-mute,#6b7686)">Survolez un bloc pour le détail</span></div>' + html + '</div>';
+      return '<div class="wp-wrap"><div class="wp-readout" style="min-height:18px;font-size:12px;color:var(--text-mute,#6b7686);margin-bottom:9px;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--text-mute,#6b7686)">Survolez un bloc pour le détail</span></div>' + html + '</div>';
     }
     return html;
   };
