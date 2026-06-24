@@ -80,7 +80,7 @@
   function HRMAX() { try { var a = window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete; return (a && (+a.hr_max || +a.hrMax)) || 190; } catch (e) { return 190; } }
   var PACE = { course: { base: 240, unit: '/km' }, natation: { base: 100, unit: '/100m' } };
   var ZC = ['var(--z1)', 'var(--z2)', 'var(--z3)', 'var(--z4)', 'var(--z5)', 'var(--z6)'];
-  function zoneOf(p) { if (p < 60) return 0; if (p < 76) return 1; if (p < 90) return 2; if (p < 105) return 3; if (p < 120) return 4; return 5; }
+  function zoneOf(p) { if (p < 55) return 0; if (p < 76) return 1; if (p < 91) return 2; if (p < 106) return 3; if (p < 121) return 4; if (p < 151) return 5; return 6; }
   var ICO = { warmup: '&#9650;', interval: '&#9889;', steady: '&#9473;', recovery: '&#9176;', cooldown: '&#9660;' };
   var NAME = { warmup: 'Echauffement', interval: 'Intervalles', steady: 'Bloc continu', recovery: 'Recuperation', cooldown: 'Retour au calme' };
   var DESC = { warmup: 'Montee progressive', interval: 'Serie effort / recup', steady: 'Effort soutenu', recovery: 'Entre les efforts', cooldown: 'Descente progressive' };
@@ -297,7 +297,7 @@
     var radius = (opts.radius != null) ? opts.radius : 12;
     var minFlex = (opts.minFlex != null) ? opts.minFlex : 0.06;
     var readout = !!opts.readout;
-    var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
+    var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#ec4899'];
     var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
     var bmins = blks.map(function (b) { return blockSegs(b).reduce(function (a, x) { return a + (+x.min || 0); }, 0); });
     var tot = bmins.reduce(function (a, b) { return a + b; }, 0) || 1;
@@ -331,7 +331,7 @@
   // colorees par zone, texte en surimpression (toujours lisible) ; series encadrees "xN".
   window.renderWorkoutDetailHTML = function (blks) {
     if (!Array.isArray(blks) || !blks.length) return '';
-    var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
+    var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#ec4899'];
     var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
     function valStr(seg, m) {
       var lo = +seg.int || 0, hi = (seg.intHi != null && +seg.intHi > 0) ? +seg.intHi : null;

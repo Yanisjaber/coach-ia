@@ -5088,7 +5088,7 @@ window.detectRideSequences = function (watts, ftp) {
     // Lissage ~15 s pour stabiliser la "base" (sinon la puissance bruitee sur-segmente)
     function sm(arr, win) { var m = arr.length, o = new Array(m), s = 0, c = 0; for (var x = 0; x <= win && x < m; x++) { s += arr[x]; c++; } for (var x2 = 0; x2 < m; x2++) { if (x2 > 0 && x2 + win < m) { s += arr[x2 + win]; c++; } if (x2 - win - 1 >= 0) { s -= arr[x2 - win - 1]; c--; } o[x2] = c > 0 ? s / c : 0; } return o; }
     var sw = sm(raw, 7);   // +/-7 s = ~15 s
-    var zoneOf = function (w) { var p = w / ftp * 100; if (p < 60) return 0; if (p < 76) return 1; if (p < 90) return 2; if (p < 105) return 3; if (p < 120) return 4; return 5; };
+    var zoneOf = function (w) { var p = w / ftp * 100; if (p < 55) return 0; if (p < 76) return 1; if (p < 91) return 2; if (p < 106) return 3; if (p < 121) return 4; if (p < 151) return 5; return 6; };
     var classOf = function (z) { return z >= 4 ? 'hard' : (z <= 1 ? 'rec' : 'base'); };  // 3 classes larges
     // Binning 5 s
     var BIN = 5, bins = [];
@@ -5144,12 +5144,12 @@ window.detectRideSequences = function (watts, ftp) {
     });
     blocks = mg;
     // 3) Nommage deduit
-    var ZN = ['Récupération', 'Endurance', 'Tempo', 'Seuil', 'VO2max', 'Anaérobie'];
+    var ZN = ['Récupération', 'Endurance', 'Tempo', 'Seuil', 'VO2max', 'Anaérobie', 'Sprint'];
     blocks.forEach(function (bl, bi2) {
       var z = zp(bl.work.int), durS = bl._durS || ((+bl.work.min || 0) * 60);
       if (bi2 === 0 && z <= 2) { bl.name = 'Échauffement'; return; }
       if (bi2 === blocks.length - 1 && z <= 2) { bl.name = 'Retour au calme'; return; }
-      if (z >= 4) { bl.name = (durS <= 50 ? 'Sprint' : (z === 4 ? 'Seuil' : 'VO2max')); return; }
+      if (z >= 4 && durS <= 50) { bl.name = 'Sprint'; return; }
       bl.name = ZN[z] || 'Bloc';
     });
     return blocks;
