@@ -5220,6 +5220,11 @@ async function renderStreamsSection(container, activityId) {
   if (watts) watts = smoothWin(watts, 1);      // ±1 s = 3 s
   if (hr) hr = smoothWin(hr, 1);                // ±1 s = 3 s
   if (cadence) cadence = smoothWin(cadence, 4); // ±4 s = 9 s (plus stable)
+  try {
+    var _hrMaxA = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && (+window.DASHBOARD_DATA.athlete.hr_max || +window.DASHBOARD_DATA.athlete.hrMax)) || 190;
+    var _ftpA = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && +window.DASHBOARD_DATA.athlete.ftp) || 250;
+    window.__lastStreams = { watts: watts ? watts.slice() : null, hr: hr ? hr.slice() : null, ftp: _ftpA, hrMax: _hrMaxA };
+  } catch (e) { }
 
   const length = (watts && watts.length) || (hr && hr.length) || (cadence && cadence.length) || 0;
   if (length === 0) {
@@ -6102,16 +6107,102 @@ async function renderStreamsSection(container, activityId) {
   try {
     var _dc = document.getElementById('detailed-charts');
     var _tb = document.getElementById('toggle-detailed');
-    if (_dc && _tb) {
-      _dc.style.display = 'none';
-      _tb.addEventListener('click', function () {
-        var willOpen = _dc.style.display === 'none';
-        _dc.style.display = willOpen ? 'block' : 'none';
-        _tb.textContent = willOpen ? 'Masquer l\'analyse détaillée' : 'Voir l\'analyse détaillée';
-        if (willOpen) { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }
-      });
-    }
+    if (_dc) _dc.style.display = 'none';
+    if (_tb) _tb.addEventListener('click', function () { if (typeof window.openFullAnalysis === 'function') window.openFullAnalysis(); });
   } catch (e) { /* ignore */ }
+}
+
+// ============================================================
+// Analyse detaillee PLEIN ECRAN : courbes temps (deplacees) + courbe de
+// puissance (mean-max) + temps par zone (puissance/FC) + distribution.
+// ============================================================
+window.openFullAnalysis = function () {
+  var S = window.__lastStreams;
+  var ov = document.getElementById('analysis-full');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'analysis-full';
+    ov.innerHTML = '<div class="af-bar"><span class="af-title">Analyse détaillée</span><button class="af-close" type="button" title="Fermer">×</button></div><div class="af-body"></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('.af-close').addEventListener('click', window.closeFullAnalysis);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') window.closeFullAnalysis(); });
+  }
+  var body = ov.querySelector('.af-body');
+  body.innerHTML = '';
+  var dc = document.getElementById('detailed-charts');
+  if (dc) {
+    dc.__origParent = dc.parentNode;
+    dc.style.display = 'block';
+    var sec1 = document.createElement('div'); sec1.className = 'af-section';
+    sec1.innerHTML = '<div class="af-h">Courbes temps</div>';
+    sec1.appendChild(dc);
+    body.appendChild(sec1);
+  }
+  body.insertAdjacentHTML('beforeend',
+    '<div class="af-section" id="af-s-pc"><div class="af-h">Courbe de puissance (mean-max)</div><div class="af-chart"><canvas id="af-pcurve"></canvas></div></div>'
+    + '<div class="af-grid2">'
+    + '<div class="af-section" id="af-s-zp"><div class="af-h">Temps par zone — Puissance</div><div class="af-chart"><canvas id="af-zpow"></canvas></div></div>'
+    + '<div class="af-section" id="af-s-zh"><div class="af-h">Temps par zone — FC</div><div class="af-chart"><canvas id="af-zhr"></canvas></div></div>'
+    + '</div>'
+    + '<div class="af-section" id="af-s-di"><div class="af-h">Distribution de puissance</div><div class="af-chart"><canvas id="af-dist"></canvas></div></div>'
+  );
+  ov.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  window.__afCharts = [];
+  setTimeout(function () { try { _buildAfCharts(S); } catch (e) { console.warn('[af charts]', e && e.message); } try { window.dispatchEvent(new Event('resize')); } catch (e2) {} }, 40);
+};
+window.closeFullAnalysis = function () {
+  var ov = document.getElementById('analysis-full'); if (!ov) return;
+  (window.__afCharts || []).forEach(function (c) { try { c.destroy(); } catch (e) {} });
+  window.__afCharts = [];
+  var dc = document.getElementById('detailed-charts');
+  if (dc && dc.__origParent) { dc.style.display = 'none'; dc.__origParent.appendChild(dc); }
+  ov.classList.remove('open');
+  document.body.style.overflow = '';
+};
+function _buildAfCharts(S) {
+  if (!S || !window.Chart) return;
+  var grid = 'rgba(255,255,255,0.06)', tick = '#9aa6b6';
+  var opts = function (extra) {
+    var o = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: grid }, ticks: { color: tick, font: { size: 10 } } }, y: { grid: { color: grid }, ticks: { color: tick, font: { size: 10 } }, beginAtZero: true } } };
+    if (extra) { for (var k in extra) o[k] = extra[k]; }
+    return o;
+  };
+  var hide = function (id) { var s = document.getElementById(id); if (s) s.style.display = 'none'; };
+  var W = (S.watts || []).map(function (x) { return (x == null || isNaN(x)) ? null : +x; });
+  var HR = (S.hr || []).map(function (x) { return (x == null || isNaN(x)) ? null : +x; });
+  var ftp = S.ftp || 250, hrMax = S.hrMax || 190;
+  var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#ec4899'];
+  var hasW = W.some(function (x) { return x != null; });
+  var hasH = HR.some(function (x) { return x != null; });
+  // Courbe de puissance
+  if (hasW) {
+    var pref = new Float64Array(W.length + 1);
+    for (var i = 0; i < W.length; i++) pref[i + 1] = pref[i] + (W[i] || 0);
+    var durs = [1, 5, 10, 15, 30, 60, 120, 180, 300, 600, 1200, 1800, 3600], labels = [], data = [];
+    durs.forEach(function (d) { if (d > W.length) return; var best = 0; for (var s = 0; s + d <= W.length; s++) { var avg = (pref[s + d] - pref[s]) / d; if (avg > best) best = avg; } labels.push(d < 60 ? (d + 's') : ((d / 60) + 'min')); data.push(Math.round(best)); });
+    window.__afCharts.push(new Chart(document.getElementById('af-pcurve'), { type: 'line', data: { labels: labels, datasets: [{ data: data, borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,.15)', fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#fbbf24' }] }, options: opts({ plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return c.parsed.y + ' W'; } } } } }) }));
+  } else { hide('af-s-pc'); }
+  // Temps par zone - puissance
+  if (hasW) {
+    var zsec = [0, 0, 0, 0, 0, 0, 0];
+    W.forEach(function (w) { if (w == null) return; var p = w / ftp * 100; var z = p < 55 ? 0 : p < 76 ? 1 : p < 91 ? 2 : p < 106 ? 3 : p < 121 ? 4 : p < 151 ? 5 : 6; zsec[z]++; });
+    window.__afCharts.push(new Chart(document.getElementById('af-zpow'), { type: 'bar', data: { labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'], datasets: [{ data: zsec.map(function (s) { return Math.round(s / 60 * 10) / 10; }), backgroundColor: ZHEX }] }, options: opts({ indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return c.parsed.x + ' min'; } } } } }) }));
+  } else { hide('af-s-zp'); }
+  // Temps par zone - FC
+  if (hasH) {
+    var hsec = [0, 0, 0, 0, 0];
+    HR.forEach(function (h) { if (h == null) return; var p = h / hrMax * 100; var z = p < 60 ? 0 : p < 70 ? 1 : p < 82 ? 2 : p < 93 ? 3 : 4; hsec[z]++; });
+    window.__afCharts.push(new Chart(document.getElementById('af-zhr'), { type: 'bar', data: { labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'], datasets: [{ data: hsec.map(function (s) { return Math.round(s / 60 * 10) / 10; }), backgroundColor: ['#60a5fa', '#22c55e', '#eab308', '#f97316', '#ef4444'] }] }, options: opts({ indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return c.parsed.x + ' min'; } } } } }) }));
+  } else { hide('af-s-zh'); }
+  // Distribution de puissance
+  if (hasW) {
+    var mx = 0; W.forEach(function (w) { if (w != null && w > mx) mx = w; });
+    var bin = 20, nb = Math.floor(mx / bin) + 1, hist = new Array(nb).fill(0);
+    W.forEach(function (w) { if (w == null) return; var b = Math.min(nb - 1, Math.floor(w / bin)); hist[b]++; });
+    var dl = []; for (var k = 0; k < nb; k++) dl.push('' + (k * bin));
+    window.__afCharts.push(new Chart(document.getElementById('af-dist'), { type: 'bar', data: { labels: dl, datasets: [{ data: hist.map(function (s) { return Math.round(s / 60 * 10) / 10; }), backgroundColor: '#3b82f6' }] }, options: opts({ plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (c) { return c[0].label + '-' + (+c[0].label + bin) + ' W'; }, label: function (c) { return c.parsed.y + ' min'; } } } } }) }));
+  } else { hide('af-s-di'); }
 }
 
 // ========= MODAL DÉTAIL SÉANCE =========
