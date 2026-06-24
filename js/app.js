@@ -5102,9 +5102,9 @@ window.detectRideSequences = function (watts, ftp) {
     var segs = remerge(bins.map(function (b) { return { z: b.z, dur: b.dur, _sw: b.w * b.dur }; }));
     // Absorption des segments < 10 s (bruit) dans le voisin de PUISSANCE la plus proche
     var guard = 0;
-    while (segs.length > 1 && guard++ < 3000) {
+    while (segs.length > 1 && guard++ < 5000) {
       var bi = -1, bd = 1e9;
-      for (var q = 0; q < segs.length; q++) { if (segs[q].dur < 10 && segs[q].dur < bd) { bd = segs[q].dur; bi = q; } }
+      for (var q = 0; q < segs.length; q++) { if (segs[q].dur < 30 && segs[q].dur < bd) { bd = segs[q].dur; bi = q; } }
       if (bi === -1) break;
       var p0 = segs[bi - 1], n0 = segs[bi + 1];
       var into = (!p0) ? n0 : (!n0 ? p0 : (Math.abs(p0.w - segs[bi].w) <= Math.abs(n0.w - segs[bi].w) ? p0 : n0));
@@ -5120,7 +5120,7 @@ window.detectRideSequences = function (watts, ftp) {
     // Zone d'un bloc a partir de son %FTP (memes seuils que la couleur des barres)
     var zp = function (p) { return zoneOf(ftp * p / 100); };
     // 1) Retire les micro-blocs (< 25 s) AVANT de fusionner
-    blocks = blocks.filter(function (bl) { return ((bl.work ? bl.work.min : 0) * 60) >= 12; });
+    blocks = blocks.filter(function (bl) { return ((bl.work ? bl.work.min : 0) * 60) >= 25; });
     // 2) Fusionne les blocs adjacents de MEME zone (duree additive, watts moyennes)
     var mg = [];
     blocks.forEach(function (bl) {
