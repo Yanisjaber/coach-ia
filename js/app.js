@@ -5087,50 +5087,40 @@ window.detectRideSequences = function (watts, ftp) {
     var n = raw.length; if (n < 180) return [];
     // Lissage ~15 s pour stabiliser la "base" (sinon la puissance bruitee sur-segmente)
     function sm(arr, win) { var m = arr.length, o = new Array(m), s = 0, c = 0; for (var x = 0; x <= win && x < m; x++) { s += arr[x]; c++; } for (var x2 = 0; x2 < m; x2++) { if (x2 > 0 && x2 + win < m) { s += arr[x2 + win]; c++; } if (x2 - win - 1 >= 0) { s -= arr[x2 - win - 1]; c--; } o[x2] = c > 0 ? s / c : 0; } return o; }
-    var sw = sm(raw, 7);   // +/-7 s = ~15 s
+    var sw = sm(raw, 2);   // +/-2 s = ~5 s : leger, garde les efforts distincts (pas de moyenne coast+sprint)
     var zoneOf = function (w) { var p = w / ftp * 100; if (p < 55) return 0; if (p < 76) return 1; if (p < 91) return 2; if (p < 106) return 3; if (p < 121) return 4; if (p < 151) return 5; return 6; };
-    var classOf = function (z) { return z >= 4 ? 'hard' : (z <= 1 ? 'rec' : 'base'); };  // 3 classes larges
-    // Binning 5 s
+    // Binning 5 s, zone par bin (7 zones)
     var BIN = 5, bins = [];
-    for (var s2 = 0; s2 < n; s2 += BIN) { var sum = 0, c2 = 0; for (var k = s2; k < Math.min(n, s2 + BIN); k++) { sum += sw[k]; c2++; } var w = c2 ? sum / c2 : 0; var z = zoneOf(w); bins.push({ w: w, dur: c2, z: z, c: classOf(z) }); }
-    // Segments par classe
-    var segs = [];
-    bins.forEach(function (bn) { var L = segs[segs.length - 1]; if (L && L.c === bn.c) { L.dur += bn.dur; L._sw += bn.w * bn.dur; L._zs += bn.z * bn.dur; } else segs.push({ c: bn.c, dur: bn.dur, _sw: bn.w * bn.dur, _zs: bn.z * bn.dur }); });
-    var recalc = function () { segs.forEach(function (g) { g.w = g._sw / Math.max(1, g.dur); g.z = Math.round(g._zs / Math.max(1, g.dur)); }); };
-    recalc();
-    // Absorption : effort court < 15 s absorbe ; base/recup < 90 s absorbe SAUF si recup entre 2 efforts (intervalle)
-    var minOf = function (cl) { return cl === 'hard' ? 15 : 90; };
-    var guard = 0, changed = true;
-    while (changed && segs.length > 1 && guard++ < 800) {
-      changed = false;
-      // segment le plus court a absorber
+    for (var s2 = 0; s2 < n; s2 += BIN) { var sum = 0, c2 = 0; for (var k = s2; k < Math.min(n, s2 + BIN); k++) { sum += sw[k]; c2++; } var w = c2 ? sum / c2 : 0; bins.push({ w: w, dur: c2, z: zoneOf(w) }); }
+    // Segments = bins consecutifs de MEME zone (jamais de moyenne entre zones differentes)
+    var remerge = function (arr) {
+      var o = [];
+      arr.forEach(function (g) { var L = o[o.length - 1]; if (L && L.z === g.z) { L.dur += g.dur; L._sw += g._sw; } else o.push({ z: g.z, dur: g.dur, _sw: g._sw }); });
+      o.forEach(function (s) { s.w = s._sw / Math.max(1, s.dur); s.z = zoneOf(s.w); });
+      return o;
+    };
+    var segs = remerge(bins.map(function (b) { return { z: b.z, dur: b.dur, _sw: b.w * b.dur }; }));
+    // Absorption des segments < 10 s (bruit) dans le voisin de PUISSANCE la plus proche
+    var guard = 0;
+    while (segs.length > 1 && guard++ < 3000) {
       var bi = -1, bd = 1e9;
-      for (var q = 0; q < segs.length; q++) {
-        if (segs[q].dur >= minOf(segs[q].c)) continue;
-        var prev = segs[q - 1], next = segs[q + 1];
-        var protectedRecup = (segs[q].c !== 'hard') && prev && next && prev.c === 'hard' && next.c === 'hard';
-        if (protectedRecup) continue;
-        if (segs[q].dur < bd) { bd = segs[q].dur; bi = q; }
-      }
+      for (var q = 0; q < segs.length; q++) { if (segs[q].dur < 10 && segs[q].dur < bd) { bd = segs[q].dur; bi = q; } }
       if (bi === -1) break;
       var p0 = segs[bi - 1], n0 = segs[bi + 1];
       var into = (!p0) ? n0 : (!n0 ? p0 : (Math.abs(p0.w - segs[bi].w) <= Math.abs(n0.w - segs[bi].w) ? p0 : n0));
       if (!into) break;
-      into.dur += segs[bi].dur; into._sw += segs[bi]._sw; into._zs += segs[bi]._zs; segs.splice(bi, 1); recalc();
-      // re-fusion eventuelle avec voisins meme classe
-      var s3 = []; segs.forEach(function (g) { var L = s3[s3.length - 1]; if (L && L.c === g.c) { L.dur += g.dur; L._sw += g._sw; L._zs += g._zs; } else s3.push(g); }); segs = s3; recalc();
-      changed = true;
+      into.dur += segs[bi].dur; into._sw += segs[bi]._sw; segs.splice(bi, 1); segs = remerge(segs);
     }
     if (!segs.length) return [];
     // Chaque segment = un bloc, a sa vraie duree (pas de regroupement en series).
     var pctFtp = function (w) { return Math.round(w / ftp * 100); };
     var blocks = segs.map(function (g) {
-      return { type: 'steady', name: null, _z: g.z, _c: g.c, _durS: g.dur, metric: 'power', unit: 'percent', work: { min: Math.round(g.dur / 60 * 100) / 100, int: pctFtp(g.w), metric: 'power' } };
+      return { type: 'steady', name: null, _z: g.z, _durS: g.dur, metric: 'power', unit: 'percent', work: { min: Math.round(g.dur / 60 * 100) / 100, int: pctFtp(g.w), metric: 'power' } };
     });
     // Zone d'un bloc a partir de son %FTP (memes seuils que la couleur des barres)
     var zp = function (p) { return zoneOf(ftp * p / 100); };
     // 1) Retire les micro-blocs (< 25 s) AVANT de fusionner
-    blocks = blocks.filter(function (bl) { return ((bl.work ? bl.work.min : 0) * 60) >= 25; });
+    blocks = blocks.filter(function (bl) { return ((bl.work ? bl.work.min : 0) * 60) >= 12; });
     // 2) Fusionne les blocs adjacents de MEME zone (duree additive, watts moyennes)
     var mg = [];
     blocks.forEach(function (bl) {
