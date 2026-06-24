@@ -5329,9 +5329,7 @@ async function renderStreamsSection(container, activityId) {
   const _ftp = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && +window.DASHBOARD_DATA.athlete.ftp) || 250;
   const _detected = (watts && watts.length && window.detectRideSequences) ? window.detectRideSequences(watts, _ftp) : [];
   const _profHTML = (_detected.length && window.renderWorkoutProfileHTML)
-    ? '<div class="modal-section"><div class="modal-section-title">Profil de séance</div>'
-      + window.renderWorkoutProfileHTML(_detected, { minFlex: 0.004, labels: false, readout: true })
-      + '</div>'
+    ? window.__collapsible('profil', 'Profil de séance', window.renderWorkoutProfileHTML(_detected, { minFlex: 0.004, labels: false, readout: true }))
     : '';
   const _toggleHTML = _profHTML
     ? '<button id="toggle-detailed" type="button" style="width:100%;background:var(--bg-elev2);border:1px solid var(--border);color:var(--text-dim);border-radius:9px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin:6px 0 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;">Voir l\'analyse détaillée</button>'
@@ -7850,34 +7848,10 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
         + (ratio != null ? '<div style="font-size:11px;color:var(--text-mute,#6b7686);margin-top:7px">Réalisé : ' + (act.tss || 0) + ' TSS pour ' + p.tss + ' prévus — ' + ratio + ' % de la charge cible.</div>' : '')
         + '</div>';
     }
-    var _collapsed = false;
-    try { _collapsed = localStorage.getItem('pvr_collapsed') === '1'; } catch (e) { }
-    var _chev = _collapsed ? '▸' : '▾';
-    return '<div class="modal-section">'
-      + '<div class="modal-section-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
-      +   '<span>Prévu vs Réalisé <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· ' + ((p.name || 'séance prévue')) + '</span></span>'
-      +   '<button class="pvr-toggle" type="button" style="background:var(--bg-elev2);border:1px solid var(--border2,#374256);color:var(--text-dim,#9aa6b6);border-radius:7px;padding:4px 11px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;text-transform:none;letter-spacing:0;display:inline-flex;align-items:center;gap:6px;flex:none">'
-      +     '<span class="pvr-label">' + (_collapsed ? 'Afficher' : 'Masquer') + '</span><span class="pvr-chev" style="display:inline-block;width:9px;text-align:center">' + _chev + '</span>'
-      +   '</button>'
-      + '</div>'
-      + '<div class="pvr-content"' + (_collapsed ? ' hidden' : '') + '>' + bars + structHTML + '</div>'
-      + '</div>';
+    return window.__collapsible('pvr', 'Prévu vs Réalisé', bars + structHTML);
   } catch (e) { console.warn('[prevu vs realise]', e && e.message); return ''; }
 };
 
-// Repli/depli de la comparaison Prevu vs Realise (etat memorise)
-document.addEventListener('click', function (e) {
-  var t = e.target.closest ? e.target.closest('.pvr-toggle') : null;
-  if (!t) return;
-  var sec = t.closest('.modal-section');
-  var content = sec ? sec.querySelector('.pvr-content') : null;
-  if (!content) return;
-  var nowHidden = !content.hidden;
-  content.hidden = nowHidden;
-  var chev = t.querySelector('.pvr-chev'); if (chev) chev.textContent = nowHidden ? '▸' : '▾';
-  var lab = t.querySelector('.pvr-label'); if (lab) lab.textContent = nowHidden ? 'Afficher' : 'Masquer';
-  try { localStorage.setItem('pvr_collapsed', nowHidden ? '1' : '0'); } catch (e2) { }
-});
 
 // Bouton/selecteur de lien dans le HEADER de la modale (a cote des "...").
 window.__setupModalLinkSelect = function (act, iso) {
@@ -7954,6 +7928,34 @@ window.__statSvg = {
   mtn: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20 9 8l3.5 6 2.5-4.5L21 20Z"/></svg>',
   bolt: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>'
 };
+// Section repliable reutilisable (bouton Masquer/Afficher a droite, etat memorise par cle).
+window.__collapsible = function (key, titleInner, contentHTML) {
+  var collapsed = false;
+  try { collapsed = localStorage.getItem(key + '_collapsed') === '1'; } catch (e) { }
+  var chev = collapsed ? '▸' : '▾';
+  return '<div class="modal-section">'
+    + '<div class="modal-section-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+    +   '<span>' + titleInner + '</span>'
+    +   '<button class="coll-toggle" type="button" data-key="' + key + '" style="background:var(--bg-elev2);border:1px solid var(--border2,#374256);color:var(--text-dim,#9aa6b6);border-radius:7px;padding:4px 11px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;text-transform:none;letter-spacing:0;display:inline-flex;align-items:center;gap:6px;flex:none">'
+    +     '<span class="coll-label">' + (collapsed ? 'Afficher' : 'Masquer') + '</span><span class="coll-chev" style="display:inline-block;width:9px;text-align:center">' + chev + '</span>'
+    +   '</button>'
+    + '</div>'
+    + '<div class="coll-content"' + (collapsed ? ' hidden' : '') + '>' + contentHTML + '</div>'
+    + '</div>';
+};
+document.addEventListener('click', function (e) {
+  var t = e.target.closest ? e.target.closest('.coll-toggle') : null;
+  if (!t) return;
+  var sec = t.closest('.modal-section');
+  var content = sec ? sec.querySelector('.coll-content') : null;
+  if (!content) return;
+  var nowHidden = !content.hidden;
+  content.hidden = nowHidden;
+  var chev = t.querySelector('.coll-chev'); if (chev) chev.textContent = nowHidden ? '▸' : '▾';
+  var lab = t.querySelector('.coll-label'); if (lab) lab.textContent = nowHidden ? 'Afficher' : 'Masquer';
+  try { localStorage.setItem((t.dataset.key || 'coll') + '_collapsed', nowHidden ? '1' : '0'); } catch (e2) { }
+});
+
 window.renderStatsBlockHTML = function (heroes, tiles) {
   var mut = 'var(--text-mute,#7c879c)';
   var heroCard = function (hh) {
@@ -8303,7 +8305,7 @@ function openSessionModal(iso, source) {
         const _struct = act.structure;
         const _structDet = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(_struct) : '';
         const profileHTML = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutProfileHTML === 'function')
-          ? `<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(_struct)}${_structDet}</div>`
+          ? window.__collapsible('profil', 'Profil de séance', window.renderWorkoutProfileHTML(_struct) + _structDet)
           : '';
         const _escNote = (x) => String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
         const notesHTML = (act.notes && String(act.notes).trim())
@@ -9013,7 +9015,7 @@ function openSessionModal(iso, source) {
       const sections = [];
       if (Array.isArray(t.structure) && t.structure.length && typeof window.renderWorkoutProfileHTML === 'function') {
         const _det = (typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(t.structure) : '';
-        sections.push(`<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(t.structure)}${_det}</div>`);
+        sections.push(window.__collapsible('profil', 'Profil de séance', window.renderWorkoutProfileHTML(t.structure) + _det));
       }
       if (t.notes) {
         sections.push(`<div class="modal-section">
