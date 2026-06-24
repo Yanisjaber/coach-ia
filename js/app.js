@@ -8244,7 +8244,7 @@ function openSessionModal(iso, source) {
         // Strava (sinon on n'affiche pas de cases vides).
         const _hasStrava = !!(stravaId && /^\d+$/.test(stravaId));
         const graphHTML = _hasStrava ? `<div class="modal-section"><div id="streams-section"></div></div>` : '';
-        const lienHTML = _hasStrava ? `<div class="modal-section"><div class="modal-section-title">Lien activité</div>${intervalsLink}</div>` : '';
+        const lienHTML = '';
         bodyEl.innerHTML = `
           ${switchHTML}
           ${syntheseHTML}
