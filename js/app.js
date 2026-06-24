@@ -8222,18 +8222,16 @@ function openSessionModal(iso, source) {
         const _tiles = [];
         if (act.category === 'competition' && act.target != null && act.target !== '') _tiles.push(tile('Temps cible', fmtMinToTime(act.target), '#c084fc'));
         if (act.avg_watts) {
-          let pv = `${act.avg_watts} moy`;
-          if (act.max_watts) pv += ` · ${act.max_watts} max`;
-          if (act.np) pv += ` · NP ${act.np}`;
-          if (act.intensity || act.ftpPct) pv += ` <span style="font-weight:400;color:${_mut};font-size:11px">(IF ${act.intensity || '—'} · ${act.ftpPct || 0}% FTP)</span>`;
+          let pv = `${act.avg_watts} moy` + (act.max_watts ? ` · ${act.max_watts} max` : '') + ` <span style="font-weight:400;color:${_mut};font-size:11px">W</span>`;
           _tiles.push(tile('Puissance', pv, '#f59e0b'));
-        } else if (act.np) {
-          _tiles.push(tile('Puissance', `NP ${act.np} W` + (act.intensity ? ` <span style="font-weight:400;color:${_mut};font-size:11px">(IF ${act.intensity})</span>` : ''), '#f59e0b'));
+        }
+        if (act.np) {
+          _tiles.push(tile('NP', `${act.np} W` + (act.intensity || act.ftpPct ? ` <span style="font-weight:400;color:${_mut};font-size:11px">(IF ${act.intensity || '—'} · ${act.ftpPct || 0}% FTP)</span>` : ''), '#fbbf24'));
         }
         if (act.hr) _tiles.push(tile('Cardio', `${act.hr} moy` + (act.max_hr ? ` · ${act.max_hr} max` : '') + ` <span style="font-weight:400;color:${_mut};font-size:11px">bpm</span>`, '#f87171'));
         if (act.cadence) _tiles.push(tile('Cadence', `${act.cadence}` + (act.max_cadence ? ` · ${act.max_cadence} max` : '') + ` <span style="font-weight:400;color:${_mut};font-size:11px">rpm</span>`, '#a78bfa'));
-        if (vMaxToShow) _tiles.push(tile('Vitesse max', `${vMaxToShow} km/h`, '#22d3ee'));
-        { let chg = []; if (act.tss) chg.push(`${act.tss} TSS`); if (act.kj) chg.push(`${act.kj} kJ`); if (act.calories) chg.push(`${act.calories} kcal`); if (act.rpe) chg.push(`RPE ${act.rpe}`); if (act.laps) chg.push(`${act.laps} tours`); if (chg.length) _tiles.push(tile('Charge', chg.join(' · '), '#9ca3af')); }
+        if (act.tss) _tiles.push(tile('TSS', `${act.tss}`, '#9ca3af'));
+        { let chg = []; if (act.kj) chg.push(`${act.kj} kJ`); if (act.calories) chg.push(`${act.calories} kcal`); if (act.rpe) chg.push(`RPE ${act.rpe}`); if (act.laps) chg.push(`${act.laps} tours`); if (chg.length) _tiles.push(tile('Énergie', chg.join(' · '), '#9ca3af')); }
         const _tileGrid = _tiles.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">${_tiles.join('')}</div>` : '';
         const statsHTML = (_heroRow || _tileGrid) ? `<div class="modal-section">${_heroRow}${_tileGrid}</div>` : '';
 
