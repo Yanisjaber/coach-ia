@@ -5127,6 +5127,20 @@ window.detectRideSequences = function (watts, ftp) {
     var blocks = segs.map(function (g) {
       return { type: 'steady', name: null, _z: g.z, _c: g.c, _durS: g.dur, metric: 'power', unit: 'percent', work: { min: Math.round(g.dur / 60 * 100) / 100, int: pctFtp(g.w), metric: 'power' } };
     });
+    // Fusion finale : blocs adjacents de MEME zone -> un seul bloc (duree additive, watts moyennes).
+    var zp = function (p) { return zoneOf(ftp * p / 100); };
+    var mg = [];
+    blocks.forEach(function (bl) {
+      var L = mg[mg.length - 1];
+      if (L && L.type !== 'interval' && bl.type !== 'interval' && zp(L.work.int) === zp(bl.work.int)) {
+        var d1 = +L.work.min || 0, d2 = +bl.work.min || 0, dt = d1 + d2;
+        L.work.int = dt ? Math.round((L.work.int * d1 + bl.work.int * d2) / dt) : L.work.int;
+        L.work.min = Math.round(dt * 100) / 100;
+        L._durS = (L._durS || d1 * 60) + (bl._durS || d2 * 60);
+        L._z = zp(L.work.int);
+      } else { bl._z = zp(bl.work.int); mg.push(bl); }
+    });
+    blocks = mg;
     // Nommage deduit
     var ZN = ['Récupération', 'Endurance', 'Tempo', 'Seuil', 'VO2max', 'Anaérobie'];
     blocks.forEach(function (bl, bi2) {
