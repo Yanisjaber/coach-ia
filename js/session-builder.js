@@ -305,9 +305,10 @@
       var segs = blockSegs(b), bmin = bmins[bi] || 0, it = bmin || 1;
       var _tseg = b.work || segs[0];
       var _tm = (b.metric) || (_tseg && _tseg.metric) || 'power';
-      var _tval = _tseg ? label(_tseg, _tm) : '';
-      var _tip = (b.name || NAME[b.type] || '') + ' · ' + fmtDur(bmin) + (_tval ? (' · ' + _tval.replace(/ \. /g, ' · ')) : '') + (b.type === 'interval' && b.reps > 1 ? ' · ' + b.reps + '×' : '');
-      html += '<div title="' + esc(_tip) + '" style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(minFlex, bmin / tot) + '">';
+      var _tval = _tseg ? label(_tseg, _tm).replace(/ \. /g, ' · ') : '';
+      var _meta = fmtDur(bmin) + (_tval ? (' · ' + _tval) : '') + (b.type === 'interval' && b.reps > 1 ? ' · ' + b.reps + '×' : '');
+      var _dot = ZHEX[zoneOf(midOf(_tseg || { int: 0 }))];
+      html += '<div class="wp-block" data-name="' + esc(b.name || NAME[b.type] || '') + '" data-meta="' + esc(_meta) + '" data-dot="' + _dot + '" style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(minFlex, bmin / tot) + '">';
       html += '<div style="flex:1;display:flex;align-items:flex-end;gap:0;min-height:0">';
       segs.forEach(function (s) {
         var hgt = Math.max(8, (midOf(s) / mx) * 100);
@@ -367,6 +368,38 @@
     }).join('');
     return '<div style="margin-top:18px">' + out + '</div>';
   };
+  // Tooltip custom (Modele A) au survol des blocs de profil (.wp-block)
+  (function () {
+    if (window.__wpTipInit) return; window.__wpTipInit = true;
+    var tip = null;
+    var esc2 = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    function ensure() {
+      if (tip) return tip;
+      tip = document.createElement('div');
+      tip.id = 'wp-tip';
+      tip.style.cssText = 'position:fixed;z-index:99999;pointer-events:none;opacity:0;transition:opacity .1s;background:#0f1420;border:1px solid #2c3850;border-radius:10px;padding:8px 13px;display:inline-flex;align-items:center;gap:9px;box-shadow:0 8px 24px rgba(0,0,0,.5);white-space:nowrap;font-family:inherit';
+      document.body.appendChild(tip);
+      return tip;
+    }
+    function show(el) {
+      var t = ensure();
+      var nm = el.getAttribute('data-name') || '', mt = el.getAttribute('data-meta') || '', dot = el.getAttribute('data-dot') || '#888';
+      t.innerHTML = '<span style="width:9px;height:9px;border-radius:50%;background:' + dot + ';flex:none"></span>'
+        + '<span style="font-size:12.5px;font-weight:700;color:#fff">' + esc2(nm) + '</span>'
+        + '<span style="font-size:12px;color:#9aa6b6">' + esc2(mt) + '</span>'
+        + '<span style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%) rotate(45deg);width:11px;height:11px;background:#0f1420;border-right:1px solid #2c3850;border-bottom:1px solid #2c3850"></span>';
+      t.style.opacity = '1';
+      var r = el.getBoundingClientRect(), tw = t.offsetWidth, th = t.offsetHeight;
+      var left = r.left + r.width / 2 - tw / 2;
+      left = Math.max(6, Math.min(window.innerWidth - tw - 6, left));
+      var top = r.top - th - 9; if (top < 6) top = r.bottom + 9;
+      t.style.left = left + 'px'; t.style.top = top + 'px';
+    }
+    function hide() { if (tip) tip.style.opacity = '0'; }
+    document.addEventListener('mouseover', function (e) { var el = e.target.closest ? e.target.closest('.wp-block') : null; if (el) show(el); });
+    document.addEventListener('mouseout', function (e) { var el = e.target.closest ? e.target.closest('.wp-block') : null; if (el) hide(); });
+  })();
+
   window.getCurrentWorkoutStructure = function () { return getBlocks(); };
   window.setWorkoutStructure = function (s) { showSection(); setBlocks(s); };
   window.resetWorkoutStructure = function () { showSection(); reset(); };
