@@ -294,6 +294,7 @@
     var bg = (opts.bg != null) ? opts.bg : 'var(--bg-elev2,#1b2230)';
     var brd = (opts.border != null) ? opts.border : '1px solid var(--border,#2a3444)';
     var radius = (opts.radius != null) ? opts.radius : 12;
+    var minFlex = (opts.minFlex != null) ? opts.minFlex : 0.06;
     var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
     var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
     var bmins = blks.map(function (b) { return blockSegs(b).reduce(function (a, x) { return a + (+x.min || 0); }, 0); });
@@ -302,7 +303,7 @@
     var html = '<div style="background:' + bg + ';border:' + brd + ';border-radius:' + radius + 'px;padding:' + pad + 'px;display:flex;align-items:stretch;gap:2px;height:' + H + 'px;overflow:hidden">';
     blks.forEach(function (b, bi) {
       var segs = blockSegs(b), bmin = bmins[bi] || 0, it = bmin || 1;
-      html += '<div title="' + esc((b.name || NAME[b.type] || '') + ' - ' + fmtDur(bmin)) + '" style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(0.06, bmin / tot) + '">';
+      html += '<div title="' + esc((b.name || NAME[b.type] || '') + ' - ' + fmtDur(bmin)) + '" style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(minFlex, bmin / tot) + '">';
       html += '<div style="flex:1;display:flex;align-items:flex-end;gap:0;min-height:0">';
       segs.forEach(function (s) {
         var hgt = Math.max(8, (midOf(s) / mx) * 100);

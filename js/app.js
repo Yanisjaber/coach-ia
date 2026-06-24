@@ -5325,7 +5325,7 @@ async function renderStreamsSection(container, activityId) {
   const _detected = (watts && watts.length && window.detectRideSequences) ? window.detectRideSequences(watts, _ftp) : [];
   const _profHTML = (_detected.length && window.renderWorkoutProfileHTML)
     ? '<div class="modal-section"><div class="modal-section-title">Profil de séance <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· séquences détectées</span></div>'
-      + window.renderWorkoutProfileHTML(_detected)
+      + window.renderWorkoutProfileHTML(_detected, { minFlex: 0.004 })
       + '</div>'
     : '';
   const _toggleHTML = _profHTML
