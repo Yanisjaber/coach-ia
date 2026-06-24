@@ -6123,21 +6123,35 @@ window.openFullAnalysis = function () {
   window.__prevPanelId = (cur && cur.id && cur.id !== 'p-analysis') ? cur.id : (window.__prevPanelId || 'p1');
   // ferme la modale d'activite
   var modal = document.getElementById('session-modal'); if (modal) modal.classList.remove('active');
-  // structure de la page (Retour + sections)
-  page.innerHTML = '<div class="af-head"><button class="af-back" type="button">\u2190 Retour</button></div><div class="af-body2"></div>';
-  page.querySelector('.af-back').addEventListener('click', window.closeFullAnalysis);
-  var body = page.querySelector('.af-body2');
-  // deplace les courbes temps (deja construites dans la modale)
-  var dc = document.getElementById('detailed-charts');
-  if (dc) { dc.style.display = 'block'; var s1 = document.createElement('div'); s1.className = 'af-section'; s1.innerHTML = '<div class="af-h">Courbes temps</div>'; s1.appendChild(dc); body.appendChild(s1); }
-  body.insertAdjacentHTML('beforeend',
-    '<div class="af-section" id="af-s-pc"><div class="af-h">Courbe de puissance (mean-max)</div><div class="af-chart"><canvas id="af-pcurve"></canvas></div></div>'
-    + '<div class="af-grid2">'
-    + '<div class="af-section" id="af-s-zp"><div class="af-h">Temps par zone \u2014 Puissance</div><div class="af-chart"><canvas id="af-zpow"></canvas></div></div>'
-    + '<div class="af-section" id="af-s-zh"><div class="af-h">Temps par zone \u2014 FC</div><div class="af-chart"><canvas id="af-zhr"></canvas></div></div>'
+  // structure : Retour + onglets internes + contenus
+  page.innerHTML =
+    '<div class="af-head">'
+    + '<button class="af-back" type="button">\u2190 Retour</button>'
+    + '<div class="af-tabs">'
+    +   '<button class="af-tab active" type="button" data-tab="courbes">Courbes</button>'
+    +   '<button class="af-tab" type="button" data-tab="records">Records</button>'
+    +   '<button class="af-tab" type="button" data-tab="zones">Zones</button>'
+    +   '<button class="af-tab" type="button" data-tab="dist">Distribution</button>'
     + '</div>'
-    + '<div class="af-section" id="af-s-di"><div class="af-h">Distribution de puissance</div><div class="af-chart"><canvas id="af-dist"></canvas></div></div>'
-  );
+    + '</div>'
+    + '<div class="af-tabc active" id="af-tab-courbes"><div class="af-h">Courbes temps</div><div id="af-courbes-slot"></div></div>'
+    + '<div class="af-tabc" id="af-tab-records"><div class="af-section"><div class="af-h">Courbe de puissance (mean-max)</div><div class="af-chart"><canvas id="af-pcurve"></canvas></div></div></div>'
+    + '<div class="af-tabc" id="af-tab-zones"><div class="af-grid2"><div class="af-section"><div class="af-h">Temps par zone \u2014 Puissance</div><div class="af-chart"><canvas id="af-zpow"></canvas></div></div><div class="af-section"><div class="af-h">Temps par zone \u2014 FC</div><div class="af-chart"><canvas id="af-zhr"></canvas></div></div></div></div>'
+    + '<div class="af-tabc" id="af-tab-dist"><div class="af-section"><div class="af-h">Distribution de puissance</div><div class="af-chart"><canvas id="af-dist"></canvas></div></div></div>';
+  page.querySelector('.af-back').addEventListener('click', window.closeFullAnalysis);
+  // deplace les courbes temps (deja construites dans la modale) dans l'onglet Courbes
+  var dc = document.getElementById('detailed-charts');
+  if (dc) { dc.style.display = 'block'; var slot = page.querySelector('#af-courbes-slot'); if (slot) slot.appendChild(dc); }
+  // bascule d'onglets
+  page.querySelectorAll('.af-tab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      page.querySelectorAll('.af-tab').forEach(function (b) { b.classList.remove('active'); });
+      page.querySelectorAll('.af-tabc').forEach(function (c) { c.classList.remove('active'); });
+      btn.classList.add('active');
+      var tc = page.querySelector('#af-tab-' + btn.dataset.tab); if (tc) tc.classList.add('active');
+      try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+    });
+  });
   // active la page (sidebar inchangee)
   document.querySelectorAll('.tab').forEach(function (b) { b.classList.remove('active'); });
   document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
