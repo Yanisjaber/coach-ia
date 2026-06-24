@@ -7835,19 +7835,7 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
         + (targetPct != null ? '<div style="position:absolute;left:' + targetPct + '%;top:-2px;width:2px;height:11px;background:#cdd5e5"></div>' : '')
         + '</div></div>';
     }
-    // kJ prevu : pas stocke -> estime depuis la structure planifiee (watts cibles x duree)
-    var _ftp = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && +window.DASHBOARD_DATA.athlete.ftp) || 250;
-    var _estKj = function (blks) {
-      if (!Array.isArray(blks) || !blks.length) return null;
-      var total = 0;
-      blks.forEach(function (b) {
-        var reps = Math.max(1, b.reps | 0);
-        var segs = [b.work]; if (b.type === 'interval' && b.rec) segs.push(b.rec);
-        for (var r = 0; r < reps; r++) segs.forEach(function (s) { if (!s) return; var mid = (s.intHi != null && +s.intHi > 0) ? ((+s.int + +s.intHi) / 2) : (+s.int || 0); total += (_ftp * mid / 100) * ((+s.min || 0) * 60); });
-      });
-      return total / 1000;
-    };
-    var _pKj = (p.structure && p.structure.length) ? _estKj(p.structure) : null;
+    var _pKj = (p.structure && p.structure.length && window.__estKjFromStructure) ? window.__estKjFromStructure(p.structure) : null;
     var bars = ''
       + barRow('Durée', p.duration, act.duration, function (x) { return fmtD(x); })
       + barRow('Distance', p.km, act.distance_km, function (x) { return Math.round(x) + ' km'; })
@@ -7941,7 +7929,8 @@ window.__statSvg = {
   clock: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   route: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg>',
   mtn: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20 9 8l3.5 6 2.5-4.5L21 20Z"/></svg>',
-  bolt: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>'
+  bolt: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>',
+  speed: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14" r="2"/><path d="M13.4 12.6 19 7"/><path d="M3.6 19a9 9 0 1 1 16.8 0"/></svg>'
 };
 // Section repliable reutilisable (bouton Masquer/Afficher a droite, etat memorise par cle).
 window.__collapsible = function (key, titleInner, contentHTML) {
@@ -7970,6 +7959,19 @@ document.addEventListener('click', function (e) {
   var lab = t.querySelector('.coll-label'); if (lab) lab.textContent = nowHidden ? 'Afficher' : 'Masquer';
   try { localStorage.setItem((t.dataset.key || 'coll') + '_collapsed', nowHidden ? '1' : '0'); } catch (e2) { }
 });
+
+// Estime l'energie (kJ) d'une structure planifiee : Σ (watts cibles x duree).
+window.__estKjFromStructure = function (blks, ftp) {
+  if (!Array.isArray(blks) || !blks.length) return null;
+  ftp = +ftp || ((window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && +window.DASHBOARD_DATA.athlete.ftp) || 250);
+  var total = 0;
+  blks.forEach(function (b) {
+    var reps = Math.max(1, b.reps | 0);
+    var segs = [b.work]; if (b.type === 'interval' && b.rec) segs.push(b.rec);
+    for (var r = 0; r < reps; r++) segs.forEach(function (s) { if (!s) return; var mid = (s.intHi != null && +s.intHi > 0) ? ((+s.int + +s.intHi) / 2) : (+s.int || 0); total += (ftp * mid / 100) * ((+s.min || 0) * 60); });
+  });
+  return total / 1000;
+};
 
 window.renderStatsBlockHTML = function (heroes, tiles) {
   var mut = 'var(--text-mute,#7c879c)';
@@ -9020,11 +9022,14 @@ function openSessionModal(iso, source) {
       const _heroes = [];
       if (dur) _heroes.push({ svg: _S.clock, val: (dur < 60 ? Math.round(dur) + '<span style="font-size:13px"> min</span>' : (Math.floor(dur / 60) + '<span style="font-size:13px">h</span>' + String(Math.round(dur % 60)).padStart(2, '0'))), unit: '', lab: 'Durée prévue', color: '#60a5fa' });
       if (t.km) _heroes.push({ svg: _S.route, val: Math.round(t.km), unit: 'km', lab: 'Distance prévue', color: '#22d3ee' });
+      if (t.km && dur) _heroes.push({ svg: _S.speed, val: (Math.round((t.km / (dur / 60)) * 10) / 10), unit: 'km/h', lab: 'Vitesse prévue', color: '#34d399' });
       if (t.dplus) _heroes.push({ svg: _S.mtn, val: Math.round(t.dplus), unit: 'm D+', lab: 'Dénivelé prévu', color: '#84cc16' });
       if (_heroes.length < 3 && t.tss) _heroes.push({ svg: _S.bolt, val: t.tss, unit: '', lab: 'TSS estimé', color: '#fbbf24' });
       const _tiles = [];
       if (t.tss && _heroes.every(function (h) { return h.lab !== 'TSS estimé'; })) _tiles.push({ lab: 'TSS estimé', val: '' + t.tss, color: '#fbbf24' });
       if (t.rpe != null && t.rpe !== '') _tiles.push({ lab: 'RPE estimé', val: t.rpe + '/10', color: '#f59e0b' });
+      var _pKj = (Array.isArray(t.structure) && t.structure.length && window.__estKjFromStructure) ? window.__estKjFromStructure(t.structure) : null;
+      if (_pKj != null) _tiles.push({ lab: 'Énergie estimée', val: Math.round(_pKj) + ' kJ', color: '#9ca3af' });
       const statsHTML = window.renderStatsBlockHTML(_heroes, _tiles);
 
       const sections = [];
