@@ -5329,7 +5329,9 @@ async function renderStreamsSection(container, activityId) {
   const _ftp = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && +window.DASHBOARD_DATA.athlete.ftp) || 250;
   const _detected = (watts && watts.length && window.detectRideSequences) ? window.detectRideSequences(watts, _ftp) : [];
   const _profHTML = (_detected.length && window.renderWorkoutProfileHTML)
-    ? window.__collapsible('profil', 'Profil de séance', window.renderWorkoutProfileHTML(_detected, { minFlex: 0.004, labels: false, readout: true }))
+    ? '<div class="modal-section"><div class="modal-section-title">Profil de séance</div>'
+      + window.renderWorkoutProfileHTML(_detected, { minFlex: 0.004, labels: false, readout: true })
+      + '</div>'
     : '';
   const _toggleHTML = _profHTML
     ? '<button id="toggle-detailed" type="button" style="width:100%;background:var(--bg-elev2);border:1px solid var(--border);color:var(--text-dim);border-radius:9px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin:6px 0 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;">Voir l\'analyse détaillée</button>'
@@ -7934,7 +7936,7 @@ window.__collapsible = function (key, titleInner, contentHTML) {
   try { collapsed = localStorage.getItem(key + '_collapsed') === '1'; } catch (e) { }
   var chev = collapsed ? '▸' : '▾';
   return '<div class="modal-section">'
-    + '<div class="modal-section-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+    + '<div class="modal-section-title" style="display:flex;align-items:center;gap:10px">'
     +   '<span>' + titleInner + '</span>'
     +   '<button class="coll-toggle" type="button" data-key="' + key + '" style="background:var(--bg-elev2);border:1px solid var(--border2,#374256);color:var(--text-dim,#9aa6b6);border-radius:7px;padding:4px 11px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;text-transform:none;letter-spacing:0;display:inline-flex;align-items:center;gap:6px;flex:none">'
     +     '<span class="coll-label">' + (collapsed ? 'Afficher' : 'Masquer') + '</span><span class="coll-chev" style="display:inline-block;width:9px;text-align:center">' + chev + '</span>'
@@ -8305,7 +8307,7 @@ function openSessionModal(iso, source) {
         const _struct = act.structure;
         const _structDet = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(_struct) : '';
         const profileHTML = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutProfileHTML === 'function')
-          ? window.__collapsible('profil', 'Profil de séance', window.renderWorkoutProfileHTML(_struct) + _structDet)
+          ? `<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(_struct)}${_structDet}</div>`
           : '';
         const _escNote = (x) => String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
         const notesHTML = (act.notes && String(act.notes).trim())
@@ -9015,7 +9017,7 @@ function openSessionModal(iso, source) {
       const sections = [];
       if (Array.isArray(t.structure) && t.structure.length && typeof window.renderWorkoutProfileHTML === 'function') {
         const _det = (typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(t.structure) : '';
-        sections.push(window.__collapsible('profil', 'Profil de séance', window.renderWorkoutProfileHTML(t.structure) + _det));
+        sections.push(`<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(t.structure)}${_det}</div>`);
       }
       if (t.notes) {
         sections.push(`<div class="modal-section">
