@@ -164,6 +164,8 @@
     transition: color 0.12s, background 0.12s;
   }
   .modal-action-btn:hover { color: var(--accent); background: var(--bg-elev2); }
+  /* Le <select> transparent du lien intercepte le survol : on relaie l'effet au bouton */
+  .modal-link-wrap:hover .modal-action-btn { color: var(--accent); background: var(--bg-elev2); }
   .modal-action-btn[hidden] { display: none !important; }
   .modal-action-btn .dots {
     display: inline-block;
@@ -940,5 +942,4 @@
   font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .gpx-btn:hover { background: rgba(96,165,250,.22); }
-.gpx-name { font-size: 12.5px; color: var(--text-dim); }
-.gpx-clear { background: transparent; border: none; color: var(--danger); font-size: 12px; cursor: pointer; text-decoration: underline; }
+.gpx-n
