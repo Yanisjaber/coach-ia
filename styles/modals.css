@@ -14,6 +14,7 @@
     z-index: 1000;
     padding: 40px 20px;
     overflow-y: auto;
+    scrollbar-gutter: stable;
   }
   .modal-overlay.active { display: flex; }
   /* === Modal de confirmation custom (utilisée par appConfirm, appAlert, appPrompt) === */
@@ -931,4 +932,4 @@
   flex-direction: column;
 }
 .add-modal-content .modal-header { flex: 0 0 auto; }
-.add-modal-content .modal-footer 
+.ad
