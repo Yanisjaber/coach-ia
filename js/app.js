@@ -7922,6 +7922,34 @@ document.addEventListener('click', function (e) {
   }
 });
 
+// SVGs + bloc stats reutilisable (heros + tuiles centrees, max 2 rangees).
+window.__statSvg = {
+  clock: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  route: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg>',
+  mtn: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20 9 8l3.5 6 2.5-4.5L21 20Z"/></svg>',
+  bolt: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>'
+};
+window.renderStatsBlockHTML = function (heroes, tiles) {
+  var mut = 'var(--text-mute,#7c879c)';
+  var heroCard = function (hh) {
+    return '<div style="flex:1;min-width:0;background:var(--bg-elev2,#1b2230);border-radius:11px;padding:13px;display:flex;align-items:center;justify-content:center;gap:11px;">'
+      + (hh.svg ? '<span style="color:' + hh.color + ';flex:none;line-height:0">' + hh.svg + '</span>' : '')
+      + '<div style="min-width:0"><div style="font-size:22px;font-weight:700;color:var(--text,#fff);line-height:1;white-space:nowrap">' + hh.val + (hh.unit ? '<span style="font-size:12px;color:' + mut + '"> ' + hh.unit + '</span>' : '') + '</div>'
+      + '<div style="font-size:10px;color:' + mut + ';text-transform:uppercase;letter-spacing:.4px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + hh.lab + '</div></div></div>';
+  };
+  var tileHTML = function (tt, basis) {
+    return '<div style="flex:0 1 ' + basis + ';background:' + tt.color + '17;border-radius:9px;padding:10px 12px;text-align:center;min-width:0;">'
+      + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:' + tt.color + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + tt.lab + '</div>'
+      + '<div style="font-size:14px;font-weight:600;color:var(--text,#e7ebf3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + tt.val + '</div></div>';
+  };
+  heroes = (heroes || []).filter(Boolean); tiles = (tiles || []).filter(Boolean);
+  var heroRow = heroes.length ? '<div style="display:flex;gap:11px;margin-bottom:11px;flex-wrap:wrap">' + heroes.slice(0, 4).map(heroCard).join('') + '</div>' : '';
+  var n = tiles.length, cols = n <= 4 ? Math.max(1, n) : Math.ceil(n / 2);
+  var basis = 'calc((100% - ' + ((cols - 1) * 8) + 'px) / ' + cols + ')';
+  var grid = n ? '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">' + tiles.map(function (t) { return tileHTML(t, basis); }).join('') + '</div>' : '';
+  return (heroRow || grid) ? '<div class="modal-section">' + heroRow + grid + '</div>' : '';
+};
+
 function openSessionModal(iso, source) {
   window.__currentModalIso = iso; window.__currentModalSource = source;
   { const _lw = document.getElementById('modal-link-wrap'); if (_lw) _lw.hidden = true; }
@@ -8946,13 +8974,17 @@ function openSessionModal(iso, source) {
       }
       metaEl.innerHTML = `${_dateStr}${_timeStr}`;
       const dur = t.duration || 0;
-      const cards = [];
-      if (dur) cards.push({ label: 'Durée', value: fmtDur(dur), unit: '' });
-      if (t.km) cards.push({ label: 'Distance', value: Math.round(t.km) + ' km', unit: '' });
-      if (t.dplus) cards.push({ label: 'Dénivelé', value: Math.round(t.dplus) + ' m', unit: '' });
-      if (t.tss) cards.push({ label: 'TSS', value: t.tss, unit: '' });
-      if (t.rpe != null && t.rpe !== '') cards.push({ label: 'RPE', value: t.rpe, unit: '' });
-      if (t.type) cards.push({ label: 'Type', value: t.type, unit: '', isText: true });
+      const _S = window.__statSvg || {};
+      const _heroes = [];
+      if (dur) _heroes.push({ svg: _S.clock, val: (dur < 60 ? Math.round(dur) + '<span style="font-size:13px"> min</span>' : (Math.floor(dur / 60) + '<span style="font-size:13px">h</span>' + String(Math.round(dur % 60)).padStart(2, '0'))), unit: '', lab: 'Durée prévue', color: '#60a5fa' });
+      if (t.km) _heroes.push({ svg: _S.route, val: Math.round(t.km), unit: 'km', lab: 'Distance prévue', color: '#22d3ee' });
+      if (t.dplus) _heroes.push({ svg: _S.mtn, val: Math.round(t.dplus), unit: 'm D+', lab: 'Dénivelé prévu', color: '#84cc16' });
+      if (_heroes.length < 3 && t.tss) _heroes.push({ svg: _S.bolt, val: t.tss, unit: '', lab: 'TSS estimé', color: '#fbbf24' });
+      const _tiles = [];
+      if (t.tss && _heroes.every(function (h) { return h.lab !== 'TSS estimé'; })) _tiles.push({ lab: 'TSS estimé', val: '' + t.tss, color: '#fbbf24' });
+      if (t.rpe != null && t.rpe !== '') _tiles.push({ lab: 'RPE estimé', val: t.rpe + '/10', color: '#f59e0b' });
+      if (t.type) _tiles.push({ lab: 'Type', val: (String(t.type).charAt(0).toUpperCase() + String(t.type).slice(1)), color: '#a78bfa' });
+      const statsHTML = window.renderStatsBlockHTML(_heroes, _tiles);
 
       const sections = [];
       if (Array.isArray(t.structure) && t.structure.length && typeof window.renderWorkoutProfileHTML === 'function') {
@@ -8967,9 +8999,7 @@ function openSessionModal(iso, source) {
       }
       bodyEl.innerHTML = `
         ${switchHTML}
-        <div class="modal-metrics">
-          ${cards.map(c => `<div class="modal-metric"><div class="m-label">${c.label}</div><div class="m-value" style="${c.isText ? 'font-size:15px;text-transform:capitalize;' : ''}">${c.value}</div></div>`).join('')}
-        </div>
+        ${statsHTML}
         ${sections.join('')}
       `;
       wireSwitchButtons();
