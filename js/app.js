@@ -7814,43 +7814,44 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
     var p = mm.matched;
     if (!p) return '';
     var fmtD = function (min) { return (typeof fmtDur === 'function') ? fmtDur(+min || 0) : (Math.round(+min || 0) + ' min'); };
-    var rows = [];
-    function addRow(label, pv, rv, unit, fmt) {
+    // Une barre par metrique : remplissage = realise, repere = cible prevue.
+    // Couleur : au-dessus de la cible = vert, en dessous = orange, sans cible = neutre.
+    function barRow(label, pv, rv, fmt) {
       var hasP = (pv != null && pv !== ''), hasR = (rv != null && rv !== '');
-      if (!hasP && !hasR) return;
+      if (!hasP && !hasR) return '';
       var pvn = +pv || 0, rvn = +rv || 0, d = rvn - pvn;
-      var show = function (x) { return fmt ? fmt(x) : (Math.round(x) + (unit ? (' ' + unit) : '')); };
-      var pct = pvn ? Math.abs(d) / pvn : (d ? 1 : 0);
-      var col = (d === 0) ? 'var(--text-mute,#6b7686)' : (pct <= 0.05 ? '#5fb87a' : (pct <= 0.15 ? '#c9a23a' : '#d08442'));
-      var dTxt = (!hasP || !hasR) ? '—' : ((d > 0 ? '+' : (d < 0 ? '−' : '')) + show(Math.abs(d)));
-      rows.push({ label: label, p: hasP ? show(pvn) : '—', r: hasR ? show(rvn) : '—', d: dTxt, col: col });
+      var col = !hasP ? '#9aa6b6' : (d > 0 ? '#5fb87a' : (d < 0 ? '#d08442' : '#9aa6b6'));
+      var scale = Math.max(pvn, rvn, 1);
+      var fillPct = Math.max(3, Math.min(100, rvn / scale * 100));
+      var targetPct = hasP ? Math.max(0, Math.min(100, pvn / scale * 100)) : null;
+      var right = '<span style="color:var(--text,#e7ecf3);font-weight:600">' + (hasR ? fmt(rvn) : '—');
+      if (hasP) right += ' <span style="color:var(--text-mute,#6b7686);font-weight:400">/ ' + fmt(pvn) + ' prévu</span>';
+      if (hasP && hasR && d !== 0) right += ' <span style="color:' + col + '">' + (d > 0 ? '+' : '−') + fmt(Math.abs(d)) + '</span>';
+      right += '</span>';
+      return '<div style="margin-top:13px">'
+        + '<div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px"><span style="color:var(--text-dim,#9aa6b6)">' + label + '</span>' + right + '</div>'
+        + '<div style="position:relative;height:7px;background:var(--bg-elev,#222b3d);border-radius:4px">'
+        + '<div style="width:' + fillPct + '%;height:100%;background:' + col + ';border-radius:4px"></div>'
+        + (targetPct != null ? '<div style="position:absolute;left:' + targetPct + '%;top:-2px;width:2px;height:11px;background:#cdd5e5"></div>' : '')
+        + '</div></div>';
     }
-    addRow('Durée', p.duration, act.duration, '', fmtD);
-    addRow('Distance', p.km, act.distance_km, 'km');
-    addRow('Dénivelé', p.dplus, act.elevation_gain, 'm');
-    addRow('TSS', p.tss, act.tss, '');
-    addRow('RPE', p.rpe, act.rpe, '');
-    if (!rows.length) return '';
-    var head = '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:0 16px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#6b7686);padding-bottom:6px"><span></span><span style="text-align:right">Prévu</span><span style="text-align:right">Réalisé</span><span style="text-align:right">Écart</span></div>';
-    var body = rows.map(function (r) {
-      return '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:0 16px;font-size:13px;align-items:center;border-top:1px solid var(--border,#232c3d);padding:9px 0">'
-        + '<span style="color:var(--text-dim,#9aa6b6)">' + r.label + '</span>'
-        + '<span style="text-align:right;color:var(--text-dim,#cdd5e5)">' + r.p + '</span>'
-        + '<span style="text-align:right;color:var(--text,#e7ecf3);font-weight:600">' + r.r + '</span>'
-        + '<span style="text-align:right;color:' + r.col + '">' + r.d + '</span>'
-        + '</div>';
-    }).join('');
+    var bars = ''
+      + barRow('Durée', p.duration, act.duration, function (x) { return fmtD(x); })
+      + barRow('Distance', p.km, act.distance_km, function (x) { return Math.round(x) + ' km'; })
+      + barRow('Énergie', null, act.kj, function (x) { return Math.round(x) + ' kJ'; })
+      + barRow('TSS', p.tss, act.tss, function (x) { return '' + Math.round(x); });
+    if (!bars) return '';
     var structHTML = '';
     if (Array.isArray(p.structure) && p.structure.length && window.renderWorkoutProfileHTML) {
       var ratio = (p.tss && act.tss) ? Math.round((+act.tss) / (+p.tss) * 100) : null;
-      structHTML = '<div style="margin-top:14px">'
+      structHTML = '<div style="margin-top:16px">'
         + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#6b7686);margin-bottom:7px">Structure prévue (objectif)</div>'
         + window.renderWorkoutProfileHTML(p.structure, { height: 56, labels: false })
         + (ratio != null ? '<div style="font-size:11px;color:var(--text-mute,#6b7686);margin-top:7px">Réalisé : ' + (act.tss || 0) + ' TSS pour ' + p.tss + ' prévus — ' + ratio + ' % de la charge cible.</div>' : '')
         + '</div>';
     }
     return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· ' + ((p.name || 'séance prévue')) + '</span></div>'
-      + head + body + structHTML + '</div>';
+      + bars + structHTML + '</div>';
   } catch (e) { console.warn('[prevu vs realise]', e && e.message); return ''; }
 };
 
