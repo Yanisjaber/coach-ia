@@ -6187,8 +6187,10 @@ var __PC_DURS = (function () {
   for (s = 1; s <= 10; s++) d.push(s);            // 1..10 s (chaque seconde)
   for (s = 15; s <= 30; s += 5) d.push(s);        // 15, 20, 25, 30 s
   d.push(45);                                      // 45 s
-  for (s = 60; s <= 600; s += 60) d.push(s);       // 1..10 min (chaque minute)
-  for (s = 900; s <= 18000; s += 300) d.push(s);   // 15 min et + (tous les 5 min, jusqu'a 5h)
+  for (s = 60; s <= 600; s += 60) d.push(s);        // 1..10 min (chaque minute)
+  for (s = 900; s <= 3600; s += 300) d.push(s);     // 15..60 min (tous les 5 min)
+  for (s = 4500; s <= 9000; s += 900) d.push(s);    // 1h15..2h30 (tous les 15 min)
+  for (s = 10800; s <= 28800; s += 1800) d.push(s); // 3h et + (tous les 30 min, jusqu'a 8h)
   return d;
 })();
 window.__powerCurveFromWatts = function (watts) {
@@ -6250,7 +6252,12 @@ function _buildRecordsTable(S) {
   var altGain = function (s0, s1) { var g = 0, prev = null; for (var k = s0; k < s1; k++) { var x = ALT[k]; if (x == null) continue; if (prev != null && x > prev) g += x - prev; prev = x; } return g; };
   var avgR = function (arr, s0, s1) { var sum = 0, c = 0; for (var k = s0; k < s1; k++) { var x = arr[k]; if (x != null && !isNaN(x)) { sum += x; c++; } } return c ? sum / c : 0; };
   var fmtT = function (sec) { var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.round(sec % 60); return (h > 0 ? (h + ':' + String(m).padStart(2, '0')) : ('' + m)) + ':' + String(s).padStart(2, '0'); };
-  var fmtDur = function (d) { return d < 60 ? (d + 's') : (d % 60 === 0 ? (d / 60 + 'min') : (Math.floor(d / 60) + 'min' + (d % 60) + 's')); };
+  var fmtDur = function (d) {
+    if (d < 60) return d + 's';
+    if (d < 3600) return (d % 60 === 0) ? (d / 60 + 'min') : (Math.floor(d / 60) + 'min' + (d % 60) + 's');
+    var h = Math.floor(d / 3600), m = Math.round((d % 3600) / 60);
+    return m === 0 ? (h + 'h') : (h + 'h' + String(m).padStart(2, '0'));
+  };
   var std = __PC_DURS.filter(function (d) { return d <= n; });
   var hasCad = CAD.some(function (x) { return x != null; });
   var rows = std.map(function (d) {
