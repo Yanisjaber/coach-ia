@@ -6192,9 +6192,13 @@ window.__powerCurveFromWatts = function (watts) {
   return out;
 };
 // toutes les courbes connues, regroupees par duree -> pour le rang
-window.__allPowerCurvesByDur = function () {
+window.__allPowerCurvesByDur = function (cutoffIso) {
   var m = {};
-  if (Array.isArray(data)) data.forEach(function (dd) { (dd.activities || []).forEach(function (a) { var pc = a && a.power_curve; if (!pc) return; for (var k in pc) { var v = +pc[k]; if (!isNaN(v)) { (m[k] = m[k] || []).push(v); } } }); });
+  if (Array.isArray(data)) data.forEach(function (dd) {
+    var diso = (typeof toIsoDate === 'function') ? toIsoDate(dd.date) : null;
+    if (cutoffIso && diso && diso > cutoffIso) return;   // sorties POSTERIEURES ignorees (rang fige a la date)
+    (dd.activities || []).forEach(function (a) { var pc = a && a.power_curve; if (!pc) return; for (var k in pc) { var v = +pc[k]; if (!isNaN(v)) { (m[k] = m[k] || []).push(v); } } });
+  });
   return m;
 };
 // recalcul global : parcourt les sorties avec puissance, calcule + sauve la courbe
@@ -6231,7 +6235,7 @@ function _buildRecordsTable(S) {
     if (Array.isArray(data)) data.forEach(function (dd) { (dd.activities || []).forEach(function (a) { if (String(a._sbId) === String(window.__lastActSbId)) a.power_curve = curCurve; }); });
     if (window.cloudSync && window.cloudSync.savePowerCurve) { try { window.cloudSync.savePowerCurve(window.__lastActSbId, curCurve); } catch (e) {} }
   }
-  var byDur = (typeof window.__allPowerCurvesByDur === 'function') ? window.__allPowerCurvesByDur() : {};
+  var byDur = (typeof window.__allPowerCurvesByDur === 'function') ? window.__allPowerCurvesByDur(window.__lastActDate) : {};
   var distMax = 0; for (var di = 0; di < DIST.length; di++) { var dv = DIST[di]; if (dv != null && dv > distMax) distMax = dv; }
   var toM = distMax > 1000 ? 1 : 1000;
   var distAt = function (idx) { var x = DIST[Math.min(idx, DIST.length - 1)]; return (x == null ? 0 : x) * toM; };
@@ -8697,6 +8701,7 @@ function openSessionModal(iso, source) {
         if (_streamsEl) {
           const streamId = act.id || act.activityId || day.activityId;
           window.__lastActSbId = act._sbId || null;
+          window.__lastActDate = iso;
           if (streamId) renderStreamsSection(_streamsEl, streamId);
           else _streamsEl.innerHTML = '<div class="modal-placeholder">Pas d\'ID activité disponible pour cette séance.</div>';
         }
