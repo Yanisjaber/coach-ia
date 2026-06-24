@@ -7848,14 +7848,9 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
       return total / 1000;
     };
     var _pKj = (p.structure && p.structure.length) ? _estKj(p.structure) : null;
-    // Vitesse moy : cible = km/duree prevus ; realise = vitesse Strava (ou km/duree)
-    var _pSpeed = (p.km && p.duration) ? (p.km / (p.duration / 60)) : null;
-    var _rSpeed = act.avg_speed_kmh || ((act.distance_km && act.duration) ? (act.distance_km / (act.duration / 60)) : null);
-    var _fmtKmh = function (x) { return (Math.round(x * 10) / 10) + ' km/h'; };
     var bars = ''
       + barRow('Durée', p.duration, act.duration, function (x) { return fmtD(x); })
       + barRow('Distance', p.km, act.distance_km, function (x) { return Math.round(x) + ' km'; })
-      + barRow('Vitesse moy', _pSpeed, _rSpeed, _fmtKmh)
       + barRow('Énergie', (_pKj != null ? Math.round(_pKj) : null), act.kj, function (x) { return Math.round(x) + ' kJ'; })
       + barRow('TSS', p.tss, act.tss, function (x) { return '' + Math.round(x); });
     if (!bars) return '';
