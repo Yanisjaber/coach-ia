@@ -8230,7 +8230,9 @@ function openSessionModal(iso, source) {
         if (act.laps) _tiles.push(tile('Tours', `${act.laps}`, '#9ca3af'));
         const _n = _tiles.length;
         const _cols = _n <= 4 ? Math.max(1, _n) : Math.ceil(_n / 2);   // <=4 -> 1 rangee ; sinon 2 rangees equilibrees
-        const _tileGrid = _n ? `<div style="display:grid;grid-template-columns:repeat(${_cols},minmax(0,1fr));gap:8px">${_tiles.join('')}</div>` : '';
+        const _basis = `calc((100% - ${(_cols - 1) * 8}px) / ${_cols})`;
+        const _cells = _tiles.map(function (t) { return t.replace('<div style="', `<div style="flex:0 1 ${_basis};`); });
+        const _tileGrid = _n ? `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">${_cells.join('')}</div>` : '';
         const statsHTML = (_heroRow || _tileGrid) ? `<div class="modal-section">${_heroRow}${_tileGrid}</div>` : '';
 
         // --- Lien Strava ---
