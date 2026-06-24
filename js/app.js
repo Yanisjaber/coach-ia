@@ -6182,7 +6182,15 @@ document.addEventListener('click', function (e) {
   e.preventDefault();
   if (typeof window.openFullAnalysis === 'function') window.openFullAnalysis();
 });
-var __PC_DURS = [1, 5, 10, 15, 30, 60, 120, 180, 300, 600, 1200, 1800, 3600];
+var __PC_DURS = (function () {
+  var d = [], s;
+  for (s = 1; s <= 10; s++) d.push(s);            // 1..10 s (chaque seconde)
+  for (s = 15; s <= 30; s += 5) d.push(s);        // 15, 20, 25, 30 s
+  d.push(45);                                      // 45 s
+  for (s = 60; s <= 600; s += 60) d.push(s);       // 1..10 min (chaque minute)
+  for (s = 900; s <= 18000; s += 300) d.push(s);   // 15 min et + (tous les 5 min, jusqu'a 5h)
+  return d;
+})();
 window.__powerCurveFromWatts = function (watts) {
   if (!watts || !watts.length) return null;
   var n = watts.length, pref = new Float64Array(n + 1);
