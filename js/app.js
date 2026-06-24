@@ -7664,6 +7664,79 @@ function buildRealisedDay(iso) {
   }
   return realDay;
 }
+// ============================================================
+// Comparaison PRÉVU vs RÉALISÉ (affichée dans la modale du réalisé).
+// Rapproche une activité réalisée avec une séance prévue : même jour, même sport,
+// et (si plusieurs réalisées le même jour) durée la plus proche (appariement greedy).
+// ============================================================
+window.renderPrevuVsRealiseHTML = function (act, iso) {
+  try {
+    if (!act || act.category === 'competition') return '';
+    var planned = ((typeof loadTrainings === 'function') ? loadTrainings() : [])
+      .filter(function (t) { return !window.coachModeKeep || window.coachModeKeep(t.ia); })
+      .filter(function (t) { return t.date === iso; });
+    if (!planned.length) return '';
+    var catOf = function (x) { return (typeof getSportCategory === 'function') ? getSportCategory(x) : x; };
+    var actCat = catOf(act.raw_type || act.sport);
+    var cands = planned.filter(function (t) { return catOf(t.sport) === actCat; });
+    if (!cands.length) return '';
+    var dayObj = (typeof buildRealisedDay === 'function') ? buildRealisedDay(iso) : null;
+    var reals = ((dayObj && dayObj.activities) ? dayObj.activities : [act])
+      .filter(function (x) { return catOf(x.raw_type || x.sport) === actCat; });
+    var keyOf = function (x) { return String(x._sbId || x.client_id || x._manualId || x.id || (x.name + '|' + (x.duration || 0))); };
+    var actKey = keyOf(act);
+    var combos = [];
+    cands.forEach(function (p, pi) { reals.forEach(function (r, ri) { combos.push({ pi: pi, ri: ri, diff: Math.abs((+p.duration || 0) - (+r.duration || 0)) }); }); });
+    combos.sort(function (a, b) { return a.diff - b.diff; });
+    var usedP = {}, usedR = {}, match = null;
+    combos.forEach(function (c) {
+      if (usedP[c.pi] || usedR[c.ri]) return;
+      usedP[c.pi] = 1; usedR[c.ri] = 1;
+      if (keyOf(reals[c.ri]) === actKey) match = cands[c.pi];
+    });
+    if (!match) return '';
+    var p = match;
+    var fmtD = function (min) { return (typeof fmtDur === 'function') ? fmtDur(+min || 0) : (Math.round(+min || 0) + ' min'); };
+    var rows = [];
+    function addRow(label, pv, rv, unit, fmt) {
+      var hasP = (pv != null && pv !== ''), hasR = (rv != null && rv !== '');
+      if (!hasP && !hasR) return;
+      var pvn = +pv || 0, rvn = +rv || 0, d = rvn - pvn;
+      var show = function (x) { return fmt ? fmt(x) : (Math.round(x) + (unit ? (' ' + unit) : '')); };
+      var pct = pvn ? Math.abs(d) / pvn : (d ? 1 : 0);
+      var col = (d === 0) ? 'var(--text-mute,#6b7686)' : (pct <= 0.05 ? '#5fb87a' : (pct <= 0.15 ? '#c9a23a' : '#d08442'));
+      var dTxt = (!hasP || !hasR) ? '—' : ((d > 0 ? '+' : (d < 0 ? '−' : '')) + show(Math.abs(d)));
+      rows.push({ label: label, p: hasP ? show(pvn) : '—', r: hasR ? show(rvn) : '—', d: dTxt, col: col });
+    }
+    addRow('Durée', p.duration, act.duration, '', fmtD);
+    addRow('Distance', p.km, act.distance_km, 'km');
+    addRow('Dénivelé', p.dplus, act.elevation_gain, 'm');
+    addRow('TSS', p.tss, act.tss, '');
+    addRow('RPE', p.rpe, act.rpe, '');
+    if (!rows.length) return '';
+    var head = '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:0 16px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#6b7686);padding-bottom:6px"><span></span><span style="text-align:right">Prévu</span><span style="text-align:right">Réalisé</span><span style="text-align:right">Écart</span></div>';
+    var body = rows.map(function (r) {
+      return '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:0 16px;font-size:13px;align-items:center;border-top:1px solid var(--border,#232c3d);padding:9px 0">'
+        + '<span style="color:var(--text-dim,#9aa6b6)">' + r.label + '</span>'
+        + '<span style="text-align:right;color:var(--text-dim,#cdd5e5)">' + r.p + '</span>'
+        + '<span style="text-align:right;color:var(--text,#e7ecf3);font-weight:600">' + r.r + '</span>'
+        + '<span style="text-align:right;color:' + r.col + '">' + r.d + '</span>'
+        + '</div>';
+    }).join('');
+    var structHTML = '';
+    if (Array.isArray(p.structure) && p.structure.length && window.renderWorkoutProfileHTML) {
+      var ratio = (p.tss && act.tss) ? Math.round((+act.tss) / (+p.tss) * 100) : null;
+      structHTML = '<div style="margin-top:14px">'
+        + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#6b7686);margin-bottom:7px">Structure prévue (objectif)</div>'
+        + window.renderWorkoutProfileHTML(p.structure, { height: 56, labels: false })
+        + (ratio != null ? '<div style="font-size:11px;color:var(--text-mute,#6b7686);margin-top:7px">Réalisé : ' + (act.tss || 0) + ' TSS pour ' + p.tss + ' prévus — ' + ratio + ' % de la charge cible.</div>' : '')
+        + '</div>';
+    }
+    return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· rapproché par durée</span></div>'
+      + head + body + structHTML + '</div>';
+  } catch (e) { console.warn('[prevu vs realise]', e && e.message); return ''; }
+};
+
 function openSessionModal(iso, source) {
   // Reconstruire la date depuis l'iso (les jours futurs ne sont PAS dans data)
   const date = new Date(iso + 'T12:00:00');
@@ -7974,6 +8047,7 @@ function openSessionModal(iso, source) {
           <div style="font-size:11px;color:var(--text-mute);margin-top:6px;">ID activité : <code>${stravaId}</code></div>
         ` : '';
 
+        const comparHTML = (typeof window.renderPrevuVsRealiseHTML === 'function') ? window.renderPrevuVsRealiseHTML(act, iso) : '';
         const _struct = act.structure;
         const _structDet = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(_struct) : '';
         const profileHTML = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutProfileHTML === 'function')
@@ -7991,6 +8065,7 @@ function openSessionModal(iso, source) {
         bodyEl.innerHTML = `
           ${switchHTML}
           ${syntheseHTML}
+          ${comparHTML}
           ${puissanceFcHTML}
           ${effortHTML}
           ${cardioHTML}
