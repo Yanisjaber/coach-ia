@@ -6264,8 +6264,8 @@ function _buildRecordsTable(S) {
     var arr = byDur[d] || []; var greater = 0; for (var z = 0; z < arr.length; z++) { if (arr[z] > cur) greater++; }
     var rank = greater + 1, totalR = arr.length || 1;
     var pct = totalR > 0 ? Math.max(2, Math.round((totalR - rank + 1) / totalR * 100)) : 0;
-    var barCol = (pct >= 85) ? '#fbbf24' : '#5fb87a';
-    var rankTxtCol = (pct >= 85) ? '#fbbf24' : '#cbd5e1';
+    var medal = rank === 1 ? '\ud83e\udd47 ' : (rank === 2 ? '\ud83e\udd48 ' : (rank === 3 ? '\ud83e\udd49 ' : ''));
+    var rankTxtCol = (rank <= 10) ? '#fbbf24' : 'var(--text-dim,#9aa6b6)';
     var distM = Math.max(0, distAt(s1) - distAt(s0));
     var spd = distM > 0 ? ((distM / 1000) / (d / 3600)) : 0;
     var dplus = altGain(s0, s1);
@@ -6273,7 +6273,7 @@ function _buildRecordsTable(S) {
     return '<tr>'
       + '<td>' + fmtDur(d) + '</td>'
       + '<td class="af-tw"><b>' + cur + ' W</b></td>'
-      + '<td style="min-width:170px"><div style="display:flex;align-items:center;gap:9px"><span style="color:' + rankTxtCol + ';font-weight:700;white-space:nowrap">' + rank + '<span style="color:var(--text-mute,#6b7686);font-weight:400"> / ' + totalR + '</span></span><div style="flex:1;height:5px;background:var(--bg-elev,#222b3d);border-radius:3px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + barCol + '"></div></div></div></td>'
+      + '<td style="min-width:170px"><div style="display:flex;align-items:center;gap:9px"><span style="color:' + rankTxtCol + ';font-weight:700;white-space:nowrap">' + medal + rank + '<span style="color:var(--text-mute,#6b7686);font-weight:400"> / ' + totalR + '</span></span><div style="flex:1;height:5px;background:var(--bg-elev,#222b3d);border-radius:3px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:#5fb87a"></div></div></div></td>'
       + '<td>' + fmtT(s0) + ' \u2192 ' + fmtT(s1) + '</td>'
       + '</tr>';
   }).join('');
