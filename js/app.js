@@ -5122,10 +5122,6 @@ window.detectRideSequences = function (watts, ftp) {
       changed = true;
     }
     if (!segs.length) return [];
-    // Construction des blocs + groupement des series d'efforts
-    var pctFtp = function (w) { return Math.round(w / ftp * 100); };
-    var avgWD = function (arr) { var s = 0, d = 0; arr.forEach(function (x) { s += x.w * x.dur; d += x.dur; }); return d ? s / d : 0; };
-    var medDur = function (arr) { var d = arr.map(function (x) { return x.dur; }).sort(function (p, q) { return p - q; }); return d.length ? d[Math.floor(d.length / 2)] : 0; };
     // Chaque segment = un bloc, a sa vraie duree (pas de regroupement en series).
     var pctFtp = function (w) { return Math.round(w / ftp * 100); };
     var blocks = segs.map(function (g) {
@@ -10302,3 +10298,4 @@ document.querySelectorAll('#sport-filter .sport-btn').forEach(btn => {
     }
   });
 })();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                               
