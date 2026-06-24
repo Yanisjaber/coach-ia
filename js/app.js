@@ -6249,14 +6249,16 @@ function _buildRecordsTable(S) {
     var bw = bestWin(d), s0 = bw.start, s1 = Math.min(n, s0 + d), cur = Math.round(bw.avg);
     var arr = byDur[d] || []; var greater = 0; for (var z = 0; z < arr.length; z++) { if (arr[z] > cur) greater++; }
     var rank = greater + 1, totalR = arr.length || 1;
-    var rankCol = rank === 1 ? '#fbbf24' : (rank <= 3 ? '#cbd5e1' : 'var(--text-dim,#9aa6b6)');
+    var pct = totalR > 0 ? Math.max(2, Math.round((totalR - rank + 1) / totalR * 100)) : 0;
+    var barCol = (pct >= 85) ? '#fbbf24' : '#5fb87a';
+    var rankTxtCol = (pct >= 85) ? '#fbbf24' : '#cbd5e1';
     var distM = Math.max(0, distAt(s1) - distAt(s0));
     var spd = distM > 0 ? ((distM / 1000) / (d / 3600)) : 0;
     var dplus = altGain(s0, s1);
     var cad = avgR(CAD, s0, s1);
     return '<tr>'
       + '<td>' + fmtDur(d) + '</td>'
-      + '<td style="color:' + rankCol + ';font-weight:700">' + rank + '<span style="color:var(--text-mute,#6b7686);font-weight:400"> / ' + totalR + '</span></td>'
+      + '<td style="min-width:170px"><div style="display:flex;align-items:center;gap:9px"><span style="color:' + rankTxtCol + ';font-weight:700;white-space:nowrap">' + rank + '<span style="color:var(--text-mute,#6b7686);font-weight:400"> / ' + totalR + '</span></span><div style="flex:1;height:5px;background:var(--bg-elev,#222b3d);border-radius:3px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + barCol + '"></div></div></div></td>'
       + '<td class="af-tw"><b>' + cur + ' W</b></td>'
       + '<td>' + (distM >= 1000 ? (Math.round(distM / 10) / 100 + ' km') : (Math.round(distM) + ' m')) + '</td>'
       + '<td>' + (spd ? (Math.round(spd * 10) / 10 + ' km/h') : '\u2014') + '</td>'
