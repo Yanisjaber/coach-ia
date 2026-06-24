@@ -5127,30 +5127,31 @@ window.detectRideSequences = function (watts, ftp) {
     var blocks = segs.map(function (g) {
       return { type: 'steady', name: null, _z: g.z, _c: g.c, _durS: g.dur, metric: 'power', unit: 'percent', work: { min: Math.round(g.dur / 60 * 100) / 100, int: pctFtp(g.w), metric: 'power' } };
     });
-    // Fusion finale : blocs adjacents de MEME zone -> un seul bloc (duree additive, watts moyennes).
+    // Zone d'un bloc a partir de son %FTP (memes seuils que la couleur des barres)
     var zp = function (p) { return zoneOf(ftp * p / 100); };
+    // 1) Retire les micro-blocs (< 25 s) AVANT de fusionner
+    blocks = blocks.filter(function (bl) { return ((bl.work ? bl.work.min : 0) * 60) >= 25; });
+    // 2) Fusionne les blocs adjacents de MEME zone (duree additive, watts moyennes)
     var mg = [];
     blocks.forEach(function (bl) {
       var L = mg[mg.length - 1];
-      if (L && L.type !== 'interval' && bl.type !== 'interval' && zp(L.work.int) === zp(bl.work.int)) {
+      if (L && zp(L.work.int) === zp(bl.work.int)) {
         var d1 = +L.work.min || 0, d2 = +bl.work.min || 0, dt = d1 + d2;
         L.work.int = dt ? Math.round((L.work.int * d1 + bl.work.int * d2) / dt) : L.work.int;
         L.work.min = Math.round(dt * 100) / 100;
         L._durS = (L._durS || d1 * 60) + (bl._durS || d2 * 60);
-        L._z = zp(L.work.int);
-      } else { bl._z = zp(bl.work.int); mg.push(bl); }
+      } else { mg.push(bl); }
     });
     blocks = mg;
-    // Nommage deduit
+    // 3) Nommage deduit
     var ZN = ['Récupération', 'Endurance', 'Tempo', 'Seuil', 'VO2max', 'Anaérobie'];
     blocks.forEach(function (bl, bi2) {
-      if (bl.type === 'interval') return;
-      if (bi2 === 0 && bl._z <= 2) { bl.name = 'Échauffement'; return; }
-      if (bi2 === blocks.length - 1 && bl._z <= 2) { bl.name = 'Retour au calme'; return; }
-      if (bl._c === 'hard') { bl.name = (bl._durS <= 50 ? 'Sprint' : (bl._z === 4 ? 'Seuil' : 'VO2max')); return; }
-      bl.name = ZN[bl._z] || 'Bloc';
+      var z = zp(bl.work.int), durS = bl._durS || ((+bl.work.min || 0) * 60);
+      if (bi2 === 0 && z <= 2) { bl.name = 'Échauffement'; return; }
+      if (bi2 === blocks.length - 1 && z <= 2) { bl.name = 'Retour au calme'; return; }
+      if (z >= 4) { bl.name = (durS <= 50 ? 'Sprint' : (z === 4 ? 'Seuil' : 'VO2max')); return; }
+      bl.name = ZN[z] || 'Bloc';
     });
-    blocks = blocks.filter(function (bl) { var d = (bl.work ? bl.work.min : 0) * 60 * (bl.reps || 1) + (bl.rec ? bl.rec.min * 60 * (bl.reps || 1) : 0); return d >= 20; });
     return blocks;
   } catch (e) { console.warn('[detect sequences]', e && e.message); return []; }
 };
