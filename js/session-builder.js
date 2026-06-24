@@ -307,9 +307,10 @@
       var segs = blockSegs(b), bmin = bmins[bi] || 0, it = bmin || 1;
       var _tseg = b.work || segs[0];
       var _tm = (b.metric) || (_tseg && _tseg.metric) || 'power';
-      var _tval = _tseg ? label(_tseg, _tm).replace(/ \. /g, ' · ') : '';
-      var _meta = fmtDurSec(bmin) + (_tval ? (' · ' + _tval) : '') + (b.type === 'interval' && b.reps > 1 ? ' · ' + b.reps + '×' : '');
-      var _dot = ZHEX[zoneOf(midOf(_tseg || { int: 0 }))];
+      var _zc = zoneOf(midOf(_tseg || { int: 0 }));   // zone par seuils = celle de la couleur
+      var _tval = _tseg ? label(_tseg, _tm).replace(/ \. Z[^.]*$/, '').replace(/ \. /g, ' · ') : '';
+      var _meta = fmtDurSec(bmin) + (_tval ? (' · ' + _tval) : '') + ' · Z' + (_zc + 1) + (b.type === 'interval' && b.reps > 1 ? ' · ' + b.reps + '×' : '');
+      var _dot = ZHEX[_zc];
       html += '<div class="wp-block" data-name="' + esc(b.name || NAME[b.type] || '') + '" data-meta="' + esc(_meta) + '" data-dot="' + _dot + '" style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(minFlex, bmin / tot) + '">';
       html += '<div style="flex:1;display:flex;align-items:flex-end;gap:0;min-height:0">';
       segs.forEach(function (s) {
