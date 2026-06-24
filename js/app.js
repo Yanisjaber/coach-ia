@@ -5341,6 +5341,7 @@ async function renderStreamsSection(container, activityId) {
   const _toggleHTML = _profHTML
     ? '<button id="toggle-detailed" type="button" style="width:100%;background:var(--bg-elev2);border:1px solid var(--border);color:var(--text-dim);border-radius:9px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin:6px 0 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;">Voir l\'analyse détaillée</button>'
     : '';
+  try { var _stray = document.getElementById('detailed-charts'); if (_stray) _stray.remove(); } catch (e) { }
   container.innerHTML = _profHTML + _toggleHTML + '<div id="detailed-charts">' + `
     <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;margin-bottom:14px;font-size:12px;color:var(--text-dim);">
       <div style="display:inline-flex;gap:6px;align-items:baseline;">Temps : <strong id="stat-temps" style="color:var(--text);font-size:14px;min-width:70px;text-align:left;display:inline-block;">—</strong></div>
@@ -6113,47 +6114,45 @@ async function renderStreamsSection(container, activityId) {
 // ============================================================
 window.openFullAnalysis = function () {
   var S = window.__lastStreams;
-  var ov = document.getElementById('analysis-full');
-  if (!ov) {
-    ov = document.createElement('div');
-    ov.id = 'analysis-full';
-    ov.innerHTML = '<div class="af-bar"><span class="af-title">Analyse détaillée</span><button class="af-close" type="button" title="Fermer">×</button></div><div class="af-body"></div>';
-    document.body.appendChild(ov);
-    ov.querySelector('.af-close').addEventListener('click', window.closeFullAnalysis);
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') window.closeFullAnalysis(); });
-  }
-  var body = ov.querySelector('.af-body');
-  body.innerHTML = '';
+  var container = document.querySelector('.main .container') || document.querySelector('.container');
+  if (!container) return;
+  var page = document.getElementById('p-analysis');
+  if (!page) { page = document.createElement('section'); page.className = 'panel'; page.id = 'p-analysis'; container.appendChild(page); }
+  // memorise le panneau courant pour le retour
+  var cur = document.querySelector('.panel.active');
+  window.__prevPanelId = (cur && cur.id && cur.id !== 'p-analysis') ? cur.id : (window.__prevPanelId || 'p1');
+  // ferme la modale d'activite
+  var modal = document.getElementById('session-modal'); if (modal) modal.classList.remove('active');
+  // structure de la page (Retour + sections)
+  page.innerHTML = '<div class="af-head"><button class="af-back" type="button">\u2190 Retour</button></div><div class="af-body2"></div>';
+  page.querySelector('.af-back').addEventListener('click', window.closeFullAnalysis);
+  var body = page.querySelector('.af-body2');
+  // deplace les courbes temps (deja construites dans la modale)
   var dc = document.getElementById('detailed-charts');
-  if (dc) {
-    dc.__origParent = dc.parentNode;
-    dc.style.display = 'block';
-    var sec1 = document.createElement('div'); sec1.className = 'af-section';
-    sec1.innerHTML = '<div class="af-h">Courbes temps</div>';
-    sec1.appendChild(dc);
-    body.appendChild(sec1);
-  }
+  if (dc) { dc.style.display = 'block'; var s1 = document.createElement('div'); s1.className = 'af-section'; s1.innerHTML = '<div class="af-h">Courbes temps</div>'; s1.appendChild(dc); body.appendChild(s1); }
   body.insertAdjacentHTML('beforeend',
     '<div class="af-section" id="af-s-pc"><div class="af-h">Courbe de puissance (mean-max)</div><div class="af-chart"><canvas id="af-pcurve"></canvas></div></div>'
     + '<div class="af-grid2">'
-    + '<div class="af-section" id="af-s-zp"><div class="af-h">Temps par zone — Puissance</div><div class="af-chart"><canvas id="af-zpow"></canvas></div></div>'
-    + '<div class="af-section" id="af-s-zh"><div class="af-h">Temps par zone — FC</div><div class="af-chart"><canvas id="af-zhr"></canvas></div></div>'
+    + '<div class="af-section" id="af-s-zp"><div class="af-h">Temps par zone \u2014 Puissance</div><div class="af-chart"><canvas id="af-zpow"></canvas></div></div>'
+    + '<div class="af-section" id="af-s-zh"><div class="af-h">Temps par zone \u2014 FC</div><div class="af-chart"><canvas id="af-zhr"></canvas></div></div>'
     + '</div>'
     + '<div class="af-section" id="af-s-di"><div class="af-h">Distribution de puissance</div><div class="af-chart"><canvas id="af-dist"></canvas></div></div>'
   );
-  ov.classList.add('open');
-  document.body.style.overflow = 'hidden';
+  // active la page (sidebar inchangee)
+  document.querySelectorAll('.tab').forEach(function (b) { b.classList.remove('active'); });
+  document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
+  page.classList.add('active');
+  var tb = document.getElementById('topbar-title'); if (tb) tb.textContent = 'Analyse détaillée';
+  try { window.scrollTo(0, 0); } catch (e) {}
   window.__afCharts = [];
   setTimeout(function () { try { _buildAfCharts(S); } catch (e) { console.warn('[af charts]', e && e.message); } try { window.dispatchEvent(new Event('resize')); } catch (e2) {} }, 40);
 };
 window.closeFullAnalysis = function () {
-  var ov = document.getElementById('analysis-full'); if (!ov) return;
   (window.__afCharts || []).forEach(function (c) { try { c.destroy(); } catch (e) {} });
   window.__afCharts = [];
-  var dc = document.getElementById('detailed-charts');
-  if (dc && dc.__origParent) { dc.style.display = 'none'; dc.__origParent.appendChild(dc); }
-  ov.classList.remove('open');
-  document.body.style.overflow = '';
+  var pid = window.__prevPanelId || 'p1';
+  if (typeof activatePanel === 'function') { activatePanel(pid, false); }
+  else { var pg = document.getElementById('p-analysis'); if (pg) pg.classList.remove('active'); var pv = document.getElementById(pid); if (pv) pv.classList.add('active'); }
 };
 // Clic sur "Voir l'analyse detaillee" (delegation -> robuste quel que soit le moment de rendu)
 document.addEventListener('click', function (e) {
