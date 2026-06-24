@@ -7783,7 +7783,7 @@ window.__setupModalLinkSelect = function (act, iso) {
   menu.hidden = true;
   wrap.classList.remove('open');
   wrap.hidden = false;
-  if (btn) btn.style.color = mm.matched ? 'var(--accent)' : '';
+  if (btn) btn.style.color = '';
   wrap.title = mm.matched ? ('Séance prévue liée : ' + (mm.matched.name || '')) : 'Aucune séance prévue liée';
 };
 
