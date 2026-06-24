@@ -5126,25 +5126,11 @@ window.detectRideSequences = function (watts, ftp) {
     var pctFtp = function (w) { return Math.round(w / ftp * 100); };
     var avgWD = function (arr) { var s = 0, d = 0; arr.forEach(function (x) { s += x.w * x.dur; d += x.dur; }); return d ? s / d : 0; };
     var medDur = function (arr) { var d = arr.map(function (x) { return x.dur; }).sort(function (p, q) { return p - q; }); return d.length ? d[Math.floor(d.length / 2)] : 0; };
-    var blocks = [], idx = 0;
-    var isHigh = function (g) { return g.c === 'hard'; };
-    while (idx < segs.length) {
-      if (isHigh(segs[idx]) && idx + 1 < segs.length && !isHigh(segs[idx + 1])) {
-        var work = [], rec = [], jj = idx;
-        while (jj + 1 < segs.length && isHigh(segs[jj]) && !isHigh(segs[jj + 1]) && (jj + 2 >= segs.length || isHigh(segs[jj + 2]))) { work.push(segs[jj]); rec.push(segs[jj + 1]); jj += 2; }
-        if (jj < segs.length && isHigh(segs[jj])) { work.push(segs[jj]); jj += 1; }
-        if (work.length >= 2) {
-          var wS = medDur(work), nm = (wS <= 50 ? 'Sprints' : 'Intervalles');
-          blocks.push({ type: 'interval', name: nm, reps: work.length, metric: 'power', unit: 'percent',
-            work: { min: Math.round(wS / 60 * 100) / 100, int: pctFtp(avgWD(work)), metric: 'power' },
-            rec: { min: Math.round(medDur(rec) / 60 * 100) / 100, int: pctFtp(rec.length ? avgWD(rec) : 0), metric: 'power' } });
-          idx = jj; continue;
-        }
-      }
-      var g0 = segs[idx];
-      blocks.push({ type: 'steady', name: null, _z: g0.z, _c: g0.c, _durS: g0.dur, metric: 'power', unit: 'percent', work: { min: Math.round(g0.dur / 60 * 100) / 100, int: pctFtp(g0.w), metric: 'power' } });
-      idx++;
-    }
+    // Chaque segment = un bloc, a sa vraie duree (pas de regroupement en series).
+    var pctFtp = function (w) { return Math.round(w / ftp * 100); };
+    var blocks = segs.map(function (g) {
+      return { type: 'steady', name: null, _z: g.z, _c: g.c, _durS: g.dur, metric: 'power', unit: 'percent', work: { min: Math.round(g.dur / 60 * 100) / 100, int: pctFtp(g.w), metric: 'power' } };
+    });
     // Nommage deduit
     var ZN = ['Récupération', 'Endurance', 'Tempo', 'Seuil', 'VO2max', 'Anaérobie'];
     blocks.forEach(function (bl, bi2) {
