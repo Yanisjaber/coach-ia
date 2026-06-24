@@ -8202,7 +8202,7 @@ function openSessionModal(iso, source) {
           else _speedHero = { val: +(_distKm / (dur / 60)).toFixed(1), unit: 'km/h', lab: 'Vitesse moy' };
         }
         const heroCard = (svg, val, unit, lab, color) =>
-          `<div style="flex:1;min-width:0;background:var(--bg-elev2,#1b2230);border-radius:11px;padding:13px;display:flex;align-items:center;gap:11px;">`
+          `<div style="flex:1;min-width:0;background:var(--bg-elev2,#1b2230);border-radius:11px;padding:13px;display:flex;align-items:center;justify-content:center;gap:11px;">`
           + `<span style="color:${color};flex:none;line-height:0">${svg}</span>`
           + `<div style="min-width:0"><div style="font-size:22px;font-weight:700;color:var(--text,#fff);line-height:1;white-space:nowrap">${val}${unit ? `<span style="font-size:12px;color:var(--text-mute,#7c879c)"> ${unit}</span>` : ''}</div>`
           + `<div style="font-size:10px;color:var(--text-mute,#7c879c);text-transform:uppercase;letter-spacing:.4px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lab}</div></div></div>`;
@@ -8211,14 +8211,13 @@ function openSessionModal(iso, source) {
         if (_speedHero) _heroes.push(heroCard(_svgSpeed, _speedHero.val, _speedHero.unit, _speedHero.lab, '#34d399'));
         if (_dplusM) _heroes.push(heroCard(_svgMtn, _dplusM, 'm D+', 'Dénivelé', '#84cc16'));
         if (_heroes.length < 4 && act.np) _heroes.push(heroCard(_svgSpeed, act.np, 'W', 'NP', '#fbbf24'));
-        if (_heroes.length < 4 && act.tss) _heroes.push(heroCard(_svgClock, act.tss, '', 'TSS', '#fbbf24'));
         const _heroRow = _heroes.length ? `<div style="display:flex;gap:11px;margin-bottom:11px;flex-wrap:wrap">${_heroes.slice(0, 4).join('')}</div>` : '';
 
         const _mut = 'var(--text-mute,#7c879c)';
         const tile = (lab, valHTML, color) =>
-          `<div style="background:${color}17;border-radius:9px;padding:9px 12px;">`
+          `<div style="background:${color}17;border-radius:9px;padding:10px 12px;text-align:center;">`
           + `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:${color}">${lab}</div>`
-          + `<div style="font-size:14px;font-weight:600;color:var(--text,#e7ebf3);margin-top:2px">${valHTML}</div></div>`;
+          + `<div style="font-size:14px;font-weight:600;color:var(--text,#e7ebf3);margin-top:3px">${valHTML}</div></div>`;
         const _tiles = [];
         if (act.category === 'competition' && act.target != null && act.target !== '') _tiles.push(tile('Temps cible', fmtMinToTime(act.target), '#c084fc'));
         if (act.avg_watts) {
@@ -8230,7 +8229,7 @@ function openSessionModal(iso, source) {
         }
         if (act.hr) _tiles.push(tile('Cardio', `${act.hr} moy` + (act.max_hr ? ` · ${act.max_hr} max` : '') + ` <span style="font-weight:400;color:${_mut};font-size:11px">bpm</span>`, '#f87171'));
         if (act.cadence) _tiles.push(tile('Cadence', `${act.cadence}` + (act.max_cadence ? ` · ${act.max_cadence} max` : '') + ` <span style="font-weight:400;color:${_mut};font-size:11px">rpm</span>`, '#a78bfa'));
-        if (act.tss) _tiles.push(tile('TSS', `${act.tss}`, '#9ca3af'));
+        _tiles.push(tile('TSS', (act.tss != null && act.tss !== '') ? `${act.tss}` : '—', '#9ca3af'));
         { let chg = []; if (act.kj) chg.push(`${act.kj} kJ`); if (act.calories) chg.push(`${act.calories} kcal`); if (act.rpe) chg.push(`RPE ${act.rpe}`); if (act.laps) chg.push(`${act.laps} tours`); if (chg.length) _tiles.push(tile('Énergie', chg.join(' · '), '#9ca3af')); }
         const _tileGrid = _tiles.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">${_tiles.join('')}</div>` : '';
         const statsHTML = (_heroRow || _tileGrid) ? `<div class="modal-section">${_heroRow}${_tileGrid}</div>` : '';
