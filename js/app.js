@@ -5223,7 +5223,7 @@ async function renderStreamsSection(container, activityId) {
   try {
     var _hrMaxA = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && (+window.DASHBOARD_DATA.athlete.hr_max || +window.DASHBOARD_DATA.athlete.hrMax)) || 190;
     var _ftpA = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && +window.DASHBOARD_DATA.athlete.ftp) || 250;
-    window.__lastStreams = { watts: watts ? watts.slice() : null, hr: hr ? hr.slice() : null, ftp: _ftpA, hrMax: _hrMaxA };
+    window.__lastStreams = { watts: watts ? watts.slice() : null, hr: hr ? hr.slice() : null, cadence: cadence ? cadence.slice() : null, altitude: altitude ? altitude.slice() : null, distance: distance ? distance.slice() : null, ftp: _ftpA, hrMax: _hrMaxA };
   } catch (e) { }
 
   const length = (watts && watts.length) || (hr && hr.length) || (cadence && cadence.length) || 0;
@@ -6133,7 +6133,7 @@ window.openFullAnalysis = function () {
     +   '<button class="af-tab" type="button" data-tab="dist">Distribution</button>'
     + '</div>'
     + '<div class="af-tabc active" id="af-tab-courbes"><div id="af-courbes-slot"></div></div>'
-    + '<div class="af-tabc" id="af-tab-records"><div class="af-section"><div class="af-h">Courbe de puissance (mean-max)</div><div class="af-chart"><canvas id="af-pcurve"></canvas></div></div></div>'
+    + '<div class="af-tabc" id="af-tab-records"><div class="af-section"><div class="af-h">Courbe de puissance (mean-max)</div><div class="af-chart"><canvas id="af-pcurve"></canvas></div></div><div class="af-section"><div class="af-h">Records de puissance</div><div id="af-records"></div></div></div>'
     + '<div class="af-tabc" id="af-tab-zones"><div class="af-grid2"><div class="af-section"><div class="af-h">Temps par zone \u2014 Puissance</div><div class="af-chart"><canvas id="af-zpow"></canvas></div></div><div class="af-section"><div class="af-h">Temps par zone \u2014 FC</div><div class="af-chart"><canvas id="af-zhr"></canvas></div></div></div></div>'
     + '<div class="af-tabc" id="af-tab-dist"><div class="af-section"><div class="af-h">Distribution de puissance</div><div class="af-chart"><canvas id="af-dist"></canvas></div></div></div>';
   page.querySelector('.af-back').addEventListener('click', window.closeFullAnalysis);
@@ -6173,6 +6173,37 @@ document.addEventListener('click', function (e) {
   e.preventDefault();
   if (typeof window.openFullAnalysis === 'function') window.openFullAnalysis();
 });
+function _buildRecordsTable(S, bestWin) {
+  var W = S.watts || [], CAD = S.cadence || [], ALT = S.altitude || [], DIST = S.distance || [], n = W.length;
+  if (!n || typeof bestWin !== 'function') return '';
+  var distMax = 0; for (var i = 0; i < DIST.length; i++) { var v = DIST[i]; if (v != null && v > distMax) distMax = v; }
+  var toM = distMax > 1000 ? 1 : 1000;   // stream en metres ou km -> on ramene en metres
+  var distAt = function (idx) { var x = DIST[Math.min(idx, DIST.length - 1)]; return (x == null ? 0 : x) * toM; };
+  var altGain = function (s0, s1) { var g = 0, prev = null; for (var k = s0; k < s1; k++) { var x = ALT[k]; if (x == null) continue; if (prev != null && x > prev) g += x - prev; prev = x; } return g; };
+  var avgR = function (arr, s0, s1) { var sum = 0, c = 0; for (var k = s0; k < s1; k++) { var x = arr[k]; if (x != null && !isNaN(x)) { sum += x; c++; } } return c ? sum / c : 0; };
+  var fmtT = function (sec) { var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.round(sec % 60); return (h > 0 ? (h + ':' + String(m).padStart(2, '0')) : ('' + m)) + ':' + String(s).padStart(2, '0'); };
+  var fmtDur = function (d) { return d < 60 ? (d + 's') : (d % 60 === 0 ? (d / 60 + 'min') : (Math.floor(d / 60) + 'min' + (d % 60) + 's')); };
+  var std = [1, 5, 10, 15, 30, 60, 120, 180, 300, 600, 1200, 1800, 3600].filter(function (d) { return d <= n; });
+  var hasCad = CAD.some(function (x) { return x != null; });
+  var rows = std.map(function (d) {
+    var bw = bestWin(d), s0 = bw.start, s1 = Math.min(n, s0 + d);
+    var distM = Math.max(0, distAt(s1) - distAt(s0));
+    var spd = distM > 0 ? ((distM / 1000) / (d / 3600)) : 0;
+    var dplus = altGain(s0, s1);
+    var cad = avgR(CAD, s0, s1);
+    return '<tr>'
+      + '<td>' + fmtDur(d) + '</td>'
+      + '<td class="af-tw"><b>' + Math.round(bw.avg) + ' W</b></td>'
+      + '<td>' + (distM >= 1000 ? (Math.round(distM / 10) / 100 + ' km') : (Math.round(distM) + ' m')) + '</td>'
+      + '<td>' + (spd ? (Math.round(spd * 10) / 10 + ' km/h') : '—') + '</td>'
+      + '<td>' + Math.round(dplus) + ' m</td>'
+      + (hasCad ? '<td>' + (cad ? (Math.round(cad) + ' rpm') : '—') + '</td>' : '')
+      + '<td>' + fmtT(s0) + ' \u2192 ' + fmtT(s1) + '</td>'
+      + '</tr>';
+  }).join('');
+  return '<div class="af-table-wrap"><table class="af-table"><thead><tr><th>Durée</th><th>Puissance</th><th>Distance</th><th>Vitesse</th><th>D+</th>' + (hasCad ? '<th>Cadence</th>' : '') + '<th>Intervalle</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
 function _buildAfCharts(S) {
   if (!S || !window.Chart) return;
   var grid = 'rgba(255,255,255,0.06)', tick = '#9aa6b6';
@@ -6188,13 +6219,33 @@ function _buildAfCharts(S) {
   var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#ec4899'];
   var hasW = W.some(function (x) { return x != null; });
   var hasH = HR.some(function (x) { return x != null; });
-  // Courbe de puissance
+  // Courbe de puissance (mean-max) seconde par seconde + tableau de records
   if (hasW) {
-    var pref = new Float64Array(W.length + 1);
-    for (var i = 0; i < W.length; i++) pref[i + 1] = pref[i] + (W[i] || 0);
-    var durs = [1, 5, 10, 15, 30, 60, 120, 180, 300, 600, 1200, 1800, 3600], labels = [], data = [];
-    durs.forEach(function (d) { if (d > W.length) return; var best = 0; for (var s = 0; s + d <= W.length; s++) { var avg = (pref[s + d] - pref[s]) / d; if (avg > best) best = avg; } labels.push(d < 60 ? (d + 's') : ((d / 60) + 'min')); data.push(Math.round(best)); });
-    window.__afCharts.push(new Chart(document.getElementById('af-pcurve'), { type: 'line', data: { labels: labels, datasets: [{ data: data, borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,.15)', fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#fbbf24' }] }, options: opts({ plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return c.parsed.y + ' W'; } } } } }) }));
+    var n = W.length;
+    var pref = new Float64Array(n + 1);
+    for (var i = 0; i < n; i++) pref[i + 1] = pref[i] + (W[i] || 0);
+    var bestWin = function (d) { var best = -1, bi = 0; for (var s = 0; s + d <= n; s++) { var avg = (pref[s + d] - pref[s]) / d; if (avg > best) { best = avg; bi = s; } } return { avg: best, start: bi }; };
+    var durs = [];
+    for (var d = 1; d <= 60; d++) durs.push(d);
+    for (d = 65; d <= 300; d += 5) durs.push(d);
+    for (d = 320; d <= 1200; d += 20) durs.push(d);
+    for (d = 1260; d <= 3600; d += 60) durs.push(d);
+    for (d = 3900; d <= n; d += 300) durs.push(d);
+    durs = durs.filter(function (x) { return x <= n; });
+    var pts = durs.map(function (x) { return { x: x, y: Math.round(bestWin(x).avg) }; });
+    var fmtSec = function (s) { return s < 60 ? (s + 's') : (s < 3600 ? (Math.round(s / 60) + 'min') : ((Math.round(s / 360) / 10) + 'h')); };
+    window.__afCharts.push(new Chart(document.getElementById('af-pcurve'), {
+      type: 'line',
+      data: { datasets: [{ data: pts, borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,.15)', fill: true, tension: 0.2, pointRadius: 0, borderWidth: 2 }] },
+      options: opts({
+        scales: {
+          x: { type: 'logarithmic', min: 1, max: n, grid: { color: grid }, ticks: { color: tick, font: { size: 10 }, callback: function (v) { return fmtSec(v); } } },
+          y: { grid: { color: grid }, ticks: { color: tick, font: { size: 10 } }, beginAtZero: true }
+        },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (c) { return fmtSec(c[0].parsed.x); }, label: function (c) { return c.parsed.y + ' W'; } } } }
+      })
+    }));
+    try { var _rt = document.getElementById('af-records'); if (_rt) _rt.innerHTML = _buildRecordsTable(S, bestWin); } catch (e) { console.warn('[records]', e && e.message); }
   } else { hide('af-s-pc'); }
   // Temps par zone - puissance
   if (hasW) {
