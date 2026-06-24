@@ -8224,7 +8224,7 @@ function openSessionModal(iso, source) {
         if (act.np) _tiles.push(tile('NP' + (act.ftpPct ? ` · ${act.ftpPct}% FTP` : ''), `${act.np} W` + (act.intensity ? ` · IF ${act.intensity}` : ''), '#fbbf24'));
         if (act.hr) _tiles.push(tile('Cardio · bpm', `${act.hr} moy` + (act.max_hr ? ` · ${act.max_hr} max` : ''), '#f87171'));
         if (act.cadence) _tiles.push(tile('Cadence · rpm', `${act.cadence}` + (act.max_cadence ? ` · ${act.max_cadence} max` : ''), '#a78bfa'));
-        if (act.tss != null && act.tss !== '') _tiles.push(tile('TSS', `${act.tss}`, '#9ca3af'));
+        if (act.tss) _tiles.push(tile('TSS', `${act.tss}`, '#9ca3af'));
         if (act.kj) _tiles.push(tile('Énergie', `${act.kj} kJ` + (act.calories ? ` · ${act.calories} kcal` : ''), '#9ca3af'));
         if (act.rpe) _tiles.push(tile('RPE', `${act.rpe}/10`, '#9ca3af'));
         if (act.laps) _tiles.push(tile('Tours', `${act.laps}`, '#9ca3af'));
