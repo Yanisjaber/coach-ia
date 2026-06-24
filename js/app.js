@@ -5076,6 +5076,75 @@ if (typeof Chart !== 'undefined') {
 // (Plugin axisVisibility retiré — la synchro axe ↔ dataset est faite dans
 // legendConfig.onClick avec un requestAnimationFrame pour éviter les conflits)
 
+// Detecte les sequences d'une sortie a partir du stream de puissance et renvoie des
+// blocs AU MEME FORMAT que les seances structurees (int = %FTP), reutilisables par
+// renderWorkoutProfileHTML / renderWorkoutDetailHTML. Heuristique (approximatif).
+window.detectRideSequences = function (watts, ftp) {
+  try {
+    ftp = +ftp || 250;
+    if (!watts || !watts.length) return [];
+    var W = []; for (var i = 0; i < watts.length; i++) { var v = watts[i]; W.push((v == null || isNaN(v)) ? 0 : +v); }
+    var n = W.length; if (n < 180) return [];   // < 3 min : pas d'analyse
+    var zoneOf = function (w) { var p = w / ftp * 100; if (p < 60) return 0; if (p < 76) return 1; if (p < 90) return 2; if (p < 105) return 3; if (p < 120) return 4; return 5; };
+    // 1) Binning 10 s
+    var BIN = 10, bins = [];
+    for (var s = 0; s < n; s += BIN) { var sum = 0, c = 0; for (var k = s; k < Math.min(n, s + BIN); k++) { sum += W[k]; c++; } var w = c ? sum / c : 0; bins.push({ w: w, dur: c, z: zoneOf(w) }); }
+    // 2) Fusion bins meme zone -> segments
+    var segs = [];
+    bins.forEach(function (bn) { var L = segs[segs.length - 1]; if (L && L.z === bn.z) { L.dur += bn.dur; L._sw += bn.w * bn.dur; } else segs.push({ z: bn.z, dur: bn.dur, _sw: bn.w * bn.dur }); });
+    segs.forEach(function (g) { g.w = g._sw / Math.max(1, g.dur); });
+    // 3) Lissage : absorber segments < 30 s dans le voisin de zone la plus proche
+    var MIN = 30, changed = true, guard = 0;
+    while (changed && segs.length > 1 && guard++ < 500) {
+      changed = false;
+      for (var q = 0; q < segs.length; q++) {
+        if (segs[q].dur < MIN) {
+          var prev = segs[q - 1], next = segs[q + 1], into = (!prev) ? next : (!next ? prev : (Math.abs(prev.z - segs[q].z) <= Math.abs(next.z - segs[q].z) ? prev : next));
+          if (into) { into.dur += segs[q].dur; into._sw += segs[q].w * segs[q].dur; into.w = into._sw / into.dur; segs.splice(q, 1); changed = true; break; }
+        }
+      }
+    }
+    // re-fusion adjacents meme zone
+    var s2 = [];
+    segs.forEach(function (g) { var L = s2[s2.length - 1]; if (L && L.z === g.z) { L.dur += g.dur; L._sw += g.w * g.dur; L.w = L._sw / L.dur; } else s2.push({ z: g.z, dur: g.dur, _sw: g.w * g.dur, w: g.w }); });
+    segs = s2;
+    if (!segs.length) return [];
+    // 4) Series d'intervalles : motif [haut(z>=4), bas(z<=2)] repete >= 2 fois
+    var pctFtp = function (w) { return Math.round(w / ftp * 100); };
+    var avgWD = function (arr) { var s = 0, d = 0; arr.forEach(function (x) { s += x.w * x.dur; d += x.dur; }); return d ? s / d : 0; };
+    var medDur = function (arr) { var d = arr.map(function (x) { return x.dur; }).sort(function (p, q) { return p - q; }); return d.length ? d[Math.floor(d.length / 2)] : 0; };
+    var isHigh = function (g) { return g.z >= 4; }, isLow = function (g) { return g.z <= 2; };
+    var blocks = [], idx = 0;
+    while (idx < segs.length) {
+      if (isHigh(segs[idx]) && idx + 1 < segs.length && isLow(segs[idx + 1])) {
+        var work = [], rec = [], j = idx;
+        while (j + 1 < segs.length && isHigh(segs[j]) && isLow(segs[j + 1])) { work.push(segs[j]); rec.push(segs[j + 1]); j += 2; }
+        if (j < segs.length && isHigh(segs[j])) { work.push(segs[j]); j += 1; }
+        if (work.length >= 2) {
+          blocks.push({ type: 'interval', name: 'Intervalles', reps: work.length, metric: 'power', unit: 'percent',
+            work: { min: Math.round(medDur(work) / 60 * 10) / 10, int: pctFtp(avgWD(work)), metric: 'power' },
+            rec: { min: Math.round(medDur(rec) / 60 * 10) / 10, int: pctFtp(rec.length ? avgWD(rec) : 0), metric: 'power' } });
+          idx = j; continue;
+        }
+      }
+      var g0 = segs[idx];
+      blocks.push({ type: 'steady', name: null, _z: g0.z, metric: 'power', unit: 'percent', work: { min: Math.round(g0.dur / 60 * 10) / 10, int: pctFtp(g0.w), metric: 'power' } });
+      idx++;
+    }
+    // 5) Nommage
+    var ZN = ['Récupération', 'Endurance', 'Tempo', 'Seuil', 'VO2max', 'Anaérobie'];
+    blocks.forEach(function (bl, bi) {
+      if (bl.type === 'interval') return;
+      if (bi === 0 && bl._z <= 2) { bl.name = 'Échauffement'; return; }
+      if (bi === blocks.length - 1 && bl._z <= 2) { bl.name = 'Retour au calme'; return; }
+      bl.name = ZN[bl._z] || 'Bloc';
+    });
+    // filtre blocs residuels trop courts
+    blocks = blocks.filter(function (bl) { var d = (bl.work ? bl.work.min : 0) * 60 * (bl.reps || 1) + (bl.rec ? bl.rec.min * 60 * (bl.reps || 1) : 0); return d >= 25; });
+    return blocks;
+  } catch (e) { console.warn('[detect sequences]', e && e.message); return []; }
+};
+
 async function renderStreamsSection(container, activityId) {
   destroyModalCharts();
   const cached = streamsCache[activityId] !== undefined || loadStreamsFromLS(activityId);
@@ -5256,7 +5325,18 @@ async function renderStreamsSection(container, activityId) {
   const wbalPts = pairs(wbal);
   const speedPts = pairs(speed);
 
-  container.innerHTML = `
+  const _ftp = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && +window.DASHBOARD_DATA.athlete.ftp) || 250;
+  const _detected = (watts && watts.length && window.detectRideSequences) ? window.detectRideSequences(watts, _ftp) : [];
+  const _profHTML = (_detected.length && window.renderWorkoutProfileHTML)
+    ? '<div class="modal-section"><div class="modal-section-title">Profil de séance <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· séquences détectées</span></div>'
+      + window.renderWorkoutProfileHTML(_detected)
+      + (window.renderWorkoutDetailHTML ? window.renderWorkoutDetailHTML(_detected) : '')
+      + '</div>'
+    : '';
+  const _toggleHTML = _profHTML
+    ? '<button id="toggle-detailed" type="button" style="width:100%;background:var(--bg-elev2);border:1px solid var(--border);color:var(--text-dim);border-radius:9px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin:6px 0 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;">Voir l\'analyse détaillée</button>'
+    : '';
+  container.innerHTML = _profHTML + _toggleHTML + '<div id="detailed-charts">' + `
     <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;margin-bottom:14px;font-size:12px;color:var(--text-dim);">
       <div style="display:inline-flex;gap:6px;align-items:baseline;">Temps : <strong id="stat-temps" style="color:var(--text);font-size:14px;min-width:70px;text-align:left;display:inline-block;">—</strong></div>
       <div style="display:inline-flex;gap:6px;align-items:baseline;">Distance : <strong id="stat-dist" style="color:var(--text);font-size:14px;min-width:80px;text-align:left;display:inline-block;">—</strong></div>
@@ -5334,7 +5414,7 @@ async function renderStreamsSection(container, activityId) {
         </div>
       </div>
       <div class="chart-wrap" style="height:180px;"><canvas id="streams-speed-alt"></canvas></div>` : ''}
-  `;
+  ` + '</div>';
 
   // Compute stats sur la plage [minX, maxX] (en m si distance, en s si temps)
   // Utilise les FULL streams (pas downsampled) pour la précision.
@@ -6018,6 +6098,20 @@ async function renderStreamsSection(container, activityId) {
       });
     }, 0);
   }
+  // Replie les graphes detailles derriere le bouton "Voir l'analyse detaillee"
+  try {
+    var _dc = document.getElementById('detailed-charts');
+    var _tb = document.getElementById('toggle-detailed');
+    if (_dc && _tb) {
+      _dc.style.display = 'none';
+      _tb.addEventListener('click', function () {
+        var willOpen = _dc.style.display === 'none';
+        _dc.style.display = willOpen ? 'block' : 'none';
+        _tb.textContent = willOpen ? 'Masquer l\'analyse détaillée' : 'Voir l\'analyse détaillée';
+        if (willOpen) { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }
+      });
+    }
+  } catch (e) { /* ignore */ }
 }
 
 // ========= MODAL DÉTAIL SÉANCE =========
@@ -8154,7 +8248,7 @@ function openSessionModal(iso, source) {
         // Sections Strava : on n'affiche Graphique / Lien que s'il y a une vraie activite
         // Strava (sinon on n'affiche pas de cases vides).
         const _hasStrava = !!(stravaId && /^\d+$/.test(stravaId));
-        const graphHTML = _hasStrava ? `<div class="modal-section"><div class="modal-section-title">Graphique</div><div id="streams-section"></div></div>` : '';
+        const graphHTML = _hasStrava ? `<div class="modal-section"><div id="streams-section"></div></div>` : '';
         const lienHTML = _hasStrava ? `<div class="modal-section"><div class="modal-section-title">Lien activité</div>${intervalsLink}</div>` : '';
         bodyEl.innerHTML = `
           ${switchHTML}
