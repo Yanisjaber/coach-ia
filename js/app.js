@@ -6260,14 +6260,10 @@ function _buildRecordsTable(S) {
       + '<td>' + fmtDur(d) + '</td>'
       + '<td style="min-width:170px"><div style="display:flex;align-items:center;gap:9px"><span style="color:' + rankTxtCol + ';font-weight:700;white-space:nowrap">' + rank + '<span style="color:var(--text-mute,#6b7686);font-weight:400"> / ' + totalR + '</span></span><div style="flex:1;height:5px;background:var(--bg-elev,#222b3d);border-radius:3px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + barCol + '"></div></div></div></td>'
       + '<td class="af-tw"><b>' + cur + ' W</b></td>'
-      + '<td>' + (distM >= 1000 ? (Math.round(distM / 10) / 100 + ' km') : (Math.round(distM) + ' m')) + '</td>'
-      + '<td>' + (spd ? (Math.round(spd * 10) / 10 + ' km/h') : '\u2014') + '</td>'
-      + '<td>' + Math.round(dplus) + ' m</td>'
-      + (hasCad ? '<td>' + (cad ? (Math.round(cad) + ' rpm') : '\u2014') + '</td>' : '')
       + '<td>' + fmtT(s0) + ' \u2192 ' + fmtT(s1) + '</td>'
       + '</tr>';
   }).join('');
-  return '<div class="af-table-wrap"><table class="af-table"><thead><tr><th>Durée</th><th>Rang</th><th>Puissance</th><th>Distance</th><th>Vitesse</th><th>D+</th>' + (hasCad ? '<th>Cadence</th>' : '') + '<th>Intervalle</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  return '<div class="af-table-wrap"><table class="af-table"><thead><tr><th>Durée</th><th>Rang</th><th>Puissance</th><th>Intervalle</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 function _buildAfCharts(S) {
