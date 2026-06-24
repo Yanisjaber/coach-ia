@@ -122,6 +122,7 @@
   function allSegs() { var o = []; blocks.forEach(function (b) { blockSegs(b).forEach(function (x) { o.push(x); }); }); return o; }
   function totals() { var dur = 0, tss = 0; allSegs().forEach(function (s) { dur += (+s.min || 0); var f = midOf(s) / 100; tss += ((+s.min || 0) / 60) * f * f * 100; }); return { dur: dur, tss: Math.round(tss) }; }
   function fmtDur(min) { var h = Math.floor(min / 60), m = Math.round(min % 60); return h ? h + 'h' + pad(m) : m + ' min'; }
+  function fmtDurSec(min) { var tot = Math.round((+min || 0) * 60), h = Math.floor(tot / 3600), m = Math.floor((tot % 3600) / 60), s = tot % 60; if (h > 0) return h + 'h' + pad(m); if (m > 0) return s ? (m + 'min ' + pad(s) + 's') : (m + 'min'); return s + 's'; }
 
   function R(id) { return document.getElementById(id); }
   function fillFields() {
@@ -295,6 +296,7 @@
     var brd = (opts.border != null) ? opts.border : '1px solid var(--border,#2a3444)';
     var radius = (opts.radius != null) ? opts.radius : 12;
     var minFlex = (opts.minFlex != null) ? opts.minFlex : 0.06;
+    var readout = !!opts.readout;
     var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
     var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
     var bmins = blks.map(function (b) { return blockSegs(b).reduce(function (a, x) { return a + (+x.min || 0); }, 0); });
@@ -306,7 +308,7 @@
       var _tseg = b.work || segs[0];
       var _tm = (b.metric) || (_tseg && _tseg.metric) || 'power';
       var _tval = _tseg ? label(_tseg, _tm).replace(/ \. /g, ' · ') : '';
-      var _meta = fmtDur(bmin) + (_tval ? (' · ' + _tval) : '') + (b.type === 'interval' && b.reps > 1 ? ' · ' + b.reps + '×' : '');
+      var _meta = fmtDurSec(bmin) + (_tval ? (' · ' + _tval) : '') + (b.type === 'interval' && b.reps > 1 ? ' · ' + b.reps + '×' : '');
       var _dot = ZHEX[zoneOf(midOf(_tseg || { int: 0 }))];
       html += '<div class="wp-block" data-name="' + esc(b.name || NAME[b.type] || '') + '" data-meta="' + esc(_meta) + '" data-dot="' + _dot + '" style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(minFlex, bmin / tot) + '">';
       html += '<div style="flex:1;display:flex;align-items:flex-end;gap:0;min-height:0">';
@@ -319,6 +321,9 @@
       html += '</div>';
     });
     html += '</div>';
+    if (readout) {
+      return '<div class="wp-wrap"><div class="wp-readout" style="min-height:18px;font-size:12px;color:var(--text-mute,#6b7686);margin-bottom:9px;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--text-mute,#6b7686)">Survolez un bloc pour le détail</span></div>' + html + '</div>';
+    }
     return html;
   };
   // Detail des intervalles : barres proportionnelles a la duree (largeur = duree),
@@ -396,8 +401,23 @@
       t.style.left = left + 'px'; t.style.top = top + 'px';
     }
     function hide() { if (tip) tip.style.opacity = '0'; }
-    document.addEventListener('mouseover', function (e) { var el = e.target.closest ? e.target.closest('.wp-block') : null; if (el) show(el); });
-    document.addEventListener('mouseout', function (e) { var el = e.target.closest ? e.target.closest('.wp-block') : null; if (el) hide(); });
+    var PLACE = '<span style="color:var(--text-mute,#6b7686)">Survolez un bloc pour le détail</span>';
+    var readoutOf = function (el) { var w = el.closest ? el.closest('.wp-wrap') : null; return w ? w.querySelector('.wp-readout') : null; };
+    document.addEventListener('mouseover', function (e) {
+      var el = e.target.closest ? e.target.closest('.wp-block') : null; if (!el) return;
+      var ro = readoutOf(el);
+      if (ro) {
+        var nm = el.getAttribute('data-name') || '', mt = el.getAttribute('data-meta') || '', dot = el.getAttribute('data-dot') || '#888';
+        ro.innerHTML = '<span style="width:9px;height:9px;border-radius:50%;background:' + dot + ';flex:none"></span>'
+          + '<span style="font-weight:700;color:var(--text,#e7ecf3)">' + esc2(nm) + '</span>'
+          + '<span style="color:var(--text-dim,#9aa6b6)">' + esc2(mt) + '</span>';
+      } else { show(el); }
+    });
+    document.addEventListener('mouseout', function (e) {
+      var el = e.target.closest ? e.target.closest('.wp-block') : null; if (!el) return;
+      var ro = readoutOf(el);
+      if (ro) ro.innerHTML = PLACE; else hide();
+    });
   })();
 
   window.getCurrentWorkoutStructure = function () { return getBlocks(); };
