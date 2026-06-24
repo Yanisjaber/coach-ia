@@ -7672,6 +7672,7 @@ function buildRealisedDay(iso) {
 window.renderPrevuVsRealiseHTML = function (act, iso) {
   try {
     if (!act || act.category === 'competition') return '';
+    var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
     var planned = ((typeof loadTrainings === 'function') ? loadTrainings() : [])
       .filter(function (t) { return !window.coachModeKeep || window.coachModeKeep(t.ia); })
       .filter(function (t) { return t.date === iso; });
@@ -7711,14 +7712,27 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
       }
     }
 
-    // 3) Aucun rapprochement
+    // Selecteur de rapprochement manuel : toutes les seances prevues du jour
+    var pickerHTML = '';
+    if (act._sbId && planned.length) {
+      var opts = '<option value="none"' + (matched ? '' : ' selected') + '>Aucune</option>'
+        + planned.map(function (pp) {
+            var lab = (pp.name || 'Séance') + ' · ' + ((typeof fmtDur === 'function') ? fmtDur(+pp.duration || 0) : ((+pp.duration || 0) + ' min'));
+            var seld = (matched && String(matched._sbId) === String(pp._sbId)) ? ' selected' : '';
+            return '<option value="' + esc(pp._sbId) + '"' + seld + '>' + esc(lab) + '</option>';
+          }).join('');
+      pickerHTML = '<div style="margin-top:14px;display:flex;align-items:center;gap:9px;flex-wrap:wrap">'
+        + '<span style="font-size:11px;color:var(--text-mute,#6b7686)">Séance prévue liée</span>'
+        + '<select class="pvr-picker" data-sbid="' + esc(act._sbId) + '" style="background:var(--bg-elev,#141a23);border:1px solid var(--border2,#374256);color:var(--text,#e7ecf3);border-radius:8px;padding:6px 9px;font-size:12.5px;font-family:inherit;max-width:100%">' + opts + '</select>'
+        + '</div>';
+    }
+
+    // 3) Aucun rapprochement : on propose quand meme le selecteur si des prevus existent
     if (!matched) {
-      if (link === 'none') {
-        var cand2 = planned.filter(function (p) { return catOf(p.sport) === actCat; });
-        if (cand2.length && act._sbId) {
-          return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé</div>'
-            + '<button class="pvr-relink" data-sbid="' + act._sbId + '" style="background:none;border:1px solid var(--border2,#374256);color:var(--text-dim,#9aa6b6);border-radius:8px;padding:7px 13px;font-size:12px;cursor:pointer;font-family:inherit">Rapprocher à la séance prévue</button></div>';
-        }
+      if (pickerHTML) {
+        return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé</div>'
+          + '<div style="font-size:12px;color:var(--text-mute,#6b7686)">Aucune séance prévue rapprochée.</div>'
+          + pickerHTML + '</div>';
       }
       return '';
     }
@@ -7760,9 +7774,8 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
         + (ratio != null ? '<div style="font-size:11px;color:var(--text-mute,#6b7686);margin-top:7px">Réalisé : ' + (act.tss || 0) + ' TSS pour ' + p.tss + ' prévus — ' + ratio + ' % de la charge cible.</div>' : '')
         + '</div>';
     }
-    var unlink = act._sbId ? '<button class="pvr-unlink" data-sbid="' + act._sbId + '" title="Délier ce rapprochement" style="float:right;background:none;border:1px solid var(--border2,#374256);color:var(--text-mute,#6b7686);border-radius:7px;padding:3px 11px;font-size:11px;cursor:pointer;text-transform:none;letter-spacing:0;font-weight:400;font-family:inherit">Délier</button>' : '';
-    return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· rapproché par durée</span>' + unlink + '</div>'
-      + head + body + structHTML + '</div>';
+    return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· rapproché par durée</span></div>'
+      + head + body + structHTML + pickerHTML + '</div>';
   } catch (e) { console.warn('[prevu vs realise]', e && e.message); return ''; }
 };
 
@@ -7777,14 +7790,12 @@ window.__setActPlannedLink = function (sbId, val) {
   }
 };
 
-// Boutons Delier / Rapprocher dans la section Prevu vs Realise
-document.addEventListener('click', function (e) {
-  var u = e.target.closest ? e.target.closest('.pvr-unlink') : null;
-  var r = e.target.closest ? e.target.closest('.pvr-relink') : null;
-  if (!u && !r) return;
-  e.preventDefault(); e.stopPropagation();
-  var sbid = (u || r).dataset.sbid;
-  var val = u ? 'none' : null;           // delier = sentinel 'none' ; rapprocher = null -> ré-auto-match
+// Selecteur de rapprochement Prevu vs Realise : choisir / changer / delier le lien
+document.addEventListener('change', function (e) {
+  var sel = e.target.closest ? e.target.closest('.pvr-picker') : null;
+  if (!sel) return;
+  var sbid = sel.dataset.sbid;
+  var val = sel.value;                   // 'none' (aucune/delier) ou uuid de la seance prevue choisie
   if (typeof window.__setActPlannedLink === 'function') window.__setActPlannedLink(sbid, val);
   if (window.cloudSync && window.cloudSync.linkActivityPlanned) window.cloudSync.linkActivityPlanned(sbid, val);
   if (typeof window.__modalActIdx === 'number') window.__openActIdx = window.__modalActIdx;
