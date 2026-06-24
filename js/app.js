@@ -6219,14 +6219,13 @@ window.recalcAllPowerCurves = async function (onProgress) {
   for (var i = 0; i < list.length; i++) {
     var a = list[i];
     try {
-      if (!a.power_curve) {
-        var streams = (typeof loadStreams === 'function') ? await loadStreams(a.id || a.activityId) : null;
-        var watts = streams ? (Array.isArray(streams) ? ((streams.find(function (x) { return x && x.type === 'watts'; }) || {}).data) : streams.watts) : null;
-        if (watts && watts.length) {
-          var curve = window.__powerCurveFromWatts(watts);
-          if (curve) { a.power_curve = curve; if (window.cloudSync && window.cloudSync.savePowerCurve) await window.cloudSync.savePowerCurve(a._sbId, curve); ok++; }
-        }
-      } else { ok++; }
+      // Recompute TOUJOURS (force) : sinon les sorties deja calculees gardent un ancien jeu de durees.
+      var streams = (typeof loadStreams === 'function') ? await loadStreams(a.id || a.activityId) : null;
+      var watts = streams ? (Array.isArray(streams) ? ((streams.find(function (x) { return x && x.type === 'watts'; }) || {}).data) : streams.watts) : null;
+      if (watts && watts.length) {
+        var curve = window.__powerCurveFromWatts(watts);
+        if (curve) { a.power_curve = curve; if (window.cloudSync && window.cloudSync.savePowerCurve) await window.cloudSync.savePowerCurve(a._sbId, curve); ok++; }
+      }
     } catch (e) { /* skip */ }
     done++; if (onProgress) onProgress(done, total, ok);
   }
