@@ -7850,10 +7850,30 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
         + (ratio != null ? '<div style="font-size:11px;color:var(--text-mute,#6b7686);margin-top:7px">Réalisé : ' + (act.tss || 0) + ' TSS pour ' + p.tss + ' prévus — ' + ratio + ' % de la charge cible.</div>' : '')
         + '</div>';
     }
-    return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· ' + ((p.name || 'séance prévue')) + '</span></div>'
-      + bars + structHTML + '</div>';
+    var _collapsed = false;
+    try { _collapsed = localStorage.getItem('pvr_collapsed') === '1'; } catch (e) { }
+    var _chev = _collapsed ? '▸' : '▾';
+    return '<div class="modal-section">'
+      + '<div class="modal-section-title pvr-toggle" style="cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none">'
+      +   '<span class="pvr-chev" style="font-size:10px;color:var(--text-mute,#6b7686)">' + _chev + '</span>'
+      +   'Prévu vs Réalisé <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· ' + ((p.name || 'séance prévue')) + '</span>'
+      + '</div>'
+      + '<div class="pvr-content"' + (_collapsed ? ' hidden' : '') + '>' + bars + structHTML + '</div>'
+      + '</div>';
   } catch (e) { console.warn('[prevu vs realise]', e && e.message); return ''; }
 };
+
+// Repli/depli de la comparaison Prevu vs Realise (etat memorise)
+document.addEventListener('click', function (e) {
+  var t = e.target.closest ? e.target.closest('.pvr-toggle') : null;
+  if (!t) return;
+  var content = t.parentElement ? t.parentElement.querySelector('.pvr-content') : null;
+  if (!content) return;
+  var nowHidden = !content.hidden;
+  content.hidden = nowHidden;
+  var chev = t.querySelector('.pvr-chev'); if (chev) chev.textContent = nowHidden ? '▸' : '▾';
+  try { localStorage.setItem('pvr_collapsed', nowHidden ? '1' : '0'); } catch (e2) { }
+});
 
 // Bouton/selecteur de lien dans le HEADER de la modale (a cote des "...").
 window.__setupModalLinkSelect = function (act, iso) {
