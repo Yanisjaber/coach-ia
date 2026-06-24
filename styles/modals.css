@@ -934,15 +934,19 @@
 .add-modal-content .modal-header { flex: 0 0 auto; }
 .ad
 /* ===== Page Analyse detaillee (panneau #p-analysis) ===== */
-#p-analysis .af-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
-#p-analysis .af-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+#p-analysis .af-head { margin-bottom: 14px; }
+#p-analysis .af-tabbar {
+  display: flex; gap: 2px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border); margin-bottom: 20px;
+}
 #p-analysis .af-tab {
-  background: var(--bg-elev2); border: 1px solid var(--border); color: var(--text-dim);
-  border-radius: 8px; padding: 7px 14px; font-size: 13px; font-weight: 600;
-  cursor: pointer; font-family: inherit; transition: color .12s, background .12s, border-color .12s;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--text-dim); padding: 9px 15px; font-size: 13.5px; font-weight: 600;
+  cursor: pointer; font-family: inherit; margin-bottom: -1px;
+  transition: color .12s, border-color .12s;
 }
 #p-analysis .af-tab:hover { color: var(--text); }
-#p-analysis .af-tab.active { color: var(--accent); border-color: var(--accent); background: var(--bg-elev); }
+#p-analysis .af-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 #p-analysis .af-tabc { display: none; }
 #p-analysis .af-tabc.active { display: block; }
 #p-analysis .af-back {

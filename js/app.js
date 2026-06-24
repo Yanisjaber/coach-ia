@@ -6125,16 +6125,14 @@ window.openFullAnalysis = function () {
   var modal = document.getElementById('session-modal'); if (modal) modal.classList.remove('active');
   // structure : Retour + onglets internes + contenus
   page.innerHTML =
-    '<div class="af-head">'
-    + '<button class="af-back" type="button">\u2190 Retour</button>'
-    + '<div class="af-tabs">'
+    '<div class="af-head"><button class="af-back" type="button">\u2190 Retour</button></div>'
+    + '<div class="af-tabbar">'
     +   '<button class="af-tab active" type="button" data-tab="courbes">Courbes</button>'
     +   '<button class="af-tab" type="button" data-tab="records">Records</button>'
     +   '<button class="af-tab" type="button" data-tab="zones">Zones</button>'
     +   '<button class="af-tab" type="button" data-tab="dist">Distribution</button>'
     + '</div>'
-    + '</div>'
-    + '<div class="af-tabc active" id="af-tab-courbes"><div class="af-h">Courbes temps</div><div id="af-courbes-slot"></div></div>'
+    + '<div class="af-tabc active" id="af-tab-courbes"><div id="af-courbes-slot"></div></div>'
     + '<div class="af-tabc" id="af-tab-records"><div class="af-section"><div class="af-h">Courbe de puissance (mean-max)</div><div class="af-chart"><canvas id="af-pcurve"></canvas></div></div></div>'
     + '<div class="af-tabc" id="af-tab-zones"><div class="af-grid2"><div class="af-section"><div class="af-h">Temps par zone \u2014 Puissance</div><div class="af-chart"><canvas id="af-zpow"></canvas></div></div><div class="af-section"><div class="af-h">Temps par zone \u2014 FC</div><div class="af-chart"><canvas id="af-zhr"></canvas></div></div></div></div>'
     + '<div class="af-tabc" id="af-tab-dist"><div class="af-section"><div class="af-h">Distribution de puissance</div><div class="af-chart"><canvas id="af-dist"></canvas></div></div></div>';
