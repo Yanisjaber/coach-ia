@@ -8190,6 +8190,7 @@ function openSessionModal(iso, source) {
         const _svgClock = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
         const _svgRoute = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg>';
         const _svgSpeed = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14" r="2"/><path d="M13.4 12.6 19 7"/><path d="M3.6 19a9 9 0 1 1 16.8 0"/></svg>';
+        const _svgMtn = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20 9 8l3.5 6 2.5-4.5L21 20Z"/></svg>';
         const _durStr = dur < 60 ? `${Math.round(dur)}<span style="font-size:13px"> min</span>` : `${h}<span style="font-size:13px">h</span>${m}`;
         let _speedHero = null;
         if (act.avg_speed_kmh) _speedHero = { val: act.avg_speed_kmh, unit: 'km/h', lab: 'Vitesse moy' };
@@ -8208,9 +8209,10 @@ function openSessionModal(iso, source) {
         const _heroes = [heroCard(_svgClock, _durStr, '', elapsedSub ? ('Durée · ' + elapsedSub) : 'Durée', '#60a5fa')];
         if (_distKm) _heroes.push(heroCard(_svgRoute, _distKm, 'km', 'Distance', '#22d3ee'));
         if (_speedHero) _heroes.push(heroCard(_svgSpeed, _speedHero.val, _speedHero.unit, _speedHero.lab, '#34d399'));
-        if (_heroes.length < 3 && act.np) _heroes.push(heroCard(_svgSpeed, act.np, 'W', 'NP', '#fbbf24'));
-        if (_heroes.length < 3 && act.tss) _heroes.push(heroCard(_svgClock, act.tss, '', 'TSS', '#fbbf24'));
-        const _heroRow = _heroes.length ? `<div style="display:flex;gap:11px;margin-bottom:11px;flex-wrap:wrap">${_heroes.slice(0, 3).join('')}</div>` : '';
+        if (_dplusM) _heroes.push(heroCard(_svgMtn, _dplusM, 'm D+', 'Dénivelé', '#84cc16'));
+        if (_heroes.length < 4 && act.np) _heroes.push(heroCard(_svgSpeed, act.np, 'W', 'NP', '#fbbf24'));
+        if (_heroes.length < 4 && act.tss) _heroes.push(heroCard(_svgClock, act.tss, '', 'TSS', '#fbbf24'));
+        const _heroRow = _heroes.length ? `<div style="display:flex;gap:11px;margin-bottom:11px;flex-wrap:wrap">${_heroes.slice(0, 4).join('')}</div>` : '';
 
         const _mut = 'var(--text-mute,#7c879c)';
         const tile = (lab, valHTML, color) =>
@@ -8230,7 +8232,6 @@ function openSessionModal(iso, source) {
         }
         if (act.hr) _tiles.push(tile('Cardio', `${act.hr} moy` + (act.max_hr ? ` · ${act.max_hr} max` : '') + ` <span style="font-weight:400;color:${_mut};font-size:11px">bpm</span>`, '#f87171'));
         if (act.cadence) _tiles.push(tile('Cadence', `${act.cadence}` + (act.max_cadence ? ` · ${act.max_cadence} max` : '') + ` <span style="font-weight:400;color:${_mut};font-size:11px">rpm</span>`, '#a78bfa'));
-        if (_dplusM) _tiles.push(tile('Dénivelé', `${_dplusM} m D+` + (act.elevation_loss ? ` · ${act.elevation_loss} D−` : ''), '#4ade80'));
         if (vMaxToShow) _tiles.push(tile('Vitesse max', `${vMaxToShow} km/h`, '#22d3ee'));
         { let chg = []; if (act.tss) chg.push(`${act.tss} TSS`); if (act.kj) chg.push(`${act.kj} kJ`); if (act.calories) chg.push(`${act.calories} kcal`); if (act.rpe) chg.push(`RPE ${act.rpe}`); if (act.laps) chg.push(`${act.laps} tours`); if (chg.length) _tiles.push(tile('Charge', chg.join(' · '), '#9ca3af')); }
         const _tileGrid = _tiles.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">${_tiles.join('')}</div>` : '';
