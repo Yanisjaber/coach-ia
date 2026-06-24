@@ -8229,7 +8229,7 @@ function openSessionModal(iso, source) {
         }
         if (act.hr) _tiles.push(tile('Cardio', `${act.hr} moy` + (act.max_hr ? ` · ${act.max_hr} max` : '') + ` <span style="font-weight:400;color:${_mut};font-size:11px">bpm</span>`, '#f87171'));
         if (act.cadence) _tiles.push(tile('Cadence', `${act.cadence}` + (act.max_cadence ? ` · ${act.max_cadence} max` : '') + ` <span style="font-weight:400;color:${_mut};font-size:11px">rpm</span>`, '#a78bfa'));
-        _tiles.push(tile('TSS', (act.tss != null && act.tss !== '') ? `${act.tss}` : '—', '#9ca3af'));
+        if (act.tss != null && act.tss !== '') _tiles.push(tile('TSS', `${act.tss}`, '#9ca3af'));
         { let chg = []; if (act.kj) chg.push(`${act.kj} kJ`); if (act.calories) chg.push(`${act.calories} kcal`); if (act.rpe) chg.push(`RPE ${act.rpe}`); if (act.laps) chg.push(`${act.laps} tours`); if (chg.length) _tiles.push(tile('Énergie', chg.join(' · '), '#9ca3af')); }
         const _tileGrid = _tiles.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">${_tiles.join('')}</div>` : '';
         const statsHTML = (_heroRow || _tileGrid) ? `<div class="modal-section">${_heroRow}${_tileGrid}</div>` : '';
