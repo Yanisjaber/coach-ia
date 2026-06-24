@@ -8984,7 +8984,6 @@ function openSessionModal(iso, source) {
       const _tiles = [];
       if (t.tss && _heroes.every(function (h) { return h.lab !== 'TSS estimé'; })) _tiles.push({ lab: 'TSS estimé', val: '' + t.tss, color: '#fbbf24' });
       if (t.rpe != null && t.rpe !== '') _tiles.push({ lab: 'RPE estimé', val: t.rpe + '/10', color: '#f59e0b' });
-      if (t.type) _tiles.push({ lab: 'Type', val: (String(t.type).charAt(0).toUpperCase() + String(t.type).slice(1)), color: '#a78bfa' });
       const statsHTML = window.renderStatsBlockHTML(_heroes, _tiles);
 
       const sections = [];

@@ -305,17 +305,18 @@
     var html = '<div style="background:' + bg + ';border:' + brd + ';border-radius:' + radius + 'px;padding:' + pad + 'px;display:flex;align-items:stretch;gap:2px;height:' + H + 'px;overflow:hidden">';
     blks.forEach(function (b, bi) {
       var segs = blockSegs(b), bmin = bmins[bi] || 0, it = bmin || 1;
-      var _tseg = b.work || segs[0];
-      var _tm = (b.metric) || (_tseg && _tseg.metric) || 'power';
-      var _zc = zoneOf(midOf(_tseg || { int: 0 }));   // zone par seuils = celle de la couleur
-      var _tval = _tseg ? label(_tseg, _tm).replace(/ \. Z[^.]*$/, '').replace(/ \. /g, ' · ') : '';
-      var _meta = fmtDurSec(bmin) + (_tval ? (' · ' + _tval) : '') + ' · Z' + (_zc + 1) + (b.type === 'interval' && b.reps > 1 ? ' · ' + b.reps + '×' : '');
-      var _dot = ZHEX[_zc];
-      html += '<div class="wp-block" data-name="' + esc(b.name || NAME[b.type] || '') + '" data-meta="' + esc(_meta) + '" data-dot="' + _dot + '" style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(minFlex, bmin / tot) + '">';
+      var _m = (b.metric) || (b.work && b.work.metric) || 'power';
+      // Conteneur du bloc (mise en page seulement) ; le hover se fait par SEGMENT.
+      html += '<div style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(minFlex, bmin / tot) + '">';
       html += '<div style="flex:1;display:flex;align-items:flex-end;gap:0;min-height:0">';
       segs.forEach(function (s) {
+        var zi = zoneOf(midOf(s));
         var hgt = Math.max(8, (midOf(s) / mx) * 100);
-        html += '<div style="flex:' + Math.max(0.05, (+s.min || 0) / it) + ';height:' + hgt + '%;background:' + ZHEX[zoneOf(midOf(s))] + ';border-radius:2px 2px 0 0;min-width:1px;opacity:.95"></div>';
+        var sName = (b.type === 'interval' && b.rec && s === b.rec) ? 'Récup'
+          : (b.type === 'interval' ? ((b.name && b.name !== NAME.interval) ? b.name : 'Effort') : (b.name || NAME[b.type] || ''));
+        var sVal = label(s, _m).replace(/ \. Z[^.]*$/, '').replace(/ \. /g, ' · ');
+        var sMeta = fmtDurSec(+s.min || 0) + ' · Z' + (zi + 1) + (sVal ? (' · ' + sVal) : '');
+        html += '<div class="wp-block" data-name="' + esc(sName) + '" data-meta="' + esc(sMeta) + '" data-dot="' + ZHEX[zi] + '" style="flex:' + Math.max(0.05, (+s.min || 0) / it) + ';height:' + hgt + '%;background:' + ZHEX[zi] + ';border-radius:2px 2px 0 0;min-width:1px;opacity:.95;cursor:default"></div>';
       });
       html += '</div>';
       if (showLabels) html += '<div style="height:15px;line-height:15px;font-size:9px;color:var(--text-mute,#6b7686);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px">' + esc(b.name || NAME[b.type] || '') + '</div>';
