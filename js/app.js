@@ -7669,25 +7669,23 @@ function buildRealisedDay(iso) {
 // Rapproche une activité réalisée avec une séance prévue : même jour, même sport,
 // et (si plusieurs réalisées le même jour) durée la plus proche (appariement greedy).
 // ============================================================
-window.renderPrevuVsRealiseHTML = function (act, iso) {
+// Rapprochement PREVU<->REALISE : renvoie {planned:[prevus du jour], matched:prevu|null}
+// et persiste le lien auto la 1re fois (meme jour + sport + duree la plus proche, greedy).
+window.__plannedMatch = function (act, iso) {
+  var empty = { planned: [], matched: null };
   try {
-    if (!act || act.category === 'competition') return '';
-    var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    if (!act || act.category === 'competition') return empty;
     var planned = ((typeof loadTrainings === 'function') ? loadTrainings() : [])
       .filter(function (t) { return !window.coachModeKeep || window.coachModeKeep(t.ia); })
       .filter(function (t) { return t.date === iso; });
     var catOf = function (x) { return (typeof getSportCategory === 'function') ? getSportCategory(x) : x; };
     var actCat = catOf(act.raw_type || act.sport);
-    var link = act.planned_id;            // null/undefined = a evaluer ; 'none' = delie ; sinon uuid prevu
+    var link = act.planned_id;
     var matched = null;
-
-    // 1) Lien deja stocke en base
     if (link && link !== 'none') {
       matched = planned.find(function (p) { return String(p._sbId) === String(link); });
-      if (!matched) link = null;          // plan supprime -> on retente un auto-match
+      if (!matched) link = null;
     }
-
-    // 2) Auto-rapprochement (1re fois) : meme sport + duree la plus proche (greedy si plusieurs)
     if (!matched && link !== 'none') {
       var cands = planned.filter(function (p) { return catOf(p.sport) === actCat; });
       if (cands.length) {
@@ -7711,33 +7709,16 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
         }
       }
     }
+    return { planned: planned, matched: matched };
+  } catch (e) { console.warn('[planned match]', e && e.message); return empty; }
+};
 
-    // Selecteur de rapprochement manuel : toutes les seances prevues du jour
-    var pickerHTML = '';
-    if (act._sbId && planned.length) {
-      var opts = '<option value="none"' + (matched ? '' : ' selected') + '>Aucune</option>'
-        + planned.map(function (pp) {
-            var lab = (pp.name || 'Séance') + ' · ' + ((typeof fmtDur === 'function') ? fmtDur(+pp.duration || 0) : ((+pp.duration || 0) + ' min'));
-            var seld = (matched && String(matched._sbId) === String(pp._sbId)) ? ' selected' : '';
-            return '<option value="' + esc(pp._sbId) + '"' + seld + '>' + esc(lab) + '</option>';
-          }).join('');
-      pickerHTML = '<div style="margin-top:14px;display:flex;align-items:center;gap:9px;flex-wrap:wrap">'
-        + '<span style="font-size:11px;color:var(--text-mute,#6b7686)">Séance prévue liée</span>'
-        + '<select class="pvr-picker" data-sbid="' + esc(act._sbId) + '" style="background:var(--bg-elev,#141a23);border:1px solid var(--border2,#374256);color:var(--text,#e7ecf3);border-radius:8px;padding:6px 9px;font-size:12.5px;font-family:inherit;max-width:100%">' + opts + '</select>'
-        + '</div>';
-    }
-
-    // 3) Aucun rapprochement : on propose quand meme le selecteur si des prevus existent
-    if (!matched) {
-      if (pickerHTML) {
-        return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé</div>'
-          + '<div style="font-size:12px;color:var(--text-mute,#6b7686)">Aucune séance prévue rapprochée.</div>'
-          + pickerHTML + '</div>';
-      }
-      return '';
-    }
-
-    var p = matched;
+// Section comparaison (corps de la modale) : uniquement si une seance prevue est rapprochee.
+window.renderPrevuVsRealiseHTML = function (act, iso) {
+  try {
+    var mm = window.__plannedMatch(act, iso);
+    var p = mm.matched;
+    if (!p) return '';
     var fmtD = function (min) { return (typeof fmtDur === 'function') ? fmtDur(+min || 0) : (Math.round(+min || 0) + ' min'); };
     var rows = [];
     function addRow(label, pv, rv, unit, fmt) {
@@ -7774,9 +7755,30 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
         + (ratio != null ? '<div style="font-size:11px;color:var(--text-mute,#6b7686);margin-top:7px">Réalisé : ' + (act.tss || 0) + ' TSS pour ' + p.tss + ' prévus — ' + ratio + ' % de la charge cible.</div>' : '')
         + '</div>';
     }
-    return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· rapproché par durée</span></div>'
-      + head + body + structHTML + pickerHTML + '</div>';
+    return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· ' + ((p.name || 'séance prévue')) + '</span></div>'
+      + head + body + structHTML + '</div>';
   } catch (e) { console.warn('[prevu vs realise]', e && e.message); return ''; }
+};
+
+// Bouton/selecteur de lien dans le HEADER de la modale (a cote des "...").
+window.__setupModalLinkSelect = function (act, iso) {
+  var wrap = document.getElementById('modal-link-wrap');
+  var sel = document.getElementById('modal-link-select');
+  var btn = document.getElementById('modal-link-btn');
+  if (!wrap || !sel) return;
+  if (!act || act.category === 'competition' || !act._sbId) { wrap.hidden = true; return; }
+  var mm = window.__plannedMatch(act, iso);
+  if (!mm.planned.length) { wrap.hidden = true; return; }
+  var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  sel.innerHTML = '<option value="none">Aucune</option>' + mm.planned.map(function (pp) {
+    var lab = (pp.name || 'Séance') + ' · ' + ((typeof fmtDur === 'function') ? fmtDur(+pp.duration || 0) : ((+pp.duration || 0) + ' min'));
+    return '<option value="' + esc(pp._sbId) + '">' + esc(lab) + '</option>';
+  }).join('');
+  sel.value = mm.matched ? String(mm.matched._sbId) : 'none';
+  sel.dataset.sbid = act._sbId;
+  wrap.hidden = false;
+  if (btn) btn.style.color = mm.matched ? 'var(--accent)' : '';
+  wrap.title = mm.matched ? ('Séance prévue liée : ' + (mm.matched.name || '')) : 'Aucune séance prévue liée';
 };
 
 // Reflete le lien prevu<->realise dans DASHBOARD_DATA (memoire) pour persistance en session.
@@ -7804,6 +7806,7 @@ document.addEventListener('change', function (e) {
 
 function openSessionModal(iso, source) {
   window.__currentModalIso = iso; window.__currentModalSource = source;
+  { const _lw = document.getElementById('modal-link-wrap'); if (_lw) _lw.hidden = true; }
   // Reconstruire la date depuis l'iso (les jours futurs ne sont PAS dans data)
   const date = new Date(iso + 'T12:00:00');
   if (isNaN(date.getTime())) return;
@@ -8143,6 +8146,7 @@ function openSessionModal(iso, source) {
           ${graphHTML}
           ${lienHTML}
         `;
+        try { window.__setupModalLinkSelect(act, iso); } catch (e) { /* ignore */ }
         // Wire switch buttons (avant le chargement async des streams)
         bodyEl.querySelectorAll('.modal-activity-switch button').forEach(btn => {
           btn.addEventListener('click', () => renderModalActivity(+btn.dataset.i));
