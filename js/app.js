@@ -6103,13 +6103,8 @@ async function renderStreamsSection(container, activityId) {
       });
     }, 0);
   }
-  // Replie les graphes detailles derriere le bouton "Voir l'analyse detaillee"
-  try {
-    var _dc = document.getElementById('detailed-charts');
-    var _tb = document.getElementById('toggle-detailed');
-    if (_dc) _dc.style.display = 'none';
-    if (_tb) _tb.addEventListener('click', function () { if (typeof window.openFullAnalysis === 'function') window.openFullAnalysis(); });
-  } catch (e) { /* ignore */ }
+  // Graphes detailles caches inline : ils s'affichent dans l'analyse plein ecran.
+  try { var _dc = document.getElementById('detailed-charts'); if (_dc) _dc.style.display = 'none'; } catch (e) { /* ignore */ }
 }
 
 // ============================================================
@@ -6160,6 +6155,13 @@ window.closeFullAnalysis = function () {
   ov.classList.remove('open');
   document.body.style.overflow = '';
 };
+// Clic sur "Voir l'analyse detaillee" (delegation -> robuste quel que soit le moment de rendu)
+document.addEventListener('click', function (e) {
+  var b = e.target.closest ? e.target.closest('#toggle-detailed') : null;
+  if (!b) return;
+  e.preventDefault();
+  if (typeof window.openFullAnalysis === 'function') window.openFullAnalysis();
+});
 function _buildAfCharts(S) {
   if (!S || !window.Chart) return;
   var grid = 'rgba(255,255,255,0.06)', tick = '#9aa6b6';
