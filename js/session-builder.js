@@ -303,7 +303,11 @@
     var html = '<div style="background:' + bg + ';border:' + brd + ';border-radius:' + radius + 'px;padding:' + pad + 'px;display:flex;align-items:stretch;gap:2px;height:' + H + 'px;overflow:hidden">';
     blks.forEach(function (b, bi) {
       var segs = blockSegs(b), bmin = bmins[bi] || 0, it = bmin || 1;
-      html += '<div title="' + esc((b.name || NAME[b.type] || '') + ' - ' + fmtDur(bmin)) + '" style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(minFlex, bmin / tot) + '">';
+      var _tseg = b.work || segs[0];
+      var _tm = (b.metric) || (_tseg && _tseg.metric) || 'power';
+      var _tval = _tseg ? label(_tseg, _tm) : '';
+      var _tip = (b.name || NAME[b.type] || '') + ' · ' + fmtDur(bmin) + (_tval ? (' · ' + _tval.replace(/ \. /g, ' · ')) : '') + (b.type === 'interval' && b.reps > 1 ? ' · ' + b.reps + '×' : '');
+      html += '<div title="' + esc(_tip) + '" style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(minFlex, bmin / tot) + '">';
       html += '<div style="flex:1;display:flex;align-items:flex-end;gap:0;min-height:0">';
       segs.forEach(function (s) {
         var hgt = Math.max(8, (midOf(s) / mx) * 100);
