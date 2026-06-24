@@ -7675,27 +7675,55 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
     var planned = ((typeof loadTrainings === 'function') ? loadTrainings() : [])
       .filter(function (t) { return !window.coachModeKeep || window.coachModeKeep(t.ia); })
       .filter(function (t) { return t.date === iso; });
-    if (!planned.length) return '';
     var catOf = function (x) { return (typeof getSportCategory === 'function') ? getSportCategory(x) : x; };
     var actCat = catOf(act.raw_type || act.sport);
-    var cands = planned.filter(function (t) { return catOf(t.sport) === actCat; });
-    if (!cands.length) return '';
-    var dayObj = (typeof buildRealisedDay === 'function') ? buildRealisedDay(iso) : null;
-    var reals = ((dayObj && dayObj.activities) ? dayObj.activities : [act])
-      .filter(function (x) { return catOf(x.raw_type || x.sport) === actCat; });
-    var keyOf = function (x) { return String(x._sbId || x.client_id || x._manualId || x.id || (x.name + '|' + (x.duration || 0))); };
-    var actKey = keyOf(act);
-    var combos = [];
-    cands.forEach(function (p, pi) { reals.forEach(function (r, ri) { combos.push({ pi: pi, ri: ri, diff: Math.abs((+p.duration || 0) - (+r.duration || 0)) }); }); });
-    combos.sort(function (a, b) { return a.diff - b.diff; });
-    var usedP = {}, usedR = {}, match = null;
-    combos.forEach(function (c) {
-      if (usedP[c.pi] || usedR[c.ri]) return;
-      usedP[c.pi] = 1; usedR[c.ri] = 1;
-      if (keyOf(reals[c.ri]) === actKey) match = cands[c.pi];
-    });
-    if (!match) return '';
-    var p = match;
+    var link = act.planned_id;            // null/undefined = a evaluer ; 'none' = delie ; sinon uuid prevu
+    var matched = null;
+
+    // 1) Lien deja stocke en base
+    if (link && link !== 'none') {
+      matched = planned.find(function (p) { return String(p._sbId) === String(link); });
+      if (!matched) link = null;          // plan supprime -> on retente un auto-match
+    }
+
+    // 2) Auto-rapprochement (1re fois) : meme sport + duree la plus proche (greedy si plusieurs)
+    if (!matched && link !== 'none') {
+      var cands = planned.filter(function (p) { return catOf(p.sport) === actCat; });
+      if (cands.length) {
+        var dayObj = (typeof buildRealisedDay === 'function') ? buildRealisedDay(iso) : null;
+        var reals = ((dayObj && dayObj.activities) ? dayObj.activities : [act]).filter(function (x) { return catOf(x.raw_type || x.sport) === actCat; });
+        var keyOf = function (x) { return String(x._sbId || x.client_id || x._manualId || x.id || (x.name + '|' + (x.duration || 0))); };
+        var actKey = keyOf(act);
+        var combos = [];
+        cands.forEach(function (p, pi) { reals.forEach(function (r, ri) { combos.push({ pi: pi, ri: ri, diff: Math.abs((+p.duration || 0) - (+r.duration || 0)) }); }); });
+        combos.sort(function (x, y) { return x.diff - y.diff; });
+        var usedP = {}, usedR = {};
+        combos.forEach(function (c) {
+          if (usedP[c.pi] || usedR[c.ri]) return;
+          usedP[c.pi] = 1; usedR[c.ri] = 1;
+          if (keyOf(reals[c.ri]) === actKey) matched = cands[c.pi];
+        });
+        if (matched && matched._sbId && act._sbId) {
+          act.planned_id = String(matched._sbId);
+          if (typeof window.__setActPlannedLink === 'function') window.__setActPlannedLink(act._sbId, String(matched._sbId));
+          if (window.cloudSync && window.cloudSync.linkActivityPlanned) window.cloudSync.linkActivityPlanned(act._sbId, String(matched._sbId));
+        }
+      }
+    }
+
+    // 3) Aucun rapprochement
+    if (!matched) {
+      if (link === 'none') {
+        var cand2 = planned.filter(function (p) { return catOf(p.sport) === actCat; });
+        if (cand2.length && act._sbId) {
+          return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé</div>'
+            + '<button class="pvr-relink" data-sbid="' + act._sbId + '" style="background:none;border:1px solid var(--border2,#374256);color:var(--text-dim,#9aa6b6);border-radius:8px;padding:7px 13px;font-size:12px;cursor:pointer;font-family:inherit">Rapprocher à la séance prévue</button></div>';
+        }
+      }
+      return '';
+    }
+
+    var p = matched;
     var fmtD = function (min) { return (typeof fmtDur === 'function') ? fmtDur(+min || 0) : (Math.round(+min || 0) + ' min'); };
     var rows = [];
     function addRow(label, pv, rv, unit, fmt) {
@@ -7732,12 +7760,39 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
         + (ratio != null ? '<div style="font-size:11px;color:var(--text-mute,#6b7686);margin-top:7px">Réalisé : ' + (act.tss || 0) + ' TSS pour ' + p.tss + ' prévus — ' + ratio + ' % de la charge cible.</div>' : '')
         + '</div>';
     }
-    return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· rapproché par durée</span></div>'
+    var unlink = act._sbId ? '<button class="pvr-unlink" data-sbid="' + act._sbId + '" title="Délier ce rapprochement" style="float:right;background:none;border:1px solid var(--border2,#374256);color:var(--text-mute,#6b7686);border-radius:7px;padding:3px 11px;font-size:11px;cursor:pointer;text-transform:none;letter-spacing:0;font-weight:400;font-family:inherit">Délier</button>' : '';
+    return '<div class="modal-section"><div class="modal-section-title">Prévu vs Réalisé <span style="font-weight:400;font-size:11px;color:var(--text-mute,#6b7686);text-transform:none;letter-spacing:0">· rapproché par durée</span>' + unlink + '</div>'
       + head + body + structHTML + '</div>';
   } catch (e) { console.warn('[prevu vs realise]', e && e.message); return ''; }
 };
 
+// Reflete le lien prevu<->realise dans DASHBOARD_DATA (memoire) pour persistance en session.
+window.__setActPlannedLink = function (sbId, val) {
+  if (!Array.isArray(data) || !sbId) return;
+  for (var di = 0; di < data.length; di++) {
+    var acts = data[di].activities || [];
+    for (var ai = 0; ai < acts.length; ai++) {
+      if (String(acts[ai]._sbId) === String(sbId)) acts[ai].planned_id = val;
+    }
+  }
+};
+
+// Boutons Delier / Rapprocher dans la section Prevu vs Realise
+document.addEventListener('click', function (e) {
+  var u = e.target.closest ? e.target.closest('.pvr-unlink') : null;
+  var r = e.target.closest ? e.target.closest('.pvr-relink') : null;
+  if (!u && !r) return;
+  e.preventDefault(); e.stopPropagation();
+  var sbid = (u || r).dataset.sbid;
+  var val = u ? 'none' : null;           // delier = sentinel 'none' ; rapprocher = null -> ré-auto-match
+  if (typeof window.__setActPlannedLink === 'function') window.__setActPlannedLink(sbid, val);
+  if (window.cloudSync && window.cloudSync.linkActivityPlanned) window.cloudSync.linkActivityPlanned(sbid, val);
+  if (typeof window.__modalActIdx === 'number') window.__openActIdx = window.__modalActIdx;
+  if (window.__currentModalIso && typeof openSessionModal === 'function') openSessionModal(window.__currentModalIso, window.__currentModalSource || 'realise');
+});
+
 function openSessionModal(iso, source) {
+  window.__currentModalIso = iso; window.__currentModalSource = source;
   // Reconstruire la date depuis l'iso (les jours futurs ne sont PAS dans data)
   const date = new Date(iso + 'T12:00:00');
   if (isNaN(date.getTime())) return;
@@ -7793,6 +7848,7 @@ function openSessionModal(iso, source) {
       let currentIdx = 0;
       function renderModalActivity(idx) {
         currentIdx = idx;
+        window.__modalActIdx = idx;
         const act = acts[idx];
         // Boutons d'action : seulement pour les activités manuelles (Strava est read-only)
         const _editBtn2 = document.getElementById('modal-edit-btn');

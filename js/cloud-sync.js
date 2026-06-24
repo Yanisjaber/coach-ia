@@ -525,6 +525,16 @@ export async function deleteTraining(training) {
   } catch (e) { console.warn('[del training]', e.message); }
 }
 
+export async function linkActivityPlanned(sbId, plannedId) {
+  if (readOnly()) return;
+  if (!isAuthed()) return;
+  if (!sbId) return;
+  try {
+    // plannedId : uuid de la seance prevue rapprochee, 'none' (delie explicite) ou null (a re-evaluer)
+    await window.sb.from('activities').update({ planned_id: plannedId }).eq('id', sbId).eq('user_id', uid());
+  } catch (e) { console.warn('[link planned]', e.message); }
+}
+
 export async function pushRestDay(isoDate, isRest, ia) {
   if (!isAuthed()) return;
   try {
@@ -551,6 +561,7 @@ window.cloudSync = {
   pushTemplate, deleteTemplate,
   pushCompetition, deleteCompetition, pushCompetitionRegistry, deleteCompetitionByActivity,
   pushTraining, deleteTraining,
+  linkActivityPlanned,
   pushRestDay,
   pullAllFromCloud,
 };
