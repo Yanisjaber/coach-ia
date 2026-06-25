@@ -947,7 +947,7 @@
 #p-analysis .af-hgauges { display: flex; gap: 16px; }
 #p-analysis .af-class { background: rgba(167, 139, 250, .15); color: var(--purple); border-radius: 7px; padding: 5px 11px; font-size: 11px; font-weight: 600; }
 #p-analysis .af-tabbar {
-  display: flex; gap: 2px; flex-wrap: wrap;
+  display: flex; gap: 2px; flex-wrap: wrap; justify-content: center;
   border-bottom: 1px solid var(--border); margin-bottom: 20px;
 }
 #p-analysis .af-tab {
@@ -986,4 +986,4 @@
 #p-analysis .af-table th {
   text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .4px;
   color: var(--text-mute); font-weight: 600; padding: 10px 14px;
-  background: var(--bg-elev2); border-bottom: 1px solid var(--bo
+  background: var(--bg-elev2); border-b
