@@ -45,8 +45,26 @@ const SEC_TO_COL: Record<number, string> = {
   3600:"1h",5400:"1h30",7200:"2h",9000:"2h30",10800:"3h",12600:"3h30",14400:"4h",16200:"4h30",18000:"5h",
   21600:"6h",25200:"7h",28800:"8h",
 };
-// Durées du Power Profile (secondes), dérivées de SEC_TO_COL.
+// Durées du Power Profile (secondes), dérivées de SEC_TO_COL (table power_profile).
 const DURATIONS = Object.keys(SEC_TO_COL).map(Number).sort((a, b) => a - b);
+
+// Jeu de durées du CLIENT (doit rester identique à __PC_DURS dans js/app.js).
+// La courbe est calculée sur l'UNION (SEC_TO_COL ∪ client) pour servir à la fois
+// la table power_profile ET le tableau des records côté client.
+const PC_DURS: number[] = (() => {
+  const d: number[] = [];
+  for (let s = 1; s <= 10; s++) d.push(s);
+  for (let s = 15; s <= 30; s += 5) d.push(s);
+  d.push(45);
+  for (let s = 60; s <= 600; s += 60) d.push(s);
+  for (let s = 900; s <= 3600; s += 300) d.push(s);
+  for (let s = 4500; s <= 9000; s += 900) d.push(s);
+  for (let s = 10800; s <= 28800; s += 1800) d.push(s);
+  return d;
+})();
+const MMP_DURS = Array.from(new Set([...DURATIONS, ...PC_DURS])).sort((a, b) => a - b);
+// Version du jeu de durées CLIENT (doit rester égale à __PC_VERSION dans js/app.js).
+const CLIENT_PC_VERSION = 2;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -125,6 +143,7 @@ Deno.serve(async (req) => {
         const watts = (raw?.watts?.data) || [];
         const powerCurve: Record<string, number> = computeMMP(watts);
         powerCurve.v = POWER_CURVE_VERSION; // marqueur de version (ignoré par l'agrégation)
+        powerCurve._v = CLIENT_PC_VERSION; // marqueur attendu par le client (records sans recalcul manuel)
         const gz = await gzipBase64(JSON.stringify(streamArray));
 
         const { error: upErr } = await sbAdmin.from("activities").update({
@@ -188,7 +207,7 @@ function computeMMP(wattsStream: any[]): Record<string, number> {
   for (let i = 0; i < n; i++) cum[i + 1] = cum[i] + ws[i];
 
   const result: Record<string, number> = {};
-  for (const d of DURATIONS) {
+  for (const d of MMP_DURS) {
     if (d > n) continue;
     let best = 0;
     for (let i = 0; i + d <= n; i++) {
@@ -404,7 +423,7 @@ async function recomputePowerProfileBySport(sb: any, userId: string): Promise<nu
 // Recalcule la power_curve (avec les NOUVELLES durées) depuis les streams déjà
 // stockés, pour les activités dont la courbe est absente/obsolète. Lot limité
 // (idempotent, relançable). Renvoie { done, remaining }.
-const POWER_CURVE_VERSION = 3; // bump quand on change les durées/calculs (force un re-backfill local)
+const POWER_CURVE_VERSION = 4; // bump quand on change les durées/calculs (force un re-backfill local)
 async function backfillPowerCurves(sb: any, userId: string, limit: number): Promise<{ done: number; remaining: number }> {
   // 1) Repère les activités obsolètes SANS charger les streams (power_curve est léger).
   const { data, error } = await sb
@@ -432,6 +451,7 @@ async function backfillPowerCurves(sb: any, userId: string, limit: number): Prom
       const pc: Record<string, number> = computeMMP(watts);
       Object.assign(pc, computeLateMMP(watts)); // late_300 / late_1200 si sortie > 2 h 30
       pc.v = POWER_CURVE_VERSION; // marqueur de version (ignoré par l'agrégation)
+      pc._v = CLIENT_PC_VERSION; // marqueur attendu par le client
       await sb.from("activities").update({ power_curve: pc }).eq("id", a.id);
       done++;
     } catch (e) {
