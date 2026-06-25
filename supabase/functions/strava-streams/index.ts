@@ -89,6 +89,16 @@ Deno.serve(async (req) => {
 
     const sbAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Profil athlete (pour les metriques : TRIMP, eFTP, W'bal, CHO...).
+    const { data: _prof } = await sbAdmin
+      .from("user_profiles").select("ftp, hr_max, lthr, extras").eq("user_id", user.id).maybeSingle();
+    const ATH = {
+      ftp: +(_prof?.ftp) || 0,
+      hrMax: +(_prof?.hr_max) || 0,
+      hrRest: 50,
+      sex: (_prof?.extras && _prof.extras.x_sex) || 'M',
+    };
+
     let streamsSynced = 0;
     let rateLimited = false;
     let fetchErrors = 0;
@@ -144,6 +154,7 @@ Deno.serve(async (req) => {
         const powerCurve: Record<string, number> = computeMMP(watts);
         powerCurve.v = POWER_CURVE_VERSION; // marqueur de version (ignoré par l'agrégation)
         powerCurve._v = CLIENT_PC_VERSION; // marqueur attendu par le client (records sans recalcul manuel)
+        const metrics = computeMetrics(watts, (raw?.heartrate?.data) || [], (raw?.time?.data) || [], ATH);
         const gz = await gzipBase64(JSON.stringify(streamArray));
 
         const { error: upErr } = await sbAdmin.from("activities").update({
@@ -151,6 +162,7 @@ Deno.serve(async (req) => {
           streams_format: STREAM_FORMAT,
           streams_synced_at: new Date().toISOString(),
           power_curve: powerCurve,
+          metrics: metrics,
         }).eq("id", a.id);
         if (upErr) { fetchErrors++; continue; }
         streamsSynced++;
@@ -159,7 +171,7 @@ Deno.serve(async (req) => {
 
     // ===== 5) Backfill power_curve (nouvelles durées) depuis les streams stockés =====
     // Lot limité (idempotent) : recalcule la courbe des activités obsolètes.
-    const backfill = await backfillPowerCurves(sbAdmin, user.id, 100);
+    const backfill = await backfillPowerCurves(sbAdmin, user.id, 100, ATH);
 
     // ===== 6) Recalculs power_profile (legacy) + power_profile_sport (par sport) =====
     // On recalcule le profil par sport à CHAQUE passage : il s'appuie sur les power_curve
@@ -199,6 +211,102 @@ Deno.serve(async (req) => {
 // ============ POWER PROFILE ============
 
 // MMP : pour chaque durée, meilleure moyenne sur une fenêtre glissante.
+const METRICS_VERSION = 2; // doit rester egal a `var m = { _v: ? }` cote client (app.js)
+
+// Extrait un flux par type depuis [{type,data}].
+function streamData(arr: any[], type: string): any[] {
+  if (!Array.isArray(arr)) return [];
+  const s = arr.find((x) => x && x.type === type);
+  return (s && Array.isArray(s.data)) ? s.data : [];
+}
+
+// Calcule les metriques avancees (port serveur de __computeActivityMetrics).
+function computeMetrics(W: any[], HR: any[], T: any[], ath: any): Record<string, any> {
+  const ftp = +ath.ftp || 250;
+  const hrMax = +ath.hrMax || 190;
+  const sex = ath.sex || 'M';
+  const hrRest = +ath.hrRest || 50;
+  const m: Record<string, any> = { _v: METRICS_VERSION };
+  const n = (W && W.length) || 0;
+
+  if (n) {
+    const ps = new Float64Array(n + 1);
+    for (let i = 0; i < n; i++) ps[i + 1] = ps[i] + (+W[i] || 0);
+    const bestAvg = (d: number) => { if (d > n) return 0; let b = 0; for (let s = 0; s + d <= n; s++) { const v = (ps[s + d] - ps[s]) / d; if (v > b) b = v; } return b; };
+
+    let pmax = 0; for (let i = 0; i < n; i++) { const w0 = +W[i] || 0; if (w0 > pmax) pmax = w0; }
+    m.pmax = Math.round(pmax);
+    let ex = 0; for (let i = 0; i < n; i++) { const w1 = +W[i] || 0; if (w1 > ftp) ex += (w1 - ftp); }
+    m.work_over_ftp_kj = Math.round(ex / 100) / 10;
+
+    if (n >= 30) {
+      let np4 = 0, npc = 0;
+      for (let r = 30; r <= n; r++) { const a30 = (ps[r] - ps[r - 30]) / 30; np4 += a30 * a30 * a30 * a30; npc++; }
+      if (npc) m.np = Math.round(Math.pow(np4 / npc, 0.25));
+    }
+    if (m.np && ftp) { const ifr = m.np / ftp; m.if_pct = Math.round(ifr * 100); m.tss = Math.round(n / 3600 * ifr * ifr * 100); }
+
+    const hard = (bestAvg(300) >= ftp * 0.86) || (bestAvg(60) >= ftp * 1.15) || (bestAvg(1200) >= ftp * 0.84);
+    if (hard) {
+      const durs = [120, 180, 240, 300, 420, 600, 720, 900, 1200].filter((d) => d <= n);
+      if (durs.length >= 2) {
+        let sx = 0, sy = 0, sxy = 0, sxx = 0; const k = durs.length;
+        durs.forEach((d) => { const x = 1 / d, y = bestAvg(d); sx += x; sy += y; sxy += x * y; sxx += x * x; });
+        const slope = (k * sxy - sx * sy) / (k * sxx - sx * sx); const inter = (sy - slope * sx) / k;
+        if (isFinite(inter) && inter > 0) m.cp = Math.round(inter);
+        if (isFinite(slope) && slope > 0) m.w_prime = Math.round(slope);
+      }
+      const p20 = bestAvg(1200), p5 = bestAvg(300);
+      if (p20) m.eftp = Math.round(0.95 * p20);
+      else if (p5) m.eftp = Math.round(0.90 * p5);
+      else if (m.cp) m.eftp = Math.round(0.97 * m.cp);
+      const cp = m.cp || Math.round(0.97 * ftp), wp = m.w_prime || 20000;
+      if (cp > 0 && wp > 0) {
+        let bSum = 0, bN = 0; for (let i = 0; i < n; i++) { const w2 = +W[i] || 0; if (w2 < cp) { bSum += w2; bN++; } }
+        const dcp = bN ? (cp - bSum / bN) : 0; const tau = 546 * Math.exp(-0.01 * dcp) + 316;
+        let bal = wp, minb = wp; const rec = 1 - Math.exp(-1 / tau);
+        for (let i = 0; i < n; i++) { const w3 = +W[i] || 0; if (w3 > cp) bal -= (w3 - cp); else bal += (wp - bal) * rec; if (bal > wp) bal = wp; if (bal < minb) minb = bal; }
+        m.wbal_kj = Math.round(Math.min(wp, wp - minb) / 100) / 10;
+      }
+    }
+
+    let choMech = 0;
+    for (let i = 0; i < n; i++) { const w4 = +W[i] || 0; if (w4 <= 0) continue; const I = w4 / ftp; let fr = 1 / (1 + Math.exp(-5 * (I - 0.45))); if (fr < 0.15) fr = 0.15; if (fr > 1) fr = 1; choMech += (w4 / 1000) * fr; }
+    m.cho_g = Math.round(choMech / 4.0);
+
+    let z1 = 0, z2 = 0, z3 = 0;
+    for (let i = 0; i < n; i++) { const ww = W[i]; if (ww == null) continue; const pr = ww / ftp; if (pr < 0.80) z1++; else if (pr <= 1.05) z2++; else z3++; }
+    const zt = z1 + z2 + z3;
+    if (zt) {
+      const f1 = z1 / zt, f2 = z2 / zt, f3 = z3 / zt;
+      if (f2 > 0 && f3 > 0) m.pol_index = Math.round(Math.log10((f1 * f3) / (f2 * f2)) * 100) / 100;
+      m.pol_class = (f1 >= f2 && f2 >= f3) ? 'Pyramidal' : (f3 > f2) ? 'Polarisé' : (f2 > f1) ? 'Seuil' : 'Endurance';
+    }
+  }
+
+  if (HR && HR.length) {
+    const hn = HR.length, denom = (hrMax - hrRest) || 1, kk = (sex === 'F') ? 1.67 : 1.92;
+    let trimp = 0;
+    for (let i = 0; i < hn; i++) { const hh = HR[i]; if (hh == null) continue; let r = (hh - hrRest) / denom; if (r < 0) r = 0; if (r > 1) r = 1; trimp += (1 / 60) * r * 0.64 * Math.exp(kk * r); }
+    m.trimp = Math.round(trimp);
+    let drop = 0;
+    if (T && T.length === hn) {
+      let j = 0;
+      for (let i = 0; i < hn; i++) {
+        if (j < i) j = i;
+        const target = T[i] + 60;
+        while (j < hn && T[j] < target) j++;
+        if (j >= hn) break;
+        if (HR[i] != null && HR[j] != null && HR[i] >= 0.85 * hrMax) { const d1 = HR[i] - HR[j]; if (d1 > drop) drop = d1; }
+      }
+    } else {
+      for (let i = 0; i + 60 < hn; i++) { if (HR[i] == null || HR[i + 60] == null) continue; if (HR[i] >= 0.85 * hrMax) { const d2 = HR[i] - HR[i + 60]; if (d2 > drop) drop = d2; } }
+    }
+    if (drop > 0) m.hrrc = Math.round(drop);
+  }
+  return m;
+}
+
 function computeMMP(wattsStream: any[]): Record<string, number> {
   if (!wattsStream || !wattsStream.length) return {};
   const ws = wattsStream.map((w) => (w != null && w > 0 ? Math.round(w) : 0));
@@ -424,7 +532,7 @@ async function recomputePowerProfileBySport(sb: any, userId: string): Promise<nu
 // stockés, pour les activités dont la courbe est absente/obsolète. Lot limité
 // (idempotent, relançable). Renvoie { done, remaining }.
 const POWER_CURVE_VERSION = 4; // bump quand on change les durées/calculs (force un re-backfill local)
-async function backfillPowerCurves(sb: any, userId: string, limit: number): Promise<{ done: number; remaining: number }> {
+async function backfillPowerCurves(sb: any, userId: string, limit: number, ath: any): Promise<{ done: number; remaining: number }> {
   // 1) Repère les activités obsolètes SANS charger les streams (power_curve est léger).
   const { data, error } = await sb
     .from("activities")
@@ -447,12 +555,14 @@ async function backfillPowerCurves(sb: any, userId: string, limit: number): Prom
         done++; continue;
       }
       const jsonStr = await gunzipBase64(row.streams_gz);
-      const watts = wattsFromStreamArray(JSON.parse(jsonStr));
+      const arr = JSON.parse(jsonStr);
+      const watts = streamData(arr, "watts");
       const pc: Record<string, number> = computeMMP(watts);
       Object.assign(pc, computeLateMMP(watts)); // late_300 / late_1200 si sortie > 2 h 30
       pc.v = POWER_CURVE_VERSION; // marqueur de version (ignoré par l'agrégation)
       pc._v = CLIENT_PC_VERSION; // marqueur attendu par le client
-      await sb.from("activities").update({ power_curve: pc }).eq("id", a.id);
+      const metrics = computeMetrics(watts, streamData(arr, "heartrate"), streamData(arr, "time"), ath);
+      await sb.from("activities").update({ power_curve: pc, metrics: metrics }).eq("id", a.id);
       done++;
     } catch (e) {
       console.error("backfill power_curve", a.id, (e as any)?.message);
