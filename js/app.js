@@ -6112,7 +6112,78 @@ async function renderStreamsSection(container, activityId) {
 // Analyse detaillee PLEIN ECRAN : courbes temps (deplacees) + courbe de
 // puissance (mean-max) + temps par zone (puissance/FC) + distribution.
 // ============================================================
-window.__buildAfOverview = function (act) {
+// Calcule les metriques avancees d'une activite a partir des streams.
+// S = { watts:[], hr:[], ftp, hrMax } ; ath = objet athlete ; hrRest = FC repos (Whoop si dispo).
+// Tout est calculable depuis watts+FC sauf l'equilibre G/D (mesure capteur, pas dans Strava).
+window.__computeActivityMetrics = function (S, ath, hrRest) {
+  S = S || {}; ath = ath || {};
+  var W = S.watts || [], HR = S.hr || [];
+  var ftp = +S.ftp || +ath.ftp || 250;
+  var hrMax = +S.hrMax || +ath.hr_max || +ath.hrMax || 190;
+  var sex = ath.sex || 'M';
+  hrRest = +hrRest || +ath.hr_rest || 50;
+  var m = { _v: 1 };
+  var n = W.length;
+
+  if (n) {
+    var ps = new Float64Array(n + 1);
+    for (var i = 0; i < n; i++) ps[i + 1] = ps[i] + (+W[i] || 0);
+    var bestAvg = function (d) { if (d > n) return 0; var b = 0; for (var s = 0; s + d <= n; s++) { var v = (ps[s + d] - ps[s]) / d; if (v > b) b = v; } return b; };
+
+    var pmax = 0; for (var i2 = 0; i2 < n; i2++) { var w0 = +W[i2] || 0; if (w0 > pmax) pmax = w0; }
+    m.pmax = Math.round(pmax);
+
+    var ex = 0; for (var i3 = 0; i3 < n; i3++) { var w1 = +W[i3] || 0; if (w1 > ftp) ex += (w1 - ftp); }
+    m.work_over_ftp_kj = Math.round(ex / 100) / 10;
+
+    var durs = [120, 180, 240, 300, 420, 600, 720, 900, 1200].filter(function (d) { return d <= n; });
+    if (durs.length >= 2) {
+      var sx = 0, sy = 0, sxy = 0, sxx = 0, k = durs.length;
+      durs.forEach(function (d) { var x = 1 / d, y = bestAvg(d); sx += x; sy += y; sxy += x * y; sxx += x * x; });
+      var slope = (k * sxy - sx * sy) / (k * sxx - sx * sx); var inter = (sy - slope * sx) / k;
+      if (isFinite(inter) && inter > 0) m.cp = Math.round(inter);
+      if (isFinite(slope) && slope > 0) m.w_prime = Math.round(slope);
+    }
+
+    var p20 = bestAvg(1200), p5 = bestAvg(300);
+    if (p20) m.eftp = Math.round(0.95 * p20);
+    else if (p5) m.eftp = Math.round(0.90 * p5);
+    else if (m.cp) m.eftp = Math.round(0.97 * m.cp);
+
+    var cp = m.cp || Math.round(0.97 * ftp), wp = m.w_prime || 20000;
+    if (cp > 0 && wp > 0) {
+      var bSum = 0, bN = 0; for (var b1 = 0; b1 < n; b1++) { var w2 = +W[b1] || 0; if (w2 < cp) { bSum += w2; bN++; } }
+      var dcp = bN ? (cp - bSum / bN) : 0; var tau = 546 * Math.exp(-0.01 * dcp) + 316;
+      var bal = wp, minb = wp, rec = 1 - Math.exp(-1 / tau);
+      for (var b2 = 0; b2 < n; b2++) { var w3 = +W[b2] || 0; if (w3 > cp) bal -= (w3 - cp); else bal += (wp - bal) * rec; if (bal > wp) bal = wp; if (bal < minb) minb = bal; }
+      m.wbal_kj = Math.round((wp - minb) / 100) / 10;
+    }
+
+    var GE_carb = 0, choMech = 0;
+    for (var c1 = 0; c1 < n; c1++) { var w4 = +W[c1] || 0; if (w4 <= 0) continue; var I = w4 / ftp; var fr = 1 / (1 + Math.exp(-5 * (I - 0.45))); if (fr < 0.15) fr = 0.15; if (fr > 1) fr = 1; choMech += (w4 / 1000) * fr; }
+    m.cho_g = Math.round(choMech / 4.0);
+
+    var z1 = 0, z2 = 0, z3 = 0;
+    for (var p1 = 0; p1 < n; p1++) { var ww = W[p1]; if (ww == null) continue; var pr = ww / ftp; if (pr < 0.80) z1++; else if (pr <= 1.05) z2++; else z3++; }
+    var zt = z1 + z2 + z3;
+    if (zt) {
+      var f1 = z1 / zt, f2 = z2 / zt, f3 = z3 / zt;
+      if (f2 > 0 && f3 > 0) m.pol_index = Math.round(Math.log10((f1 * f3) / (f2 * f2)) * 100) / 100;
+      m.pol_class = (f1 >= f2 && f2 >= f3) ? 'Pyramidal' : (f3 > f2) ? 'Polarisé' : (f2 > f1) ? 'Seuil' : 'Endurance';
+    }
+  }
+
+  if (HR.length) {
+    var hn = HR.length, denom = (hrMax - hrRest) || 1, kk = (sex === 'F') ? 1.67 : 1.92, trimp = 0;
+    for (var h1 = 0; h1 < hn; h1++) { var hh = HR[h1]; if (hh == null) continue; var r = (hh - hrRest) / denom; if (r < 0) r = 0; if (r > 1) r = 1; trimp += (1 / 60) * r * 0.64 * Math.exp(kk * r); }
+    m.trimp = Math.round(trimp);
+    var drop = 0; for (var h2 = 0; h2 + 60 < hn; h2++) { if (HR[h2] == null || HR[h2 + 60] == null) continue; if (HR[h2] >= 0.85 * hrMax) { var dd = HR[h2] - HR[h2 + 60]; if (dd > drop) drop = dd; } }
+    if (drop > 0) m.hrrc = Math.round(drop);
+  }
+  return m;
+};
+window.__buildAfOverview = function (act, m) {
+  m = m || {};
   if (!act) return '<div class="af-section"><div class="af-h">Aperçu</div><div style="color:var(--text-mute)">Données indisponibles.</div></div>';
   var ath = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete) || {};
   var hrMax = +ath.hr_max || +ath.hrMax || +act.max_hr || 0;
@@ -6149,6 +6220,9 @@ window.__buildAfOverview = function (act) {
   if (act.max_watts) l1.push(st('P max', Math.round(act.max_watts) + 'w'));
   if (ef) l1.push(st('P/FC', ef));
   if (act.cadence) l1.push(st('Cad', Math.round(act.cadence)));
+  if (m.eftp) l1.push(st('eFTP', m.eftp + 'w'));
+  if (m.trimp) l1.push(st('TRIMP', m.trimp));
+  if (m.hrrc) l1.push(st('HRRc', m.hrrc));
 
   var l2 = [];
   l2.push(st('Durée', fmtHMS(durSec)));
@@ -6156,8 +6230,17 @@ window.__buildAfOverview = function (act) {
   if (act.elevation_gain) l2.push(st('D+', Math.round(act.elevation_gain) + 'm'));
   if (act.avg_speed_kmh) l2.push(st('Vit', (+act.avg_speed_kmh).toFixed(1) + 'km/h'));
   if (act.calories) l2.push(st('kcal', Math.round(act.calories)));
+  if (m.cho_g) l2.push(st('CHO', m.cho_g + 'g'));
+
+  var l3 = [];
+  if (m.cp) l3.push(st('CP', m.cp + 'w'));
+  if (m.w_prime) l3.push(st('W\u2032', (m.w_prime / 1000).toFixed(1) + 'kJ'));
+  if (m.pmax) l3.push(st('Pmax', m.pmax + 'w'));
+  if (m.wbal_kj) l3.push(st('W\u2032bal', '-' + m.wbal_kj + 'kJ'));
+  if (m.work_over_ftp_kj) l3.push(st('Travail >FTP', m.work_over_ftp_kj + 'kJ'));
 
   var pills = [];
+  if (m.pol_class) pills.push('<span style="color:var(--purple)">' + m.pol_class + (m.pol_index != null ? ' ' + m.pol_index : '') + '</span>');
   if (ctl != null) pills.push('<span style="color:var(--info)">Condition ' + Math.round(ctl) + '</span>');
   if (atl != null) pills.push('<span style="color:var(--warn)">Fatigue ' + Math.round(atl) + '</span>');
   if (tsb != null) pills.push('<span style="color:' + (tsb >= 0 ? 'var(--accent)' : 'var(--danger)') + '">Forme ' + (tsb >= 0 ? '+' : '') + Math.round(tsb) + '</span>');
@@ -6165,13 +6248,28 @@ window.__buildAfOverview = function (act) {
   var html = '<div class="af-section"><div class="af-h">Aperçu de la séance</div>';
   if (gaugesArr.length) html += '<div style="display:grid;grid-template-columns:repeat(' + gaugesArr.length + ',1fr);gap:16px;margin-bottom:18px">' + gaugesArr.join('') + '</div>';
   if (cardsArr.length) html += '<div style="display:grid;grid-template-columns:repeat(' + cardsArr.length + ',1fr);gap:10px;margin-bottom:16px">' + cardsArr.join('') + '</div>';
-  if (l1.length) html += '<div style="display:flex;flex-wrap:wrap;gap:8px 22px;padding:12px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);font-size:13px">' + l1.join('') + '</div>';
+  if (l1.length) html += '<div style="display:flex;flex-wrap:wrap;gap:8px 22px;padding:12px 0;border-top:1px solid var(--border);font-size:13px">' + l1.join('') + '</div>';
+  if (l3.length) html += '<div style="display:flex;flex-wrap:wrap;gap:8px 22px;padding:12px 0;border-top:1px solid var(--border);font-size:13px"><span style="color:var(--text-mute);font-size:11px;width:100%;margin-bottom:-4px">Puissance avancée</span>' + l3.join('') + '</div>';
   if (l2.length || pills.length) html += '<div style="display:flex;flex-wrap:wrap;gap:8px 22px;padding-top:12px;font-size:13px">' + l2.join('') + (pills.length ? ('<span style="flex:1"></span>' + pills.join('<span style="color:var(--text-mute);margin:0 2px"> </span>')) : '') + '</div>';
   html += '</div>';
   return html;
 };
 window.openFullAnalysis = function () {
   var S = window.__lastStreams;
+  try {
+    var _ath = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete) || {};
+    var _rhr = 0;
+    if (Array.isArray(data)) { for (var _di = 0; _di < data.length; _di++) { if (data[_di].date === window.__lastActDate) { _rhr = +data[_di].rhr || 0; break; } } }
+    window.__lastMetrics = window.__computeActivityMetrics(S, _ath, _rhr);
+    var _sb = window.__lastActSbId;
+    if (_sb && window.__lastMetrics) {
+      var _prev = null;
+      if (Array.isArray(data)) data.forEach(function (dd) { (dd.activities || []).forEach(function (aa) { if (String(aa._sbId) === String(_sb)) { _prev = aa.metrics; aa.metrics = window.__lastMetrics; } }); });
+      if ((!_prev || +_prev._v !== +window.__lastMetrics._v) && window.cloudSync && window.cloudSync.saveActivityMetrics) {
+        try { window.cloudSync.saveActivityMetrics(_sb, window.__lastMetrics); } catch (e) {}
+      }
+    }
+  } catch (e) { console.warn('[metrics]', e && e.message); window.__lastMetrics = {}; }
   var container = document.querySelector('.main .container') || document.querySelector('.container');
   if (!container) return;
   var page = document.getElementById('p-analysis');
@@ -6191,7 +6289,7 @@ window.openFullAnalysis = function () {
     +   '<button class="af-tab" type="button" data-tab="zones">Zones</button>'
     +   '<button class="af-tab" type="button" data-tab="dist">Distribution</button>'
     + '</div>'
-    + '<div class="af-tabc active" id="af-tab-apercu">' + window.__buildAfOverview(window.__lastAct) + '</div>'
+    + '<div class="af-tabc active" id="af-tab-apercu">' + window.__buildAfOverview(window.__lastAct, window.__lastMetrics) + '</div>'
     + '<div class="af-tabc" id="af-tab-courbes"><div id="af-courbes-slot"></div></div>'
     + '<div class="af-tabc" id="af-tab-records"><div class="af-section"><div class="af-h">Courbe de puissance (mean-max)</div><div class="af-chart"><canvas id="af-pcurve"></canvas></div></div><div class="af-section"><div class="af-h" style="display:flex;align-items:center;justify-content:space-between;gap:10px">Records de puissance <button class="af-recalc af-back" type="button" style="margin:0">Recalculer les records</button></div><div id="af-recalc-status" style="font-size:11px;color:var(--text-mute);margin-bottom:8px;display:none"></div><div id="af-records"></div></div></div>'
     + '<div class="af-tabc" id="af-tab-zones"><div class="af-grid2"><div class="af-section"><div class="af-h">Temps par zone \u2014 Puissance</div><div class="af-chart"><canvas id="af-zpow"></canvas></div></div><div class="af-section"><div class="af-h">Temps par zone \u2014 FC</div><div class="af-chart"><canvas id="af-zhr"></canvas></div></div></div></div>'

@@ -534,6 +534,15 @@ export async function savePowerCurve(sbId, curve) {
   } catch (e) { console.warn('[power curve]', e.message); }
 }
 
+export async function saveActivityMetrics(sbId, metrics) {
+  if (readOnly()) return;
+  if (!isAuthed()) return;
+  if (!sbId || !metrics) return;
+  try {
+    await window.sb.from('activities').update({ metrics: metrics }).eq('id', sbId).eq('user_id', uid());
+  } catch (e) { console.warn('[activity metrics]', e.message); }
+}
+
 export async function linkActivityPlanned(sbId, plannedId) {
   if (readOnly()) return;
   if (!isAuthed()) return;
@@ -570,7 +579,7 @@ window.cloudSync = {
   pushTemplate, deleteTemplate,
   pushCompetition, deleteCompetition, pushCompetitionRegistry, deleteCompetitionByActivity,
   pushTraining, deleteTraining,
-  linkActivityPlanned, savePowerCurve,
+  linkActivityPlanned, savePowerCurve, saveActivityMetrics,
   pushRestDay,
   pullAllFromCloud,
 };

@@ -122,7 +122,7 @@ const ACTIVITY_LIGHT_COLS = [
   'category', 'source', 'client_id', 'user_notes',
   'priority', 'target', 'course_dplus', 'laps', 'gpx_name', 'stages', 'event',
   'rpe', 'structure', 'type', 'excl_power', 'excl_hr', 'excl_distance',
-  'planned_id', 'power_curve',
+  'planned_id', 'power_curve', 'metrics',
 ].join(',');
 
 // Colonnes "safe" de strava_connections : SURTOUT PAS les tokens.
@@ -345,6 +345,7 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
       _sbId: a.id,                          // uuid (pour update/delete des manuelles)
       planned_id: a.planned_id || null,    // lien vers la seance prevue rapprochee ('none' = delie)
       power_curve: a.power_curve || null,  // best W par duree (records)
+      metrics: a.metrics || null,          // metriques avancees calculees (TRIMP, eFTP, W', CHO...)
       source: a.source || 'strava',
       _manual: (a.source === 'manual'),
       _manualId: a.client_id || String(a.id),
