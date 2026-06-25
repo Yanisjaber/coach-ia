@@ -3103,12 +3103,6 @@ function openTrainModal(mode) {
   const s = document.getElementById('train-modal-sport');
   if (s) s.value = 'Ride';
   if (s && s._customUpdate) s._customUpdate();
-  // Enhance le select Type aussi
-  if (typeof enhanceSelect === 'function') enhanceSelect('train-modal-type');
-  const tt = document.getElementById('train-modal-type');
-  if (tt && tt._customUpdate) tt._customUpdate();
-  const t = document.getElementById('train-modal-type');
-  if (t) t.value = 'endurance';
   // Date par défaut : aujourd'hui pour réalisé, demain pour prévu
   const dateInput = document.getElementById('train-modal-date');
   if (dateInput) {
@@ -3257,7 +3251,7 @@ function saveTrainFromModal() {
   }
   const time = (document.getElementById('train-modal-time') || {}).value || '';
   const sport = document.getElementById('train-modal-sport').value;
-  const type = document.getElementById('train-modal-type').value;
+  const type = (document.getElementById('train-modal-type') || {}).value || '';
   const duration = parseInt(document.getElementById('train-modal-duration').value, 10) || 0;
   const tss = parseInt(document.getElementById('train-modal-tss').value, 10) || 0;
   const notes = document.getElementById('train-modal-notes').value.trim();
