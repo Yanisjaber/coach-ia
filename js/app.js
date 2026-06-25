@@ -6193,12 +6193,14 @@ var __PC_DURS = (function () {
   for (s = 10800; s <= 28800; s += 1800) d.push(s); // 3h et + (tous les 30 min, jusqu'a 8h)
   return d;
 })();
+var __PC_VERSION = 2;   // bumper quand le jeu de durees change -> force le recalcul
 window.__powerCurveFromWatts = function (watts) {
   if (!watts || !watts.length) return null;
   var n = watts.length, pref = new Float64Array(n + 1);
   for (var i = 0; i < n; i++) { var w = watts[i]; pref[i + 1] = pref[i] + ((w == null || isNaN(w)) ? 0 : +w); }
   var out = {};
   __PC_DURS.forEach(function (d) { if (d > n) return; var best = 0; for (var s = 0; s + d <= n; s++) { var avg = (pref[s + d] - pref[s]) / d; if (avg > best) best = avg; } out[d] = Math.round(best); });
+  out._v = __PC_VERSION;
   return out;
 };
 // toutes les courbes connues, regroupees par duree -> pour le rang
@@ -6207,7 +6209,7 @@ window.__allPowerCurvesByDur = function (cutoffIso) {
   if (Array.isArray(data)) data.forEach(function (dd) {
     var diso = (typeof toIsoDate === 'function') ? toIsoDate(dd.date) : null;
     if (cutoffIso && diso && diso > cutoffIso) return;   // sorties POSTERIEURES ignorees (rang fige a la date)
-    (dd.activities || []).forEach(function (a) { var pc = a && a.power_curve; if (!pc) return; for (var k in pc) { var v = +pc[k]; if (!isNaN(v)) { (m[k] = m[k] || []).push(v); } } });
+    (dd.activities || []).forEach(function (a) { var pc = a && a.power_curve; if (!pc) return; for (var k in pc) { if (k === '_v') continue; var v = +pc[k]; if (!isNaN(v)) { (m[k] = m[k] || []).push(v); } } });
   });
   return m;
 };
@@ -6218,8 +6220,8 @@ window.recalcAllPowerCurves = async function (onProgress) {
   var total = list.length, done = 0, ok = 0;
   for (var i = 0; i < list.length; i++) {
     var a = list[i];
+    if (a.power_curve && +a.power_curve._v === __PC_VERSION) { ok++; done++; if (onProgress) onProgress(done, total, ok); continue; }
     try {
-      // Recompute TOUJOURS (force) : sinon les sorties deja calculees gardent un ancien jeu de durees.
       var streams = (typeof loadStreams === 'function') ? await loadStreams(a.id || a.activityId) : null;
       var watts = streams ? (Array.isArray(streams) ? ((streams.find(function (x) { return x && x.type === 'watts'; }) || {}).data) : streams.watts) : null;
       if (watts && watts.length) {
