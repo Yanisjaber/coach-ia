@@ -226,3 +226,6 @@
 .workout-block .workout-reps-input {
   width: 50px !important;
 }
+
+/* Ancien bloc remplace par l'editeur #sb-root (session-builder.js) — jamais affiche */
+.workout-structure-block { display: none !important; }
