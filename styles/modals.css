@@ -986,3 +986,7 @@
 @media (max-width: 760px) {
   .af-overview-grid { grid-template-columns: 1fr !important; }
 }
+
+/* Aperçu affiché en permanence au-dessus des onglets de l'analyse */
+#p-analysis .af-overview-wrap { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+#p-analysis .af-overview-wrap .af-section { margin-bottom: 0; }

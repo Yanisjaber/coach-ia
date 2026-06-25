@@ -6306,15 +6306,14 @@ window.openFullAnalysis = function () {
   // structure : Retour + onglets internes + contenus
   page.innerHTML =
     '<div class="af-head"><button class="af-back" type="button">\u2190 Retour</button></div>'
+    + '<div class="af-overview-wrap">' + window.__buildAfOverview(window.__lastAct, window.__lastMetrics) + '</div>'
     + '<div class="af-tabbar">'
-    +   '<button class="af-tab active" type="button" data-tab="apercu">Aperçu</button>'
-    +   '<button class="af-tab" type="button" data-tab="courbes">Courbes</button>'
+    +   '<button class="af-tab active" type="button" data-tab="courbes">Courbes</button>'
     +   '<button class="af-tab" type="button" data-tab="records">Records</button>'
     +   '<button class="af-tab" type="button" data-tab="zones">Zones</button>'
     +   '<button class="af-tab" type="button" data-tab="dist">Distribution</button>'
     + '</div>'
-    + '<div class="af-tabc active" id="af-tab-apercu">' + window.__buildAfOverview(window.__lastAct, window.__lastMetrics) + '</div>'
-    + '<div class="af-tabc" id="af-tab-courbes"><div id="af-courbes-slot"></div></div>'
+    + '<div class="af-tabc active" id="af-tab-courbes"><div id="af-courbes-slot"></div></div>'
     + '<div class="af-tabc" id="af-tab-records"><div class="af-section"><div class="af-h">Courbe de puissance (mean-max)</div><div class="af-chart"><canvas id="af-pcurve"></canvas></div></div><div class="af-section"><div class="af-h" style="display:flex;align-items:center;justify-content:space-between;gap:10px">Records de puissance <button class="af-recalc af-back" type="button" style="margin:0">Recalculer les records</button></div><div id="af-recalc-status" style="font-size:11px;color:var(--text-mute);margin-bottom:8px;display:none"></div><div id="af-records"></div></div></div>'
     + '<div class="af-tabc" id="af-tab-zones"><div class="af-grid2"><div class="af-section"><div class="af-h">Temps par zone \u2014 Puissance</div><div class="af-chart"><canvas id="af-zpow"></canvas></div></div><div class="af-section"><div class="af-h">Temps par zone \u2014 FC</div><div class="af-chart"><canvas id="af-zhr"></canvas></div></div></div></div>'
     + '<div class="af-tabc" id="af-tab-dist"><div class="af-section"><div class="af-h">Distribution de puissance</div><div class="af-chart"><canvas id="af-dist"></canvas></div></div></div>';
