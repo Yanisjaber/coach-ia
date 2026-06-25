@@ -828,6 +828,8 @@
     min-width: 0; /* permet la troncature dans les flex-children comme le file-picker */
   }
   .form-field.form-col-2 { grid-column: 1 / -1; }
+  /* .form-field a display:flex -> l'attribut hidden ne suffit pas, on force */
+  .form-field[hidden] { display: none !important; }
   .form-field > span {
     font-size: 11px;
     color: var(--text-dim);
