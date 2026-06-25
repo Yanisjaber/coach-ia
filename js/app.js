@@ -6219,23 +6219,36 @@ window.__buildAfOverview = function (act, m) {
   var row = function (label, val) { return '<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text-dim)">' + label + '</span><span style="font-weight:600;text-align:right">' + val + '</span></div>'; };
   var mkCard = function (title, col, rows) { if (!rows.length) return ''; return '<div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:12px;font-weight:600;margin-bottom:8px;color:' + col + '">' + title + '</div><div style="font-size:13px;line-height:2.05">' + rows.join('') + '</div></div>'; };
 
-  // ---- Groupe 1 : charge + intensite ----
+  // ---- Header : Retour + identite (gauche) + score cle (droite) ----
   var heroVal = tss ? Math.round(tss) : (np ? Math.round(np) : '–');
   var heroLab = tss ? 'Charge (TSS)' : 'Puiss. norm.';
-  var g1 = '<div style="display:flex;align-items:baseline;gap:7px;margin-bottom:9px"><span style="font-size:27px;font-weight:700;line-height:1">' + heroVal + '</span><span style="font-size:11px;color:var(--text-dim)">' + heroLab + '</span></div>';
-  var npt = [];
-  if (np) npt.push(row('NP', Math.round(np) + ' w'));
-  if (act.kj) npt.push(row('Travail', Math.round(act.kj) + ' kJ'));
-  if (npt.length) g1 += '<div style="font-size:13px;line-height:2.05">' + npt.join('') + '</div>';
-  var gs = [];
-  if (ifPct) gs.push(gauge('Intensité (IF)', ifPct + '%', ifPct, 'var(--warn)'));
-  if (fcMaxPct) gs.push(gauge('FC max', fcMaxPct + '%', fcMaxPct, 'var(--danger)'));
-  if (vi) gs.push(gauge('Variabilité', vi.toFixed(2), (vi - 1) * 200, 'var(--info)'));
-  if (gs.length) g1 += '<div style="display:flex;flex-direction:column;gap:8px;margin-top:9px">' + gs.join('') + '</div>';
-  if (m.pol_class) g1 += '<div style="display:inline-block;margin-top:10px;background:rgba(167,139,250,.15);color:var(--purple);border-radius:7px;padding:4px 10px;font-size:11px;font-weight:600">' + m.pol_class + (m.pol_index != null ? ' · ' + m.pol_index : '') + '</div>';
+  var _iso = window.__lastActDate || (act.start_date_local ? String(act.start_date_local).slice(0, 10) : '');
+  var _nm = (act.name || 'Activité').replace(/</g, '&lt;');
+  var _when = '';
+  try {
+    if (_iso) _when = new Date(_iso + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    var _hm = (act.start_date_local && String(act.start_date_local).length >= 16) ? String(act.start_date_local).slice(11, 16) : '';
+    if (_hm) _when += ' · ' + _hm;
+  } catch (e9) {}
 
-  // ---- Groupes detail ----
+  var hg = [];
+  if (ifPct) hg.push('<div style="width:148px">' + gauge('Intensité (IF)', ifPct + '%', ifPct, 'var(--warn)') + '</div>');
+  if (fcMaxPct) hg.push('<div style="width:148px">' + gauge('FC max', fcMaxPct + '%', fcMaxPct, 'var(--danger)') + '</div>');
+  if (vi) hg.push('<div style="width:148px">' + gauge('Variabilité', vi.toFixed(2), (vi - 1) * 200, 'var(--info)') + '</div>');
+
+  var header = '<div class="af-topbar">'
+    + '<button class="af-back" type="button">← Retour</button>'
+    + '<div class="af-id"><div class="af-id-name">' + _nm + '</div>' + (_when ? '<div class="af-id-sub">' + _when + '</div>' : '') + '</div>'
+    + '<div class="af-headline">'
+    +   '<div class="af-score"><span class="af-score-v">' + heroVal + '</span><span class="af-score-l">' + heroLab + '</span></div>'
+    +   (hg.length ? '<div class="af-hgauges">' + hg.join('') + '</div>' : '')
+    +   (m.pol_class ? '<div class="af-class">' + m.pol_class + (m.pol_index != null ? ' · ' + m.pol_index : '') + '</div>' : '')
+    + '</div>'
+    + '</div>';
+
+  // ---- Colonnes de detail ----
   var pRows = [];
+  if (np) pRows.push(row('NP', Math.round(np) + ' w'));
   if (act.avg_watts || pmaxW) pRows.push(row('Moy / Max', (act.avg_watts ? Math.round(act.avg_watts) : '–') + ' / ' + (pmaxW ? Math.round(pmaxW) : '–') + ' w'));
   if (m.eftp) pRows.push(row('eFTP', m.eftp + ' w'));
   if (m.cp) pRows.push(row('CP' + (m.w_prime ? " · W'" : ''), m.cp + 'w' + (m.w_prime ? ' · ' + (m.w_prime / 1000).toFixed(1) + 'kJ' : '')));
@@ -6268,7 +6281,6 @@ window.__buildAfOverview = function (act, m) {
   var grp = function (title, col, rows) { if (!rows.length) return ''; return '<div><div style="font-size:11px;font-weight:600;color:' + col + ';margin-bottom:7px;text-transform:uppercase;letter-spacing:.4px">' + title + '</div><div style="font-size:13px;line-height:2.05">' + rows.join('') + '</div></div>'; };
 
   var band = '<div class="af-band">'
-    + '<div style="min-width:205px">' + g1 + '</div>'
     + grp('Puissance', 'var(--warn)', pRows)
     + grp('Cardio', 'var(--danger)', cRows)
     + grp('Volume', 'var(--accent)', vRows)
@@ -6276,7 +6288,7 @@ window.__buildAfOverview = function (act, m) {
     + grp('Forme', 'var(--purple)', fRows)
     + '</div>';
 
-  var html = '<div class="af-section">' + band + '</div>';
+  var html = header + '<div class="af-section">' + band + '</div>';
   return html;
 };
 window.openFullAnalysis = function () {
@@ -6295,16 +6307,6 @@ window.openFullAnalysis = function () {
       }
     }
   } catch (e) { console.warn('[metrics]', e && e.message); window.__lastMetrics = {}; }
-  var _ovA = window.__lastAct || {};
-  var _ovIso = window.__lastActDate || (_ovA.start_date_local ? String(_ovA.start_date_local).slice(0, 10) : '');
-  var _ovName = (_ovA.name || 'Activité').replace(/</g, '&lt;');
-  var _ovWhen = '';
-  try {
-    if (_ovIso) { _ovWhen = new Date(_ovIso + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
-    var _hm = (_ovA.start_date_local && String(_ovA.start_date_local).length >= 16) ? String(_ovA.start_date_local).slice(11, 16) : '';
-    if (_hm) _ovWhen += ' · ' + _hm;
-  } catch (e3) {}
-  window.__ovHeadTitle = '<div class="af-head-title"><div class="af-head-name">' + _ovName + '</div>' + (_ovWhen ? '<div class="af-head-sub">' + _ovWhen + '</div>' : '') + '</div>';
   var container = document.querySelector('.main .container') || document.querySelector('.container');
   if (!container) return;
   var page = document.getElementById('p-analysis');
@@ -6316,8 +6318,7 @@ window.openFullAnalysis = function () {
   var modal = document.getElementById('session-modal'); if (modal) modal.classList.remove('active');
   // structure : Retour + onglets internes + contenus
   page.innerHTML =
-    '<div class="af-head"><button class="af-back" type="button">\u2190 Retour</button>' + (window.__ovHeadTitle || '') + '</div>'
-    + '<div class="af-overview-wrap">' + window.__buildAfOverview(window.__lastAct, window.__lastMetrics) + '</div>'
+    '<div class="af-overview-wrap">' + window.__buildAfOverview(window.__lastAct, window.__lastMetrics) + '</div>'
     + '<div class="af-tabbar">'
     +   '<button class="af-tab active" type="button" data-tab="courbes">Courbes</button>'
     +   '<button class="af-tab" type="button" data-tab="records">Records</button>'

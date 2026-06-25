@@ -934,10 +934,18 @@
 .add-modal-content .modal-header { flex: 0 0 auto; }
 .ad
 /* ===== Page Analyse detaillee (panneau #p-analysis) ===== */
-#p-analysis .af-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
-#p-analysis .af-head-title { display: flex; flex-direction: column; line-height: 1.25; }
-#p-analysis .af-head-name { font-size: 16px; font-weight: 600; color: var(--text); }
-#p-analysis .af-head-sub { font-size: 12px; color: var(--text-dim); text-transform: capitalize; }
+#p-analysis .af-head { margin-bottom: 14px; }
+/* Barre du haut : Retour + identité (gauche) · score clé (droite) */
+#p-analysis .af-topbar { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 22px; }
+#p-analysis .af-id { display: flex; flex-direction: column; line-height: 1.25; }
+#p-analysis .af-id-name { font-size: 17px; font-weight: 600; color: var(--text); }
+#p-analysis .af-id-sub { font-size: 12px; color: var(--text-dim); text-transform: capitalize; }
+#p-analysis .af-headline { margin-left: auto; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+#p-analysis .af-score { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+#p-analysis .af-score-v { font-size: 30px; font-weight: 700; color: var(--text); }
+#p-analysis .af-score-l { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+#p-analysis .af-hgauges { display: flex; gap: 16px; }
+#p-analysis .af-class { background: rgba(167, 139, 250, .15); color: var(--purple); border-radius: 7px; padding: 5px 11px; font-size: 11px; font-weight: 600; }
 #p-analysis .af-tabbar {
   display: flex; gap: 2px; flex-wrap: wrap;
   border-bottom: 1px solid var(--border); margin-bottom: 20px;
@@ -978,18 +986,4 @@
 #p-analysis .af-table th {
   text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .4px;
   color: var(--text-mute); font-weight: 600; padding: 10px 14px;
-  background: var(--bg-elev2); border-bottom: 1px solid var(--border); white-space: nowrap;
-}
-#p-analysis .af-table td { padding: 9px 14px; color: var(--text-dim); border-top: 1px solid var(--border); white-space: nowrap; }
-#p-analysis .af-table tbody tr:hover td { background: rgba(255,255,255,0.03); }
-#p-analysis .af-table td b { color: var(--text); font-weight: 700; }
-#p-analysis .af-table .af-tw { color: var(--text); }
-
-/* Aperçu : rail empilé au-dessus des cartes sur petit écran */
-@media (max-width: 760px) {
-  .af-overview-grid { grid-template-columns: 1fr !important; }
-}
-
-/* Aperçu affiché en permanence au-dessus des onglets de l'analyse */
-#p-analysis .af-overview-wrap { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
-#p-analysis 
+  background: var(--bg-elev2); border-bottom: 1px solid var(--bo
