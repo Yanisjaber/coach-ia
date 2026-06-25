@@ -6272,9 +6272,9 @@ window.__buildAfOverview = function (act, m) {
     + mkCard('Forme', 'var(--purple)', fRows);
 
   var html = '<div class="af-section"><div class="af-h">Aperçu de la séance</div>'
-    + '<div class="af-overview-grid" style="display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:stretch">'
+    + '<div class="af-overview-grid" style="display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:stretch;max-width:1280px">'
     + rail
-    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-content:start">' + cards + '</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:12px;align-content:start">' + cards + '</div>'
     + '</div></div>';
   return html;
 };
