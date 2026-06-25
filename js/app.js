@@ -5174,6 +5174,7 @@ async function renderStreamsSection(container, activityId) {
   let cadence = findStream('cadence');
   const altitude = findStream('altitude');
   const distance = findStream('distance');
+  const time = findStream('time');
 
   // Lissage 3 s (moyenne glissante centrée ±1 s = 3 points) sur Puissance, FC, Cadence
   // Pour adoucir le bruit instantané sans perdre les variations réelles.
@@ -5223,7 +5224,7 @@ async function renderStreamsSection(container, activityId) {
   try {
     var _hrMaxA = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && (+window.DASHBOARD_DATA.athlete.hr_max || +window.DASHBOARD_DATA.athlete.hrMax)) || 190;
     var _ftpA = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && +window.DASHBOARD_DATA.athlete.ftp) || 250;
-    window.__lastStreams = { watts: watts ? watts.slice() : null, hr: hr ? hr.slice() : null, cadence: cadence ? cadence.slice() : null, altitude: altitude ? altitude.slice() : null, distance: distance ? distance.slice() : null, ftp: _ftpA, hrMax: _hrMaxA };
+    window.__lastStreams = { watts: watts ? watts.slice() : null, hr: hr ? hr.slice() : null, cadence: cadence ? cadence.slice() : null, altitude: altitude ? altitude.slice() : null, distance: distance ? distance.slice() : null, time: time ? time.slice() : null, ftp: _ftpA, hrMax: _hrMaxA };
   } catch (e) { }
 
   const length = (watts && watts.length) || (hr && hr.length) || (cadence && cadence.length) || 0;
@@ -6122,7 +6123,7 @@ window.__computeActivityMetrics = function (S, ath, hrRest) {
   var hrMax = +S.hrMax || +ath.hr_max || +ath.hrMax || 190;
   var sex = ath.sex || 'M';
   hrRest = +hrRest || +ath.hr_rest || 50;
-  var m = { _v: 1 };
+  var m = { _v: 2 };
   var n = W.length;
 
   if (n) {
@@ -6192,7 +6193,22 @@ window.__computeActivityMetrics = function (S, ath, hrRest) {
     var hn = HR.length, denom = (hrMax - hrRest) || 1, kk = (sex === 'F') ? 1.67 : 1.92, trimp = 0;
     for (var h1 = 0; h1 < hn; h1++) { var hh = HR[h1]; if (hh == null) continue; var r = (hh - hrRest) / denom; if (r < 0) r = 0; if (r > 1) r = 1; trimp += (1 / 60) * r * 0.64 * Math.exp(kk * r); }
     m.trimp = Math.round(trimp);
-    var drop = 0; for (var h2 = 0; h2 + 60 < hn; h2++) { if (HR[h2] == null || HR[h2 + 60] == null) continue; if (HR[h2] >= 0.85 * hrMax) { var dd = HR[h2] - HR[h2 + 60]; if (dd > drop) drop = dd; } }
+    // HRRc : plus forte chute de FC sur 60 s de TEMPS ECOULE reel (gere les pauses),
+    // mesuree apres un instant a FC haute. Repli sur l'index si pas de flux temps.
+    var drop = 0;
+    var T = S.time;
+    if (T && T.length === hn) {
+      var j = 0;
+      for (var h2 = 0; h2 < hn; h2++) {
+        if (j < h2) j = h2;
+        var target = T[h2] + 60;
+        while (j < hn && T[j] < target) j++;
+        if (j >= hn) break;
+        if (HR[h2] != null && HR[j] != null && HR[h2] >= 0.85 * hrMax) { var d1 = HR[h2] - HR[j]; if (d1 > drop) drop = d1; }
+      }
+    } else {
+      for (var h3 = 0; h3 + 60 < hn; h3++) { if (HR[h3] == null || HR[h3 + 60] == null) continue; if (HR[h3] >= 0.85 * hrMax) { var d2 = HR[h3] - HR[h3 + 60]; if (d2 > drop) drop = d2; } }
+    }
     if (drop > 0) m.hrrc = Math.round(drop);
   }
   return m;
