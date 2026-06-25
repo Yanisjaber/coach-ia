@@ -963,7 +963,14 @@
   flex-direction: column;
 }
 .add-modal-content .modal-header { flex: 0 0 auto; }
-.ad
+.add-modal-content .modal-footer { flex: 0 0 auto; }
+.add-modal-content .add-form-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
 /* ===== Page Analyse detaillee (panneau #p-analysis) ===== */
 #p-analysis .af-head { margin-bottom: 14px; }
 /* Barre du haut : Retour + identité (gauche) · score clé (droite) */
