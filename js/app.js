@@ -6136,6 +6136,20 @@ window.__computeActivityMetrics = function (S, ath, hrRest) {
     var ex = 0; for (var i3 = 0; i3 < n; i3++) { var w1 = +W[i3] || 0; if (w1 > ftp) ex += (w1 - ftp); }
     m.work_over_ftp_kj = Math.round(ex / 100) / 10;
 
+    // NP (moyenne glissante 30s, puissance 4) -> IF -> TSS, calcules nous-memes
+    // (utile quand la source ne fournit pas intensity/tss).
+    if (n >= 30) {
+      var np4 = 0, npc = 0;
+      for (var r = 30; r <= n; r++) { var a30 = (ps[r] - ps[r - 30]) / 30; np4 += a30 * a30 * a30 * a30; npc++; }
+      if (npc) m.np = Math.round(Math.pow(np4 / npc, 0.25));
+    }
+    if (m.np && ftp) { var ifr = m.np / ftp; m.if_pct = Math.round(ifr * 100); m.tss = Math.round(n / 3600 * ifr * ifr * 100); }
+
+    // eFTP / CP / W' / W'bal ne sont fiables que si la sortie contient un effort
+    // assez dur (sinon le modele puissance-duree donne des valeurs absurdes).
+    var hard = (bestAvg(300) >= ftp * 0.86) || (bestAvg(60) >= ftp * 1.15) || (bestAvg(1200) >= ftp * 0.84);
+
+    if (hard) {
     var durs = [120, 180, 240, 300, 420, 600, 720, 900, 1200].filter(function (d) { return d <= n; });
     if (durs.length >= 2) {
       var sx = 0, sy = 0, sxy = 0, sxx = 0, k = durs.length;
@@ -6156,7 +6170,8 @@ window.__computeActivityMetrics = function (S, ath, hrRest) {
       var dcp = bN ? (cp - bSum / bN) : 0; var tau = 546 * Math.exp(-0.01 * dcp) + 316;
       var bal = wp, minb = wp, rec = 1 - Math.exp(-1 / tau);
       for (var b2 = 0; b2 < n; b2++) { var w3 = +W[b2] || 0; if (w3 > cp) bal -= (w3 - cp); else bal += (wp - bal) * rec; if (bal > wp) bal = wp; if (bal < minb) minb = bal; }
-      m.wbal_kj = Math.round((wp - minb) / 100) / 10;
+      m.wbal_kj = Math.round(Math.min(wp, wp - minb) / 100) / 10;   // deplete <= W'
+    }
     }
 
     var GE_carb = 0, choMech = 0;
@@ -6190,7 +6205,7 @@ window.__buildAfOverview = function (act, m) {
   var durMin = act.duration || (act.moving_time ? Math.round(act.moving_time / 60) : 0);
   var durSec = act.moving_time || act.elapsed_time || (durMin * 60);
   var fmtHMS = function (s) { s = Math.round(s); var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; var p = function (n) { return n < 10 ? '0' + n : '' + n; }; return h ? (h + ':' + p(m) + ':' + p(x)) : (m + ':' + p(x)); };
-  var ifPct = act.ftpPct || (act.intensity ? Math.round(act.intensity * 100) : 0);
+  var ifPct = act.ftpPct || (act.intensity ? Math.round(act.intensity * 100) : 0) || m.if_pct || 0;
   var vi = act.variability_index ? +act.variability_index : 0;
   var srpe = (act.rpe && durMin) ? Math.round(act.rpe * durMin) : 0;
   var ef = (act.np && act.hr) ? (act.np / act.hr).toFixed(2) : null;
@@ -6210,7 +6225,8 @@ window.__buildAfOverview = function (act, m) {
 
   var cardsArr = [];
   if (act.np) cardsArr.push(card(Math.round(act.np) + '<span style="font-size:13px">w</span>', 'Puiss. norm.'));
-  if (act.tss) cardsArr.push(card(Math.round(act.tss), 'Charge (TSS)'));
+  var _tss = act.tss || m.tss || 0;
+  if (_tss) cardsArr.push(card(Math.round(_tss), 'Charge (TSS)'));
   if (srpe) cardsArr.push(card(srpe, 'S-RPE' + (act.rpe ? ' (RPE ' + act.rpe + ')' : '')));
   if (act.kj) cardsArr.push(card(Math.round(act.kj) + '<span style="font-size:13px">kJ</span>', 'Travail'));
 
