@@ -6204,12 +6204,18 @@ window.__powerCurveFromWatts = function (watts) {
   return out;
 };
 // toutes les courbes connues, regroupees par duree -> pour le rang
-window.__allPowerCurvesByDur = function (cutoffIso) {
+window.__allPowerCurvesByDur = function (cutoffIso, sportCat) {
   var m = {};
+  var catOf = function (x) { return (typeof getSportCategory === 'function') ? getSportCategory(x) : x; };
   if (Array.isArray(data)) data.forEach(function (dd) {
     var diso = (typeof toIsoDate === 'function') ? toIsoDate(dd.date) : null;
     if (cutoffIso && diso && diso > cutoffIso) return;   // sorties POSTERIEURES ignorees (rang fige a la date)
-    (dd.activities || []).forEach(function (a) { var pc = a && a.power_curve; if (!pc) return; for (var k in pc) { if (k === '_v') continue; var v = +pc[k]; if (!isNaN(v)) { (m[k] = m[k] || []).push(v); } } });
+    (dd.activities || []).forEach(function (a) {
+      if (!a || a._exclPower) return;                                          // masquee des records
+      if (sportCat && catOf(a.raw_type || a.sport) !== sportCat) return;       // autre sport
+      var pc = a.power_curve; if (!pc) return;
+      for (var k in pc) { if (k === '_v') continue; var v = +pc[k]; if (!isNaN(v)) { (m[k] = m[k] || []).push(v); } }
+    });
   });
   return m;
 };
@@ -6246,7 +6252,7 @@ function _buildRecordsTable(S) {
     if (Array.isArray(data)) data.forEach(function (dd) { (dd.activities || []).forEach(function (a) { if (String(a._sbId) === String(window.__lastActSbId)) a.power_curve = curCurve; }); });
     if (window.cloudSync && window.cloudSync.savePowerCurve) { try { window.cloudSync.savePowerCurve(window.__lastActSbId, curCurve); } catch (e) {} }
   }
-  var byDur = (typeof window.__allPowerCurvesByDur === 'function') ? window.__allPowerCurvesByDur(window.__lastActDate) : {};
+  var byDur = (typeof window.__allPowerCurvesByDur === 'function') ? window.__allPowerCurvesByDur(window.__lastActDate, window.__lastActSport) : {};
   var distMax = 0; for (var di = 0; di < DIST.length; di++) { var dv = DIST[di]; if (dv != null && dv > distMax) distMax = dv; }
   var toM = distMax > 1000 ? 1 : 1000;
   var distAt = function (idx) { var x = DIST[Math.min(idx, DIST.length - 1)]; return (x == null ? 0 : x) * toM; };
@@ -6315,7 +6321,7 @@ function _buildAfCharts(S) {
     var fmtSec = function (t) { t = Math.round(t); return t < 60 ? (t + 's') : (t < 3600 ? (Math.round(t / 60) + 'min') : ((Math.round(t / 360) / 10) + 'h')); };
     var pts = durs.map(function (x) { return { x: TX(x), y: Math.round(bestWin(x).avg) }; });
     // Record all-time (envelope des meilleures perfs <= date) par duree standard
-    var byDur = (typeof window.__allPowerCurvesByDur === 'function') ? window.__allPowerCurvesByDur(window.__lastActDate) : {};
+    var byDur = (typeof window.__allPowerCurvesByDur === 'function') ? window.__allPowerCurvesByDur(window.__lastActDate, window.__lastActSport) : {};
     var recPts = [];
     __PC_DURS.forEach(function (d2) { if (d2 > n) return; var arr = byDur[d2]; if (!arr || !arr.length) return; var mx = 0; for (var z = 0; z < arr.length; z++) if (arr[z] > mx) mx = arr[z]; recPts.push({ x: TX(d2), y: Math.round(mx) }); });
     var tickT = [1, 5, 10, 30, 60, 300, 1200, 3600, 9000, 18000].filter(function (t) { return t <= n; });
@@ -8727,6 +8733,7 @@ function openSessionModal(iso, source) {
           const streamId = act.id || act.activityId || day.activityId;
           window.__lastActSbId = act._sbId || null;
           window.__lastActDate = iso;
+          window.__lastActSport = (typeof getSportCategory === 'function') ? getSportCategory(act.raw_type || act.sport) : null;
           if (streamId) renderStreamsSection(_streamsEl, streamId);
           else _streamsEl.innerHTML = '<div class="modal-placeholder">Pas d\'ID activité disponible pour cette séance.</div>';
         }
