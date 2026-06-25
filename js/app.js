@@ -6310,17 +6310,28 @@ function _buildAfCharts(S) {
     for (d = 1260; d <= 3600; d += 60) durs.push(d);
     for (d = 3900; d <= n; d += 300) durs.push(d);
     durs = durs.filter(function (x) { return x <= n; });
-    var pts = durs.map(function (x) { return { x: x, y: Math.round(bestWin(x).avg) }; });
-    var fmtSec = function (s) { return s < 60 ? (s + 's') : (s < 3600 ? (Math.round(s / 60) + 'min') : ((Math.round(s / 360) / 10) + 'h')); };
+    // Echelle X compressee (donne moins de place aux courtes durees qu'un log pur)
+    var PW = 0.32, TX = function (t) { return Math.pow(t, PW); }, iTX = function (v) { return Math.pow(v, 1 / PW); };
+    var fmtSec = function (t) { t = Math.round(t); return t < 60 ? (t + 's') : (t < 3600 ? (Math.round(t / 60) + 'min') : ((Math.round(t / 360) / 10) + 'h')); };
+    var pts = durs.map(function (x) { return { x: TX(x), y: Math.round(bestWin(x).avg) }; });
+    // Record all-time (envelope des meilleures perfs <= date) par duree standard
+    var byDur = (typeof window.__allPowerCurvesByDur === 'function') ? window.__allPowerCurvesByDur(window.__lastActDate) : {};
+    var recPts = [];
+    __PC_DURS.forEach(function (d2) { if (d2 > n) return; var arr = byDur[d2]; if (!arr || !arr.length) return; var mx = 0; for (var z = 0; z < arr.length; z++) if (arr[z] > mx) mx = arr[z]; recPts.push({ x: TX(d2), y: Math.round(mx) }); });
+    var tickT = [1, 5, 10, 30, 60, 300, 1200, 3600, 9000, 18000].filter(function (t) { return t <= n; });
     window.__afCharts.push(new Chart(document.getElementById('af-pcurve'), {
       type: 'line',
-      data: { datasets: [{ data: pts, borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,.15)', fill: true, tension: 0.2, pointRadius: 0, borderWidth: 2 }] },
+      data: { datasets: [
+        { label: 'Record', data: recPts, borderColor: '#7c8698', borderDash: [5, 4], borderWidth: 2, pointRadius: 0, fill: false, tension: 0.2 },
+        { label: 'Cette sortie', data: pts, borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,.15)', fill: true, tension: 0.2, pointRadius: 0, borderWidth: 2.5 }
+      ] },
       options: opts({
+        interaction: { mode: 'nearest', intersect: false, axis: 'x' },
         scales: {
-          x: { type: 'logarithmic', min: 1, max: n, grid: { color: grid }, ticks: { color: tick, font: { size: 10 }, callback: function (v) { return fmtSec(v); } } },
+          x: { type: 'linear', min: TX(1), max: TX(n), grid: { color: grid }, afterBuildTicks: function (ax) { ax.ticks = tickT.map(function (t) { return { value: TX(t) }; }); }, ticks: { color: tick, font: { size: 10 }, autoSkip: false, callback: function (v) { return fmtSec(iTX(v)); } } },
           y: { grid: { color: grid }, ticks: { color: tick, font: { size: 10 } }, beginAtZero: true }
         },
-        plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (c) { return fmtSec(c[0].parsed.x); }, label: function (c) { return c.parsed.y + ' W'; } } } }
+        plugins: { legend: { display: true, labels: { color: tick, boxWidth: 14, font: { size: 11 } } }, tooltip: { callbacks: { title: function (c) { return fmtSec(iTX(c[0].parsed.x)); }, label: function (c) { return c.dataset.label + ' : ' + c.parsed.y + ' W'; } } } }
       })
     }));
     try { var _rt = document.getElementById('af-records'); if (_rt) _rt.innerHTML = _buildRecordsTable(S); } catch (e) { console.warn('[records]', e && e.message); }
