@@ -6251,6 +6251,7 @@ window.__buildAfOverview = function (act, m) {
   var pRows = [];
   if (np) pRows.push(row('NP', Math.round(np) + ' w'));
   if (act.avg_watts || pmaxW) pRows.push(row('Moy / Max', (act.avg_watts ? Math.round(act.avg_watts) : '–') + ' / ' + (pmaxW ? Math.round(pmaxW) : '–') + ' w'));
+  if (act.cadence) pRows.push(row('Cadence', Math.round(act.cadence) + ' rpm'));
   if (m.eftp) pRows.push(row('eFTP', m.eftp + ' w'));
   if (m.cp) pRows.push(row('CP' + (m.w_prime ? " · W'" : ''), m.cp + 'w' + (m.w_prime ? ' · ' + (m.w_prime / 1000).toFixed(1) + 'kJ' : '')));
   if (m.wbal_kj) pRows.push(row("W'bal (baisse)", '-' + m.wbal_kj + ' kJ'));
@@ -6267,7 +6268,6 @@ window.__buildAfOverview = function (act, m) {
   if (act.distance_km) vRows.push(row('Distance', (+act.distance_km).toFixed(1) + ' km'));
   if (act.elevation_gain) vRows.push(row('Dénivelé+', Math.round(act.elevation_gain) + ' m'));
   if (act.avg_speed_kmh) vRows.push(row('Vitesse moy', (+act.avg_speed_kmh).toFixed(1) + ' km/h'));
-  if (act.cadence) vRows.push(row('Cadence', Math.round(act.cadence)));
 
   var eRows = [];
   if (act.kj) eRows.push(row('Travail', Math.round(act.kj) + ' kJ'));
