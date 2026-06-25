@@ -6231,19 +6231,20 @@ window.__buildAfOverview = function (act, m) {
     if (_hm) _when += ' · ' + _hm;
   } catch (e9) {}
 
-  var hg = [];
-  if (ifPct) hg.push('<div style="width:148px">' + gauge('Intensité (IF)', ifPct + '%', ifPct, 'var(--warn)') + '</div>');
-  if (fcMaxPct) hg.push('<div style="width:148px">' + gauge('FC max', fcMaxPct + '%', fcMaxPct, 'var(--danger)') + '</div>');
-  if (vi) hg.push('<div style="width:148px">' + gauge('Variabilité', vi.toFixed(2), (vi - 1) * 200, 'var(--info)') + '</div>');
+  var cg = [];
+  if (ifPct) cg.push(gauge('Intensité (IF)', ifPct + '%', ifPct, 'var(--warn)'));
+  if (fcMaxPct) cg.push(gauge('FC max', fcMaxPct + '%', fcMaxPct, 'var(--danger)'));
+  if (vi) cg.push(gauge('Variabilité', vi.toFixed(2), (vi - 1) * 200, 'var(--info)'));
 
   var header = '<div class="af-topbar">'
     + '<button class="af-back" type="button">← Retour</button>'
     + '<div class="af-id"><div class="af-id-name">' + _nm + '</div>' + (_when ? '<div class="af-id-sub">' + _when + '</div>' : '') + '</div>'
-    + '<div class="af-headline">'
-    +   '<div class="af-score"><span class="af-score-v">' + heroVal + '</span><span class="af-score-l">' + heroLab + '</span></div>'
-    +   (hg.length ? '<div class="af-hgauges">' + hg.join('') + '</div>' : '')
-    +   (m.pol_class ? '<div class="af-class">' + m.pol_class + (m.pol_index != null ? ' · ' + m.pol_index : '') + '</div>' : '')
-    + '</div>'
+    + '</div>';
+
+  var chargeCol = '<div style="min-width:200px">'
+    + '<div style="display:flex;align-items:baseline;gap:7px;margin-bottom:9px"><span style="font-size:27px;font-weight:700;line-height:1">' + heroVal + '</span><span style="font-size:11px;color:var(--text-dim)">' + heroLab + '</span></div>'
+    + (cg.length ? '<div style="display:flex;flex-direction:column;gap:8px">' + cg.join('') + '</div>' : '')
+    + (m.pol_class ? '<div style="display:inline-block;margin-top:10px;background:rgba(167,139,250,.15);color:var(--purple);border-radius:7px;padding:4px 10px;font-size:11px;font-weight:600">' + m.pol_class + (m.pol_index != null ? ' · ' + m.pol_index : '') + '</div>' : '')
     + '</div>';
 
   // ---- Colonnes de detail ----
@@ -6281,6 +6282,7 @@ window.__buildAfOverview = function (act, m) {
   var grp = function (title, col, rows) { if (!rows.length) return ''; return '<div><div style="font-size:11px;font-weight:600;color:' + col + ';margin-bottom:7px;text-transform:uppercase;letter-spacing:.4px">' + title + '</div><div style="font-size:13px;line-height:2.05">' + rows.join('') + '</div></div>'; };
 
   var band = '<div class="af-band">'
+    + chargeCol
     + grp('Puissance', 'var(--warn)', pRows)
     + grp('Cardio', 'var(--danger)', cRows)
     + grp('Volume', 'var(--accent)', vRows)
