@@ -981,3 +981,8 @@
 #p-analysis .af-table tbody tr:hover td { background: rgba(255,255,255,0.03); }
 #p-analysis .af-table td b { color: var(--text); font-weight: 700; }
 #p-analysis .af-table .af-tw { color: var(--text); }
+
+/* Aperçu : rail empilé au-dessus des cartes sur petit écran */
+@media (max-width: 760px) {
+  .af-overview-grid { grid-template-columns: 1fr !important; }
+}

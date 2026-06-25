@@ -6204,70 +6204,78 @@ window.__buildAfOverview = function (act, m) {
   var hrMax = +ath.hr_max || +ath.hrMax || +act.max_hr || 0;
   var durMin = act.duration || (act.moving_time ? Math.round(act.moving_time / 60) : 0);
   var durSec = act.moving_time || act.elapsed_time || (durMin * 60);
-  var fmtHMS = function (s) { s = Math.round(s); var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; var p = function (n) { return n < 10 ? '0' + n : '' + n; }; return h ? (h + ':' + p(m) + ':' + p(x)) : (m + ':' + p(x)); };
+  var fmtHMS = function (s) { s = Math.round(s); var h = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), x = s % 60; var p = function (n) { return n < 10 ? '0' + n : '' + n; }; return h ? (h + ':' + p(mm) + ':' + p(x)) : (mm + ':' + p(x)); };
   var ifPct = act.ftpPct || (act.intensity ? Math.round(act.intensity * 100) : 0) || m.if_pct || 0;
   var vi = act.variability_index ? +act.variability_index : 0;
-  var srpe = (act.rpe && durMin) ? Math.round(act.rpe * durMin) : 0;
-  var ef = (act.np && act.hr) ? (act.np / act.hr).toFixed(2) : null;
-  var fcMoyPct = (act.hr && hrMax) ? Math.round(act.hr / hrMax * 100) : null;
+  var ef = (act.np && act.hr) ? (act.np / act.hr).toFixed(2) : ((m.np && act.hr) ? (m.np / act.hr).toFixed(2) : null);
   var fcMaxPct = (act.max_hr && hrMax) ? Math.round(act.max_hr / hrMax * 100) : null;
+  var np = act.np || m.np || 0;
+  var tss = act.tss || m.tss || 0;
+  var pmaxW = act.max_watts || m.pmax || 0;
   var ctl = null, atl = null, tsb = null;
   if (Array.isArray(data)) { for (var i = 0; i < data.length; i++) { if (data[i].date === window.__lastActDate) { ctl = data[i].ctl; atl = data[i].atl; tsb = data[i].tsb; break; } } }
 
-  var gauge = function (label, valTxt, w, col) { return '<div style="margin-bottom:2px"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-dim);margin-bottom:5px"><span>' + label + '</span><span style="color:var(--text);font-weight:600">' + valTxt + '</span></div><div style="height:8px;background:var(--bg-elev2);border-radius:99px;overflow:hidden"><div style="width:' + Math.max(0, Math.min(100, w)) + '%;height:100%;background:' + col + '"></div></div></div>'; };
-  var card = function (val, label) { return '<div style="background:var(--bg-elev2);border-radius:10px;padding:12px 8px;text-align:center"><div style="font-size:23px;font-weight:700;line-height:1.1">' + val + '</div><div style="font-size:11px;color:var(--text-dim);margin-top:3px">' + label + '</div></div>'; };
-  var st = function (label, val) { return '<span><span style="color:var(--text-dim)">' + label + ' </span><b style="font-weight:600">' + val + '</b></span>'; };
+  var gauge = function (label, valTxt, w, col) { return '<div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-dim);margin-bottom:4px"><span>' + label + '</span><span style="color:var(--text);font-weight:600">' + valTxt + '</span></div><div style="height:6px;background:var(--bg-elev2);border-radius:99px;overflow:hidden"><div style="width:' + Math.max(0, Math.min(100, w)) + '%;height:100%;background:' + col + '"></div></div></div>'; };
+  var row = function (label, val) { return '<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text-dim)">' + label + '</span><span style="font-weight:600;text-align:right">' + val + '</span></div>'; };
+  var mkCard = function (title, col, rows) { if (!rows.length) return ''; return '<div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:12px;font-weight:600;margin-bottom:8px;color:' + col + '">' + title + '</div><div style="font-size:13px;line-height:2.05">' + rows.join('') + '</div></div>'; };
 
-  var gaugesArr = [];
-  if (ifPct) gaugesArr.push(gauge('Intensité (IF)', ifPct + '%', ifPct, 'var(--warn)'));
-  if (fcMaxPct) gaugesArr.push(gauge('FC max', fcMaxPct + '%', fcMaxPct, 'var(--danger)'));
-  if (vi) gaugesArr.push(gauge('Variabilité', vi.toFixed(2), (vi - 1) * 200, 'var(--info)'));
+  // ---- Rail gauche : chiffre cle + NP/Travail + jauges + classe ----
+  var heroVal = tss ? Math.round(tss) : (np ? Math.round(np) : '–');
+  var heroLab = tss ? 'Charge (TSS)' : 'Puiss. norm.';
+  var rail = '<div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px">';
+  rail += '<div style="text-align:center"><div style="font-size:30px;font-weight:700;line-height:1">' + heroVal + '</div><div style="font-size:11px;color:var(--text-dim);margin-top:2px">' + heroLab + '</div></div>';
+  var smalls = [];
+  if (np) smalls.push('<div style="text-align:center"><div style="font-size:17px;font-weight:600">' + Math.round(np) + 'w</div><div style="font-size:10px;color:var(--text-dim)">NP</div></div>');
+  if (act.kj) smalls.push('<div style="text-align:center"><div style="font-size:17px;font-weight:600">' + Math.round(act.kj) + 'kJ</div><div style="font-size:10px;color:var(--text-dim)">Travail</div></div>');
+  if (smalls.length) rail += '<div style="height:1px;background:var(--border)"></div><div style="display:flex;justify-content:space-around">' + smalls.join('') + '</div>';
+  var gs = [];
+  if (ifPct) gs.push(gauge('Intensité (IF)', ifPct + '%', ifPct, 'var(--warn)'));
+  if (fcMaxPct) gs.push(gauge('FC max', fcMaxPct + '%', fcMaxPct, 'var(--danger)'));
+  if (vi) gs.push(gauge('Variabilité', vi.toFixed(2), (vi - 1) * 200, 'var(--info)'));
+  if (gs.length) rail += '<div style="height:1px;background:var(--border)"></div><div style="display:flex;flex-direction:column;gap:10px">' + gs.join('') + '</div>';
+  if (m.pol_class) rail += '<div style="margin-top:auto;text-align:center;background:rgba(167,139,250,.15);color:var(--purple);border-radius:8px;padding:7px;font-size:12px;font-weight:600">' + m.pol_class + (m.pol_index != null ? ' · ' + m.pol_index : '') + '</div>';
+  rail += '</div>';
 
-  var cardsArr = [];
-  if (act.np) cardsArr.push(card(Math.round(act.np) + '<span style="font-size:13px">w</span>', 'Puiss. norm.'));
-  var _tss = act.tss || m.tss || 0;
-  if (_tss) cardsArr.push(card(Math.round(_tss), 'Charge (TSS)'));
-  if (srpe) cardsArr.push(card(srpe, 'S-RPE' + (act.rpe ? ' (RPE ' + act.rpe + ')' : '')));
-  if (act.kj) cardsArr.push(card(Math.round(act.kj) + '<span style="font-size:13px">kJ</span>', 'Travail'));
+  // ---- Cartes detail (droite) ----
+  var pRows = [];
+  if (act.avg_watts || pmaxW) pRows.push(row('Moy / Max', (act.avg_watts ? Math.round(act.avg_watts) : '–') + ' / ' + (pmaxW ? Math.round(pmaxW) : '–') + ' w'));
+  if (m.eftp) pRows.push(row('eFTP', m.eftp + ' w'));
+  if (m.cp) pRows.push(row('CP' + (m.w_prime ? " · W'" : ''), m.cp + 'w' + (m.w_prime ? ' · ' + (m.w_prime / 1000).toFixed(1) + 'kJ' : '')));
+  if (m.wbal_kj) pRows.push(row("W'bal (baisse)", '-' + m.wbal_kj + ' kJ'));
+  if (m.work_over_ftp_kj) pRows.push(row('Travail &gt;FTP', m.work_over_ftp_kj + ' kJ'));
 
-  var l1 = [];
-  if (act.hr || act.max_hr) l1.push(st('FC', (act.hr || '–') + '/' + (act.max_hr || '–')));
-  if (act.avg_watts) l1.push(st('P moy', Math.round(act.avg_watts) + 'w'));
-  if (act.max_watts) l1.push(st('P max', Math.round(act.max_watts) + 'w'));
-  if (ef) l1.push(st('P/FC', ef));
-  if (act.cadence) l1.push(st('Cad', Math.round(act.cadence)));
-  if (m.eftp) l1.push(st('eFTP', m.eftp + 'w'));
-  if (m.trimp) l1.push(st('TRIMP', m.trimp));
-  if (m.hrrc) l1.push(st('HRRc', m.hrrc));
+  var cRows = [];
+  if (act.hr || act.max_hr) cRows.push(row('Moy / Max', (act.hr || '–') + ' / ' + (act.max_hr || '–') + ' bpm'));
+  if (ef) cRows.push(row('P/FC (EF)', ef));
+  if (m.trimp) cRows.push(row('TRIMP', m.trimp));
+  if (m.hrrc) cRows.push(row('HRRc', m.hrrc + ' bpm'));
 
-  var l2 = [];
-  l2.push(st('Durée', fmtHMS(durSec)));
-  if (act.distance_km) l2.push(st('Dist', (+act.distance_km).toFixed(1) + 'km'));
-  if (act.elevation_gain) l2.push(st('D+', Math.round(act.elevation_gain) + 'm'));
-  if (act.avg_speed_kmh) l2.push(st('Vit', (+act.avg_speed_kmh).toFixed(1) + 'km/h'));
-  if (act.calories) l2.push(st('kcal', Math.round(act.calories)));
-  if (m.cho_g) l2.push(st('CHO', m.cho_g + 'g'));
+  var vRows = [];
+  vRows.push(row('Durée', fmtHMS(durSec)));
+  if (act.distance_km) vRows.push(row('Distance', (+act.distance_km).toFixed(1) + ' km'));
+  if (act.elevation_gain) vRows.push(row('Dénivelé+', Math.round(act.elevation_gain) + ' m'));
+  if (act.avg_speed_kmh) vRows.push(row('Vitesse moy', (+act.avg_speed_kmh).toFixed(1) + ' km/h'));
+  if (act.cadence) vRows.push(row('Cadence', Math.round(act.cadence)));
 
-  var l3 = [];
-  if (m.cp) l3.push(st('CP', m.cp + 'w'));
-  if (m.w_prime) l3.push(st('W\u2032', (m.w_prime / 1000).toFixed(1) + 'kJ'));
-  if (m.pmax) l3.push(st('Pmax', m.pmax + 'w'));
-  if (m.wbal_kj) l3.push(st('W\u2032bal', '-' + m.wbal_kj + 'kJ'));
-  if (m.work_over_ftp_kj) l3.push(st('Travail >FTP', m.work_over_ftp_kj + 'kJ'));
+  var eRows = [];
+  if (act.kj) eRows.push(row('Travail', Math.round(act.kj) + ' kJ'));
+  if (act.calories) eRows.push(row('Calories', Math.round(act.calories) + ' kcal'));
+  if (m.cho_g) eRows.push(row('CHO estimé', m.cho_g + ' g'));
 
-  var pills = [];
-  if (m.pol_class) pills.push('<span style="color:var(--purple)">' + m.pol_class + (m.pol_index != null ? ' ' + m.pol_index : '') + '</span>');
-  if (ctl != null) pills.push('<span style="color:var(--info)">Condition ' + Math.round(ctl) + '</span>');
-  if (atl != null) pills.push('<span style="color:var(--warn)">Fatigue ' + Math.round(atl) + '</span>');
-  if (tsb != null) pills.push('<span style="color:' + (tsb >= 0 ? 'var(--accent)' : 'var(--danger)') + '">Forme ' + (tsb >= 0 ? '+' : '') + Math.round(tsb) + '</span>');
+  var fRows = [];
+  if (ctl != null) fRows.push(row('Condition phys.', Math.round(ctl)));
+  if (atl != null) fRows.push(row('Fatigue', Math.round(atl)));
+  if (tsb != null) fRows.push(row('Forme', '<span style="color:' + (tsb >= 0 ? 'var(--accent)' : 'var(--danger)') + '">' + (tsb >= 0 ? '+' : '') + Math.round(tsb) + '</span>'));
 
-  var html = '<div class="af-section"><div class="af-h">Aperçu de la séance</div>';
-  if (gaugesArr.length) html += '<div style="display:grid;grid-template-columns:repeat(' + gaugesArr.length + ',1fr);gap:16px;margin-bottom:18px">' + gaugesArr.join('') + '</div>';
-  if (cardsArr.length) html += '<div style="display:grid;grid-template-columns:repeat(' + cardsArr.length + ',1fr);gap:10px;margin-bottom:16px">' + cardsArr.join('') + '</div>';
-  if (l1.length) html += '<div style="display:flex;flex-wrap:wrap;gap:8px 22px;padding:12px 0;border-top:1px solid var(--border);font-size:13px">' + l1.join('') + '</div>';
-  if (l3.length) html += '<div style="display:flex;flex-wrap:wrap;gap:8px 22px;padding:12px 0;border-top:1px solid var(--border);font-size:13px"><span style="color:var(--text-mute);font-size:11px;width:100%;margin-bottom:-4px">Puissance avancée</span>' + l3.join('') + '</div>';
-  if (l2.length || pills.length) html += '<div style="display:flex;flex-wrap:wrap;gap:8px 22px;padding-top:12px;font-size:13px">' + l2.join('') + (pills.length ? ('<span style="flex:1"></span>' + pills.join('<span style="color:var(--text-mute);margin:0 2px"> </span>')) : '') + '</div>';
-  html += '</div>';
+  var cards = mkCard('Puissance', 'var(--warn)', pRows) + mkCard('Cardio', 'var(--danger)', cRows)
+    + mkCard('Volume', 'var(--accent)', vRows) + mkCard('Énergie', 'var(--info)', eRows)
+    + mkCard('Forme', 'var(--purple)', fRows);
+
+  var html = '<div class="af-section"><div class="af-h">Aperçu de la séance</div>'
+    + '<div class="af-overview-grid" style="display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:stretch">'
+    + rail
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-content:start">' + cards + '</div>'
+    + '</div></div>';
   return html;
 };
 window.openFullAnalysis = function () {
