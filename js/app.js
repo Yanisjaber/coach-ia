@@ -6112,6 +6112,64 @@ async function renderStreamsSection(container, activityId) {
 // Analyse detaillee PLEIN ECRAN : courbes temps (deplacees) + courbe de
 // puissance (mean-max) + temps par zone (puissance/FC) + distribution.
 // ============================================================
+window.__buildAfOverview = function (act) {
+  if (!act) return '<div class="af-section"><div class="af-h">Aperçu</div><div style="color:var(--text-mute)">Données indisponibles.</div></div>';
+  var ath = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete) || {};
+  var hrMax = +ath.hr_max || +ath.hrMax || +act.max_hr || 0;
+  var durMin = act.duration || (act.moving_time ? Math.round(act.moving_time / 60) : 0);
+  var durSec = act.moving_time || act.elapsed_time || (durMin * 60);
+  var fmtHMS = function (s) { s = Math.round(s); var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; var p = function (n) { return n < 10 ? '0' + n : '' + n; }; return h ? (h + ':' + p(m) + ':' + p(x)) : (m + ':' + p(x)); };
+  var ifPct = act.ftpPct || (act.intensity ? Math.round(act.intensity * 100) : 0);
+  var vi = act.variability_index ? +act.variability_index : 0;
+  var srpe = (act.rpe && durMin) ? Math.round(act.rpe * durMin) : 0;
+  var ef = (act.np && act.hr) ? (act.np / act.hr).toFixed(2) : null;
+  var fcMoyPct = (act.hr && hrMax) ? Math.round(act.hr / hrMax * 100) : null;
+  var fcMaxPct = (act.max_hr && hrMax) ? Math.round(act.max_hr / hrMax * 100) : null;
+  var ctl = null, atl = null, tsb = null;
+  if (Array.isArray(data)) { for (var i = 0; i < data.length; i++) { if (data[i].date === window.__lastActDate) { ctl = data[i].ctl; atl = data[i].atl; tsb = data[i].tsb; break; } } }
+
+  var gauge = function (label, valTxt, w, col) { return '<div style="margin-bottom:2px"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-dim);margin-bottom:5px"><span>' + label + '</span><span style="color:var(--text);font-weight:600">' + valTxt + '</span></div><div style="height:8px;background:var(--bg-elev2);border-radius:99px;overflow:hidden"><div style="width:' + Math.max(0, Math.min(100, w)) + '%;height:100%;background:' + col + '"></div></div></div>'; };
+  var card = function (val, label) { return '<div style="background:var(--bg-elev2);border-radius:10px;padding:12px 8px;text-align:center"><div style="font-size:23px;font-weight:700;line-height:1.1">' + val + '</div><div style="font-size:11px;color:var(--text-dim);margin-top:3px">' + label + '</div></div>'; };
+  var st = function (label, val) { return '<span><span style="color:var(--text-dim)">' + label + ' </span><b style="font-weight:600">' + val + '</b></span>'; };
+
+  var gaugesArr = [];
+  if (ifPct) gaugesArr.push(gauge('Intensité (IF)', ifPct + '%', ifPct, 'var(--warn)'));
+  if (fcMaxPct) gaugesArr.push(gauge('FC max', fcMaxPct + '%', fcMaxPct, 'var(--danger)'));
+  if (vi) gaugesArr.push(gauge('Variabilité', vi.toFixed(2), (vi - 1) * 200, 'var(--info)'));
+
+  var cardsArr = [];
+  if (act.np) cardsArr.push(card(Math.round(act.np) + '<span style="font-size:13px">w</span>', 'Puiss. norm.'));
+  if (act.tss) cardsArr.push(card(Math.round(act.tss), 'Charge (TSS)'));
+  if (srpe) cardsArr.push(card(srpe, 'S-RPE' + (act.rpe ? ' (RPE ' + act.rpe + ')' : '')));
+  if (act.kj) cardsArr.push(card(Math.round(act.kj) + '<span style="font-size:13px">kJ</span>', 'Travail'));
+
+  var l1 = [];
+  if (act.hr || act.max_hr) l1.push(st('FC', (act.hr || '–') + '/' + (act.max_hr || '–')));
+  if (act.avg_watts) l1.push(st('P moy', Math.round(act.avg_watts) + 'w'));
+  if (act.max_watts) l1.push(st('P max', Math.round(act.max_watts) + 'w'));
+  if (ef) l1.push(st('P/FC', ef));
+  if (act.cadence) l1.push(st('Cad', Math.round(act.cadence)));
+
+  var l2 = [];
+  l2.push(st('Durée', fmtHMS(durSec)));
+  if (act.distance_km) l2.push(st('Dist', (+act.distance_km).toFixed(1) + 'km'));
+  if (act.elevation_gain) l2.push(st('D+', Math.round(act.elevation_gain) + 'm'));
+  if (act.avg_speed_kmh) l2.push(st('Vit', (+act.avg_speed_kmh).toFixed(1) + 'km/h'));
+  if (act.calories) l2.push(st('kcal', Math.round(act.calories)));
+
+  var pills = [];
+  if (ctl != null) pills.push('<span style="color:var(--info)">Condition ' + Math.round(ctl) + '</span>');
+  if (atl != null) pills.push('<span style="color:var(--warn)">Fatigue ' + Math.round(atl) + '</span>');
+  if (tsb != null) pills.push('<span style="color:' + (tsb >= 0 ? 'var(--accent)' : 'var(--danger)') + '">Forme ' + (tsb >= 0 ? '+' : '') + Math.round(tsb) + '</span>');
+
+  var html = '<div class="af-section"><div class="af-h">Aperçu de la séance</div>';
+  if (gaugesArr.length) html += '<div style="display:grid;grid-template-columns:repeat(' + gaugesArr.length + ',1fr);gap:16px;margin-bottom:18px">' + gaugesArr.join('') + '</div>';
+  if (cardsArr.length) html += '<div style="display:grid;grid-template-columns:repeat(' + cardsArr.length + ',1fr);gap:10px;margin-bottom:16px">' + cardsArr.join('') + '</div>';
+  if (l1.length) html += '<div style="display:flex;flex-wrap:wrap;gap:8px 22px;padding:12px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);font-size:13px">' + l1.join('') + '</div>';
+  if (l2.length || pills.length) html += '<div style="display:flex;flex-wrap:wrap;gap:8px 22px;padding-top:12px;font-size:13px">' + l2.join('') + (pills.length ? ('<span style="flex:1"></span>' + pills.join('<span style="color:var(--text-mute);margin:0 2px"> </span>')) : '') + '</div>';
+  html += '</div>';
+  return html;
+};
 window.openFullAnalysis = function () {
   var S = window.__lastStreams;
   var container = document.querySelector('.main .container') || document.querySelector('.container');
@@ -6127,12 +6185,14 @@ window.openFullAnalysis = function () {
   page.innerHTML =
     '<div class="af-head"><button class="af-back" type="button">\u2190 Retour</button></div>'
     + '<div class="af-tabbar">'
-    +   '<button class="af-tab active" type="button" data-tab="courbes">Courbes</button>'
+    +   '<button class="af-tab active" type="button" data-tab="apercu">Aperçu</button>'
+    +   '<button class="af-tab" type="button" data-tab="courbes">Courbes</button>'
     +   '<button class="af-tab" type="button" data-tab="records">Records</button>'
     +   '<button class="af-tab" type="button" data-tab="zones">Zones</button>'
     +   '<button class="af-tab" type="button" data-tab="dist">Distribution</button>'
     + '</div>'
-    + '<div class="af-tabc active" id="af-tab-courbes"><div id="af-courbes-slot"></div></div>'
+    + '<div class="af-tabc active" id="af-tab-apercu">' + window.__buildAfOverview(window.__lastAct) + '</div>'
+    + '<div class="af-tabc" id="af-tab-courbes"><div id="af-courbes-slot"></div></div>'
     + '<div class="af-tabc" id="af-tab-records"><div class="af-section"><div class="af-h">Courbe de puissance (mean-max)</div><div class="af-chart"><canvas id="af-pcurve"></canvas></div></div><div class="af-section"><div class="af-h" style="display:flex;align-items:center;justify-content:space-between;gap:10px">Records de puissance <button class="af-recalc af-back" type="button" style="margin:0">Recalculer les records</button></div><div id="af-recalc-status" style="font-size:11px;color:var(--text-mute);margin-bottom:8px;display:none"></div><div id="af-records"></div></div></div>'
     + '<div class="af-tabc" id="af-tab-zones"><div class="af-grid2"><div class="af-section"><div class="af-h">Temps par zone \u2014 Puissance</div><div class="af-chart"><canvas id="af-zpow"></canvas></div></div><div class="af-section"><div class="af-h">Temps par zone \u2014 FC</div><div class="af-chart"><canvas id="af-zhr"></canvas></div></div></div></div>'
     + '<div class="af-tabc" id="af-tab-dist"><div class="af-section"><div class="af-h">Distribution de puissance</div><div class="af-chart"><canvas id="af-dist"></canvas></div></div></div>';
@@ -8734,6 +8794,7 @@ function openSessionModal(iso, source) {
           window.__lastActSbId = act._sbId || null;
           window.__lastActDate = iso;
           window.__lastActSport = (typeof getSportCategory === 'function') ? getSportCategory(act.raw_type || act.sport) : null;
+          window.__lastAct = act;
           if (streamId) renderStreamsSection(_streamsEl, streamId);
           else _streamsEl.innerHTML = '<div class="modal-placeholder">Pas d\'ID activité disponible pour cette séance.</div>';
         }
