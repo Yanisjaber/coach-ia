@@ -990,3 +990,7 @@
 /* Aperçu affiché en permanence au-dessus des onglets de l'analyse */
 #p-analysis .af-overview-wrap { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
 #p-analysis .af-overview-wrap .af-section { margin-bottom: 0; }
+
+/* Aperçu en bande horizontale : colonnes de stats réparties sur toute la largeur */
+#p-analysis .af-band { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 22px 34px; align-items: flex-start; }
+#p-analysis .af-band > div { min-width: 150px; }

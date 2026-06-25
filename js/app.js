@@ -6219,24 +6219,22 @@ window.__buildAfOverview = function (act, m) {
   var row = function (label, val) { return '<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text-dim)">' + label + '</span><span style="font-weight:600;text-align:right">' + val + '</span></div>'; };
   var mkCard = function (title, col, rows) { if (!rows.length) return ''; return '<div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:12px;font-weight:600;margin-bottom:8px;color:' + col + '">' + title + '</div><div style="font-size:13px;line-height:2.05">' + rows.join('') + '</div></div>'; };
 
-  // ---- Rail gauche : chiffre cle + NP/Travail + jauges + classe ----
+  // ---- Groupe 1 : charge + intensite ----
   var heroVal = tss ? Math.round(tss) : (np ? Math.round(np) : '–');
   var heroLab = tss ? 'Charge (TSS)' : 'Puiss. norm.';
-  var rail = '<div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px">';
-  rail += '<div style="text-align:center"><div style="font-size:30px;font-weight:700;line-height:1">' + heroVal + '</div><div style="font-size:11px;color:var(--text-dim);margin-top:2px">' + heroLab + '</div></div>';
-  var smalls = [];
-  if (np) smalls.push('<div style="text-align:center"><div style="font-size:17px;font-weight:600">' + Math.round(np) + 'w</div><div style="font-size:10px;color:var(--text-dim)">NP</div></div>');
-  if (act.kj) smalls.push('<div style="text-align:center"><div style="font-size:17px;font-weight:600">' + Math.round(act.kj) + 'kJ</div><div style="font-size:10px;color:var(--text-dim)">Travail</div></div>');
-  if (smalls.length) rail += '<div style="height:1px;background:var(--border)"></div><div style="display:flex;justify-content:space-around">' + smalls.join('') + '</div>';
+  var g1 = '<div style="display:flex;align-items:baseline;gap:7px;margin-bottom:9px"><span style="font-size:27px;font-weight:700;line-height:1">' + heroVal + '</span><span style="font-size:11px;color:var(--text-dim)">' + heroLab + '</span></div>';
+  var npt = [];
+  if (np) npt.push(row('NP', Math.round(np) + ' w'));
+  if (act.kj) npt.push(row('Travail', Math.round(act.kj) + ' kJ'));
+  if (npt.length) g1 += '<div style="font-size:13px;line-height:2.05">' + npt.join('') + '</div>';
   var gs = [];
   if (ifPct) gs.push(gauge('Intensité (IF)', ifPct + '%', ifPct, 'var(--warn)'));
   if (fcMaxPct) gs.push(gauge('FC max', fcMaxPct + '%', fcMaxPct, 'var(--danger)'));
   if (vi) gs.push(gauge('Variabilité', vi.toFixed(2), (vi - 1) * 200, 'var(--info)'));
-  if (gs.length) rail += '<div style="height:1px;background:var(--border)"></div><div style="display:flex;flex-direction:column;gap:10px">' + gs.join('') + '</div>';
-  if (m.pol_class) rail += '<div style="margin-top:auto;text-align:center;background:rgba(167,139,250,.15);color:var(--purple);border-radius:8px;padding:7px;font-size:12px;font-weight:600">' + m.pol_class + (m.pol_index != null ? ' · ' + m.pol_index : '') + '</div>';
-  rail += '</div>';
+  if (gs.length) g1 += '<div style="display:flex;flex-direction:column;gap:8px;margin-top:9px">' + gs.join('') + '</div>';
+  if (m.pol_class) g1 += '<div style="display:inline-block;margin-top:10px;background:rgba(167,139,250,.15);color:var(--purple);border-radius:7px;padding:4px 10px;font-size:11px;font-weight:600">' + m.pol_class + (m.pol_index != null ? ' · ' + m.pol_index : '') + '</div>';
 
-  // ---- Cartes detail (droite) ----
+  // ---- Groupes detail ----
   var pRows = [];
   if (act.avg_watts || pmaxW) pRows.push(row('Moy / Max', (act.avg_watts ? Math.round(act.avg_watts) : '–') + ' / ' + (pmaxW ? Math.round(pmaxW) : '–') + ' w'));
   if (m.eftp) pRows.push(row('eFTP', m.eftp + ' w'));
@@ -6267,15 +6265,18 @@ window.__buildAfOverview = function (act, m) {
   if (atl != null) fRows.push(row('Fatigue', Math.round(atl)));
   if (tsb != null) fRows.push(row('Forme', '<span style="color:' + (tsb >= 0 ? 'var(--accent)' : 'var(--danger)') + '">' + (tsb >= 0 ? '+' : '') + Math.round(tsb) + '</span>'));
 
-  var cards = mkCard('Puissance', 'var(--warn)', pRows) + mkCard('Cardio', 'var(--danger)', cRows)
-    + mkCard('Volume', 'var(--accent)', vRows) + mkCard('Énergie', 'var(--info)', eRows)
-    + mkCard('Forme', 'var(--purple)', fRows);
+  var grp = function (title, col, rows) { if (!rows.length) return ''; return '<div><div style="font-size:11px;font-weight:600;color:' + col + ';margin-bottom:7px;text-transform:uppercase;letter-spacing:.4px">' + title + '</div><div style="font-size:13px;line-height:2.05">' + rows.join('') + '</div></div>'; };
 
-  var html = '<div class="af-section"><div class="af-h">Aperçu de la séance</div>'
-    + '<div class="af-overview-grid" style="display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:stretch;max-width:1280px">'
-    + rail
-    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:12px;align-content:start">' + cards + '</div>'
-    + '</div></div>';
+  var band = '<div class="af-band">'
+    + '<div style="min-width:205px">' + g1 + '</div>'
+    + grp('Puissance', 'var(--warn)', pRows)
+    + grp('Cardio', 'var(--danger)', cRows)
+    + grp('Volume', 'var(--accent)', vRows)
+    + grp('Énergie', 'var(--info)', eRows)
+    + grp('Forme', 'var(--purple)', fRows)
+    + '</div>';
+
+  var html = '<div class="af-section"><div class="af-h">Aperçu de la séance</div>' + band + '</div>';
   return html;
 };
 window.openFullAnalysis = function () {
