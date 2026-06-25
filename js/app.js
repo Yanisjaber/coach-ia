@@ -6276,7 +6276,7 @@ window.__buildAfOverview = function (act, m) {
     + grp('Forme', 'var(--purple)', fRows)
     + '</div>';
 
-  var html = '<div class="af-section"><div class="af-h">Aperçu de la séance</div>' + band + '</div>';
+  var html = '<div class="af-section">' + band + '</div>';
   return html;
 };
 window.openFullAnalysis = function () {
@@ -6295,6 +6295,16 @@ window.openFullAnalysis = function () {
       }
     }
   } catch (e) { console.warn('[metrics]', e && e.message); window.__lastMetrics = {}; }
+  var _ovA = window.__lastAct || {};
+  var _ovIso = window.__lastActDate || (_ovA.start_date_local ? String(_ovA.start_date_local).slice(0, 10) : '');
+  var _ovName = (_ovA.name || 'Activité').replace(/</g, '&lt;');
+  var _ovWhen = '';
+  try {
+    if (_ovIso) { _ovWhen = new Date(_ovIso + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
+    var _hm = (_ovA.start_date_local && String(_ovA.start_date_local).length >= 16) ? String(_ovA.start_date_local).slice(11, 16) : '';
+    if (_hm) _ovWhen += ' · ' + _hm;
+  } catch (e3) {}
+  window.__ovHeadTitle = '<div class="af-head-title"><div class="af-head-name">' + _ovName + '</div>' + (_ovWhen ? '<div class="af-head-sub">' + _ovWhen + '</div>' : '') + '</div>';
   var container = document.querySelector('.main .container') || document.querySelector('.container');
   if (!container) return;
   var page = document.getElementById('p-analysis');
@@ -6306,7 +6316,7 @@ window.openFullAnalysis = function () {
   var modal = document.getElementById('session-modal'); if (modal) modal.classList.remove('active');
   // structure : Retour + onglets internes + contenus
   page.innerHTML =
-    '<div class="af-head"><button class="af-back" type="button">\u2190 Retour</button></div>'
+    '<div class="af-head"><button class="af-back" type="button">\u2190 Retour</button>' + (window.__ovHeadTitle || '') + '</div>'
     + '<div class="af-overview-wrap">' + window.__buildAfOverview(window.__lastAct, window.__lastMetrics) + '</div>'
     + '<div class="af-tabbar">'
     +   '<button class="af-tab active" type="button" data-tab="courbes">Courbes</button>'

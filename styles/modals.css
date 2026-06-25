@@ -934,7 +934,10 @@
 .add-modal-content .modal-header { flex: 0 0 auto; }
 .ad
 /* ===== Page Analyse detaillee (panneau #p-analysis) ===== */
-#p-analysis .af-head { margin-bottom: 14px; }
+#p-analysis .af-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+#p-analysis .af-head-title { display: flex; flex-direction: column; line-height: 1.25; }
+#p-analysis .af-head-name { font-size: 16px; font-weight: 600; color: var(--text); }
+#p-analysis .af-head-sub { font-size: 12px; color: var(--text-dim); text-transform: capitalize; }
 #p-analysis .af-tabbar {
   display: flex; gap: 2px; flex-wrap: wrap;
   border-bottom: 1px solid var(--border); margin-bottom: 20px;
@@ -989,8 +992,4 @@
 
 /* Aperçu affiché en permanence au-dessus des onglets de l'analyse */
 #p-analysis .af-overview-wrap { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
-#p-analysis .af-overview-wrap .af-section { margin-bottom: 0; }
-
-/* Aperçu en bande horizontale : colonnes de stats réparties sur toute la largeur */
-#p-analysis .af-band { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 22px 34px; align-items: flex-start; }
-#p-analysis .af-band > div { min-width: 150px; }
+#p-analysis 
