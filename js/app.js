@@ -6255,7 +6255,6 @@ window.__buildAfOverview = function (act, m) {
   if (m.eftp) pRows.push(row('eFTP', m.eftp + ' w'));
   if (m.cp) pRows.push(row('CP' + (m.w_prime ? " · W'" : ''), m.cp + 'w' + (m.w_prime ? ' · ' + (m.w_prime / 1000).toFixed(1) + 'kJ' : '')));
   if (m.wbal_kj) pRows.push(row("W'bal (baisse)", '-' + m.wbal_kj + ' kJ'));
-  if (m.work_over_ftp_kj) pRows.push(row('Travail &gt;FTP', m.work_over_ftp_kj + ' kJ'));
 
   var cRows = [];
   if (act.hr || act.max_hr) cRows.push(row('Moy / Max', (act.hr || '–') + ' / ' + (act.max_hr || '–') + ' bpm'));
@@ -6271,6 +6270,7 @@ window.__buildAfOverview = function (act, m) {
 
   var eRows = [];
   if (act.kj) eRows.push(row('Travail', Math.round(act.kj) + ' kJ'));
+  if (m.work_over_ftp_kj) eRows.push(row('dont &gt;FTP', m.work_over_ftp_kj + ' kJ'));
   if (act.calories) eRows.push(row('Calories', Math.round(act.calories) + ' kcal'));
   if (m.cho_g) eRows.push(row('CHO estimé', m.cho_g + ' g'));
 
