@@ -5212,8 +5212,8 @@ async function renderStreamsSection(container, activityId) {
     }
     return out;
   }
-  var _wattsRaw = watts ? watts.slice() : null;   // brut, pour records/metriques (le lissage est pour l'affichage)
-  if (watts) watts = smoothWin(watts, 1);      // ±1 s = 3 s
+  var _wattsRaw = watts ? watts.slice() : null;   // brut
+  // Watts NON lisses : affichage seconde par seconde (comme records/metriques).
   if (hr) hr = smoothWin(hr, 1);                // ±1 s = 3 s
   if (cadence) cadence = smoothWin(cadence, 4); // ±4 s = 9 s (plus stable)
   try {
