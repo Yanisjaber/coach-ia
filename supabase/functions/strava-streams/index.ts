@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
 
     // ===== 5) Backfill power_curve (nouvelles durées) depuis les streams stockés =====
     // Lot limité (idempotent) : recalcule la courbe des activités obsolètes.
-    const backfill = await backfillPowerCurves(sbAdmin, user.id, 50, ATH);  // lot reduit : calcul dense plus lourd
+    const backfill = await backfillPowerCurves(sbAdmin, user.id, 30, ATH);  // lot reduit : calcul dense plus lourd
 
     // ===== 6) Recalculs power_profile (legacy) + power_profile_sport (par sport) =====
     // On recalcule le profil par sport à CHAQUE passage : il s'appuie sur les power_curve

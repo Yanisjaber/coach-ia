@@ -193,6 +193,7 @@ export async function startStravaIngest(opts = {}) {
 // Boucle d'appels à strava-streams (40 activités/lot). Reporte dans la barre `prog`
 // (de `base` % à 100 %). S'arrête si l'utilisateur annule, sur rate-limit, ou quand fini.
 async function streamsPhase(session, prog, base = 0) {
+  let _streamsFailStreak = 0;
   const sb = window.sb;
   const cfg = window.SUPABASE_CONFIG;
   const url = `${cfg.url}/functions/v1/strava-streams`;
@@ -238,20 +239,29 @@ async function streamsPhase(session, prog, base = 0) {
       showIngestToast('Import annulé', 'success');
       return;
     }
-    let data;
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 40 }),
-      });
-      data = await res.json();
-      if (!res.ok) { stopTween(); prog?.fail(`${data.error || res.status}`); return; }
-    } catch (e) {
-      stopTween();
-      if (_importCancelled) { prog?.close(); return; }
-      prog?.fail(e.message || String(e)); return;
+    // Appel resilient : on reessaie les erreurs transitoires (timeout / 5xx) avec backoff
+    // au lieu de tout arreter. L'avancement est cote serveur (reprise = passage suivant).
+    let data = null, lastErr = '';
+    for (let attempt = 1; attempt <= 4 && !data; attempt++) {
+      if (_importCancelled) { stopTween(); prog?.close(); return; }
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ limit: 40 }),
+        });
+        if (res.ok) { data = await res.json(); }
+        else { lastErr = (await res.text().catch(() => '')) || ('HTTP ' + res.status); }
+      } catch (e) { lastErr = e.message || String(e); }
+      if (!data) { paint(); await new Promise(r => setTimeout(r, 1200 * attempt)); }
     }
+    if (!data) {
+      // echec persistant sur ce lot : on compte, et on s'arrete seulement apres plusieurs lots KO d'affilee
+      _streamsFailStreak = (_streamsFailStreak || 0) + 1;
+      if (_streamsFailStreak >= 5) { stopTween(); prog?.fail(`Interruption (${lastErr}). Relance la synchro pour reprendre.`); return; }
+      continue; // on retente un nouveau lot (le serveur reprend les memes activites)
+    }
+    _streamsFailStreak = 0;
 
     const remaining = data.remaining || 0;
     const pcRemaining = data.power_curve_remaining || 0; // backfill power_curve par sport
