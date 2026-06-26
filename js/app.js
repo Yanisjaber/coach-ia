@@ -6509,7 +6509,7 @@ function _buildRecordsTable(S) {
     if (d < 60) return d + 's';
     if (d < 3600) return (d % 60 === 0) ? (d / 60 + 'min') : (Math.floor(d / 60) + 'min' + (d % 60) + 's');
     var h = Math.floor(d / 3600), m = Math.round((d % 3600) / 60);
-    return m === 0 ? (h + 'h') : (h + 'h' + String(m).padStart(2, '0'));
+    return m === 0 ? (h + 'h') : (h + 'h' + String(m).padStart(2, '0') + 'm');
   };
   var std = __PC_TABLE_DURS.filter(function (d) { return d <= n; });
   var hasCad = CAD.some(function (x) { return x != null; });
@@ -6602,8 +6602,8 @@ function _buildAfCharts(S) {
     durs = durs.filter(function (x) { return x <= n; });
     // Echelle X compressee (donne moins de place aux courtes durees qu'un log pur)
     var PW = 0.32, TX = function (t) { return Math.pow(t, PW); }, iTX = function (v) { return Math.pow(v, 1 / PW); };
-    var fmtSec = function (t) { t = Math.round(t); return t < 60 ? (t + 's') : (t < 3600 ? (Math.round(t / 60) + 'min') : ((Math.round(t / 360) / 10) + 'h')); };
-    var fmtPrec = function (t) { t = Math.round(t); if (t < 60) return t + 's'; if (t < 3600) { var m = Math.floor(t / 60), s = t % 60; return s ? (m + 'min' + s + 's') : (m + 'min'); } var h = Math.floor(t / 3600), mm = Math.round((t % 3600) / 60); return mm ? (h + 'h' + (mm < 10 ? '0' + mm : mm)) : (h + 'h'); };
+    var fmtSec = function (t) { t = Math.round(t); if (t < 60) return t + 's'; if (t < 3600) return Math.round(t / 60) + 'min'; var h = Math.floor(t / 3600), mm = Math.round((t % 3600) / 60); return mm ? (h + 'h' + (mm < 10 ? '0' + mm : mm)) : (h + 'h'); };
+    var fmtPrec = function (t) { t = Math.round(t); if (t < 60) return t + 's'; if (t < 3600) { var m = Math.floor(t / 60), s = t % 60; return s ? (m + 'min' + s + 's') : (m + 'min'); } var h = Math.floor(t / 3600), mm = Math.round((t % 3600) / 60); return mm ? (h + 'h' + (mm < 10 ? '0' + mm : mm) + 'm') : (h + 'h'); };
     var pts = durs.map(function (x) { return { x: TX(x), y: Math.round(bestWin(x).avg) }; });
     // Record all-time (envelope des meilleures perfs <= date) par duree standard
     // Utilise la VRAIE courbe (dense, brute) de l'activite courante dans l'agregation
