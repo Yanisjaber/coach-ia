@@ -6609,6 +6609,14 @@ function _buildAfCharts(S) {
       var v = Math.max(mx, cur);
       return { x: TX(x), y: v > 0 ? Math.round(v) : null };
     });
+    // Courbe puissance-duree = non-croissante : un record sur une duree COURTE est au moins
+    // egal au record sur une duree plus LONGUE. Comble aussi les courtes durees sous-renseignees
+    // tant que l'historique n'est pas recalcule en dense (parcours du plus long au plus court).
+    var _runMax = 0;
+    for (var _ri = recPts.length - 1; _ri >= 0; _ri--) {
+      var _yy = recPts[_ri].y; if (_yy == null) continue;
+      if (_yy < _runMax) recPts[_ri].y = _runMax; else _runMax = _yy;
+    }
     var tickT = [1, 5, 10, 30, 60, 300, 1200, 3600, 9000, 18000].filter(function (t) { return t <= n; });
     window.__afCharts.push(new Chart(document.getElementById('af-pcurve'), {
       type: 'line',
