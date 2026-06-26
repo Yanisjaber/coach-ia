@@ -6589,8 +6589,19 @@ function _buildAfCharts(S) {
     var pts = durs.map(function (x) { return { x: TX(x), y: Math.round(bestWin(x).avg) }; });
     // Record all-time (envelope des meilleures perfs <= date) par duree standard
     var byDur = (typeof window.__allPowerCurvesByDur === 'function') ? window.__allPowerCurvesByDur(window.__lastActDate, window.__lastActSport) : {};
-    var recPts = [];
-    __PC_DURS.forEach(function (d2) { if (d2 > n) return; var arr = byDur[d2]; if (!arr || !arr.length) return; var mx = 0; for (var z = 0; z < arr.length; z++) if (arr[z] > mx) mx = arr[z]; recPts.push({ x: TX(d2), y: Math.round(mx) }); });
+    // Enveloppe des records (meilleure perf par duree standard), puis interpolation a chaque
+    // point de `durs` pour que le Record s'affiche a chaque seconde comme "Cette sortie".
+    var recEnv = [];
+    __PC_DURS.forEach(function (d2) { var arr = byDur[d2]; if (!arr || !arr.length) return; var mx = 0; for (var z = 0; z < arr.length; z++) if (arr[z] > mx) mx = arr[z]; if (mx > 0) recEnv.push({ d: d2, w: mx }); });
+    recEnv.sort(function (p, q) { return p.d - q.d; });
+    var recAt = function (dd) {
+      if (!recEnv.length) return null;
+      if (dd <= recEnv[0].d) return recEnv[0].w;
+      if (dd >= recEnv[recEnv.length - 1].d) return recEnv[recEnv.length - 1].w;
+      for (var i2 = 1; i2 < recEnv.length; i2++) { if (dd <= recEnv[i2].d) { var pa = recEnv[i2 - 1], pb = recEnv[i2], tt = (TX(dd) - TX(pa.d)) / (TX(pb.d) - TX(pa.d)); return pa.w + (pb.w - pa.w) * tt; } }
+      return recEnv[recEnv.length - 1].w;
+    };
+    var recPts = durs.map(function (x) { var rv = recAt(x); return { x: TX(x), y: rv == null ? null : Math.round(rv) }; });
     var tickT = [1, 5, 10, 30, 60, 300, 1200, 3600, 9000, 18000].filter(function (t) { return t <= n; });
     window.__afCharts.push(new Chart(document.getElementById('af-pcurve'), {
       type: 'line',
