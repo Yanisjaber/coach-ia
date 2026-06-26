@@ -6463,21 +6463,27 @@ window.__topRecordsForDur = function (dur, cutoffIso, sportCat, limit) {
 window.recalcAllPowerCurves = async function (onProgress) {
   var list = [];
   if (Array.isArray(data)) data.forEach(function (dd) { (dd.activities || []).forEach(function (a) { if (a && a._sbId && (a.id || a.activityId) && (a.avg_watts || a.np)) list.push(a); }); });
-  var total = list.length, done = 0, ok = 0;
+  var total = list.length, done = 0, ok = 0, errs = 0;
   for (var i = 0; i < list.length; i++) {
     var a = list[i];
     if (a.power_curve && +a.power_curve._v === __PC_VERSION) { ok++; done++; if (onProgress) onProgress(done, total, ok); continue; }
     try {
-      var streams = (typeof loadStreams === 'function') ? await loadStreams(a.id || a.activityId) : null;
+      var sid = a.id || a.activityId;
+      // Fetch SANS cache : evite l'accumulation memoire + le depassement de quota localStorage
+      // qui faisaient planter le recalcul vers ~500 activites.
+      var streams = (typeof loadStreamsFromSupabase === 'function') ? await loadStreamsFromSupabase(sid) : null;
       var watts = streams ? (Array.isArray(streams) ? ((streams.find(function (x) { return x && x.type === 'watts'; }) || {}).data) : streams.watts) : null;
       if (watts && watts.length) {
         var curve = window.__powerCurveFromWatts(watts);
         if (curve) { a.power_curve = curve; if (window.cloudSync && window.cloudSync.savePowerCurve) await window.cloudSync.savePowerCurve(a._sbId, curve); ok++; }
       }
-    } catch (e) { /* skip */ }
+      streams = null; watts = null;                                   // libere la memoire
+      try { if (typeof streamsCache !== 'undefined' && streamsCache[sid] !== undefined) delete streamsCache[sid]; } catch (e2) {}
+    } catch (e) { errs++; }
     done++; if (onProgress) onProgress(done, total, ok);
+    if ((i & 7) === 0) await new Promise(function (r) { setTimeout(r, 0); });   // rend la main au navigateur (UI + GC)
   }
-  return { total: total, ok: ok };
+  return { total: total, ok: ok, errors: errs };
 };
 
 function _buildRecordsTable(S) {
