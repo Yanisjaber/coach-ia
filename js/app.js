@@ -6599,24 +6599,18 @@ function _buildAfCharts(S) {
     var fmtSec = function (t) { t = Math.round(t); return t < 60 ? (t + 's') : (t < 3600 ? (Math.round(t / 60) + 'min') : ((Math.round(t / 360) / 10) + 'h')); };
     var pts = durs.map(function (x) { return { x: TX(x), y: Math.round(bestWin(x).avg) }; });
     // Record all-time (envelope des meilleures perfs <= date) par duree standard
+    // Utilise la VRAIE courbe (dense, brute) de l'activite courante dans l'agregation
+    // (sinon l'ancienne courbe stockee, plus basse/lissee, fausse le record).
+    try { var _curC = window.__powerCurveFromWatts(W); if (_curC && window.__lastActSbId && Array.isArray(data)) data.forEach(function (dd) { (dd.activities || []).forEach(function (aa) { if (String(aa._sbId) === String(window.__lastActSbId)) aa.power_curve = _curC; }); }); } catch (e) {}
     var byDur = (typeof window.__allPowerCurvesByDur === 'function') ? window.__allPowerCurvesByDur(window.__lastActDate, window.__lastActSport) : {};
     // Record all-time : VRAIE valeur a chaque point (max sur l'historique a cette duree exacte).
     // Cette sortie fait partie des records -> le Record est au moins egal a "Cette sortie"
     // (evite que le record passe sous la sortie quand la courbe stockee est plus ancienne/lissee).
-    var recPts = durs.map(function (x, i) {
-      var arr = byDur[x]; var mx = 0; if (arr) for (var z = 0; z < arr.length; z++) if (arr[z] > mx) mx = arr[z];
-      var cur = (pts[i] && pts[i].y != null) ? pts[i].y : 0;
-      var v = Math.max(mx, cur);
-      return { x: TX(x), y: v > 0 ? Math.round(v) : null };
+    var recPts = durs.map(function (x) {
+      var arr = byDur[x]; if (!arr || !arr.length) return { x: TX(x), y: null };
+      var mx = 0; for (var z = 0; z < arr.length; z++) if (arr[z] > mx) mx = arr[z];
+      return { x: TX(x), y: mx > 0 ? Math.round(mx) : null };
     });
-    // Courbe puissance-duree = non-croissante : un record sur une duree COURTE est au moins
-    // egal au record sur une duree plus LONGUE. Comble aussi les courtes durees sous-renseignees
-    // tant que l'historique n'est pas recalcule en dense (parcours du plus long au plus court).
-    var _runMax = 0;
-    for (var _ri = recPts.length - 1; _ri >= 0; _ri--) {
-      var _yy = recPts[_ri].y; if (_yy == null) continue;
-      if (_yy < _runMax) recPts[_ri].y = _runMax; else _runMax = _yy;
-    }
     var tickT = [1, 5, 10, 30, 60, 300, 1200, 3600, 9000, 18000].filter(function (t) { return t <= n; });
     window.__afCharts.push(new Chart(document.getElementById('af-pcurve'), {
       type: 'line',
