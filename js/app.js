@@ -6374,12 +6374,17 @@ window.openFullAnalysis = function () {
   window.__afCharts = [];
   setTimeout(function () { try { _buildAfCharts(S); } catch (e) { console.warn('[af charts]', e && e.message); } try { window.dispatchEvent(new Event('resize')); } catch (e2) {} }, 40);
 };
-window.closeFullAnalysis = function () {
+window.closeFullAnalysis = function (reopen) {
   (window.__afCharts || []).forEach(function (c) { try { c.destroy(); } catch (e) {} });
   window.__afCharts = [];
   var pid = window.__prevPanelId || 'p1';
   if (typeof activatePanel === 'function') { activatePanel(pid, false); }
   else { var pg = document.getElementById('p-analysis'); if (pg) pg.classList.remove('active'); var pv = document.getElementById(pid); if (pv) pv.classList.add('active'); }
+  // Retour -> rouvre la modale detail de l'activite (et non le calendrier)
+  if (reopen !== false && window.__currentModalIso && typeof openSessionModal === 'function') {
+    if (typeof window.__modalActIdx === 'number') window.__openActIdx = window.__modalActIdx;
+    try { openSessionModal(window.__currentModalIso, window.__currentModalSource || 'realise'); } catch (e) {}
+  }
 };
 // Clic sur "Voir l'analyse detaillee" (delegation -> robuste quel que soit le moment de rendu)
 document.addEventListener('click', function (e) {
@@ -6520,7 +6525,7 @@ if (!window.__recRowWired) {
       var liso = line.dataset.iso, lsb = line.dataset.sbid, idx = 0;
       if (Array.isArray(data)) { var dday = data.find(function (d) { return ((typeof toIsoDate === 'function') ? toIsoDate(d.date) : d.date) === liso; }); if (dday) { var ii = (dday.activities || []).findIndex(function (a) { return String(a._sbId) === lsb; }); if (ii >= 0) idx = ii; } }
       window.__openActIdx = idx;
-      if (typeof closeFullAnalysis === 'function') closeFullAnalysis();
+      if (typeof closeFullAnalysis === 'function') closeFullAnalysis(false);
       if (typeof openSessionModal === 'function') openSessionModal(liso, 'realise');
       return;
     }
