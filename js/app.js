@@ -6393,18 +6393,29 @@ document.addEventListener('click', function (e) {
   e.preventDefault();
   if (typeof window.openFullAnalysis === 'function') window.openFullAnalysis();
 });
-var __PC_DURS = (function () {
+// Lignes AFFICHEES dans le tableau des records (lisible, pas trop de lignes).
+var __PC_TABLE_DURS = (function () {
   var d = [], s;
-  for (s = 1; s <= 10; s++) d.push(s);            // 1..10 s (chaque seconde)
-  for (s = 15; s <= 30; s += 5) d.push(s);        // 15, 20, 25, 30 s
-  d.push(45);                                      // 45 s
-  for (s = 60; s <= 600; s += 60) d.push(s);        // 1..10 min (chaque minute)
-  for (s = 900; s <= 3600; s += 300) d.push(s);     // 15..60 min (tous les 5 min)
-  for (s = 4500; s <= 9000; s += 900) d.push(s);    // 1h15..2h30 (tous les 15 min)
-  for (s = 10800; s <= 28800; s += 1800) d.push(s); // 3h et + (tous les 30 min, jusqu'a 8h)
+  for (s = 1; s <= 10; s++) d.push(s);
+  for (s = 15; s <= 30; s += 5) d.push(s);
+  d.push(45);
+  for (s = 60; s <= 600; s += 60) d.push(s);
+  for (s = 900; s <= 3600; s += 300) d.push(s);
+  for (s = 4500; s <= 9000; s += 900) d.push(s);
+  for (s = 10800; s <= 28800; s += 1800) d.push(s);
   return d;
 })();
-var __PC_VERSION = 2;   // bumper quand le jeu de durees change -> force le recalcul
+// Resolution de STOCKAGE / records : dense (vraies valeurs a chaque seconde la ou ca compte).
+// chaque seconde jusqu'a 10 min, puis 5 s jusqu'a 30 min, 30 s jusqu'a 1 h, 5 min au-dela.
+var __PC_DURS = (function () {
+  var d = [], s;
+  for (s = 1; s <= 600; s++) d.push(s);
+  for (s = 605; s <= 1800; s += 5) d.push(s);
+  for (s = 1830; s <= 3600; s += 30) d.push(s);
+  for (s = 3900; s <= 28800; s += 300) d.push(s);
+  return d;
+})();
+var __PC_VERSION = 3;   // bumper quand le jeu de durees change -> force le recalcul
 window.__powerCurveFromWatts = function (watts) {
   if (!watts || !watts.length) return null;
   var n = watts.length, pref = new Float64Array(n + 1);
@@ -6494,7 +6505,7 @@ function _buildRecordsTable(S) {
     var h = Math.floor(d / 3600), m = Math.round((d % 3600) / 60);
     return m === 0 ? (h + 'h') : (h + 'h' + String(m).padStart(2, '0'));
   };
-  var std = __PC_DURS.filter(function (d) { return d <= n; });
+  var std = __PC_TABLE_DURS.filter(function (d) { return d <= n; });
   var hasCad = CAD.some(function (x) { return x != null; });
   var rows = std.map(function (d) {
     var bw = bestWin(d), s0 = bw.start, s1 = Math.min(n, s0 + d), cur = Math.round(bw.avg);
@@ -6589,19 +6600,12 @@ function _buildAfCharts(S) {
     var pts = durs.map(function (x) { return { x: TX(x), y: Math.round(bestWin(x).avg) }; });
     // Record all-time (envelope des meilleures perfs <= date) par duree standard
     var byDur = (typeof window.__allPowerCurvesByDur === 'function') ? window.__allPowerCurvesByDur(window.__lastActDate, window.__lastActSport) : {};
-    // Enveloppe des records (meilleure perf par duree standard), puis interpolation a chaque
-    // point de `durs` pour que le Record s'affiche a chaque seconde comme "Cette sortie".
-    var recEnv = [];
-    __PC_DURS.forEach(function (d2) { var arr = byDur[d2]; if (!arr || !arr.length) return; var mx = 0; for (var z = 0; z < arr.length; z++) if (arr[z] > mx) mx = arr[z]; if (mx > 0) recEnv.push({ d: d2, w: mx }); });
-    recEnv.sort(function (p, q) { return p.d - q.d; });
-    var recAt = function (dd) {
-      if (!recEnv.length) return null;
-      if (dd <= recEnv[0].d) return recEnv[0].w;
-      if (dd >= recEnv[recEnv.length - 1].d) return recEnv[recEnv.length - 1].w;
-      for (var i2 = 1; i2 < recEnv.length; i2++) { if (dd <= recEnv[i2].d) { var pa = recEnv[i2 - 1], pb = recEnv[i2], tt = (TX(dd) - TX(pa.d)) / (TX(pb.d) - TX(pa.d)); return pa.w + (pb.w - pa.w) * tt; } }
-      return recEnv[recEnv.length - 1].w;
-    };
-    var recPts = durs.map(function (x) { var rv = recAt(x); return { x: TX(x), y: rv == null ? null : Math.round(rv) }; });
+    // Record all-time : VRAIE valeur a chaque point (max sur l'historique a cette duree exacte).
+    var recPts = durs.map(function (x) {
+      var arr = byDur[x]; if (!arr || !arr.length) return { x: TX(x), y: null };
+      var mx = 0; for (var z = 0; z < arr.length; z++) if (arr[z] > mx) mx = arr[z];
+      return { x: TX(x), y: mx > 0 ? Math.round(mx) : null };
+    });
     var tickT = [1, 5, 10, 30, 60, 300, 1200, 3600, 9000, 18000].filter(function (t) { return t <= n; });
     window.__afCharts.push(new Chart(document.getElementById('af-pcurve'), {
       type: 'line',

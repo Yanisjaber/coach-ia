@@ -53,18 +53,15 @@ const DURATIONS = Object.keys(SEC_TO_COL).map(Number).sort((a, b) => a - b);
 // la table power_profile ET le tableau des records côté client.
 const PC_DURS: number[] = (() => {
   const d: number[] = [];
-  for (let s = 1; s <= 10; s++) d.push(s);
-  for (let s = 15; s <= 30; s += 5) d.push(s);
-  d.push(45);
-  for (let s = 60; s <= 600; s += 60) d.push(s);
-  for (let s = 900; s <= 3600; s += 300) d.push(s);
-  for (let s = 4500; s <= 9000; s += 900) d.push(s);
-  for (let s = 10800; s <= 28800; s += 1800) d.push(s);
+  for (let s = 1; s <= 600; s++) d.push(s);
+  for (let s = 605; s <= 1800; s += 5) d.push(s);
+  for (let s = 1830; s <= 3600; s += 30) d.push(s);
+  for (let s = 3900; s <= 28800; s += 300) d.push(s);
   return d;
 })();
 const MMP_DURS = Array.from(new Set([...DURATIONS, ...PC_DURS])).sort((a, b) => a - b);
 // Version du jeu de durées CLIENT (doit rester égale à __PC_VERSION dans js/app.js).
-const CLIENT_PC_VERSION = 2;
+const CLIENT_PC_VERSION = 3;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -171,7 +168,7 @@ Deno.serve(async (req) => {
 
     // ===== 5) Backfill power_curve (nouvelles durées) depuis les streams stockés =====
     // Lot limité (idempotent) : recalcule la courbe des activités obsolètes.
-    const backfill = await backfillPowerCurves(sbAdmin, user.id, 100, ATH);
+    const backfill = await backfillPowerCurves(sbAdmin, user.id, 50, ATH);  // lot reduit : calcul dense plus lourd
 
     // ===== 6) Recalculs power_profile (legacy) + power_profile_sport (par sport) =====
     // On recalcule le profil par sport à CHAQUE passage : il s'appuie sur les power_curve
@@ -531,7 +528,7 @@ async function recomputePowerProfileBySport(sb: any, userId: string): Promise<nu
 // Recalcule la power_curve (avec les NOUVELLES durées) depuis les streams déjà
 // stockés, pour les activités dont la courbe est absente/obsolète. Lot limité
 // (idempotent, relançable). Renvoie { done, remaining }.
-const POWER_CURVE_VERSION = 4; // bump quand on change les durées/calculs (force un re-backfill local)
+const POWER_CURVE_VERSION = 5; // bump quand on change les durées/calculs (force un re-backfill local)
 async function backfillPowerCurves(sb: any, userId: string, limit: number, ath: any): Promise<{ done: number; remaining: number }> {
   // 1) Repère les activités obsolètes SANS charger les streams (power_curve est léger).
   const { data, error } = await sb
