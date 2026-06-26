@@ -6436,7 +6436,7 @@ window.__topRecordsForDur = function (dur, cutoffIso, sportCat, limit) {
       if (sportCat && catOf(a.raw_type || a.sport) !== sportCat) return;
       var pc = a.power_curve; if (!pc) return;
       var v = +pc[dur]; if (isNaN(v) || v <= 0) return;
-      out.push({ w: Math.round(v), name: a.name || 'Activité', date: diso });
+      out.push({ w: Math.round(v), name: a.name || 'Activité', date: diso, sbId: (a._sbId != null ? String(a._sbId) : '') });
     });
   });
   out.sort(function (x, y) { return y.w - x.w; });
@@ -6514,6 +6514,15 @@ function _buildRecordsTable(S) {
 if (!window.__recRowWired) {
   window.__recRowWired = true;
   document.addEventListener('click', function (e) {
+    var line = e.target.closest ? e.target.closest('.rec-line') : null;
+    if (line && line.dataset.sbid) {
+      var liso = line.dataset.iso, lsb = line.dataset.sbid, idx = 0;
+      if (Array.isArray(data)) { var dday = data.find(function (d) { return ((typeof toIsoDate === 'function') ? toIsoDate(d.date) : d.date) === liso; }); if (dday) { var ii = (dday.activities || []).findIndex(function (a) { return String(a._sbId) === lsb; }); if (ii >= 0) idx = ii; } }
+      window.__openActIdx = idx;
+      if (typeof closeFullAnalysis === 'function') closeFullAnalysis();
+      if (typeof openSessionModal === 'function') openSessionModal(liso, 'realise');
+      return;
+    }
     var row = e.target.closest ? e.target.closest('.rec-row') : null;
     var host = document.getElementById('af-records');
     if (!row || !host || !host.contains(row)) return;
@@ -6524,10 +6533,12 @@ if (!window.__recRowWired) {
     host.querySelectorAll('.rec-exp').forEach(function (x) { x.remove(); });
     host.querySelectorAll('.rec-caret').forEach(function (c) { c.textContent = '▸'; });
     var list = (typeof window.__topRecordsForDur === 'function') ? window.__topRecordsForDur(dur, window.__lastActDate, window.__lastActSport, 30) : [];
-    var fmtDate = function (iso) { if (!iso) return ''; try { return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' }); } catch (e2) { return iso; } };
+    var fmtDate = function (iso) { if (!iso) return ''; try { return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e2) { return iso; } };
     var inner = list.map(function (r, i) {
       var rkCol = (i < 3) ? '#fbbf24' : 'var(--text-mute,#6b7686)';
-      return '<div class="rec-line"><span class="rec-rk" style="color:' + rkCol + '">' + (i + 1) + '</span><span class="rec-w">' + r.w + ' W</span><span class="rec-nm">' + String(r.name || '').replace(/</g, '&lt;') + '</span><span class="rec-dt">' + fmtDate(r.date) + '</span></div>';
+      var isCur = r.sbId && window.__lastActSbId && String(r.sbId) === String(window.__lastActSbId);
+      var nmStyle = isCur ? ' style="color:var(--accent);font-weight:700"' : '';
+      return '<div class="rec-line' + (isCur ? ' rec-line-cur' : '') + '" data-iso="' + (r.date || '') + '" data-sbid="' + (r.sbId || '') + '"><span class="rec-rk" style="color:' + rkCol + '">' + (i + 1) + '</span><span class="rec-w">' + r.w + ' W</span><span class="rec-nm"' + nmStyle + '>' + String(r.name || '').replace(/</g, '&lt;') + '</span><span class="rec-dt">' + fmtDate(r.date) + '</span></div>';
     }).join('');
     if (!inner) inner = '<div style="color:var(--text-mute);padding:10px">Aucun enregistrement sur cette durée.</div>';
     var tr = document.createElement('tr');
