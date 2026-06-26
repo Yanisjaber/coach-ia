@@ -1037,3 +1037,15 @@
 #p-analysis .af-table tbody tr:hover td { background: rgba(255,255,255,0.03); }
 #p-analysis .af-table td b { color: var(--text); font-weight: 700; }
 #p-analysis .af-table .af-tw { color: var(--text); }
+
+/* Records : ligne cliquable -> top 30 deplie (rang, W, nom, date) */
+#p-analysis .rec-row:hover td { background: rgba(255,255,255,0.03); }
+#p-analysis .rec-caret { display: inline-block; width: 12px; color: var(--text-mute); font-size: 10px; }
+#p-analysis .af-table .rec-exp > td { padding: 4px 8px; }
+#p-analysis .rec-exp-box { max-height: 280px; overflow-y: auto; background: var(--bg-elev2, #1b2230); border: 1px solid var(--border); border-radius: 8px; }
+#p-analysis .rec-line { display: flex; align-items: center; gap: 12px; padding: 7px 12px; font-size: 12.5px; border-bottom: 1px solid var(--border); }
+#p-analysis .rec-line:last-child { border-bottom: none; }
+#p-analysis .rec-rk { width: 26px; font-weight: 700; flex: none; }
+#p-analysis .rec-w { width: 62px; font-weight: 700; color: var(--accent); flex: none; }
+#p-analysis .rec-nm { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#p-analysis .rec-dt { color: var(--text-dim); white-space: nowrap; flex: none; }

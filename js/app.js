@@ -6424,6 +6424,24 @@ window.__allPowerCurvesByDur = function (cutoffIso, sportCat) {
   });
   return m;
 };
+// Top N enregistrements {w, nom, date} pour une duree donnee (meme filtre que le rang).
+window.__topRecordsForDur = function (dur, cutoffIso, sportCat, limit) {
+  var out = [];
+  var catOf = function (x) { return (typeof getSportCategory === 'function') ? getSportCategory(x) : x; };
+  if (Array.isArray(data)) data.forEach(function (dd) {
+    var diso = (typeof toIsoDate === 'function') ? toIsoDate(dd.date) : null;
+    if (cutoffIso && diso && diso > cutoffIso) return;
+    (dd.activities || []).forEach(function (a) {
+      if (!a || a._exclPower) return;
+      if (sportCat && catOf(a.raw_type || a.sport) !== sportCat) return;
+      var pc = a.power_curve; if (!pc) return;
+      var v = +pc[dur]; if (isNaN(v) || v <= 0) return;
+      out.push({ w: Math.round(v), name: a.name || 'Activité', date: diso });
+    });
+  });
+  out.sort(function (x, y) { return y.w - x.w; });
+  return out.slice(0, limit || 30);
+};
 // recalcul global : parcourt les sorties avec puissance, calcule + sauve la courbe
 window.recalcAllPowerCurves = async function (onProgress) {
   var list = [];
@@ -6483,14 +6501,41 @@ function _buildRecordsTable(S) {
     var spd = distM > 0 ? ((distM / 1000) / (d / 3600)) : 0;
     var dplus = altGain(s0, s1);
     var cad = avgR(CAD, s0, s1);
-    return '<tr>'
-      + '<td>' + fmtDur(d) + '</td>'
+    return '<tr class="rec-row" data-dur="' + d + '" style="cursor:pointer">'
+      + '<td><span class="rec-caret">\u25b8</span> ' + fmtDur(d) + '</td>'
       + '<td class="af-tw"><b>' + cur + ' W</b></td>'
       + '<td style="min-width:170px"><div style="display:flex;align-items:center;gap:9px"><span style="color:' + rankTxtCol + ';font-weight:700;white-space:nowrap">' + medal + rank + '<span style="color:var(--text-mute,#6b7686);font-weight:400"> / ' + totalR + '</span></span><div style="flex:1;height:5px;background:var(--bg-elev,#222b3d);border-radius:3px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:#5fb87a"></div></div></div></td>'
       + '<td>' + fmtT(s0) + ' \u2192 ' + fmtT(s1) + '</td>'
       + '</tr>';
   }).join('');
   return '<div class="af-table-wrap"><table class="af-table"><thead><tr><th>Durée</th><th>Puissance</th><th>Rang</th><th>Intervalle</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+// Clic sur une ligne de record -> deplie le top 30 (rang, W, nom, date) defilable.
+if (!window.__recRowWired) {
+  window.__recRowWired = true;
+  document.addEventListener('click', function (e) {
+    var row = e.target.closest ? e.target.closest('.rec-row') : null;
+    var host = document.getElementById('af-records');
+    if (!row || !host || !host.contains(row)) return;
+    var dur = +row.dataset.dur;
+    var next = row.nextElementSibling;
+    var setCaret = function (r, open) { var c = r.querySelector('.rec-caret'); if (c) c.textContent = open ? '▾' : '▸'; };
+    if (next && next.classList.contains('rec-exp') && +next.dataset.dur === dur) { next.remove(); setCaret(row, false); return; }
+    host.querySelectorAll('.rec-exp').forEach(function (x) { x.remove(); });
+    host.querySelectorAll('.rec-caret').forEach(function (c) { c.textContent = '▸'; });
+    var list = (typeof window.__topRecordsForDur === 'function') ? window.__topRecordsForDur(dur, window.__lastActDate, window.__lastActSport, 30) : [];
+    var fmtDate = function (iso) { if (!iso) return ''; try { return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' }); } catch (e2) { return iso; } };
+    var inner = list.map(function (r, i) {
+      var rkCol = (i < 3) ? '#fbbf24' : 'var(--text-mute,#6b7686)';
+      return '<div class="rec-line"><span class="rec-rk" style="color:' + rkCol + '">' + (i + 1) + '</span><span class="rec-w">' + r.w + ' W</span><span class="rec-nm">' + String(r.name || '').replace(/</g, '&lt;') + '</span><span class="rec-dt">' + fmtDate(r.date) + '</span></div>';
+    }).join('');
+    if (!inner) inner = '<div style="color:var(--text-mute);padding:10px">Aucun enregistrement sur cette durée.</div>';
+    var tr = document.createElement('tr');
+    tr.className = 'rec-exp'; tr.dataset.dur = dur;
+    tr.innerHTML = '<td colspan="4"><div class="rec-exp-box">' + inner + '</div></td>';
+    row.parentNode.insertBefore(tr, row.nextSibling);
+    setCaret(row, true);
+  });
 }
 
 function _buildAfCharts(S) {
