@@ -5212,13 +5212,14 @@ async function renderStreamsSection(container, activityId) {
     }
     return out;
   }
+  var _wattsRaw = watts ? watts.slice() : null;   // brut, pour records/metriques (le lissage est pour l'affichage)
   if (watts) watts = smoothWin(watts, 1);      // ±1 s = 3 s
   if (hr) hr = smoothWin(hr, 1);                // ±1 s = 3 s
   if (cadence) cadence = smoothWin(cadence, 4); // ±4 s = 9 s (plus stable)
   try {
     var _hrMaxA = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && (+window.DASHBOARD_DATA.athlete.hr_max || +window.DASHBOARD_DATA.athlete.hrMax)) || 190;
     var _ftpA = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && +window.DASHBOARD_DATA.athlete.ftp) || 250;
-    window.__lastStreams = { watts: watts ? watts.slice() : null, hr: hr ? hr.slice() : null, cadence: cadence ? cadence.slice() : null, altitude: altitude ? altitude.slice() : null, distance: distance ? distance.slice() : null, time: time ? time.slice() : null, ftp: _ftpA, hrMax: _hrMaxA };
+    window.__lastStreams = { watts: watts ? watts.slice() : null, wattsRaw: _wattsRaw, hr: hr ? hr.slice() : null, cadence: cadence ? cadence.slice() : null, altitude: altitude ? altitude.slice() : null, distance: distance ? distance.slice() : null, time: time ? time.slice() : null, ftp: _ftpA, hrMax: _hrMaxA };
   } catch (e) { }
 
   const length = (watts && watts.length) || (hr && hr.length) || (cadence && cadence.length) || 0;
@@ -6112,7 +6113,7 @@ async function renderStreamsSection(container, activityId) {
 // Tout est calculable depuis watts+FC sauf l'equilibre G/D (mesure capteur, pas dans Strava).
 window.__computeActivityMetrics = function (S, ath, hrRest) {
   S = S || {}; ath = ath || {};
-  var W = S.watts || [], HR = S.hr || [];
+  var W = S.wattsRaw || S.watts || [], HR = S.hr || [];
   var ftp = +S.ftp || +ath.ftp || 250;
   var hrMax = +S.hrMax || +ath.hr_max || +ath.hrMax || 190;
   var sex = ath.sex || 'M';
@@ -6464,7 +6465,7 @@ window.recalcAllPowerCurves = async function (onProgress) {
 };
 
 function _buildRecordsTable(S) {
-  var W = S.watts || [], CAD = S.cadence || [], ALT = S.altitude || [], DIST = S.distance || [], n = W.length;
+  var W = S.wattsRaw || S.watts || [], CAD = S.cadence || [], ALT = S.altitude || [], DIST = S.distance || [], n = W.length;
   if (!n) return '';
   var pref = new Float64Array(n + 1);
   for (var i = 0; i < n; i++) { var w = W[i]; pref[i + 1] = pref[i] + ((w == null || isNaN(w)) ? 0 : +w); }
@@ -6558,7 +6559,7 @@ function _buildAfCharts(S) {
     return o;
   };
   var hide = function (id) { var s = document.getElementById(id); if (s) s.style.display = 'none'; };
-  var W = (S.watts || []).map(function (x) { return (x == null || isNaN(x)) ? null : +x; });
+  var W = (S.wattsRaw || S.watts || []).map(function (x) { return (x == null || isNaN(x)) ? null : +x; });
   var HR = (S.hr || []).map(function (x) { return (x == null || isNaN(x)) ? null : +x; });
   var ftp = S.ftp || 250, hrMax = S.hrMax || 190;
   var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#ec4899'];
