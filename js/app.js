@@ -3696,7 +3696,7 @@ function renderWeekPlan() {
         if (items.length === 0) {
           cardHTML = `
             <div class="day-card empty-past${isToday ? ' today' : ''}" data-iso="${iso}" data-source="prevu">
-              <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
+              <div class="day-card-dow">${dowFr[dow]}${isToday ? '<span class="dow-suffix"> · auj.</span>' : ''}</div>
               <div class="day-card-date">${d.getDate()}</div>
             </div>
           `;
@@ -3736,11 +3736,15 @@ function renderWeekPlan() {
       const durStr = proposal.dur ? fmtDur(proposal.dur) : '';
       const dplusStr = proposal.dplus ? Math.round(proposal.dplus) + ' m D+' : '';
       const rpeStr = (proposal.rpe != null && proposal.rpe !== '') ? 'RPE ' + proposal.rpe : '';
-      const metaLine = [durStr, kmStr, dplusStr, rpeStr].filter(Boolean).join(' · ');
+      const metaLine = [durStr, kmStr, dplusStr, rpeStr]
+        .filter(Boolean)
+        .map(p => `<span class="dst-meta-item">${p}</span>`)
+        .join('');
       const sportBlock = sportLabel
         ? `<div class="day-card-sport"><span class="sport-pill" data-sport-cat="${sportCat}">${sportLabel}</span></div>`
         : '';
-      const dowSuffix = isToday ? " · auj." : (isPast ? ' · passé' : '');
+      const dowSuffix = isToday ? '<span class="dow-suffix"> · auj.</span>'
+                       : (isPast ? '<span class="dow-suffix"> · passé</span>' : '');
       const stageInfoLine = (proposal.stageInfo)
         ? `<div class="day-card-stage">${proposal.stageInfo}</div>`
         : '';
@@ -3755,7 +3759,10 @@ function renderWeekPlan() {
           const _r = !!it.isRace;
           const hex = _r ? compPrio(it.priority).color : (window.sportColor ? window.sportColor(it.sport) : '#9ca3af');
           const g = _r ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(it.sport, 22) : '');
-          const t = it.dur ? fmtDur(it.dur) : (it.km ? Math.round(it.km) + ' km' : '');
+          // Format compact pour colonnes étroites : "42m" au lieu de "42 min"
+          // (évite que "min" parte sur une 2e ligne quand 4-5 activités en parallèle)
+          const tRaw = it.dur ? fmtDur(it.dur) : (it.km ? Math.round(it.km) + ' km' : '');
+          const t = tRaw.replace(' min', 'm');
           const nm = it.name || 'Séance';
           return `<div class="day-multi-col" data-iso="${iso}" data-source="prevu" data-actidx="${i}" title="${String(nm).replace(/\"/g, '&quot;')}" style="background:${hex}1a">`
             + `<div class="dmc-bar" style="background:${hex}"></div>`
@@ -3896,7 +3903,9 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
       const isComp = a.category === 'competition';
       const hex = isComp ? compPrio(a.priority).color : (window.sportColor ? window.sportColor(a.raw_type || a.sport) : '#9ca3af');
       const g = isComp ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(a.raw_type || a.sport, 22) : '');
-      const t = a.duration ? fmtDur(a.duration) : (a.distance_km ? Math.round(a.distance_km) + ' km' : '');
+      // Format compact pour colonnes étroites : "42m" au lieu de "42 min"
+      const _tRaw = a.duration ? fmtDur(a.duration) : (a.distance_km ? Math.round(a.distance_km) + ' km' : '');
+      const t = _tRaw.replace(' min', 'm');
       const _nm = a.name || a.sessionName || 'Séance';
       return `<div class="day-multi-col" data-iso="${iso}" data-source="realise" data-actidx="${i}" title="${String(_nm).replace(/"/g, '&quot;')}" style="background:${hex}1a">`
         + `<div class="dmc-bar" style="background:${hex}"></div>`
@@ -3905,7 +3914,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
     }).join('');
     return `
     <div class="day-card past${isToday ? ' today' : ''} day-card--multi" data-iso="${iso}" data-source="realise">
-      <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
+      <div class="day-card-dow">${dowFr[dow]}${isToday ? '<span class="dow-suffix"> · auj.</span>' : ''}</div>
       <div class="day-card-date">${d.getDate()}</div>
       <div class="day-multi-grid">${cols}</div>
     </div>
@@ -3947,7 +3956,9 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   else if (act.tss) metaParts.push(act.tss + ' TSS'); // pas de km → on met TSS
   if (act.elevation_gain) metaParts.push(Math.round(act.elevation_gain) + ' m D+');
   if (act.rpe != null && act.rpe !== '') metaParts.push('RPE ' + act.rpe);
-  const metaLine = metaParts.join(' · ');
+  // Chaque item dans son propre span → CSS peut stacker en colonne sur petits écrans
+  // sans wrap moche au milieu de "36 km".
+  const metaLine = metaParts.map(p => `<span class="dst-meta-item">${p}</span>`).join('');
 
   // Marqueur si TOUTES les activités du jour sont manuelles (= pas tracké par Strava)
   const allManual = realDay && realDay.activities && realDay.activities.length
@@ -3977,7 +3988,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
     : '';
   return `
     <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass} day-card--single" data-iso="${iso}" data-source="realise"${raceAttr}>
-      <div class="day-card-dow">${dowFr[dow]}${isToday ? ' · auj.' : ''}</div>
+      <div class="day-card-dow">${dowFr[dow]}${isToday ? '<span class="dow-suffix"> · auj.</span>' : ''}</div>
       <div class="day-card-date">${d.getDate()}</div>
       <div class="day-single-tile" style="background:${_hex}1a" title="${String(aName).replace(/"/g, '&quot;')}">
         <div class="dmc-bar" style="background:${_hex}"></div>
@@ -4192,7 +4203,7 @@ function renderRealiseCalendar() {
         } else {
           cardHTML = `
             <div class="day-card empty-past rest-clickable${isToday ? ' today' : ''}" data-iso="${iso}" data-source="realise">
-              <div class="day-card-dow">${dowFr[dow]}${isToday ? " · auj." : ''}</div>
+              <div class="day-card-dow">${dowFr[dow]}${isToday ? '<span class="dow-suffix"> · auj.</span>' : ''}</div>
               <div class="day-card-date">${d.getDate()}</div>
               <div class="day-card-name" style="color:var(--text-mute);font-weight:500;">Repos</div>
               ${REST_COUCH_SVG}

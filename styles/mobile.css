@@ -168,24 +168,32 @@
     margin: 0; padding: 0;
   }
 
-  /* Bilan de semaine : bandeau compact en tête, stats en ligne */
-  .week-totals {
-    order: -1; grid-column: 1 / -1;
-    height: auto; min-height: 0;
-    flex-direction: row; align-items: center;
-    gap: 10px; padding: 8px 12px;
+  /* Bandeaux de note/cycle/phase au-dessus de la semaine : on les garde
+     visibles aussi en mobile, juste un peu plus compacts. */
+  .note-band,
+  .phase-band,
+  .cycle-band {
+    font-size: 10px;
+    padding: 4px 8px;
+    min-height: 18px;
   }
-  .week-totals .wt-header { flex: none; grid-template-columns: 16px auto 16px; }
-  .week-totals .wt-view { flex-direction: row; justify-content: space-around; align-items: center; gap: 10px; }
-  .week-totals .wt-val { font-size: 15px; }
-  .week-totals .wt-dots { flex-direction: column; padding: 0; }
+
+  /* Suffix " · auj." / " · passé" : sur mobile la cellule est vraiment
+     trop étroite pour afficher quoi que ce soit après le nom du jour,
+     on le cache. Le jour reste mis en valeur par sa couleur. */
+  .dow-suffix { display: none; }
+
+  /* Bilan de semaine : masqué en mobile (plus la place sur le côté).
+     Les totaux restent calculables en regardant les cellules jour. */
+  .week-totals { display: none !important; }
 
   /* Cellule jour façon Nolio : date + vignette colorée durée/distance */
   .day-card {
-    height: 86px; min-height: 0;
+    height: 104px; min-height: 0;     /* +18px pour accueillir la tuile sans écraser la date */
     padding: 4px 3px 3px;
     align-items: stretch;
     border-radius: 10px;
+    overflow: hidden;
   }
   .day-card .day-card-dow {
     margin: 0; font-size: 7.5px; letter-spacing: 0; text-align: center;
@@ -236,6 +244,93 @@
 
   /* La vignette colorée remplace la barre verte latérale */
   .day-card:not(.rest)[data-sport-cat]::before { display: none; }
+
+  /* ===== Tuile mono-activité (.day-single-tile) : même règle qu'en mode
+     laptop — on cache nom + intervals + détails, on garde icône + temps + km
+     centrés. Sinon le texte déborde sur cellule mobile étroite. ===== */
+  .day-single-tile {
+    position: relative;
+    overflow: hidden;
+    margin-top: 2px;          /* collé sous la date, pas de gap énorme */
+    min-height: 0;
+    flex: 1;                  /* occupe l'espace restant après dow + date */
+  }
+  .dst-body {
+    gap: 3px;
+    padding: 5px 4px;
+    align-items: center;
+    justify-content: center;
+  }
+  .dst-head {
+    gap: 2px;
+    align-items: center;
+    flex-direction: column;
+    width: 100%;
+  }
+  .dst-glyph { display: inline-flex; align-items: center; justify-content: center; }
+  .dst-glyph svg { width: 16px !important; height: 16px !important; }
+  .dst-name { display: none; }
+  .dst-text { align-items: center; width: 100%; gap: 0; min-width: 0; }
+  .dst-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: baseline;
+    column-gap: 4px;
+    row-gap: 0;
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    color: var(--text);
+    width: 100%;
+    overflow: hidden;
+  }
+  .dst-meta-item { white-space: nowrap; }
+  .dst-meta-item:not(:last-child)::after { content: none; }
+  .dst-meta-item:nth-child(n+3) { display: none; }
+  .dst-profile { display: none !important; }
+  .day-card-profile { display: none !important; }
+
+  /* Multi-activités sur mobile : on cache aussi les temps dès 3+, juste les icônes */
+  .day-multi-grid { gap: 3px; min-height: 50px; }
+  .dmc-glyph svg { width: 14px !important; height: 14px !important; }
+  .dmc-time { font-size: 8px; white-space: nowrap; }
+  .day-multi-grid:has(> :nth-child(3)) .dmc-time { display: none !important; }
+
+  /* 4+ activités sur mobile : on cache à partir de la 4e colonne, badge "+N"
+     sur la 3e (cliquable pour voir tout le détail via la modal jour). */
+  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(n+4) {
+    display: none !important;
+  }
+  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(3) {
+    position: relative;
+  }
+  /* Badge "+N" avec compteur exact (1 règle par tranche) */
+  .day-multi-grid:has(> .day-multi-col:nth-child(4)):not(:has(> .day-multi-col:nth-child(5))) > .day-multi-col:nth-child(3)::after { content: "+1"; }
+  .day-multi-grid:has(> .day-multi-col:nth-child(5)):not(:has(> .day-multi-col:nth-child(6))) > .day-multi-col:nth-child(3)::after { content: "+2"; }
+  .day-multi-grid:has(> .day-multi-col:nth-child(6)):not(:has(> .day-multi-col:nth-child(7))) > .day-multi-col:nth-child(3)::after { content: "+3"; }
+  .day-multi-grid:has(> .day-multi-col:nth-child(7)) > .day-multi-col:nth-child(3)::after { content: "+4"; }
+  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(3)::after {
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 18px;
+    height: 13px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #0b0e14;
+    font-size: 9px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+  }
 
   /* Compétitions : trophée seul, sans le nom (illisible en petit) */
   .day-card.race .day-card-name { display: flex; justify-content: center; margin: 0; }
@@ -302,4 +397,291 @@
 @media (max-width: 380px) {
   .hero { grid-template-columns: 1fr; }
   .sidebar .sidebar-nav .tab { font-size: 9px; }
+}
+
+/* ============================================================
+   LAPTOP / petits écrans desktop (861px ↔ 1700px)
+   MacBook 13"/14"/16", écrans secondaires bureau, Windows compacts.
+   Resserre sidebar / library / calendrier pour que les cellules
+   jour gardent assez de place pour afficher noms + km + durée.
+   ============================================================ */
+@media (min-width: 861px) and (max-width: 1700px) {
+
+  /* ===== Container : marges latérales plus serrées ===== */
+  .container { padding: 20px clamp(12px, 2vw, 28px); }
+
+  /* Suffix "· auj." / "· passé" : on garde le texte sur UNE ligne (nowrap)
+     et on coupe proprement avec ellipsis si la cellule est trop étroite.
+     Plus de wrap moche "SAM ·" / "AUJ.". Le suffix s'affiche quand il y a
+     la place, disparaît visuellement quand y'en a pas. */
+  .day-card-dow {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+  }
+
+  /* ===== Sidebar gauche : 230 → 196px ===== */
+  .sidebar { width: 196px; padding: 14px 8px; }
+  .sidebar .logo { padding: 12px 4px 12px; }
+  .sidebar .logo-icon { width: 40px; height: 40px; font-size: 18px; border-radius: 11px; }
+  .sidebar .logo-text h1 { font-size: 18px; }
+  .sidebar-navlabel { padding: 4px 8px 6px; margin-top: 14px; font-size: 9px; }
+  .sidebar-nav .tab { padding: 6px 8px; font-size: 13px; gap: 9px; }
+  .sidebar-nav .tab svg { width: 28px; height: 28px; padding: 6px; }
+  .topbar { height: 52px; padding: 0 clamp(12px, 2vw, 24px); }
+  .topbar-title { font-size: 15px; }
+
+  /* ===== Calendrier : layout horizontal calendar + library ===== */
+  .calendar-layout { gap: 12px; }
+
+  /* Library : 300 → 230px, + bouton repli */
+  .seance-library { width: 230px; padding: 11px; }
+  .lib-title { font-size: 13px; }
+  .lib-hint { font-size: 10px; margin-bottom: 8px; }
+  .lib-search-wrap { height: 30px; }
+  .lib-search-wrap input { font-size: 12px; }
+  .lib-chip { font-size: 10px; padding: 3px 8px; }
+
+  /* Bouton repli / état replié : règles globales dans library.css */
+
+  /* ===== Week row : bilan column 150 → 110px ===== */
+  .week-row-days {
+    grid-template-columns: repeat(7, 1fr) 110px;
+    gap: 5px;
+  }
+  .week-totals { padding: 8px 6px; height: 150px; }
+  .week-totals .wt-val { font-size: 17px; }
+  .week-totals .wt-lbl { font-size: 9px; }
+
+  /* ===== Day card : padding et fonts plus compacts ===== */
+  .day-card {
+    padding: 7px 8px;
+    height: 150px;
+    border-radius: 11px;
+  }
+  .day-card-dow { font-size: 9px; margin-bottom: 1px; }
+  .day-card-date { font-size: 15px; margin-bottom: 4px; }
+  .day-card-type { font-size: 9px; padding: 2px 7px; margin-bottom: 5px; }
+  .day-card-name {
+    font-size: 11px;
+    margin-bottom: 3px;
+    line-height: 1.25;
+    /* Limite à 2 lignes maxi avec ellipsis sur la 2e */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .day-card-stage { font-size: 9px; margin-bottom: 4px; }
+  .day-card-meta {
+    font-size: 10px;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* Multi-activités : vignettes plus compactes */
+  .day-multi-grid { gap: 3px; min-height: 78px; margin-top: 6px; }
+  .dmc-time {
+    font-size: 10px;
+    white-space: nowrap;       /* "42m" sur une ligne, jamais "42 / m" */
+    text-align: center;
+    line-height: 1.1;
+  }
+  .dmc-body { padding: 4px 1px; gap: 3px; }
+  .dmc-glyph svg { width: 18px !important; height: 18px !important; }
+
+  /* 4+ activités sur une même journée : on rétrécit encore (icône 14, font 9) */
+  .day-multi-grid:has(> :nth-child(4)) .dmc-glyph svg { width: 14px !important; height: 14px !important; }
+  .day-multi-grid:has(> :nth-child(4)) .dmc-time { font-size: 9px; font-weight: 500; }
+  .day-multi-grid:has(> :nth-child(4)) .dmc-body { padding: 3px 1px; gap: 2px; }
+
+  /* 5+ activités : on cache le temps (juste l'icône) sinon illisible */
+  .day-multi-grid:has(> :nth-child(5)) .dmc-time { display: none; }
+  .day-multi-grid:has(> :nth-child(5)) .dmc-glyph svg { width: 16px !important; height: 16px !important; }
+
+  /* 4+ activités : on coupe à 3 colonnes + badge "+N" (principe :
+     dès qu'une icône touche le bord, on la supprime). */
+  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(n+4) {
+    display: none !important;
+  }
+  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(3) {
+    position: relative;
+  }
+  .day-multi-grid:has(> .day-multi-col:nth-child(4)):not(:has(> .day-multi-col:nth-child(5))) > .day-multi-col:nth-child(3)::after { content: "+1"; }
+  .day-multi-grid:has(> .day-multi-col:nth-child(5)):not(:has(> .day-multi-col:nth-child(6))) > .day-multi-col:nth-child(3)::after { content: "+2"; }
+  .day-multi-grid:has(> .day-multi-col:nth-child(6)):not(:has(> .day-multi-col:nth-child(7))) > .day-multi-col:nth-child(3)::after { content: "+3"; }
+  .day-multi-grid:has(> .day-multi-col:nth-child(7)) > .day-multi-col:nth-child(3)::after { content: "+4"; }
+  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(3)::after {
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 18px;
+    height: 13px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #0b0e14;
+    font-size: 9px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+  }
+
+  /* Mono-activité : tuile compacte avec icône sport + temps + km au CENTRE.
+     Profil d'intervalles (séances prévues) absolument positionné en bas,
+     ne pousse PAS le contenu central → même alignement entre cards avec
+     et sans intervalles. */
+  .day-single-tile {
+    margin-top: 6px;
+    min-height: 60px;
+    position: relative;        /* ancrage pour .dst-profile en absolute */
+  }
+  .dst-body {
+    gap: 4px;
+    padding: 6px 6px 5px;
+    align-items: center;
+    justify-content: center;   /* icône + meta TOUJOURS centrés verticalement */
+  }
+  /* Quand un profil d'intervalles est en bas (absolute), on réserve sa place
+     en padding-bottom : le centrage du contenu (icône + temps + km) se fait
+     dans la zone restante, au-dessus du profil — plus de chevauchement. */
+  .day-single-tile:has(.dst-profile) .dst-body {
+    padding-bottom: 40px;
+  }
+  .dst-head {
+    gap: 3px;
+    align-items: center;
+    flex-direction: column;    /* icône au-dessus du texte */
+    width: 100%;
+  }
+  .dst-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dst-glyph svg { width: 20px !important; height: 20px !important; }
+
+  /* Titre caché : "coucou strava l..." n'a pas la place de respirer */
+  .dst-name { display: none; }
+
+  /* Meta : flex wrap → reste inline si la place suffit ("1h01 29 km"),
+     se replie en 2 lignes propres quand la cellule est rétrécie. Pas de
+     séparateur " · " (le gap suffit à séparer visuellement). */
+  .dst-text { align-items: center; width: 100%; gap: 0; min-width: 0; }
+  .dst-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: baseline;
+    column-gap: 5px;
+    row-gap: 0;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: center;
+    color: var(--text);
+    width: 100%;
+    overflow: hidden;
+  }
+  .dst-meta-item { white-space: nowrap; }
+  .dst-meta-item:not(:last-child)::after { content: none; }
+  /* Cache D+, RPE et toute info au-delà des 2 premières (durée + km) */
+  .dst-meta-item:nth-child(n+3) { display: none; }
+
+  /* Profil d'intervalles : positionné en bas, sans pousser l'icône+temps */
+  .dst-profile {
+    position: absolute;
+    bottom: 5px;
+    left: 5px;
+    right: 5px;
+    margin-top: 0;
+    max-height: 32px;
+    overflow: hidden;
+  }
+  /* Sécurité : clip strict de la tuile pour que rien ne déborde */
+  .day-single-tile { overflow: hidden; }
+
+  /* ===== Hero KPI : 2 colonnes au lieu de 3-4 sur ces écrans ===== */
+  .hero { gap: 12px; }
+
+  /* ===== Profil : sidebar interne 240 → 200 sur laptop ===== */
+  .profile-page-body { grid-template-columns: 200px 1fr; gap: 18px; }
+  .profile-sidebar { padding: 12px 8px; }
+  .profile-sidebar-item { padding: 7px 8px; font-size: 12.5px; }
+}
+
+/* ============================================================
+   ÉCRANS MOYENS (1701px ↔ 1900px) — légères optimisations
+   ============================================================ */
+@media (min-width: 1701px) and (max-width: 1900px) {
+  .seance-library { width: 270px; }
+  .week-row-days { grid-template-columns: repeat(7, 1fr) 130px; }
+}
+
+/* ============================================================
+   FENÊTRES VRAIMENT ÉTROITES (861px ↔ 1200px) — cache les intervals
+   Quand y'a plus la place verticale, les barres d'intervalles débordent
+   ou écrasent l'icône+temps. On les masque, le détail reste accessible
+   au clic sur la cellule.
+   ============================================================ */
+@media (min-width: 861px) and (max-width: 1500px) {
+  .dst-profile { display: none !important; }
+  .day-single-tile:has(.dst-profile) .dst-body {
+    padding-bottom: 5px !important;  /* plus de place réservée pour le profil */
+  }
+  /* Pareil pour les mini-profils dans .day-card-profile (vue prévu autre) */
+  .day-card-profile { display: none !important; }
+
+  /* Multi-activités : sur fenêtre étroite, dès 3+ activités on n'a plus la
+     place d'afficher le temps proprement (texte tronqué façon "h4 / 2r"),
+     on bascule sur juste les icônes. */
+  .day-multi-grid:has(> :nth-child(3)) .dmc-time { display: none !important; }
+  .day-multi-grid:has(> :nth-child(3)) .dmc-glyph svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+  .day-multi-grid:has(> :nth-child(3)) .dmc-body {
+    justify-content: center;
+    padding: 4px 1px;
+  }
+
+  /* 4+ activités en laptop tight : on coupe à 3 colonnes + badge "+N" sur la 3e
+     (principe : dès qu'une icône touche le bord, on la supprime et on indique
+     combien sont cachées). Identique au comportement mobile. */
+  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(n+4) {
+    display: none !important;
+  }
+  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(3) {
+    position: relative;
+  }
+  .day-multi-grid:has(> .day-multi-col:nth-child(4)):not(:has(> .day-multi-col:nth-child(5))) > .day-multi-col:nth-child(3)::after { content: "+1"; }
+  .day-multi-grid:has(> .day-multi-col:nth-child(5)):not(:has(> .day-multi-col:nth-child(6))) > .day-multi-col:nth-child(3)::after { content: "+2"; }
+  .day-multi-grid:has(> .day-multi-col:nth-child(6)):not(:has(> .day-multi-col:nth-child(7))) > .day-multi-col:nth-child(3)::after { content: "+3"; }
+  .day-multi-grid:has(> .day-multi-col:nth-child(7)) > .day-multi-col:nth-child(3)::after { content: "+4"; }
+  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(3)::after {
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 18px;
+    height: 13px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #0b0e14;
+    font-size: 9px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+  }
 }

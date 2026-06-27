@@ -301,6 +301,38 @@ function scheduleAlign() {
 }
 window.alignSeanceLibrary = scheduleAlign;
 
+// ---- Bouton replier/déplier le panneau Bibliothèque (laptop / petits écrans) ----
+function injectLibraryToggle() {
+  const panel = document.getElementById('seance-library');
+  const layout = panel ? panel.closest('.calendar-layout') : null;
+  if (!panel || !layout || panel.querySelector('.lib-toggle')) return;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'lib-toggle';
+  btn.title = 'Replier / Déplier la bibliothèque';
+  // SVG chevron-right (replier) / chevron-left (déplier) géré via JS
+  const renderIcon = () => {
+    const collapsed = layout.classList.contains('lib-collapsed');
+    btn.setAttribute('aria-label', collapsed ? 'Déplier la bibliothèque' : 'Replier la bibliothèque');
+    btn.innerHTML = collapsed
+      ? '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>'
+      : '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+  };
+  btn.addEventListener('click', () => {
+    layout.classList.toggle('lib-collapsed');
+    try { localStorage.setItem('lib-collapsed', layout.classList.contains('lib-collapsed') ? '1' : '0'); } catch {}
+    renderIcon();
+    if (typeof scheduleAlign === 'function') scheduleAlign();
+  });
+  // Restaurer l'état persisté
+  try {
+    if (localStorage.getItem('lib-collapsed') === '1') layout.classList.add('lib-collapsed');
+  } catch {}
+  renderIcon();
+  panel.appendChild(btn);
+}
+
 // ---- Init ----
 function init() {
   const addBtn = document.getElementById('lib-add');
@@ -309,6 +341,7 @@ function init() {
   if (search) search.addEventListener('input', () => { _query = search.value.trim(); renderLibrary(); });
   wireCalendarDrop();
   renderLibrary();
+  injectLibraryToggle();
 
   // Réaligne le panneau à chaque (re)rendu du calendrier + au redimensionnement.
   const cal = document.getElementById('week-calendar');
