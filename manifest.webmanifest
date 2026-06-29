@@ -2,13 +2,13 @@
   "name": "Coach IA — Entraînement & Récupération",
   "short_name": "Coach IA",
   "description": "Dashboard d'entraînement intelligent : Strava, Whoop, plans et bilans.",
-  "start_url": "/",
+  "start_url": "./dashboard.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0b0e14",
   "theme_color": "#0b0e14",
   "lang": "fr",
-  "scope": "/",
+  "scope": "./",
   "categories": ["fitness", "health", "lifestyle"],
   "icons": [
     {
