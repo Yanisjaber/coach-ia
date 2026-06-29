@@ -1,0 +1,122 @@
+/* ============================================================
+   mobile-fixes.css — Optimisations transverses pour usage tactile
+   Chargé EN DERNIER après mobile.css.
+   ============================================================ */
+
+/* ===== Safe area iOS (encoche) — applique sur tout l'app shell ===== */
+@supports (padding: env(safe-area-inset-top)) {
+  .app-shell {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* ===== Empêcher zoom auto iOS sur les inputs (font-size < 16px déclenche zoom) ===== */
+@media (max-width: 860px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="search"],
+  input[type="date"],
+  input[type="time"],
+  input[type="month"],
+  input[type="datetime-local"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* ===== Cibles tactiles minimum 44×44 ===== */
+@media (pointer: coarse), (max-width: 860px) {
+  button,
+  .tab,
+  .subtab,
+  .preset,
+  .chart-reset,
+  .lib-chip,
+  .lib-add,
+  .lib-toggle,
+  .auth-tab,
+  .auth-submit,
+  .profile-btn,
+  .profile-sidebar-item,
+  .auth-user-btn,
+  .auth-user-menu-item,
+  .month-filter button,
+  .sport-btn,
+  .day-popover-action,
+  .wt-arrow,
+  .modal-close,
+  .confirm-btn {
+    min-height: 36px;
+    touch-action: manipulation;  /* supprime délai double-tap iOS */
+  }
+  /* Icones cliquables seules (croix, flèches) : 36px min */
+  .profile-modal-close,
+  .auth-user-chevron,
+  [aria-label="Fermer"],
+  [aria-label*="Replier"],
+  [aria-label*="Déplier"] {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+/* ===== Désactive le hover persistant en touch ===== */
+@media (hover: none) {
+  *:hover { transition: none !important; }
+  /* Annule les effets de transform/translate au hover qui restent collés en touch */
+  .profile-back-btn:hover,
+  .day-card:hover,
+  .lib-toggle:hover,
+  .auth-submit:hover:not(:disabled),
+  .profile-btn-primary:hover:not(:disabled) {
+    transform: none !important;
+  }
+}
+
+/* ===== Tap highlight discret (au lieu du gris iOS par défaut) ===== */
+* {
+  -webkit-tap-highlight-color: rgba(74, 222, 128, 0.18);
+}
+
+/* ===== Scroll smooth + bounce iOS ===== */
+html { -webkit-overflow-scrolling: touch; }
+
+/* ===== Sélection texte : autorisée sur contenu, désactivée sur UI tappable ===== */
+button, .tab, .subtab, .lib-chip, .day-card, .auth-user-btn, .profile-sidebar-item {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ===== Tab bar mobile : safe area bottom (Android nav bar / iPhone home indicator) ===== */
+@media (max-width: 860px) {
+  .sidebar {
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .container {
+    padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* ===== Modals plein écran : safe area top + bottom ===== */
+@media (max-width: 860px) {
+  .modal-overlay .modal {
+    padding-top: calc(20px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ===== Empêche le pull-to-refresh accidentel quand on scroll dans la page ===== */
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* ===== Pas de sélection accidentelle au long-press sur images / icônes ===== */
+img, svg {
+  -webkit-touch-callout: none;
+  pointer-events: auto;
+}

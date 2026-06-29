@@ -157,7 +157,7 @@ function renderLibrary() {
   body.querySelectorAll('.lib-item-edit').forEach(b => b.addEventListener('click', (e) => {
     e.stopPropagation(); openTemplateModal(b.dataset.edit);
   }));
-  // Drag
+  // Drag (desktop) + tap-to-place (touch / mobile)
   body.querySelectorAll('.lib-item').forEach(it => {
     it.addEventListener('dragstart', (e) => {
       _draggingId = it.dataset.id;
@@ -171,7 +171,51 @@ function renderLibrary() {
       document.body.classList.remove('lib-dragging');
       document.querySelectorAll('.day-card.lib-drop-hover').forEach(c => c.classList.remove('lib-drop-hover'));
     });
+
+    // === Mode tactile : tap sur l'item = sélection, puis tap sur un jour = placement.
+    // Détection : pointerdown sans mouvement suivi de pointerup proche → c'est un tap.
+    // Sur les écrans desktop avec souris, le HTML5 DnD prend le dessus et ce code
+    // n'est jamais déclenché (pas de touch).
+    it.addEventListener('click', (e) => {
+      // Si on est encore en train de drag (mouse), on ignore le click final
+      if (document.body.classList.contains('lib-dragging')) return;
+      // Mode touch : on toggle la sélection
+      const wasSelected = it.classList.contains('selected-for-place');
+      // Reset toutes les sélections
+      document.querySelectorAll('.lib-item.selected-for-place').forEach(x => x.classList.remove('selected-for-place'));
+      if (!wasSelected) {
+        it.classList.add('selected-for-place');
+        _draggingId = it.dataset.id;
+        document.body.classList.add('lib-placing-mode');
+        showPlacingHint(it.querySelector('.lib-item-name')?.textContent || 'Séance');
+      } else {
+        _draggingId = null;
+        document.body.classList.remove('lib-placing-mode');
+        hidePlacingHint();
+      }
+    });
   });
+}
+
+function showPlacingHint(name) {
+  hidePlacingHint();
+  const hint = document.createElement('div');
+  hint.id = 'lib-placing-hint';
+  hint.innerHTML = `
+    <span><b>${name}</b> sélectionnée — tape un jour du calendrier pour l'y placer</span>
+    <button type="button" id="lib-placing-cancel">Annuler</button>
+  `;
+  document.body.appendChild(hint);
+  hint.querySelector('#lib-placing-cancel').addEventListener('click', () => {
+    document.querySelectorAll('.lib-item.selected-for-place').forEach(x => x.classList.remove('selected-for-place'));
+    _draggingId = null;
+    document.body.classList.remove('lib-placing-mode');
+    hidePlacingHint();
+  });
+}
+function hidePlacingHint() {
+  const h = document.getElementById('lib-placing-hint');
+  if (h) h.remove();
 }
 window.renderSeanceLibrary = renderLibrary;
 
@@ -279,6 +323,25 @@ function wireCalendarDrop() {
       window.coachInsertTemplate(iso, tpl, mode);
     }
   });
+
+  // === Mode tactile : tap sur un jour quand un template est "selected-for-place"
+  cal.addEventListener('click', (e) => {
+    if (!document.body.classList.contains('lib-placing-mode') || !_draggingId) return;
+    const card = e.target.closest('.day-card[data-iso]');
+    if (!card) return;
+    const iso = card.dataset.iso;
+    const tpl = loadTemplates().find(t => t.id === _draggingId);
+    if (iso && tpl && window.coachInsertTemplate) {
+      const mode = window.coachCalendarMode ? window.coachCalendarMode() : 'prevu';
+      window.coachInsertTemplate(iso, tpl, mode);
+    }
+    // Reset l'état de placement
+    _draggingId = null;
+    document.body.classList.remove('lib-placing-mode');
+    document.querySelectorAll('.lib-item.selected-for-place').forEach(x => x.classList.remove('selected-for-place'));
+    hidePlacingHint();
+    e.stopPropagation();
+  }, true);  // capture phase pour intercepter avant l'ouverture de la day-modal
 }
 
 // ---- Alignement vertical du panneau sur la 1re carte Bilan ----
