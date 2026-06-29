@@ -56,6 +56,7 @@
 <!-- Couche mobile : TOUJOURS en dernier -->
 <link rel="stylesheet" href="styles/mobile.css">
 <link rel="stylesheet" href="styles/mobile-fixes.css">
+<link rel="stylesheet" href="styles/mobile-home.css">
 <link rel="stylesheet" href="styles/coach.css">
 
 <!-- Loading overlay PRÉ-AFFICHÉ : visible dès le DOM rendu pour cacher le flash de
@@ -158,9 +159,11 @@
 
     <div class="card">
       <div class="kpi-label">Forme (TSB)</div>
-      <div><span class="kpi-value" id="tsb-val">—</span></div>
-      <div class="kpi-trend" id="tsb-state">—</div>
-      <div style="margin-top:10px;font-size:12px;color:var(--text-dim);">
+      <div class="tsb-pill-wrap">
+        <span class="kpi-value" id="tsb-val">—</span>
+        <span class="kpi-trend" id="tsb-state">—</span>
+      </div>
+      <div class="tsb-meta" style="margin-top:10px;font-size:12px;color:var(--text-dim);">
         Fitness CTL <span style="color:var(--text);" id="ctl-val">—</span><br>
         Fatigue ATL <span style="color:var(--text);" id="atl-val">—</span>
       </div>
@@ -188,7 +191,6 @@
     <div class="date-range" id="load-range">
       <button class="preset active" data-days="30">30j</button>
       <button class="preset" data-days="90">90j</button>
-      <button class="preset" data-days="180">6 mois</button>
       <button class="preset" data-days="365">1 an</button>
       <span class="sep">·</span>
       <span>du</span>
@@ -198,9 +200,9 @@
     </div>
     <div class="chart-wrap tall"><canvas id="chart-load"></canvas></div>
     <div class="legend">
-      <span><span class="legend-dot" style="background:var(--info);"></span>CTL (forme)</span>
-      <span><span class="legend-dot" style="background:var(--warn);"></span>ATL (fatigue)</span>
-      <span><span class="legend-dot" style="background:var(--purple);"></span>TSB (fraîcheur)</span>
+      <span><span class="legend-dot" style="background:var(--info);"></span>CTL<span class="legend-detail"> (forme)</span></span>
+      <span><span class="legend-dot" style="background:var(--warn);"></span>ATL<span class="legend-detail"> (fatigue)</span></span>
+      <span><span class="legend-dot" style="background:var(--purple);"></span>TSB<span class="legend-detail"> (fraîcheur)</span></span>
     </div>
   </div>
 

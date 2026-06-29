@@ -8,8 +8,12 @@
    donc activatePanel() et le hash continuent de fonctionner.
    ============================================================ */
 
-const MORE_PANELS = ['p6', 'p4', 'p5']; // Compétitions, Performance, Termes
-const SHORT_LABELS = { p1: 'Accueil', p2: 'Calendrier', p7: 'IA', p3: 'Stats' };
+// Panels "secondaires" affichés dans la sheet "Plus" sur mobile.
+// Compétitions (p6) et Performance (p4) sont MAINTENANT visibles dans la
+// bottom nav (l'user les veut accessibles directement), donc retirés de Plus.
+// Plus ne garde que Termes (p5) + les tabs coach injectées dynamiquement.
+const MORE_PANELS = ['p5', 'p-athletes', 'p-overview', 'p-chat'];
+const SHORT_LABELS = { p1: 'Accueil', p2: 'Calendrier', p6: 'Compét.', p4: 'Perf.', p7: 'IA', p3: 'Stats' };
 
 const mq = window.matchMedia('(max-width: 860px)');
 let moreBtn = null;
@@ -18,21 +22,14 @@ let overlay = null;
 let headerInfoHome = null; // emplacement d'origine du pied de sidebar
 
 function buildOnce() {
-  if (moreBtn) return;
+  if (moreBtn !== null) return;
 
   const nav = document.querySelector('.sidebar-nav');
   if (!nav) return;
 
-  /* --- Bouton « Plus » dans la tab bar --- */
-  moreBtn = document.createElement('button');
-  moreBtn.className = 'tab tab-more';
-  moreBtn.type = 'button';
-  moreBtn.innerHTML =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' +
-    '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>' +
-    '<span>Plus</span>';
-  moreBtn.addEventListener('click', toggleSheet);
-  nav.appendChild(moreBtn);
+  // Bouton "Plus" supprimé : on garde une référence vide pour compat.
+  // L'accès aux Termes et autres se fait via le menu user (en haut à droite).
+  moreBtn = false; // sentinel pour éviter double-init
 
   /* --- Mémorise les libellés complets (le swap se fait dans applyLabels) --- */
   Object.keys(SHORT_LABELS).forEach(panel => {
@@ -49,7 +46,31 @@ function buildOnce() {
   sheet.className = 'msheet';
   sheet.innerHTML = '<div class="msheet-handle"></div><nav class="msheet-nav"></nav><div class="msheet-foot"></div>';
 
+  document.body.appendChild(overlay);
+  document.body.appendChild(sheet);
+
+  rebuildSheetItems();
+
+  /* --- État actif de « Plus » suit le panel courant --- */
+  const obs = new MutationObserver(syncActiveState);
+  document.querySelectorAll('.panel').forEach(p =>
+    obs.observe(p, { attributes: true, attributeFilter: ['class'] }));
+  syncActiveState();
+
+  /* --- Fermer la feuille avec le bouton retour Android --- */
+  window.addEventListener('popstate', () => { if (isOpen()) closeSheet(); });
+}
+
+// Rebuild les items du sheet "Plus" depuis le nav courant. Appelé au boot
+// puis re-appelé quand des tabs coach (p-athletes, p-overview, p-chat) sont
+// ajoutées dynamiquement après l'init.
+function rebuildSheetItems() {
+  if (!sheet) return;
   const sheetNav = sheet.querySelector('.msheet-nav');
+  if (!sheetNav) return;
+  const nav = document.querySelector('.sidebar-nav');
+  if (!nav) return;
+  sheetNav.innerHTML = '';
   MORE_PANELS.forEach(panel => {
     const orig = nav.querySelector(`.tab[data-panel="${panel}"]`);
     if (!orig) return;
@@ -61,23 +82,11 @@ function buildOnce() {
     const label = orig.querySelector('span');
     item.innerHTML = (svg ? svg.outerHTML : '') + `<span>${label ? label.textContent : panel}</span>`;
     item.addEventListener('click', () => {
-      orig.click();        // réutilise activatePanel() + hash
+      orig.click();
       closeSheet();
     });
     sheetNav.appendChild(item);
   });
-
-  document.body.appendChild(overlay);
-  document.body.appendChild(sheet);
-
-  /* --- État actif de « Plus » suit le panel courant --- */
-  const obs = new MutationObserver(syncActiveState);
-  document.querySelectorAll('.panel').forEach(p =>
-    obs.observe(p, { attributes: true, attributeFilter: ['class'] }));
-  syncActiveState();
-
-  /* --- Fermer la feuille avec le bouton retour Android --- */
-  window.addEventListener('popstate', () => { if (isOpen()) closeSheet(); });
 }
 
 function isOpen() { return sheet && sheet.classList.contains('open'); }
@@ -107,10 +116,32 @@ function syncActiveState() {
   }
 }
 
-/* --- Déplace le pied de sidebar (toggle IA/Manuel, compte) dans la
-       feuille sur mobile, et le remet en place sur desktop --- */
+/* --- Sur mobile, on déplace le bouton "compte" (auth-user-menu-wrap) dans
+       la topbar (haut à droite) pour avoir un accès direct. Le reste du
+       .header-info (toggle IA/Manuel s'il existe) reste dans la sheet "Plus". --- */
 function placeHeaderInfo() {
   const info = document.querySelector('.sidebar > .header-info, .msheet-foot > .header-info');
+  const userMenu = document.querySelector('#auth-user-menu-wrap, .auth-user-menu-wrap');
+  const topbar = document.querySelector('.topbar');
+
+  // 1) Déplace le auth-user-menu-wrap vers la topbar sur mobile, retour sidebar sur desktop
+  if (userMenu && topbar) {
+    if (mq.matches) {
+      if (userMenu.parentElement !== topbar) {
+        topbar.appendChild(userMenu);
+        topbar.classList.add('has-user-menu');
+      }
+    } else {
+      // Retour à la position d'origine (.header-info) si on revient en desktop
+      const home = info || document.querySelector('.sidebar .header-info');
+      if (home && userMenu.parentElement !== home) {
+        home.appendChild(userMenu);
+        topbar.classList.remove('has-user-menu');
+      }
+    }
+  }
+
+  // 2) Le reste du .header-info (toggle IA/Manuel, etc.) va dans la sheet "Plus" sur mobile
   if (!info) return;
   if (!headerInfoHome) headerInfoHome = info.parentElement;
   const foot = sheet ? sheet.querySelector('.msheet-foot') : null;
@@ -150,3 +181,44 @@ if (document.readyState === 'loading') {
   init();
 }
 mq.addEventListener('change', onViewportChange);
+
+// Re-place le user menu quand auth.js l'injecte (après login Supabase)
+window.addEventListener('coach-ia-auth', () => {
+  // Retry sur 3 frames pour laisser auth.js terminer l'injection du menu
+  let n = 0;
+  const tick = () => {
+    placeHeaderInfo();
+    if (++n < 3) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+});
+
+// Filet de sécurité : observe SEULEMENT le nav latéral pour détecter l'arrivée
+// de nouvelles tabs (coach), pas tout document.body (sinon boucle infinie car
+// rebuildSheetItems modifie le DOM → ré-trigger l'observer).
+function setupNavObserver() {
+  if (!window.MutationObserver) return;
+  let pending = false;
+  const trigger = () => {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => {
+      pending = false;
+      try {
+        if (document.getElementById('auth-user-menu-wrap')) placeHeaderInfo();
+        rebuildSheetItems();
+      } catch (e) {
+        console.warn('[mobile-nav] observer trigger error', e);
+      }
+    });
+  };
+  const target = document.querySelector('.sidebar-nav');
+  if (target) {
+    new MutationObserver(trigger).observe(target, { childList: true, subtree: false });
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupNavObserver);
+} else {
+  setupNavObserver();
+}

@@ -300,28 +300,39 @@ function renderAcwrCard() {
   const atl = todayData.atl || 0;
   const acwr = ctl > 0 ? atl / ctl : 0;
   let color, state;
+  // État ACWR : label court + détail dans .state-detail (masqué sur mobile via CSS)
   if (ctl <= 0) { color = 'var(--text-mute)'; state = 'Pas assez de données'; }
-  else if (acwr < 0.8) { color = 'var(--warn)'; state = 'Sous-charge · désentraînement'; }
+  else if (acwr < 0.8) { color = 'var(--warn)'; state = 'Sous-charge <span class="state-detail">· désentraînement</span>'; }
   else if (acwr <= 1.3) { color = 'var(--accent)'; state = 'Zone optimale'; }
-  else if (acwr <= 1.5) { color = 'var(--warn)'; state = 'Charge élevée · vigilance'; }
+  else if (acwr <= 1.5) { color = 'var(--warn)'; state = 'Charge élevée <span class="state-detail">· vigilance</span>'; }
   else { color = 'var(--danger)'; state = 'Risque de blessure'; }
   const ringDash = 213.6;
   const frac = Math.max(0, Math.min(1, acwr / 2)); // 2.0 = anneau plein
   const off = ctl > 0 ? ringDash * (1 - frac) : ringDash;
   card.dataset.mode = 'acwr';
+  // Spans .label-detail (suffixe "ACWR") + .acwr-detail (libellés longs)
+  // sont masqués sur mobile via mobile-home.css pour un rendu épuré.
+  // Pour mobile : on remplace le donut SVG par une barre horizontale qui se
+  // remplit en proportion du frac (0..1, où 1.0 = ACWR = 2.0).
+  // CSS détecte ce layout via .ratio-bar et masque le SVG sur mobile.
+  const pct = Math.round(frac * 100);
   card.innerHTML = `
-    <div class="kpi-label">Ratio de charge (ACWR)</div>
+    <div class="kpi-label">Ratio de charge<span class="label-detail"> (ACWR)</span></div>
     <div class="ring-container">
       <div class="ring">
+        <div class="ratio-bar">
+          <div class="ratio-bar-fill" style="width:${pct}%;background:${color};"></div>
+        </div>
         <svg width="80" height="80"><circle cx="40" cy="40" r="34" fill="none" stroke="var(--border)" stroke-width="8"/><circle cx="40" cy="40" r="34" fill="none" stroke="${color}" stroke-width="8" stroke-dasharray="${ringDash}" stroke-dashoffset="${off}" stroke-linecap="round"/></svg>
         <div class="ring-text">${ctl > 0 ? acwr.toFixed(2) : '—'}</div>
       </div>
       <div>
         <div style="font-size:12.5px;font-weight:600;color:${color};margin-bottom:8px;">${state}</div>
-        <div style="font-size:11px;color:var(--text-dim);">Charge aiguë 7j</div>
-        <div style="font-size:17px;font-weight:600;">${atl.toFixed(0)}<span style="font-size:11px;font-weight:500;color:var(--text-dim);"> /j</span></div>
-        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Charge chronique 42j</div>
-        <div style="font-size:13px;">${ctl.toFixed(0)}<span style="font-size:11px;color:var(--text-dim);"> /j</span></div>
+        <div class="acwr-detail" style="font-size:11px;color:var(--text-dim);">Charge aiguë 7j</div>
+        <div class="acwr-detail" style="font-size:17px;font-weight:600;">${atl.toFixed(0)}<span style="font-size:11px;font-weight:500;color:var(--text-dim);"> /j</span></div>
+        <div class="acwr-detail" style="font-size:11px;color:var(--text-dim);margin-top:4px;">Charge chronique 42j</div>
+        <div class="acwr-detail" style="font-size:13px;">${ctl.toFixed(0)}<span style="font-size:11px;color:var(--text-dim);"> /j</span></div>
+        <div class="acwr-compact" hidden>7j <b style="color:var(--text);">${atl.toFixed(0)}</b> · 42j <b style="color:var(--text);">${ctl.toFixed(0)}</b></div>
       </div>
     </div>`;
 }
@@ -360,10 +371,15 @@ if (noWhoop) {
 }
 
 document.getElementById('tsb-val').textContent = (todayData.tsb >= 0 ? '+' : '') + todayData.tsb.toFixed(0);
-const tsbState = todayData.tsb > 5 ? 'Frais · prêt à performer' : todayData.tsb > -10 ? 'Optimal · zone de progression' : todayData.tsb > -25 ? 'Fatigué · vigilance' : 'Surchargé · décharge recommandée';
+// État TSB : on garde le label court en clair, le détail dans un span qu'on
+// peut masquer en mobile via mobile-home.css (.state-detail { display: none }).
+const tsbState = todayData.tsb > 5 ? 'Frais <span class="state-detail">· prêt à performer</span>'
+               : todayData.tsb > -10 ? 'Optimal <span class="state-detail">· zone de progression</span>'
+               : todayData.tsb > -25 ? 'Fatigué <span class="state-detail">· vigilance</span>'
+               : 'Surchargé <span class="state-detail">· décharge recommandée</span>';
 const tsbClass = todayData.tsb > 5 ? 'up' : todayData.tsb < -20 ? 'down' : '';
 const tsbEl = document.getElementById('tsb-state');
-tsbEl.textContent = tsbState;
+tsbEl.innerHTML = tsbState;
 tsbEl.className = 'kpi-trend ' + tsbClass;
 document.getElementById('ctl-val').textContent = todayData.ctl.toFixed(0);
 document.getElementById('atl-val').textContent = todayData.atl.toFixed(0);
@@ -372,11 +388,36 @@ const last7 = data.slice(-7);
 const weeklyTSS = last7.reduce((s,d)=>s+d.tss,0);
 const prev7 = data.slice(-14,-7);
 const prevTSS = prev7.reduce((s,d)=>s+d.tss,0);
-const trendPct = ((weeklyTSS - prevTSS) / prevTSS * 100).toFixed(0);
 document.getElementById('weekly-tss').textContent = weeklyTSS;
+// Sparkline 7 jours : injecté en CSS-only via spans dans la card Charge 7 jours.
+// Visible uniquement sur mobile via mobile-home.css.
+{
+  const card = document.querySelector('.hero .card:has(#weekly-tss)') || document.getElementById('weekly-tss')?.closest('.card');
+  if (card) {
+    let spark = card.querySelector('.weekly-spark');
+    if (!spark) {
+      spark = document.createElement('div');
+      spark.className = 'weekly-spark';
+      card.appendChild(spark);
+    }
+    const maxT = Math.max(1, ...last7.map(d => d.tss || 0));
+    spark.innerHTML = last7.map(d => {
+      const h = Math.max(2, Math.round((d.tss || 0) / maxT * 100));
+      return `<span style="height:${h}%;" title="${d.tss || 0} TSS"></span>`;
+    }).join('');
+  }
+}
 const trendEl = document.getElementById('weekly-trend');
-trendEl.textContent = (trendPct > 0 ? '↑ +' : '↓ ') + trendPct + '% vs semaine précédente';
-trendEl.className = 'kpi-trend ' + (trendPct > 5 ? 'up' : trendPct < -5 ? 'down' : '');
+// Si prevTSS = 0, on évite la division par zéro (qui donnait "+Infinity%")
+// et on affiche un texte explicite à la place du pourcentage.
+if (prevTSS <= 0) {
+  trendEl.textContent = weeklyTSS > 0 ? 'Nouvelle activité cette semaine' : 'Pas d\'activité';
+  trendEl.className = 'kpi-trend ' + (weeklyTSS > 0 ? 'up' : '');
+} else {
+  const trendPct = Math.round((weeklyTSS - prevTSS) / prevTSS * 100);
+  trendEl.textContent = (trendPct > 0 ? '↑ +' : trendPct < 0 ? '↓ ' : '') + trendPct + '% vs semaine précédente';
+  trendEl.className = 'kpi-trend ' + (trendPct > 5 ? 'up' : trendPct < -5 ? 'down' : '');
+}
 document.getElementById('weekly-sessions').textContent = last7.filter(d => d.tss > 0).length;
 {
   const _wkMin = last7.reduce((s,d)=>s+(d.duration||0),0);
@@ -610,8 +651,34 @@ function sliceByDate(arr, fromIso, toIso) {
   });
 }
 function setInputDate(id, d) {
-  document.getElementById(id).value = toIsoDate(d);
+  const el = document.getElementById(id);
+  el.value = toIsoDate(d);
+  syncCompactDateLabel(el);
+  // Si flatpickr est attaché à cet input (cas mobile), on synchronise aussi
+  // sa valeur visible (sinon l'altInput continue d'afficher "Sélectionner une date")
+  if (el._flatpickr) {
+    try { el._flatpickr.setDate(d, false); } catch (_) {}
+  }
 }
+// Met à jour l'overlay .date-compact-display (format DD/MM) depuis la value
+// d'un <input type="date">. Appelé par setInputDate + sur l'event 'change' du
+// picker natif (utilisateur qui choisit lui-même une date).
+function syncCompactDateLabel(input) {
+  const wrap = input.closest && input.closest('.date-compact');
+  if (!wrap) return;
+  const span = wrap.querySelector('.date-compact-display');
+  if (!span) return;
+  const v = input.value;
+  if (!v) { span.textContent = ''; return; }
+  const [, m, d] = v.split('-');
+  span.textContent = `${d}/${m}`;
+}
+// Auto-sync au change : couvre le cas où l'utilisateur ouvre le picker natif
+document.addEventListener('change', (e) => {
+  if (e.target && e.target.matches && e.target.matches('.date-compact input[type="date"]')) {
+    syncCompactDateLabel(e.target);
+  }
+});
 function getInputDate(id) {
   return document.getElementById(id).value;
 }
@@ -677,14 +744,28 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
     },
     scales: {
       x: {
-        ticks: { maxTicksLimit: 8, color: '#6b7488' },
+        // Mobile : moins de ticks (4) + police plus petite ; desktop : 8 ticks normaux.
+        ticks: {
+          maxTicksLimit: window.innerWidth < 860 ? 4 : 8,
+          color: '#6b7488',
+          font: { size: window.innerWidth < 860 ? 9 : 11 },
+          maxRotation: 0,
+        },
         grid: { display: false },
         border: { display: false },
       },
       y: {
         position: 'left',
-        title: { display: true, text: 'TSS / TSB', color: '#6b7488' },
-        ticks: { color: '#6b7488', stepSize: 20 },
+        title: {
+          display: window.innerWidth >= 860,  // pas de titre "TSS / TSB" sur mobile (gain de place)
+          text: 'TSS / TSB',
+          color: '#6b7488',
+        },
+        ticks: {
+          color: '#6b7488',
+          stepSize: 20,
+          font: { size: window.innerWidth < 860 ? 9 : 11 },
+        },
         grid: { color: 'rgba(255,255,255,0.045)', drawBorder: false },
         border: { display: false },
       },
@@ -772,6 +853,28 @@ window.goToCalendarDay = goToCalendarDay;
   document.getElementById('load-to').min = toIsoDate(data[0].date);
   document.getElementById('load-to').max = toIsoDate(data[data.length-1].date);
   renderLoadChart(toIsoDate(start), toIsoDate(end));
+
+  // Sur mobile : convertit TOUS les date inputs en flatpickr custom pour virer
+  // la chrome native iOS (chevron) qui prend de la place et ne s'enlève pas en CSS.
+  if (window.innerWidth < 860 && window.flatpickr) {
+    document.querySelectorAll('.date-range input[type="date"]').forEach(el => {
+      if (el._flatpickr) return;
+      const currentVal = el.value;
+      el.type = 'text';
+      el.setAttribute('readonly', 'readonly');
+      window.flatpickr(el, {
+        dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'd/m',
+        locale: window.flatpickr?.l10ns?.fr || 'fr',
+        defaultDate: currentVal || undefined,
+        onChange: (sel, dateStr, fp) => {
+          fp.input.value = dateStr;
+          fp.input.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+      });
+    });
+  }
 }
 
 // Event handlers

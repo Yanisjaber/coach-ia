@@ -1,0 +1,703 @@
+/* ============================================================
+   mobile-home.css — Densification de l'accueil sur mobile.
+   Garde TOUTES les infos de la vue desktop, juste réagencé.
+
+   Layout cible (< 860px) :
+     ┌─────────────────────────┐
+     │ Compétition à venir J-5 │  ← compact
+     ├─────────────────────────┤
+     │ Dernière séance         │  ← 4 KPIs en ligne
+     │ 144 · 1h27 · 143W ·137  │
+     ├──────────────┬──────────┤
+     │ ACWR 0.50    │ TSB +14  │  ← 2 cols ring mini
+     │ Sous-charge  │ Frais    │
+     │ 7j 16 / 42j32│ CTL ATL  │
+     ├──────────────┴──────────┤
+     │ Charge 7 jours 204 TSS  │  ← full width + sparkline
+     │ ↑ Nouvelle act. · 2séa  │
+     ├─────────────────────────┤
+     │ Forme & fatigue 30j     │  ← graphe compact
+     │ [chart 100px]           │
+     └─────────────────────────┘
+   ============================================================ */
+
+/* Sur desktop : le séparateur " · " est masqué, on garde les labels longs avec <br>.
+   Sur mobile (max-width 860px) : c'est l'inverse → labels longs masqués, " · " visible. */
+.tsb-meta .meta-sep { display: none; }
+
+/* Sur desktop : on masque la ratio-bar (le donut SVG suffit). Sur mobile,
+   le donut est masqué et la ratio-bar prend le relais (voir media query). */
+.ratio-bar { display: none; }
+
+/* Sur desktop : on masque l'overlay JJ/MM (les input date natifs s'affichent
+   normalement). Sur mobile : l'overlay est visible et l'input natif transparent. */
+.date-compact-display { display: none; }
+.date-compact > input[type="date"] { /* desktop : style natif intact */ }
+
+@media (max-width: 860px) {
+
+  /* === Bottom nav : tabs adaptées au mode (perso / coach / coach+athlete) === */
+
+  /* Mode PERSO (non-coach) : seulement Accueil / Calendrier / Compétitions / Performance */
+  body:not(.coach-mode) .sidebar .sidebar-nav .tab#coach-athletes-tab,
+  body:not(.coach-mode) .sidebar .sidebar-nav .tab#coach-overview-tab,
+  body:not(.coach-mode) .sidebar .sidebar-nav .tab#coach-chat-tab,
+  body:not(.coach-mode) .sidebar .sidebar-nav .tab[data-panel="p-athletes"],
+  body:not(.coach-mode) .sidebar .sidebar-nav .tab[data-panel="p-overview"],
+  body:not(.coach-mode) .sidebar .sidebar-nav .tab[data-panel="p-chat"] { display: none !important; }
+
+  /* Mode COACH sans athlète sélectionné : seul "Athletes" est visible */
+  body.coach-mode:not(.coach-has-athlete) .sidebar .sidebar-nav .tab:not(#coach-athletes-tab):not([data-panel="p-athletes"]) {
+    display: none !important;
+  }
+
+  /* Mode COACH avec athlète sélectionné : Vue d'ensemble + Calendrier + Performance + Messagerie */
+  body.coach-mode.coach-has-athlete .sidebar .sidebar-nav .tab[data-panel="p1"],
+  body.coach-mode.coach-has-athlete .sidebar .sidebar-nav .tab[data-panel="p3"],
+  body.coach-mode.coach-has-athlete .sidebar .sidebar-nav .tab[data-panel="p5"],
+  body.coach-mode.coach-has-athlete .sidebar .sidebar-nav .tab[data-panel="p6"],
+  body.coach-mode.coach-has-athlete .sidebar .sidebar-nav .tab[data-panel="p7"],
+  body.coach-mode.coach-has-athlete .sidebar .sidebar-nav .tab#coach-athletes-tab {
+    display: none !important;
+  }
+
+  /* Plus bouton supprimé partout */
+  .sidebar .sidebar-nav .tab-more { display: none !important; }
+
+  /* === Topbar mobile : compacte avec titre à gauche et compte user à droite === */
+  .topbar {
+    padding-top: calc(2px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: 4px !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between !important;
+    gap: 8px;
+  }
+  .topbar .topbar-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Bouton compte injecté dans la topbar par mobile-nav.js */
+  .topbar .auth-user-menu-wrap {
+    flex-shrink: 0;
+  }
+  .topbar .auth-user-btn {
+    padding: 3px 6px 3px 3px !important;
+    background: var(--bg-elev2) !important;
+    border-radius: 999px !important;
+    gap: 4px !important;
+  }
+  .topbar .auth-user-avatar {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 12px !important;
+  }
+  /* Sur mobile : juste l'initiale + le chevron, pas le nom complet */
+  .topbar .auth-user-name { display: none !important; }
+  .topbar .auth-user-chevron {
+    width: 10px !important;
+    height: 10px !important;
+  }
+
+  /* Supprime tout doublon du compte affiché en bas (dans .sidebar ou .msheet-foot)
+     puisque le bouton est désormais en haut à droite uniquement */
+  .sidebar .header-info,
+  .msheet-foot .header-info { display: none !important; }
+  .coach-ath-side { display: none !important; }
+  /* Menu dropdown : positionné sous l'avatar dans la topbar */
+  .topbar .auth-user-menu {
+    top: calc(100% + 6px) !important;
+    bottom: auto !important;
+    right: 0 !important;
+    left: auto !important;
+    width: auto !important;
+    min-width: 200px !important;
+    max-width: 240px !important;
+  }
+  .main { padding-top: 0 !important; padding-bottom: 0 !important; }
+  .container {
+    padding-top: 0 !important;
+    padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .panel { padding-top: 0 !important; margin-top: 0 !important; }
+  .panel.active { padding-top: 0 !important; margin-top: 0 !important; }
+  /* Hero colle directement au titre */
+  .hero { margin-top: 8px !important; }
+
+  /* === HERO grid : 2 cols par défaut, full width pour la dernière séance === */
+  .hero {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  /* Dernière séance + Charge 7j en pleine largeur */
+  .hero #last-session-card,
+  .hero .card:has(#weekly-tss),
+  .hero .coach-card {
+    grid-column: 1 / -1;
+  }
+  /* Si le coach-card est seul à la fin, full width */
+  .hero .card:last-child:nth-child(even) {
+    grid-column: 1 / -1;
+  }
+
+  /* === Cards globalement plus compactes + border-left coloré === */
+  .hero .card {
+    padding: 11px 12px;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  /* Border-left coloré par card (4 cards → 4 couleurs comme la maquette) */
+  .hero #last-session-card { border-left: 3px solid var(--accent); }
+  .hero #whoop-card { border-left: 3px solid var(--warn); }
+  .hero .card:has(#tsb-val) { border-left: 3px solid var(--accent); }
+  .hero .card:has(#weekly-tss) { border-left: 3px solid var(--info); }
+  .hero .kpi-label {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .hero .kpi-value {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .hero .kpi-unit {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-left: 4px;
+  }
+  .hero .kpi-trend {
+    font-size: 11px;
+    margin-top: 5px;
+  }
+
+  /* === Dernière séance : 4 KPIs en ligne (TSS · durée · NP · FC) === */
+  .hero #last-session-card .coach-header { margin-bottom: 6px; }
+  .hero #last-session-card .coach-pill {
+    font-size: 10px;
+    padding: 2px 8px;
+  }
+  .hero #last-session-card #last-session-name {
+    font-size: 14px !important;
+    margin-bottom: 8px !important;
+  }
+  .hero #last-session-card #last-session-metrics {
+    gap: 10px !important;
+    flex-wrap: nowrap !important;
+    justify-content: space-between;
+  }
+  /* Si les métriques sont rendues par app.js avec .ls-metric */
+  .hero #last-session-card .ls-metric {
+    flex: 1;
+    text-align: center;
+    min-width: 0;
+  }
+  .hero #last-session-card .ls-val {
+    font-size: 17px !important;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .hero #last-session-card .ls-lbl {
+    font-size: 9px !important;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 2px;
+  }
+
+  /* === Épuration : sur mobile on masque les détails secondaires === */
+  .state-detail { display: none !important; }            /* "· désentraînement", "· prêt à performer", etc. */
+  .label-detail { display: none !important; }            /* "(ACWR)" suffixe du label */
+  .acwr-detail { display: none !important; }             /* libellés longs "Charge aiguë 7j" + valeurs séparées */
+  .acwr-compact {
+    display: block !important;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    line-height: 1.4;
+  }
+  /* CTL/ATL côté TSB : on masque les libellés longs "Fitness " / "Fatigue " +
+     le <br>, et on affiche un séparateur " · " entre les 2 valeurs. */
+  .tsb-meta .meta-long { display: none; }
+  .tsb-meta .meta-sep { display: inline; color: var(--text-dim); }
+  .tsb-meta {
+    white-space: nowrap;
+    font-size: 11px !important;
+    line-height: 1.4;
+  }
+
+  /* === Card ACWR : ring camembert centré + état + 7j/42j compact dessous ===
+     Layout :
+       [ RATIO DE CHARGE ]   ← label
+       [    ring 64 px    ]  ← centré
+       [   Sous-charge    ]  ← pill jaune
+       [ 7j 16 · 42j 32   ]  ← détails compact
+  */
+  .hero #whoop-card { text-align: center; }
+  .hero .ring-container {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  /* Sur mobile : on masque le donut SVG, on affiche la barre horizontale +
+     la valeur ACWR au-dessus. Le ring devient un simple bloc vertical. */
+  .hero .ring-container > .ring {
+    flex-shrink: 0;
+    position: relative;
+    width: 100%;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  /* Masque le donut SVG en mobile */
+  .hero .ring-container > .ring svg { display: none !important; }
+  /* Affiche la ratio-bar en mobile (override du desktop qui la cache) */
+  .hero .ring-container > .ring .ratio-bar {
+    display: block !important;
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .hero .ring-container > .ring .ratio-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.4s ease;
+  }
+  /* La valeur ACWR (0.50) sous la barre, centrée, grosse typo */
+  .hero .ring-container > .ring .ring-text {
+    position: static !important;
+    transform: none !important;
+    font-size: 22px !important;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    margin: 4px 0 0 !important;
+  }
+  /* Bloc état + détails sous le ring, centré */
+  .hero .ring-container > div:not(.ring) {
+    width: 100%;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  /* État "Sous-charge" → pill jaune compact (comme TSB green pill) */
+  .hero .ring-container > div:not(.ring) > div:first-child {
+    display: inline-block;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    background: rgba(251, 191, 36, 0.12);
+    padding: 4px 12px;
+    border-radius: 999px;
+    margin-bottom: 0 !important;
+    white-space: nowrap;
+  }
+  /* Variante couleur selon le state (.color hérité de l'inline) — déjà appliqué via style="color:..." */
+  /* 7j/42j compact en dessous */
+  .acwr-compact {
+    margin-top: 6px !important;
+    font-size: 11px !important;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  /* === TSB card : pill unique "+14 Frais" centrée + Fitness/Fatigue sur 2 lignes ===
+     Layout :
+       FORME (TSB)
+       [+14  Frais]        ← une seule pill verte
+       Fitness CTL 32      ← chacun sur sa ligne, centré
+       Fatigue ATL 16
+  */
+  .hero .card:has(#tsb-val) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 7px;
+  }
+  .hero .card:has(#tsb-val) .kpi-label { margin: 0; }
+  /* La pill combinée : flex inline contenant +14 et Frais ensemble */
+  .hero .card:has(#tsb-val) .tsb-pill-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(74, 222, 128, 0.14);
+    border: 0.5px solid rgba(74, 222, 128, 0.35);
+    padding: 5px 12px 5px 5px;
+    border-radius: 999px;
+  }
+  /* Le "+14" devient un cercle plus foncé à l'intérieur de la pill */
+  .hero .card:has(#tsb-val) .tsb-pill-wrap #tsb-val {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(74, 222, 128, 0.28);
+    color: var(--accent);
+    font-size: 12px !important;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .hero .card:has(#tsb-val) .tsb-pill-wrap #tsb-state {
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 600;
+    margin: 0;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    white-space: nowrap;
+  }
+  /* Meta : Fitness CTL et Fatigue ATL, chacun sur sa ligne, centrés */
+  .hero .card:has(#tsb-val) .tsb-meta {
+    font-size: 11px !important;
+    line-height: 1.45;
+    margin-top: 2px !important;
+    text-align: center;
+    white-space: nowrap;
+  }
+  /* On garde le <br> visible pour avoir Fitness sur ligne 1, Fatigue sur ligne 2 */
+  .hero .card:has(#tsb-val) .tsb-meta br { display: inline; }
+  /* Masque le séparateur " · " (on n'en a plus besoin) */
+  .hero .card:has(#tsb-val) .tsb-meta .meta-sep { display: none !important; }
+  /* Masque les labels longs si présents (gardé du HTML précédent éventuellement) */
+  .hero .card:has(#tsb-val) .tsb-meta .meta-long { display: inline; }
+
+  /* === Charge 7j : pleine largeur, layout maquette === */
+  .hero .card:has(#weekly-tss) {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "label trend"
+      "tss   meta"
+      "spark spark";
+    gap: 4px 10px;
+    align-items: center;
+  }
+  .hero .card:has(#weekly-tss) .kpi-label { grid-area: label; margin: 0; }
+  .hero .card:has(#weekly-tss) > div:has(#weekly-tss) {
+    grid-area: tss;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .hero .card:has(#weekly-tss) #weekly-tss { font-size: 26px; }
+  .hero .card:has(#weekly-tss) .kpi-unit { margin-left: 0; }
+  .hero .card:has(#weekly-tss) #weekly-trend {
+    grid-area: trend;
+    display: inline-block;
+    background: rgba(74, 222, 128, 0.16);
+    color: var(--accent);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-size: 10px;
+    font-weight: 600;
+    justify-self: end;
+    margin: 0;
+  }
+  .hero .card:has(#weekly-tss) #weekly-trend.down {
+    background: rgba(248, 113, 113, 0.16);
+    color: var(--danger);
+  }
+  .hero .card:has(#weekly-tss) > div:nth-of-type(3):not(.weekly-spark) {
+    grid-area: meta;
+    justify-self: end;
+    display: flex;
+    gap: 10px;
+    font-size: 11px;
+    flex-direction: row;
+    margin: 0;
+  }
+  .hero .card:has(#weekly-tss) > div:nth-of-type(3):not(.weekly-spark) br { display: none; }
+
+  /* Sparkline (injectée par app.js) */
+  .hero .card:has(#weekly-tss) .weekly-spark {
+    grid-area: spark;
+    display: flex;
+    gap: 3px;
+    align-items: flex-end;
+    height: 26px;
+    margin-top: 4px;
+  }
+  .hero .card:has(#weekly-tss) .weekly-spark > span {
+    flex: 1;
+    background: var(--info);
+    border-radius: 3px;
+    min-height: 2px;
+    opacity: 0.85;
+  }
+
+  /* === Toutes les cards avec chart : padding serré + pas de débordement === */
+  .grid-vol .card,
+  .grid-1.card {
+    padding: 10px !important;
+    max-width: 100% !important;
+    overflow: hidden;
+  }
+  /* En-tête section-title qui contient un toggle (.vol-head) : compact */
+  .section-title.vol-head,
+  .vol-head {
+    flex-wrap: nowrap;
+    gap: 8px;
+    font-size: 13px !important;
+    align-items: center;
+  }
+  .vol-head > span:first-child {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Toggle générique (Heures/TSS, FC/Puissance, etc.) : compact partout */
+  .zones-toggle {
+    flex-shrink: 0;
+    padding: 2px;
+  }
+  .ztoggle-btn {
+    padding: 3px 8px !important;
+    font-size: 10px !important;
+    min-height: 22px;
+  }
+  /* Canvas (toutes les charts) bien contraints */
+  .chart-wrap, .chart-wrap.small, .chart-wrap.tall {
+    max-width: 100% !important;
+    overflow: hidden;
+  }
+  .chart-wrap canvas, .chart-wrap.small canvas {
+    max-width: 100% !important;
+  }
+
+  /* === Stats hebdo : 4 cards sur 1 ligne (au lieu de 2x2) === */
+  .vol-stats-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 5px !important;
+  }
+  .vol-stats-week {
+    text-align: center;
+    font-size: 12px;
+    margin: 6px 0 !important;
+  }
+  .vol-stat {
+    padding: 6px 4px !important;
+    gap: 3px !important;
+    flex-direction: column !important;
+    text-align: center;
+    align-items: center !important;
+    min-width: 0;
+  }
+  .vol-stat svg {
+    width: 14px !important;
+    height: 14px !important;
+    flex-shrink: 0;
+  }
+  .vol-stat > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+    width: 100%;
+  }
+  .vol-stat .vs-val {
+    font-size: 13px !important;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+  .vol-stat .vs-lbl {
+    font-size: 9px !important;
+    color: var(--text-dim);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  /* === Chart Forme & fatigue mobile : compact, filtres sur 1 ligne, centré === */
+  .grid-1.card {
+    border-left: 3px solid var(--purple, #a78bfa);
+    padding: 12px;
+  }
+  /* Titre centré + bouton reset en icône, positionné absolument à droite */
+  .grid-1.card {
+    position: relative;
+  }
+  .grid-1.card .chart-head {
+    margin-bottom: 10px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    position: relative;
+  }
+  .grid-1.card .chart-head .section-title {
+    font-size: 14px !important;
+    text-align: center;
+    flex: none;
+  }
+  .grid-1.card .chart-reset {
+    padding: 6px;
+    font-size: 0;
+    min-width: 30px;
+    min-height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .grid-1.card .chart-reset svg { width: 14px; height: 14px; }
+
+  /* Filtres date-range (générique : Forme&fatigue, Volume hebdo, Zones, etc.) :
+     tout sur 1 SEULE ligne sans scroll, tout doit tenir. */
+  .date-range {
+    margin-bottom: 10px;
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    overflow: hidden;
+  }
+  /* Presets (30j / 90j / 1 an / 4 sem / 12 sem) : ultra-compacts */
+  .date-range .preset {
+    padding: 3px 6px;
+    font-size: 9.5px;
+    min-height: 24px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  /* Masque les labels "du"/"au"/"→" et le séparateur " · " */
+  .date-range .sep,
+  .date-range > span:not(.sep) { display: none; }
+  /* Date inputs natifs : taille auto-adaptative.
+     - flex 1 partage l'espace restant équitablement entre les 2
+     - font-size en clamp() : 8.5px mini sur très petits écrans, 11px max
+     - icône calendrier MASQUÉE (gain ~20px par input) : c'est un input,
+       le tap dessus ouvre le picker iOS/Android natif quand même. */
+  /* Inputs date (génériques pour tous les .date-range) */
+  .date-range input[type="date"],
+  .date-range input.flatpickr-input,
+  .date-range input.form-control.input {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 0;
+    padding: 3px 4px;
+    font-size: clamp(9px, 2.8vw, 11px);
+    min-height: 24px;
+    box-sizing: border-box;
+    text-align: center;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .date-range input.flatpickr-input.form-control[type="hidden"],
+  .date-range input.flatpickr-input:not(.form-control) { display: none !important; }
+  /* Masque TOUS les pseudo-éléments natifs (Safari iOS) sur tous .date-range */
+  .date-range input[type="date"]::-webkit-calendar-picker-indicator,
+  .date-range input[type="date"]::-webkit-clear-button,
+  .date-range input[type="date"]::-webkit-inner-spin-button,
+  .date-range input[type="date"]::-webkit-list-button,
+  .date-range input[type="date"]::-webkit-textfield-decoration-container {
+    display: none !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 0 !important;
+  }
+  .date-range input[type="date"]::-moz-calendar-picker-indicator { display: none !important; }
+  /* Gap minimal */
+  .date-range { gap: 4px !important; }
+  .date-range .preset {
+    padding: 3px 7px;
+    font-size: clamp(9px, 2.6vw, 11px);
+  }
+
+  /* Chart : réduit pour ne pas prendre trop de hauteur sur mobile */
+  .grid-1.card .chart-wrap.tall {
+    height: 160px !important;
+    min-height: 0;
+  }
+  .grid-1.card .chart-wrap.tall canvas {
+    max-height: 160px !important;
+  }
+  /* Padding card vraiment serré sur mobile pour libérer 8 px de chaque côté */
+  .grid-1.card {
+    padding: 8px !important;
+  }
+
+  /* Légende : centrée, compact, sur 1 ligne. On masque les libellés longs
+     "(forme)" / "(fatigue)" / "(fraîcheur)" → juste CTL · ATL · TSB. */
+  .grid-1.card .legend {
+    font-size: 11px;
+    margin-top: 10px;
+    gap: 14px;
+    flex-wrap: nowrap;
+    justify-content: center;
+    text-align: center;
+  }
+  .grid-1.card .legend > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  .grid-1.card .legend .legend-detail { display: none; }
+
+  /* === Card de compétition à venir (GP Albi) : compacte === */
+  /* Cible le bandeau de compétition (s'il existe). On garde l'icône trophée
+     + nom + date + pill J-X sur une seule ligne. */
+  .comp-banner,
+  .comp-upcoming-card,
+  .race-banner {
+    padding: 10px 12px !important;
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+  .comp-banner .comp-name,
+  .comp-upcoming-card h3,
+  .race-banner h3 {
+    font-size: 13px !important;
+  }
+}
+
+/* ==== Très petits écrans (≤ 380px) : encore plus serré ==== */
+@media (max-width: 380px) {
+  .hero .ring-container > .ring svg {
+    width: 42px !important;
+    height: 42px !important;
+  }
+  .hero .ring-container > div:not(.ring) {
+    font-size: 10.5px;
+  }
+  .hero #last-session-card .ls-val {
+    font-size: 15px !important;
+  }
+  .hero .card:has(#tsb-val) #tsb-val,
+  .hero .card:has(#weekly-tss) #weekly-tss {
+    font-size: 22px;
+  }
+}

@@ -3,12 +3,10 @@
    Chargé EN DERNIER après mobile.css.
    ============================================================ */
 
-/* ===== Safe area iOS (encoche) — applique sur tout l'app shell ===== */
-@supports (padding: env(safe-area-inset-top)) {
-  .app-shell {
-    padding-top: env(safe-area-inset-top, 0px);
-  }
-}
+/* ===== Safe area iOS (encoche) =====
+   Note : on N'APPLIQUE PAS de padding-top sur .app-shell.
+   La .topbar gère elle-même son padding-top avec env(safe-area-inset-top),
+   sinon la safe-area serait appliquée 2 fois → énorme espace au-dessus du titre. */
 
 /* ===== Empêcher zoom auto iOS sur les inputs (font-size < 16px déclenche zoom) ===== */
 @media (max-width: 860px) {
@@ -113,6 +111,22 @@ button, .tab, .subtab, .lib-chip, .day-card, .auth-user-btn, .profile-sidebar-it
 /* ===== Empêche le pull-to-refresh accidentel quand on scroll dans la page ===== */
 body {
   overscroll-behavior-y: contain;
+}
+
+/* ===== Pas de scroll horizontal sur mobile : tout doit tenir en largeur ===== */
+@media (max-width: 860px) {
+  /* IMPORTANT : pas de overflow-x: hidden sur html/body — ça casse le scroll
+     vertical fluide sur iOS Safari. À la place on utilise overflow-x: clip
+     (supporté Safari 16+) ou on contraint les conteneurs internes. */
+  body { overflow-x: clip; }
+  /* Conteneurs principaux : pas de débordement horizontal possible */
+  .container, .main, .panel { max-width: 100%; }
+  .card, .grid-1, .grid-2, .hero { max-width: 100%; }
+  /* Charts + tables contraints */
+  canvas { max-width: 100% !important; }
+  table { width: 100%; max-width: 100%; }
+  /* Date range : pas de scroll interne forcé */
+  .date-range { overflow-x: visible !important; }
 }
 
 /* ===== Pas de sélection accidentelle au long-press sur images / icônes ===== */

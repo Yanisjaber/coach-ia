@@ -54,15 +54,28 @@ function cleanupAll() {
 /* ---- Bouton bascule ---- */
 function injectToggleButton() {
   if (document.getElementById('coach-side-btn')) return;
-  const wrap = document.getElementById('auth-user-menu-wrap');
-  const foot = document.querySelector('.header-info') || (wrap && wrap.parentNode);
-  if (!foot) return;
+  // Le bouton "Vue entraineur" est injecté DANS le menu user dropdown
+  // (en haut, juste sous l'email), et plus dans la sidebar/topbar.
+  const menu = document.getElementById('auth-user-menu');
+  const header = menu ? menu.querySelector('.auth-user-menu-header') : null;
+  if (!menu) {
+    // Menu pas encore prêt → retry quand auth.js l'aura injecté
+    window.addEventListener('coach-ia-auth', () => injectToggleButton(), { once: true });
+    return;
+  }
   const btn = document.createElement('button');
-  btn.id = 'coach-side-btn'; btn.type = 'button'; btn.className = 'coach-side-btn';
-  setToggleLabel(btn, false);
-  btn.addEventListener('click', toggleCoachMode);
-  if (wrap && wrap.parentNode === foot) foot.insertBefore(btn, wrap);
-  else foot.insertBefore(btn, foot.firstChild);
+  btn.id = 'coach-side-btn';
+  btn.type = 'button';
+  btn.className = 'coach-side-btn auth-user-menu-item';
+  setToggleLabel(btn, document.body.classList.contains('coach-mode'));
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menu.hidden = true;
+    toggleCoachMode();
+  });
+  // Insère juste après le header (avant les autres items "Mon profil", etc.)
+  if (header && header.nextSibling) menu.insertBefore(btn, header.nextSibling);
+  else menu.appendChild(btn);
 }
 function setToggleLabel(btn, coach) {
   btn.classList.toggle('is-coach', coach);
