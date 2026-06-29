@@ -651,7 +651,9 @@
 @media (min-width: 861px) and (max-width: 1500px) {
   /* Bilan hebdo : colonne etroite -> on garde juste icone + valeur (labels masques) */
   .week-totals .wt-lbl { display: none !important; }
-  .week-totals .wt-row { justify-content: center; gap: 7px; }
+  /* lignes alignees (icones en colonne) et bloc centre dans la carte */
+  .week-totals .wt-view { align-items: center; }
+  .week-totals .wt-row { justify-content: flex-start; gap: 7px; min-width: 52px; }
   /* ... et meme largeur que les cases jour (8 colonnes egales au lieu d'une colonne figee) */
   .week-row-days { grid-template-columns: repeat(8, 1fr) !important; }
   .week-totals { height: 150px !important; padding: 7px 5px !important; }
