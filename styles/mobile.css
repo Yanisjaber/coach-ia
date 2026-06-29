@@ -649,6 +649,9 @@
    au clic sur la cellule.
    ============================================================ */
 @media (min-width: 861px) and (max-width: 1500px) {
+  /* Bilan hebdo : colonne etroite -> on garde juste icone + valeur (labels masques) */
+  .week-totals .wt-lbl { display: none !important; }
+  .week-totals .wt-row { justify-content: center; gap: 7px; }
   .dst-profile { display: none !important; }
   .day-single-tile:has(.dst-profile) .dst-body {
     padding-bottom: 5px !important;  /* plus de place réservée pour le profil */
