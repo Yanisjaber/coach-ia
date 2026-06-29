@@ -58,6 +58,15 @@ import './day-extras.js';
 // ========= BILAN ANNUEL (nouvelle page p3, remplace Tendances long-terme) =========
 // KPIs YTD vs N-1, objectifs annuels, records, cumul kilométrique annuel.
 import './bilan.js';
+// Icones SVG des lignes du bilan hebdo (Design "icone + valeur + label")
+const _WT_IC = {
+  vol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  km:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg>',
+  sea: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4h13l-2 4 2 4H4"/></svg>',
+  tss: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>',
+  ctl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>',
+  atl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>',
+};
 import './library.js';
 import './opendossard.js';
 import './coach-ai.js';
@@ -3996,14 +4005,14 @@ function renderWeekPlan() {
           <button class="wt-arrow wt-next" title="Vue suivante">›</button>
         </div>
         <div class="wt-view wt-view-volume">
-          <div class="wt-row"><span class="wt-val">${totalHours}</span><span class="wt-lbl">Volume</span></div>
-          <div class="wt-row"><span class="wt-val">—</span><span class="wt-lbl">Km</span></div>
-          <div class="wt-row"><span class="wt-val">${weekTotalSessions}</span><span class="wt-lbl">Séances</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.vol}</span><span class="wt-val">${totalHours}</span><span class="wt-lbl">Volume</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.km}</span><span class="wt-val">—</span><span class="wt-lbl">Km</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.sea}</span><span class="wt-val">${weekTotalSessions}</span><span class="wt-lbl">Séances</span></div>
         </div>
         <div class="wt-view wt-view-charge">
-          <div class="wt-row"><span class="wt-val">${weekTotalTss}</span><span class="wt-lbl">TSS prévu</span></div>
-          <div class="wt-row"><span class="wt-val">—</span><span class="wt-lbl">CTL</span></div>
-          <div class="wt-row"><span class="wt-val">—</span><span class="wt-lbl">ATL</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.tss}</span><span class="wt-val">${weekTotalTss}</span><span class="wt-lbl">TSS prévu</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.ctl}</span><span class="wt-val">—</span><span class="wt-lbl">CTL</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.atl}</span><span class="wt-val">—</span><span class="wt-lbl">ATL</span></div>
         </div>
         <div class="wt-dots">
           <span class="wt-dot d-volume"></span>
@@ -4393,14 +4402,14 @@ function renderRealiseCalendar() {
           <button class="wt-arrow wt-next" title="Vue suivante">›</button>
         </div>
         <div class="wt-view wt-view-volume">
-          <div class="wt-row"><span class="wt-val">${totalHours}</span><span class="wt-lbl">Volume</span></div>
-          <div class="wt-row"><span class="wt-val">${totalKm}<span style="font-size:11px;font-weight:500;">km</span></span><span class="wt-lbl">Distance</span></div>
-          <div class="wt-row"><span class="wt-val">${weekTotalSessions}</span><span class="wt-lbl">Séances</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.vol}</span><span class="wt-val">${totalHours}</span><span class="wt-lbl">Volume</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.km}</span><span class="wt-val">${totalKm}<span style="font-size:11px;font-weight:500;">km</span></span><span class="wt-lbl">Distance</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.sea}</span><span class="wt-val">${weekTotalSessions}</span><span class="wt-lbl">Séances</span></div>
         </div>
         <div class="wt-view wt-view-charge">
-          <div class="wt-row"><span class="wt-val">${weekTotalTss}</span><span class="wt-lbl">TSS</span></div>
-          <div class="wt-row"><span class="wt-val">${lastCtl}</span><span class="wt-lbl">CTL</span></div>
-          <div class="wt-row"><span class="wt-val">${lastAtl}</span><span class="wt-lbl">ATL</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.tss}</span><span class="wt-val">${weekTotalTss}</span><span class="wt-lbl">TSS</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.ctl}</span><span class="wt-val">${lastCtl}</span><span class="wt-lbl">CTL</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.atl}</span><span class="wt-val">${lastAtl}</span><span class="wt-lbl">ATL</span></div>
         </div>
         <div class="wt-dots">
           <span class="wt-dot d-volume"></span>

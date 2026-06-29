@@ -157,20 +157,22 @@
   .week-totals[data-view="charge"] .wt-view-charge { display: flex; }
   .wt-row {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 1px;
+    gap: 8px;
   }
+  .wt-ic { color: var(--accent); flex: none; display: flex; align-items: center; }
+  .wt-ic svg { width: 15px; height: 15px; }
   .wt-val {
-    font-size: 20px;
+    font-size: 17px;
     font-weight: 700;
     line-height: 1;
   }
   .wt-lbl {
-    font-size: 10px;
+    font-size: 9px;
     color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 0.4px;
+    margin-left: auto;
   }
   .wt-dots {
     display: flex;
