@@ -652,6 +652,11 @@
   /* Bilan hebdo : colonne etroite -> on garde juste icone + valeur (labels masques) */
   .week-totals .wt-lbl { display: none !important; }
   .week-totals .wt-row { justify-content: center; gap: 7px; }
+  /* ... et meme largeur que les cases jour (8 colonnes egales au lieu d'une colonne figee) */
+  .week-row-days { grid-template-columns: repeat(8, 1fr) !important; }
+  .week-totals { height: 150px !important; padding: 7px 5px !important; }
+  .week-totals .wt-val { font-size: 15px !important; }
+  .week-totals .wt-ic svg { width: 13px !important; height: 13px !important; }
   .dst-profile { display: none !important; }
   .day-single-tile:has(.dst-profile) .dst-body {
     padding-bottom: 5px !important;  /* plus de place réservée pour le profil */
