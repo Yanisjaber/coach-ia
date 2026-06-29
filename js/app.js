@@ -1357,27 +1357,69 @@ function getZonesForDay(d) {
   return d.zones_hr || d.zones || null;
 }
 
-function computeZonesByDate(fromIso, toIso) {
-  // Pondérer par la durée de chaque séance pour avoir un % réel du temps total
-  const slice = data.filter(d => {
+// Repartition 5 zones a partir d'un stream (FC ou puissance) -> [%...5].
+function __zones5Hr(hr, hrMax) {
+  const z = [0, 0, 0, 0, 0]; let n = 0;
+  for (let i = 0; i < hr.length; i++) { const h = hr[i]; if (h == null) continue; const p = h / hrMax * 100; const k = p < 60 ? 0 : p < 70 ? 1 : p < 82 ? 2 : p < 93 ? 3 : 4; z[k]++; n++; }
+  if (!n) return null; return z.map(s => +(s * 100 / n).toFixed(1));
+}
+function __zones5Pow(w, ftp) {
+  const z = [0, 0, 0, 0, 0]; let n = 0;
+  for (let i = 0; i < w.length; i++) { const x = w[i]; if (x == null) continue; const p = x / ftp * 100; const k = p < 55 ? 0 : p < 76 ? 1 : p < 91 ? 2 : p < 106 ? 3 : 4; z[k]++; n++; }
+  if (!n) return null; return z.map(s => +(s * 100 / n).toFixed(1));
+}
+// Charge les streams des activites de la periode qui n'ont pas encore de zones,
+// calcule FC + puissance, et met en cache sur l'activite (_zhr / _zpow).
+async function ensureZonesForRange(fromIso, toIso) {
+  const ath = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete) || {};
+  const ftp = +ath.ftp || 250, hrMax = +ath.hr_max || +ath.hrMax || 190;
+  const todo = [];
+  data.forEach(d => {
     const iso = toIsoDate(d.date);
-    return iso >= fromIso && iso <= toIso && getZonesForDay(d) && d.duration;
-  });
-  const totals = [0,0,0,0,0];
-  let totalTime = 0;
-  slice.forEach(d => {
-    const zones = getZonesForDay(d);
-    zones.forEach((pct, i) => {
-      const minutes = (pct / 100) * d.duration;
-      totals[i] += minutes;
-      totalTime += minutes;
+    if (iso < fromIso || iso > toIso) return;
+    (d.activities || []).forEach(a => {
+      if (!a || !(a.id || a.activityId)) return;
+      const hasHr = a._zhr || a.zones_hr, hasPow = a._zpow || a.zones_power;
+      if (a._zonesDone || (hasHr && hasPow)) return;
+      todo.push(a);
     });
   });
-  if (totalTime === 0) return { pct: [0,0,0,0,0], totalMin: 0, sessions: 0 };
+  for (let i = 0; i < todo.length; i++) {
+    const a = todo[i];
+    try {
+      const streams = await loadStreamsFromSupabase(a.id || a.activityId);
+      a._zonesDone = true; // ne pas reessayer cette session meme si pas de streams
+      if (!streams) continue;
+      const watts = Array.isArray(streams) ? ((streams.find(x => x && x.type === 'watts') || {}).data) : streams.watts;
+      const hr = Array.isArray(streams) ? ((streams.find(x => x && x.type === 'heartrate') || {}).data) : streams.heartrate;
+      if (hr && hr.length && !a._zhr && !a.zones_hr) a._zhr = __zones5Hr(hr, hrMax);
+      if (watts && watts.length && !a._zpow && !a.zones_power) a._zpow = __zones5Pow(watts, ftp);
+    } catch (e) { a._zonesDone = true; }
+    if ((i & 7) === 0) await new Promise(r => setTimeout(r, 0));
+  }
+}
+function computeZonesByDate(fromIso, toIso) {
+  // Pondere par la duree de CHAQUE activite (zones calculees depuis les streams, sinon intervals)
+  const totals = [0, 0, 0, 0, 0];
+  let totalTime = 0, sessions = 0;
+  data.forEach(d => {
+    const iso = toIsoDate(d.date);
+    if (iso < fromIso || iso > toIso) return;
+    (d.activities || []).forEach(a => {
+      if (!a) return;
+      const dur = a.duration || (a.moving_time ? a.moving_time / 60 : 0);
+      if (!dur) return;
+      const zones = (currentZoneType === 'power') ? (a._zpow || a.zones_power) : (a._zhr || a.zones_hr || a.zones);
+      if (!zones || !zones.length) return;
+      sessions++;
+      for (let i = 0; i < 5; i++) { const pct = +zones[i] || 0; const m = (pct / 100) * dur; totals[i] += m; totalTime += m; }
+    });
+  });
+  if (totalTime === 0) return { pct: [0, 0, 0, 0, 0], totalMin: 0, sessions: 0 };
   return {
     pct: totals.map(m => +(m * 100 / totalTime).toFixed(1)),
     totalMin: Math.round(totalTime),
-    sessions: slice.length
+    sessions
   };
 }
 
@@ -1397,8 +1439,26 @@ const zonesChart = new Chart(document.getElementById('chart-zones'), {
   }
 });
 
-function renderZones(fromIso, toIso) {
-  const { pct, totalMin, sessions } = computeZonesByDate(fromIso, toIso);
+let _zonesRenderSeq = 0;
+async function renderZones(fromIso, toIso) {
+  const emptyEl0 = document.getElementById('zones-empty');
+  const wrapEl0 = document.getElementById('zones-chart-wrap');
+  // 1er rendu immediat avec ce qu'on a deja
+  let r = computeZonesByDate(fromIso, toIso);
+  // Si rien (zones pas encore calculees), on les calcule depuis les streams
+  const seq = ++_zonesRenderSeq;
+  if (r.pct.reduce((x, y) => x + (y || 0), 0) === 0) {
+    if (emptyEl0) { emptyEl0.hidden = false; emptyEl0.innerHTML = '<div style="color:var(--text-dim)">Calcul des zones depuis les streams…</div>'; }
+    if (wrapEl0) wrapEl0.style.display = 'none';
+    try { await ensureZonesForRange(fromIso, toIso); } catch (e) {}
+    if (seq !== _zonesRenderSeq) return; // une autre periode a ete demandee entre-temps
+    r = computeZonesByDate(fromIso, toIso);
+    if (emptyEl0) emptyEl0.innerHTML = 'Aucune donnée de zones sur cette période.<br><span style="font-size:12px;opacity:.7">Les zones nécessitent les streams FC / puissance des activités.</span>';
+  }
+  _renderZonesView(fromIso, toIso, r);
+}
+function _renderZonesView(fromIso, toIso, precomputed) {
+  const { pct, totalMin, sessions } = precomputed || computeZonesByDate(fromIso, toIso);
   const total = pct.reduce((a, b) => a + (b || 0), 0);
   const emptyEl = document.getElementById('zones-empty');
   const wrapEl = document.getElementById('zones-chart-wrap');
