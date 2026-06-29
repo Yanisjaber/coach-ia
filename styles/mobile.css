@@ -654,6 +654,8 @@
   /* infos centrees dans la carte (chaque ligne = largeur de son contenu, centree) */
   .week-totals .wt-view { align-items: center; justify-content: space-around; }
   .week-totals .wt-row { justify-content: center; gap: 7px; }
+  /* en-tete : « ‹ BILAN › » groupe et centre (au lieu des fleches collees aux bords) */
+  .week-totals .wt-header { display: flex; align-items: center; justify-content: center; gap: 6px; }
   /* ... et meme largeur que les cases jour (8 colonnes egales au lieu d'une colonne figee) */
   .week-row-days { grid-template-columns: repeat(8, 1fr) !important; }
   .week-totals { height: 150px !important; padding: 7px 5px !important; }
