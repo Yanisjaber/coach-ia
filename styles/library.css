@@ -269,7 +269,7 @@ body.lib-dragging .day-card[data-iso] { cursor: copy; }
   position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45);
   z-index: 940; opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
 }
-body.lib-open .lib-overlay-backdrop { opacity: 1; pointer-events: auto; }
+body.lib-open:has(#p2.active) .lib-overlay-backdrop { opacity: 1; pointer-events: auto; }
 .lib-fab {
   display: none;
   position: fixed; right: 16px; bottom: 16px;
@@ -302,5 +302,5 @@ body.lib-open .lib-fab { background: var(--bg-elev2); color: var(--text); border
   .calendar-layout.lib-collapsed .seance-library { width: 330px; padding: 14px; align-items: stretch; overflow-y: auto; }
   .calendar-layout.lib-collapsed .seance-library > *:not(.lib-toggle) { display: revert; }
   .calendar-layout .lib-toggle { display: none; }
-  .lib-fab { display: flex; }
+  body:has(#p2.active) .lib-fab { display: flex; }
 }
