@@ -264,8 +264,43 @@ body.lib-dragging .day-card[data-iso] { cursor: copy; }
 .lib-field-row { display: flex; gap: 12px; }
 .lib-field-row .lib-field { flex: 1; }
 
-/* Empilement sous le calendrier sur petits écrans */
-@media (max-width: 1100px) {
-  .calendar-layout { flex-direction: column; }
-  .seance-library { width: 100%; position: static; max-height: none; }
+/* Fond + bouton flottant (mode overlay) */
+.lib-overlay-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45);
+  z-index: 940; opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+}
+body.lib-open .lib-overlay-backdrop { opacity: 1; pointer-events: auto; }
+.lib-fab {
+  display: none;
+  position: fixed; right: 16px; bottom: 16px;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--accent); color: #0b1410; border: none;
+  align-items: center; justify-content: center; cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45); z-index: 960;
+  transition: background 0.15s, transform 0.12s;
+}
+.lib-fab:active { transform: scale(0.94); }
+body.lib-open .lib-fab { background: var(--bg-elev2); color: var(--text); border: 1px solid var(--border); }
+
+/* Ecran etroit : calendrier pleine largeur, bibliotheque en panneau flottant */
+@media (max-width: 1280px) {
+  .calendar-layout { flex-direction: row; }
+  .calendar-layout .week-calendar { flex: 1; min-width: 0; }
+  .calendar-layout .seance-library {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 330px; max-width: 88vw;
+    margin-top: 0 !important;
+    border-radius: 0;
+    z-index: 950;
+    transform: translateX(110%);
+    transition: transform 0.25s ease;
+    box-shadow: -12px 0 34px rgba(0, 0, 0, 0.5);
+    max-height: none; overflow-y: auto;
+  }
+  body.lib-open .calendar-layout .seance-library { transform: translateX(0); }
+  /* l'etat "replie" du desktop ne s'applique pas en overlay */
+  .calendar-layout.lib-collapsed .seance-library { width: 330px; padding: 14px; align-items: stretch; overflow-y: auto; }
+  .calendar-layout.lib-collapsed .seance-library > *:not(.lib-toggle) { display: revert; }
+  .calendar-layout .lib-toggle { display: none; }
+  .lib-fab { display: flex; }
 }

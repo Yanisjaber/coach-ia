@@ -396,6 +396,33 @@ function injectLibraryToggle() {
   panel.appendChild(btn);
 }
 
+// ---- Bibliotheque en panneau flottant (overlay) sur ecran etroit ----
+function injectLibraryOverlay() {
+  if (document.getElementById('lib-fab')) return;
+  const panel = document.getElementById('seance-library');
+  if (!panel) return;
+  const close = () => document.body.classList.remove('lib-open');
+  const toggle = () => document.body.classList.toggle('lib-open');
+
+  const bd = document.createElement('div');
+  bd.className = 'lib-overlay-backdrop';
+  bd.id = 'lib-overlay-backdrop';
+  bd.addEventListener('click', close);
+  document.body.appendChild(bd);
+
+  const fab = document.createElement('button');
+  fab.type = 'button';
+  fab.id = 'lib-fab';
+  fab.className = 'lib-fab';
+  fab.title = 'Bibliotheque de seances';
+  fab.setAttribute('aria-label', 'Ouvrir la bibliotheque');
+  fab.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>';
+  fab.addEventListener('click', toggle);
+  document.body.appendChild(fab);
+
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+}
+
 // ---- Init ----
 function init() {
   const addBtn = document.getElementById('lib-add');
@@ -405,6 +432,7 @@ function init() {
   wireCalendarDrop();
   renderLibrary();
   injectLibraryToggle();
+  injectLibraryOverlay();
 
   // Réaligne le panneau à chaque (re)rendu du calendrier + au redimensionnement.
   const cal = document.getElementById('week-calendar');
