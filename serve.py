@@ -14,7 +14,7 @@ Puis ouvre : http://localhost:8000/dashboard.html
 import os
 import sys
 from pathlib import Path
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 ROOT = Path(__file__).parent
 
@@ -44,7 +44,9 @@ class CoachIAHandler(SimpleHTTPRequestHandler):
 def run(port=8000):
     os.chdir(ROOT)
     # 0.0.0.0 : accessible aussi depuis l'émulateur Android (via 10.0.2.2)
-    server = HTTPServer(("0.0.0.0", port), CoachIAHandler)
+    ThreadingHTTPServer.request_queue_size = 128   # plus de connexions simultanees en attente
+    server = ThreadingHTTPServer(("0.0.0.0", port), CoachIAHandler)
+    server.daemon_threads = True
     url = f"http://localhost:{port}/dashboard.html"
     print("=" * 60)
     print("Coach IA - Serveur local actif")
