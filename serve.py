@@ -31,6 +31,15 @@ class CoachIAHandler(SimpleHTTPRequestHandler):
             self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         super().end_headers()
 
+    def handle(self):
+        # Le navigateur coupe souvent une connexion en cours (refresh, requete annulee).
+        # Sur Windows -> ConnectionAbortedError [WinError 10053] : benin, on l'ignore
+        # au lieu d'afficher une grosse traceback.
+        try:
+            super().handle()
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            pass
+
 
 def run(port=8000):
     os.chdir(ROOT)
