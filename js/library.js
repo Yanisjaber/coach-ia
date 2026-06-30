@@ -207,6 +207,7 @@ function renderLibrary() {
   body.querySelectorAll('.lib-item').forEach(it => {
     it.draggable = false;   // drag gere par pointer events (wirePointerDrag), fiable en overlay
     it.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch') return;   // tactile -> pas de drag (tap-to-place a la place)
       if (e.button != null && e.button > 0) return;
       _ptr = { id: it.dataset.id, item: it, x: e.clientX, y: e.clientY, started: false, ghost: null, pid: e.pointerId };
       // Capture le pointeur : empeche le conteneur scrollable (overlay) de "voler" le geste

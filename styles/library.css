@@ -194,7 +194,6 @@ body.lib-placing-mode .day-card[data-iso]:active {
   padding: 5px 2px;
   cursor: pointer;
   user-select: none;
-  touch-action: none;
 }
 .lib-cat-head:hover { color: var(--text); }
 .lib-cat-caret { display: inline-block; transition: transform 0.15s; font-size: 10px; }
