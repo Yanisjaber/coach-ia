@@ -223,7 +223,6 @@ function renderLibrary() {
         it.classList.add('selected-for-place');
         _draggingId = it.dataset.id;
         document.body.classList.add('lib-placing-mode');
-        showPlacingHint(it.querySelector('.lib-item-name')?.textContent || 'Séance');
         // overlay : on referme pour laisser voir le calendrier et taper un jour
         document.body.classList.remove('lib-open');
       } else {
