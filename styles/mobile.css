@@ -207,8 +207,8 @@
 
   /* Cellule jour façon Nolio : date + vignette colorée durée/distance */
   .day-card {
-    height: 104px; min-height: 0;     /* +18px pour accueillir la tuile sans écraser la date */
-    padding: 4px 3px 3px;
+    height: auto; min-height: 50px; aspect-ratio: 1 / 1;
+    padding: 4px 2px 3px;
     align-items: stretch;
     border-radius: 10px;
     overflow: hidden;
@@ -243,6 +243,26 @@
     text-align: center;
   }
   .day-card .day-card-meta:empty { display: none; }
+
+  /* === Cases compactes : on ne garde que l'icone du sport (detail au tap) === */
+  .day-card .day-card-dow { font-size: 8px; }
+  .day-card .day-card-date { font-size: 13px; margin: 0; }
+  /* Tuile mono-activite : juste l'icone centree */
+  .day-card--single .day-single-tile {
+    flex: 1; background: transparent !important; padding: 0; margin: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .day-card--single .dst-bar, .day-card--single .dmc-bar,
+  .day-card--single .dst-text, .day-card--single .dst-name,
+  .day-card--single .dst-meta, .day-card--single .dst-profile { display: none !important; }
+  .day-card--single .dst-body { padding: 0; }
+  .day-card--single .dst-head { justify-content: center; margin: 0; gap: 0; }
+  .day-card--single .dst-glyph svg { width: 22px; height: 22px; }
+  /* Multi-activites : juste les icones, sans le temps */
+  .day-card--multi .day-multi-grid { gap: 2px; min-height: 0; }
+  .day-card--multi .dmc-time, .day-card--multi .dmc-bar { display: none !important; }
+  .day-card--multi .dmc-body { padding: 2px 0; justify-content: center; }
+  .day-card--multi .dmc-glyph svg { width: 16px; height: 16px; }
   .day-card[data-sport-cat="cyclisme"]    .day-card-meta { background: #3b82f6; }
   .day-card[data-sport-cat="vtt"]         .day-card-meta { background: #b45309; }
   .day-card[data-sport-cat="course"]      .day-card-meta { background: #fc4c02; }
