@@ -334,42 +334,13 @@
   /* Multi-activités sur mobile : on cache aussi les temps dès 3+, juste les icônes */
   .day-multi-grid { gap: 3px; min-height: 50px; }
   .dmc-glyph svg { width: 14px !important; height: 14px !important; }
+  .day-multi-grid:has(> :nth-child(3)) .dmc-glyph svg { width: 12px !important; height: 12px !important; }
   .dmc-time { font-size: 8px; white-space: nowrap; }
   .day-multi-grid:has(> :nth-child(3)) .dmc-time { display: none !important; }
 
   /* 4+ activités sur mobile : on cache à partir de la 4e colonne, badge "+N"
      sur la 3e (cliquable pour voir tout le détail via la modal jour). */
-  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(n+4) {
-    display: none !important;
-  }
-  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(3) {
-    position: relative;
-  }
-  /* Badge "+N" avec compteur exact (1 règle par tranche) */
-  .day-multi-grid:has(> .day-multi-col:nth-child(4)):not(:has(> .day-multi-col:nth-child(5))) > .day-multi-col:nth-child(3)::after { content: "+1"; }
-  .day-multi-grid:has(> .day-multi-col:nth-child(5)):not(:has(> .day-multi-col:nth-child(6))) > .day-multi-col:nth-child(3)::after { content: "+2"; }
-  .day-multi-grid:has(> .day-multi-col:nth-child(6)):not(:has(> .day-multi-col:nth-child(7))) > .day-multi-col:nth-child(3)::after { content: "+3"; }
-  .day-multi-grid:has(> .day-multi-col:nth-child(7)) > .day-multi-col:nth-child(3)::after { content: "+4"; }
-  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(3)::after {
-    position: absolute;
-    bottom: 3px;
-    left: 50%;
-    transform: translateX(-50%);
-    min-width: 18px;
-    height: 13px;
-    padding: 0 4px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.92);
-    color: #0b0e14;
-    font-size: 9px;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-    pointer-events: none;
-  }
+  /* (plafonnement a 3 activites gere cote JS : 3 plus longues) */
 
   /* Compétitions : trophée seul, sans le nom (illisible en petit) */
   .day-card.race .day-card-name { display: flex; justify-content: center; margin: 0; }
@@ -541,36 +512,7 @@
 
   /* 4+ activités : on coupe à 3 colonnes + badge "+N" (principe :
      dès qu'une icône touche le bord, on la supprime). */
-  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(n+4) {
-    display: none !important;
-  }
-  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(3) {
-    position: relative;
-  }
-  .day-multi-grid:has(> .day-multi-col:nth-child(4)):not(:has(> .day-multi-col:nth-child(5))) > .day-multi-col:nth-child(3)::after { content: "+1"; }
-  .day-multi-grid:has(> .day-multi-col:nth-child(5)):not(:has(> .day-multi-col:nth-child(6))) > .day-multi-col:nth-child(3)::after { content: "+2"; }
-  .day-multi-grid:has(> .day-multi-col:nth-child(6)):not(:has(> .day-multi-col:nth-child(7))) > .day-multi-col:nth-child(3)::after { content: "+3"; }
-  .day-multi-grid:has(> .day-multi-col:nth-child(7)) > .day-multi-col:nth-child(3)::after { content: "+4"; }
-  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(3)::after {
-    position: absolute;
-    bottom: 3px;
-    left: 50%;
-    transform: translateX(-50%);
-    min-width: 18px;
-    height: 13px;
-    padding: 0 4px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.92);
-    color: #0b0e14;
-    font-size: 9px;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-    pointer-events: none;
-  }
+  /* (plafonnement a 3 activites gere cote JS : 3 plus longues) */
 
   /* Mono-activité : tuile compacte avec icône sport + temps + km au CENTRE.
      Profil d'intervalles (séances prévues) absolument positionné en bas,
@@ -705,34 +647,5 @@
   /* 4+ activités en laptop tight : on coupe à 3 colonnes + badge "+N" sur la 3e
      (principe : dès qu'une icône touche le bord, on la supprime et on indique
      combien sont cachées). Identique au comportement mobile. */
-  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(n+4) {
-    display: none !important;
-  }
-  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(3) {
-    position: relative;
-  }
-  .day-multi-grid:has(> .day-multi-col:nth-child(4)):not(:has(> .day-multi-col:nth-child(5))) > .day-multi-col:nth-child(3)::after { content: "+1"; }
-  .day-multi-grid:has(> .day-multi-col:nth-child(5)):not(:has(> .day-multi-col:nth-child(6))) > .day-multi-col:nth-child(3)::after { content: "+2"; }
-  .day-multi-grid:has(> .day-multi-col:nth-child(6)):not(:has(> .day-multi-col:nth-child(7))) > .day-multi-col:nth-child(3)::after { content: "+3"; }
-  .day-multi-grid:has(> .day-multi-col:nth-child(7)) > .day-multi-col:nth-child(3)::after { content: "+4"; }
-  .day-multi-grid:has(> .day-multi-col:nth-child(4)) > .day-multi-col:nth-child(3)::after {
-    position: absolute;
-    bottom: 3px;
-    left: 50%;
-    transform: translateX(-50%);
-    min-width: 18px;
-    height: 13px;
-    padding: 0 4px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.92);
-    color: #0b0e14;
-    font-size: 9px;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-    pointer-events: none;
-  }
+  /* (plafonnement a 3 activites gere cote JS : 3 plus longues) */
 }
