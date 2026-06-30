@@ -205,8 +205,9 @@
   .week-dow-head {
     display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
     position: sticky; top: 0; z-index: 6;
-    padding: 6px 0 5px; margin: 0 0 2px;
+    padding: 6px 8px 5px; margin: 0 0 4px;
     background: var(--bg, #0f1116);
+    border-radius: 10px;
   }
   .week-dow-head span {
     text-align: center; font-size: 10px; font-weight: 700;
