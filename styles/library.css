@@ -101,7 +101,12 @@
 }
 .lib-search-wrap input::placeholder { color: var(--text-mute); }
 
-.lib-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.lib-filters {
+  display: flex; flex-wrap: nowrap; gap: 6px; margin-bottom: 14px;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.lib-filters::-webkit-scrollbar { display: none; }
+.lib-chip { flex: none; }
 .lib-body { flex: 1; min-height: 0; overflow-y: auto; }
 .lib-chip {
   font-size: 11px;
