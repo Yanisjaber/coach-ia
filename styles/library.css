@@ -298,11 +298,14 @@ body.lib-open .lib-fab { background: var(--accent); color: #0b1410; border-color
     border-radius: 14px;
     z-index: 950;
     transform: translateX(calc(100% + 26px));
-    transition: transform 0.5s cubic-bezier(.4,0,.2,1);
+    opacity: 0;
+    will-change: transform, opacity;
+    transition: transform 0.5s ease, opacity 0.5s ease;
     box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
     max-height: none; overflow-y: auto; overscroll-behavior: contain;
+    pointer-events: none;
   }
-  body.lib-open .calendar-layout .seance-library { transform: translateX(0); }
+  body.lib-open .calendar-layout .seance-library { transform: translateX(0); opacity: 1; pointer-events: auto; }
   /* l'etat "replie" du desktop ne s'applique pas en overlay */
   .calendar-layout.lib-collapsed .seance-library { width: 330px; padding: 14px; align-items: stretch; overflow-y: auto; }
   .calendar-layout.lib-collapsed .seance-library > *:not(.lib-toggle) { display: revert; }
