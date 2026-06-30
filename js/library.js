@@ -38,7 +38,6 @@ function wirePointerDrag() {
     if (!_ptr.started) {
       if (Math.abs(e.clientX - _ptr.x) + Math.abs(e.clientY - _ptr.y) < 6) return;
       _ptr.started = true; _draggingId = _ptr.id;
-      console.log('[lib] DRAG started');
       document.body.classList.add('lib-dragging');
       const g = document.createElement('div'); g.id = 'lib-drag-ghost';
       g.textContent = (_ptr.item.querySelector('.lib-item-name') || {}).textContent || 'Séance';
@@ -55,7 +54,6 @@ function wirePointerDrag() {
     const st = _ptr; _ptr = null;
     if (st.ghost) st.ghost.remove();
     document.body.classList.remove('lib-dragging'); clearHover();
-    console.log('[lib] pointerup started=', st.started);
     if (!st.started) return;                 // simple clic -> gere par le handler click (tap-to-place)
     _justDragged = true; setTimeout(() => { _justDragged = false; }, 50);
     const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -63,7 +61,6 @@ function wirePointerDrag() {
     const iso = card && card.dataset.iso;
     const tpl = loadTemplates().find(t => t.id === st.id);
     _draggingId = null;
-    console.log('[lib] drop iso=', iso, 'tpl=', !!tpl, 'coachInsertTemplate=', !!window.coachInsertTemplate);
     if (iso && tpl && window.coachInsertTemplate) {
       const mode = window.coachCalendarMode ? window.coachCalendarMode() : 'prevu';
       window.coachInsertTemplate(iso, tpl, mode);
@@ -227,6 +224,8 @@ function renderLibrary() {
         _draggingId = it.dataset.id;
         document.body.classList.add('lib-placing-mode');
         showPlacingHint(it.querySelector('.lib-item-name')?.textContent || 'Séance');
+        // overlay : on referme pour laisser voir le calendrier et taper un jour
+        document.body.classList.remove('lib-open');
       } else {
         _draggingId = null;
         document.body.classList.remove('lib-placing-mode');
