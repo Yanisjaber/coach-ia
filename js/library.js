@@ -478,6 +478,16 @@ function init() {
   if (search) search.addEventListener('input', () => { _query = search.value.trim(); renderLibrary(); });
   wireCalendarDrop();
   wirePointerDrag();
+  // Molette -> defilement horizontal des filtres (PC) quand la barre deborde
+  const _filt = document.getElementById('lib-filters');
+  if (_filt && !_filt._wheelWired) {
+    _filt._wheelWired = true;
+    _filt.addEventListener('wheel', (e) => {
+      if (!e.deltaY || _filt.scrollWidth <= _filt.clientWidth) return;
+      e.preventDefault();
+      _filt.scrollLeft += e.deltaY;
+    }, { passive: false });
+  }
   renderLibrary();
   injectLibraryToggle();
   injectLibraryOverlay();
