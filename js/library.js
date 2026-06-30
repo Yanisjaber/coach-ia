@@ -321,6 +321,7 @@ function wireCalendarDrop() {
     if (iso && tpl && window.coachInsertTemplate) {
       const mode = window.coachCalendarMode ? window.coachCalendarMode() : 'prevu';
       window.coachInsertTemplate(iso, tpl, mode);
+      document.body.classList.remove('lib-open');   // referme l'overlay apres depot
     }
   });
 
@@ -334,6 +335,7 @@ function wireCalendarDrop() {
     if (iso && tpl && window.coachInsertTemplate) {
       const mode = window.coachCalendarMode ? window.coachCalendarMode() : 'prevu';
       window.coachInsertTemplate(iso, tpl, mode);
+      document.body.classList.remove('lib-open');   // referme l'overlay apres depot
     }
     // Reset l'état de placement
     _draggingId = null;
