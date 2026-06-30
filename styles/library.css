@@ -270,6 +270,8 @@ body.lib-dragging .day-card[data-iso] { cursor: copy; }
   z-index: 940; opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
 }
 body.lib-open:has(#p2.active) .lib-overlay-backdrop { opacity: 1; pointer-events: auto; }
+/* Pendant un glisser-deposer : le fond ne bloque plus le drop sur le calendrier (et s'eclaircit) */
+body.lib-dragging .lib-overlay-backdrop { pointer-events: none !important; opacity: 0.12 !important; }
 .lib-fab {
   display: none;
   position: absolute; top: 14px; right: 14px; z-index: 6;
