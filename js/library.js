@@ -49,8 +49,9 @@ function wirePointerDrag() {
       if (Math.abs(e.clientX - _ptr.x) + Math.abs(e.clientY - _ptr.y) < 6) return;
       _ptr.started = true; _draggingId = _ptr.id;
       document.body.classList.add('lib-dragging');
-      const g = document.createElement('div'); g.id = 'lib-drag-ghost';
-      g.textContent = (_ptr.item.querySelector('.lib-item-name') || {}).textContent || 'Séance';
+      const g = _ptr.item.cloneNode(true); g.id = 'lib-drag-ghost';
+      g.style.width = _ptr.item.offsetWidth + 'px';
+      const _e = g.querySelector('.lib-item-edit'); if (_e) _e.remove();
       document.body.appendChild(g); _ptr.ghost = g;
     }
     if (_ptr.ghost) { _ptr.ghost.style.left = e.clientX + 'px'; _ptr.ghost.style.top = e.clientY + 'px'; }
