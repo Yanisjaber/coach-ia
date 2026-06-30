@@ -100,6 +100,7 @@
   .week-row-days {
     display: grid;
     grid-template-columns: repeat(7, 1fr) 150px;
+    grid-auto-rows: 170px;
     gap: 6px;
   }
   .week-totals {
