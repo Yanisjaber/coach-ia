@@ -165,7 +165,7 @@ function renderLibrary() {
     const items = groups[k];
     const collapsed = !!_collapsed[k];
     const itemsHtml = items.map(t => `
-      <div class="lib-item" draggable="true" data-id="${t.id}" title="Glisse-moi sur un jour">
+      <div class="lib-item" data-id="${t.id}" title="Glisse-moi sur un jour">
         <span class="lib-accent" style="background:${info.color};"></span>
         <span class="lib-grip" aria-hidden="true">⠿</span>
         <div class="lib-item-body">
