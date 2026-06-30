@@ -680,3 +680,7 @@
 
   footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-mute); font-size: 11px; text-align: center; }
 
+
+/* En-tete jours + resume de semaine : reserves au mobile (voir mobile.css) */
+.week-dow-head { display: none; }
+.week-row-sum { display: none; }

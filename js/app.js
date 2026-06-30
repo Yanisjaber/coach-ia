@@ -4022,15 +4022,19 @@ function renderWeekPlan() {
     `;
     dayCards.push(totalsCard);
 
+    const _wsumDur = weekTotalDur <= 0 ? '' : (weekTotalDur < 60 ? `${Math.round(weekTotalDur)}min` : `${Math.floor(weekTotalDur/60)}h${Math.round(weekTotalDur%60).toString().padStart(2,'0')}`);
+    const _wsumKm = (typeof totalKm !== 'undefined' && totalKm > 0) ? ` \u00b7 ${totalKm} km` : '';
+    const weekSum = weekTotalSessions > 0 ? `<span class="week-row-sum">${weekTotalSessions} s\u00e9ance${weekTotalSessions>1?'s':''}${_wsumDur?` \u00b7 ${_wsumDur}`:''}${_wsumKm}</span>` : '';
     weeksHtml.push(`
       <div class="week-row">
-        <div class="week-row-label">${weekLabel}</div>
+        <div class="week-row-label">${weekLabel}${weekSum}</div>
         <div class="week-row-days">${dayCards.join('')}</div>
       </div>
     `);
   }
 
-  document.getElementById('week-calendar').innerHTML = `<div class="month-plan">${weeksHtml.join('')}</div>`;
+  const _dowHead = '<div class="week-dow-head">' + ['L','M','M','J','V','S','D'].map(function(x){return '<span>'+x+'</span>';}).join('') + '</div>';
+  document.getElementById('week-calendar').innerHTML = `<div class="month-plan">${_dowHead}${weeksHtml.join('')}</div>`;
 }
 
 // ========= MODE PRÉVU vs RÉALISÉ =========
@@ -4419,15 +4423,19 @@ function renderRealiseCalendar() {
     `;
     dayCards.push(totalsCard);
 
+    const _wsumDur = weekTotalDur <= 0 ? '' : (weekTotalDur < 60 ? `${Math.round(weekTotalDur)}min` : `${Math.floor(weekTotalDur/60)}h${Math.round(weekTotalDur%60).toString().padStart(2,'0')}`);
+    const _wsumKm = (typeof totalKm !== 'undefined' && totalKm > 0) ? ` \u00b7 ${totalKm} km` : '';
+    const weekSum = weekTotalSessions > 0 ? `<span class="week-row-sum">${weekTotalSessions} s\u00e9ance${weekTotalSessions>1?'s':''}${_wsumDur?` \u00b7 ${_wsumDur}`:''}${_wsumKm}</span>` : '';
     weeksHtml.push(`
       <div class="week-row">
-        <div class="week-row-label">${weekLabel}</div>
+        <div class="week-row-label">${weekLabel}${weekSum}</div>
         <div class="week-row-days">${dayCards.join('')}</div>
       </div>
     `);
   }
 
-  document.getElementById('week-calendar').innerHTML = `<div class="month-plan">${weeksHtml.join('')}</div>`;
+  const _dowHead = '<div class="week-dow-head">' + ['L','M','M','J','V','S','D'].map(function(x){return '<span>'+x+'</span>';}).join('') + '</div>';
+  document.getElementById('week-calendar').innerHTML = `<div class="month-plan">${_dowHead}${weeksHtml.join('')}</div>`;
 }
 
 // Handler flèches + clic carte (event delegation sur le calendrier)
