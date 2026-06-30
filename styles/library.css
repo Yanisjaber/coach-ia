@@ -26,6 +26,8 @@
   transition: width 0.22s ease, padding 0.22s ease;
 }
 
+/* Bouton repli desktop retire (overlay gere les ecrans etroits, evitait le chevauchement avec + Nouveau) */
+.lib-toggle { display: none !important; }
 /* Bouton repli/déplier la bibliothèque (injecté par js/library.js) */
 .lib-toggle {
   position: absolute;
