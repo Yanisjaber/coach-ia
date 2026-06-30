@@ -209,6 +209,7 @@ function renderLibrary() {
     it.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'touch') return;   // tactile -> pas de drag (tap-to-place a la place)
       if (e.button != null && e.button > 0) return;
+      if (e.target.closest && e.target.closest('.lib-item-edit')) return;   // clic crayon -> pas de capture (sinon le clic part sur la carte)
       _ptr = { id: it.dataset.id, item: it, x: e.clientX, y: e.clientY, started: false, ghost: null, pid: e.pointerId };
       // Capture le pointeur : empeche le conteneur scrollable (overlay) de "voler" le geste
       // et de declencher pointercancel, ce qui tuait le drag dans l'overlay.
