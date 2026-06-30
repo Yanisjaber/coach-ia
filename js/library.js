@@ -406,15 +406,6 @@ function injectLibraryOverlay() {
   const close = () => document.body.classList.remove('lib-open');
   const toggle = () => document.body.classList.toggle('lib-open');
 
-  const bd = document.createElement('div');
-  bd.className = 'lib-overlay-backdrop';
-  bd.id = 'lib-overlay-backdrop';
-  bd.addEventListener('click', close);
-  // IMPORTANT : meme parent que la bibliotheque (.calendar-layout) sinon, si un ancetre
-  // a un transform, le panneau fixe est "emprisonne" et le fond (sur body) passe au-dessus
-  // -> les clics atterrissent sur le fond. En partageant le contexte, z-index 940 < 950 ok.
-  (panel.parentNode || document.body).appendChild(bd);
-
   const fab = document.createElement('button');
   fab.type = 'button';
   fab.id = 'lib-fab';
@@ -428,6 +419,11 @@ function injectLibraryOverlay() {
   (_card || document.body).appendChild(fab);
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  document.addEventListener('mousedown', (e) => {
+    if (!document.body.classList.contains('lib-open')) return;
+    if (e.target.closest('#seance-library') || e.target.closest('#lib-fab')) return;
+    close();
+  });
 }
 
 // ---- Init ----
