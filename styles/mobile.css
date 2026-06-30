@@ -244,12 +244,13 @@
   }
   .day-card .day-card-meta:empty { display: none; }
 
-  /* === Cases compactes : on ne garde que l'icone du sport (detail au tap) === */
+  /* === Cases compactes : chaque seance = un mini-carre colore (detail au tap) === */
   .day-card .day-card-dow { font-size: 8px; }
-  .day-card .day-card-date { font-size: 13px; margin: 0; }
-  /* Tuile mono-activite : juste l'icone centree */
+  .day-card .day-card-date { font-size: 13px; margin: 0 0 2px; }
+  /* Mono-activite : un mini-carre colore avec l'icone du sport */
   .day-card--single .day-single-tile {
-    flex: 1; background: transparent !important; padding: 0; margin: 0;
+    flex: none; align-self: center; width: 30px; height: 30px;
+    padding: 0; margin: 0 auto; border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
   }
   .day-card--single .dst-bar, .day-card--single .dmc-bar,
@@ -257,12 +258,19 @@
   .day-card--single .dst-meta, .day-card--single .dst-profile { display: none !important; }
   .day-card--single .dst-body { padding: 0; }
   .day-card--single .dst-head { justify-content: center; margin: 0; gap: 0; }
-  .day-card--single .dst-glyph svg { width: 22px; height: 22px; }
-  /* Multi-activites : juste les icones, sans le temps */
-  .day-card--multi .day-multi-grid { gap: 2px; min-height: 0; }
+  .day-card--single .dst-glyph svg { width: 18px; height: 18px; }
+  /* Multi-activites : plusieurs mini-carres colores (un par seance) */
+  .day-card--multi .day-multi-grid {
+    display: flex; flex-wrap: wrap; gap: 3px;
+    justify-content: center; align-content: flex-start; min-height: 0;
+  }
+  .day-card--multi .day-multi-col {
+    width: 24px; height: 24px; min-width: 0; padding: 0;
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  }
   .day-card--multi .dmc-time, .day-card--multi .dmc-bar { display: none !important; }
-  .day-card--multi .dmc-body { padding: 2px 0; justify-content: center; }
-  .day-card--multi .dmc-glyph svg { width: 16px; height: 16px; }
+  .day-card--multi .dmc-body { padding: 0; justify-content: center; }
+  .day-card--multi .dmc-glyph svg { width: 15px; height: 15px; }
   .day-card[data-sport-cat="cyclisme"]    .day-card-meta { background: #3b82f6; }
   .day-card[data-sport-cat="vtt"]         .day-card-meta { background: #b45309; }
   .day-card[data-sport-cat="course"]      .day-card-meta { background: #fc4c02; }
