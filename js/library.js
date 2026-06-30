@@ -427,10 +427,10 @@ function injectLibraryToggle() {
     renderIcon();
     if (typeof scheduleAlign === 'function') scheduleAlign();
   });
-  // Restaurer l'état persisté
-  try {
-    if (localStorage.getItem('lib-collapsed') === '1') layout.classList.add('lib-collapsed');
-  } catch {}
+  // Plus de restauration auto du repli : la bibliotheque s'ouvre depliee quand il y a la place
+  // (l'overlay gere deja les ecrans etroits). On nettoie l'ancien etat persiste.
+  try { localStorage.removeItem('lib-collapsed'); } catch {}
+  layout.classList.remove('lib-collapsed');
   renderIcon();
   panel.appendChild(btn);
 }
