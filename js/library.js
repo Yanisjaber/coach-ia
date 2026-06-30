@@ -205,8 +205,10 @@ function renderLibrary() {
     it.draggable = false;   // drag gere par pointer events (wirePointerDrag), fiable en overlay
     it.addEventListener('pointerdown', (e) => {
       if (e.button != null && e.button > 0) return;
-      _ptr = { id: it.dataset.id, item: it, x: e.clientX, y: e.clientY, started: false, ghost: null };
-      console.log('[lib] pointerdown', it.dataset.id, e.pointerType, e.button);
+      _ptr = { id: it.dataset.id, item: it, x: e.clientX, y: e.clientY, started: false, ghost: null, pid: e.pointerId };
+      // Capture le pointeur : empeche le conteneur scrollable (overlay) de "voler" le geste
+      // et de declencher pointercancel, ce qui tuait le drag dans l'overlay.
+      try { it.setPointerCapture(e.pointerId); } catch (_) {}
     });
 
     // === Mode tactile : tap sur l'item = sélection, puis tap sur un jour = placement.
