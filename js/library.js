@@ -410,7 +410,10 @@ function injectLibraryOverlay() {
   bd.className = 'lib-overlay-backdrop';
   bd.id = 'lib-overlay-backdrop';
   bd.addEventListener('click', close);
-  document.body.appendChild(bd);
+  // IMPORTANT : meme parent que la bibliotheque (.calendar-layout) sinon, si un ancetre
+  // a un transform, le panneau fixe est "emprisonne" et le fond (sur body) passe au-dessus
+  // -> les clics atterrissent sur le fond. En partageant le contexte, z-index 940 < 950 ok.
+  (panel.parentNode || document.body).appendChild(bd);
 
   const fab = document.createElement('button');
   fab.type = 'button';
