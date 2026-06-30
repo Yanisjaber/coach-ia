@@ -300,8 +300,10 @@ body.lib-open .lib-fab { background: var(--accent); color: #0b1410; border-color
     transform: translateX(calc(100% + 26px));
     transition: transform 0.25s ease;
     box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
-    max-height: none; overflow-y: auto;
+    max-height: none; overflow-y: auto; overscroll-behavior: contain;
   }
+  /* overlay ouvert : on bloque le scroll de l'arriere-plan */
+  body.lib-open { overflow: hidden; }
   body.lib-open .calendar-layout .seance-library { transform: translateX(0); }
   /* l'etat "replie" du desktop ne s'applique pas en overlay */
   .calendar-layout.lib-collapsed .seance-library { width: 330px; padding: 14px; align-items: stretch; overflow-y: auto; }
