@@ -29,6 +29,46 @@ let _filter = 'tous';
 let _query = '';
 const _collapsed = {};            // { sportKey: true } si replié
 let _draggingId = null;           // modèle en cours de glissement
+let _ptr = null, _justDragged = false;   // drag "maison" (pointer events, fiable en overlay fixed)
+function wirePointerDrag() {
+  if (window.__libPtrWired) return; window.__libPtrWired = true;
+  const clearHover = () => document.querySelectorAll('.day-card.lib-drop-hover').forEach(c => c.classList.remove('lib-drop-hover'));
+  document.addEventListener('pointermove', (e) => {
+    if (!_ptr) return;
+    if (!_ptr.started) {
+      if (Math.abs(e.clientX - _ptr.x) + Math.abs(e.clientY - _ptr.y) < 6) return;
+      _ptr.started = true; _draggingId = _ptr.id;
+      document.body.classList.add('lib-dragging');
+      const g = document.createElement('div'); g.id = 'lib-drag-ghost';
+      g.textContent = (_ptr.item.querySelector('.lib-item-name') || {}).textContent || 'Séance';
+      document.body.appendChild(g); _ptr.ghost = g;
+    }
+    if (_ptr.ghost) { _ptr.ghost.style.left = e.clientX + 'px'; _ptr.ghost.style.top = e.clientY + 'px'; }
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const card = el && el.closest ? el.closest('.day-card[data-iso]') : null;
+    document.querySelectorAll('.day-card.lib-drop-hover').forEach(c => { if (c !== card) c.classList.remove('lib-drop-hover'); });
+    if (card) card.classList.add('lib-drop-hover');
+  });
+  document.addEventListener('pointerup', (e) => {
+    if (!_ptr) return;
+    const st = _ptr; _ptr = null;
+    if (st.ghost) st.ghost.remove();
+    document.body.classList.remove('lib-dragging'); clearHover();
+    if (!st.started) return;                 // simple clic -> gere par le handler click (tap-to-place)
+    _justDragged = true; setTimeout(() => { _justDragged = false; }, 50);
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const card = el && el.closest ? el.closest('.day-card[data-iso]') : null;
+    const iso = card && card.dataset.iso;
+    const tpl = loadTemplates().find(t => t.id === st.id);
+    _draggingId = null;
+    if (iso && tpl && window.coachInsertTemplate) {
+      const mode = window.coachCalendarMode ? window.coachCalendarMode() : 'prevu';
+      window.coachInsertTemplate(iso, tpl, mode);
+      document.body.classList.remove('lib-open');   // referme l'overlay apres depot
+    }
+  });
+  document.addEventListener('pointercancel', () => { if (_ptr && _ptr.ghost) _ptr.ghost.remove(); _ptr = null; document.body.classList.remove('lib-dragging'); clearHover(); });
+}
 
 function loadTemplates() {
   try { return JSON.parse(localStorage.getItem(LIB_KEY) || '[]'); }
@@ -159,17 +199,10 @@ function renderLibrary() {
   }));
   // Drag (desktop) + tap-to-place (touch / mobile)
   body.querySelectorAll('.lib-item').forEach(it => {
-    it.addEventListener('dragstart', (e) => {
-      _draggingId = it.dataset.id;
-      try { e.dataTransfer.setData('text/plain', it.dataset.id); e.dataTransfer.effectAllowed = 'copy'; } catch {}
-      it.classList.add('dragging');
-      document.body.classList.add('lib-dragging');
-    });
-    it.addEventListener('dragend', () => {
-      _draggingId = null;
-      it.classList.remove('dragging');
-      document.body.classList.remove('lib-dragging');
-      document.querySelectorAll('.day-card.lib-drop-hover').forEach(c => c.classList.remove('lib-drop-hover'));
+    it.draggable = false;   // drag gere par pointer events (wirePointerDrag), fiable en overlay
+    it.addEventListener('pointerdown', (e) => {
+      if (e.button != null && e.button > 0) return;
+      _ptr = { id: it.dataset.id, item: it, x: e.clientX, y: e.clientY, started: false, ghost: null };
     });
 
     // === Mode tactile : tap sur l'item = sélection, puis tap sur un jour = placement.
@@ -177,8 +210,8 @@ function renderLibrary() {
     // Sur les écrans desktop avec souris, le HTML5 DnD prend le dessus et ce code
     // n'est jamais déclenché (pas de touch).
     it.addEventListener('click', (e) => {
-      // Si on est encore en train de drag (mouse), on ignore le click final
-      if (document.body.classList.contains('lib-dragging')) return;
+      // Ignore le click final apres un drag
+      if (_justDragged || document.body.classList.contains('lib-dragging')) return;
       // Mode touch : on toggle la sélection
       const wasSelected = it.classList.contains('selected-for-place');
       // Reset toutes les sélections
@@ -433,6 +466,7 @@ function init() {
   const search = document.getElementById('lib-search');
   if (search) search.addEventListener('input', () => { _query = search.value.trim(); renderLibrary(); });
   wireCalendarDrop();
+  wirePointerDrag();
   renderLibrary();
   injectLibraryToggle();
   injectLibraryOverlay();
