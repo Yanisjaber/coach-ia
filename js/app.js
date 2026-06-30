@@ -3927,7 +3927,11 @@ function renderWeekPlan() {
       const _date = `<div class="day-card-date">${d.getDate()}</div>`;
 
       if (hasMulti) {
-        const cols = items.map((it, i) => {
+        let _list = items.map((it, i) => ({ it, i }));
+        if (_list.length > 3) {
+          _list = _list.slice().sort((x, y) => (y.it.dur || 0) - (x.it.dur || 0)).slice(0, 3).sort((x, y) => x.i - y.i);
+        }
+        const cols = _list.map(({ it, i }) => {
           const _r = !!it.isRace;
           const hex = _r ? compPrio(it.priority).color : (window.sportColor ? window.sportColor(it.sport) : '#9ca3af');
           const g = _r ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(it.sport, 22) : '');
@@ -4075,7 +4079,13 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   // hauteur (1 par activite : liisere couleur du sport + glyph + duree). Clic = ouvre l'activite.
   if (hasMulti) {
     const _acts = (realDay && realDay.activities && realDay.activities.length) ? realDay.activities : [act];
-    const cols = _acts.map((a, i) => {
+    // Pas la place d'afficher toutes les activites -> on garde les 3 plus longues
+    // (evite les icones coupees en bas de case). Le tap ouvre le detail complet.
+    let _list = _acts.map((a, i) => ({ a, i }));
+    if (_list.length > 3) {
+      _list = _list.slice().sort((x, y) => (y.a.duration || 0) - (x.a.duration || 0)).slice(0, 3).sort((x, y) => x.i - y.i);
+    }
+    const cols = _list.map(({ a, i }) => {
       const isComp = a.category === 'competition';
       const hex = isComp ? compPrio(a.priority).color : (window.sportColor ? window.sportColor(a.raw_type || a.sport) : '#9ca3af');
       const g = isComp ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(a.raw_type || a.sport, 22) : '');
