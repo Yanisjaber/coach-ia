@@ -22,6 +22,16 @@ const SPORTS = [
   { key: 'autre',       label: 'Autre',        color: '#9ca3af' },
 ];
 const SPORT_BY = Object.fromEntries(SPORTS.map(s => [s.key, s]));
+const _SPORT_SVG = {
+  cyclisme: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l5-9h3l-2 9"/><path d="M11 8h4l2 5"/></svg>',
+  vtt:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l5-9h3l-2 9"/><path d="M11 8h4l2 5"/></svg>',
+  course:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="5" r="1.6"/><path d="M6 21l3-5 2-3 2 2 1 4"/><path d="M11 13l-2-3 4-2 2 3 3 1"/></svg>',
+  trail:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l6-12 4 7 2-3 6 8z"/></svg>',
+  natation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 17c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/></svg>',
+  musculation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9v6M4 8v8M18 9v6M20 8v8M6 12h12"/></svg>',
+  autre:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>',
+};
+function sportIcon(k) { return _SPORT_SVG[k] || _SPORT_SVG.autre; }
 function sportInfo(key) { return SPORT_BY[key] || SPORT_BY.autre; }
 
 // ---- État local ----
@@ -166,15 +176,10 @@ function renderLibrary() {
     const collapsed = !!_collapsed[k];
     const itemsHtml = items.map(t => `
       <div class="lib-item" data-id="${t.id}" title="Glisse-moi sur un jour">
-        <span class="lib-accent" style="background:${info.color};"></span>
-        <span class="lib-grip" aria-hidden="true">⠿</span>
+        <span class="lib-ic" style="background:${info.color}22;color:${info.color}">${sportIcon(k)}</span>
         <div class="lib-item-body">
           <div class="lib-item-name">${esc(t.name)}</div>
-          <div class="lib-item-meta">
-            ${t.duration_min ? `<span class="lib-pill">${fmtDur(t.duration_min)}</span>` : ''}
-            ${t.tss ? `<span class="lib-pill">${t.tss} TSS</span>` : ''}
-          </div>
-          ${t.description ? `<div class="lib-item-desc">${esc(t.description)}</div>` : ''}
+          ${[t.duration_min ? fmtDur(t.duration_min) : null, t.tss ? (t.tss + ' TSS') : null].filter(Boolean).join(' · ') ? `<div class="lib-item-meta">${[t.duration_min ? fmtDur(t.duration_min) : null, t.tss ? (t.tss + ' TSS') : null].filter(Boolean).join(' · ')}</div>` : ''}
         </div>
         <button class="lib-item-edit" data-edit="${t.id}" title="Modifier" type="button">✎</button>
       </div>

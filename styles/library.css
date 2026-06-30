@@ -202,37 +202,29 @@ body.lib-placing-mode .day-card[data-iso]:active {
 .lib-cat.collapsed .lib-cat-items { display: none; }
 .lib-cat-count { background: var(--bg-elev2); border-radius: 999px; padding: 1px 8px; font-size: 10px; }
 
+/* Design 5 : liste epuree (icone sport en pastille + nom + duree/TSS) */
 .lib-item {
-  display: flex; align-items: stretch; gap: 0;
-  background: var(--bg-elev2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  margin-top: 7px;
-  overflow: hidden;
-  cursor: grab;
-  transition: border-color 0.15s, transform 0.1s;
+  display: flex; align-items: center; gap: 12px;
+  background: none; border: none; border-radius: 8px;
+  margin-top: 0; padding: 10px 8px;
+  cursor: grab; position: relative;
+  transition: background 0.12s;
 }
-.lib-item:hover { border-color: var(--text-mute); }
+.lib-item + .lib-item { border-top: 0.5px solid var(--border); }
+.lib-item:hover { background: rgba(255, 255, 255, 0.04); }
 .lib-item.dragging { opacity: 0.5; }
-.lib-accent { width: 4px; flex: none; }
-.lib-grip { display: flex; align-items: center; padding: 0 6px; color: var(--text-mute); font-size: 13px; }
-.lib-item-body { flex: 1; min-width: 0; padding: 9px 8px 9px 2px; }
-.lib-item-name { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.25; }
-.lib-item-meta { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
-.lib-pill {
-  font-size: 10px; padding: 2px 7px; border-radius: 6px;
-  background: var(--bg); color: var(--text-dim); border: 1px solid var(--border);
-}
-.lib-item-desc {
-  font-size: 11px; color: var(--text-mute); margin-top: 5px; line-height: 1.4;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
+.lib-ic { width: 34px; height: 34px; border-radius: 9px; flex: none; display: flex; align-items: center; justify-content: center; }
+.lib-ic svg { width: 18px; height: 18px; }
+.lib-item-body { flex: 1; min-width: 0; }
+.lib-item-name { font-size: 13px; font-weight: 500; color: var(--text); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-item-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
 .lib-item-edit {
   background: none; border: none; color: var(--text-mute);
-  cursor: pointer; font-size: 13px; padding: 0 8px; flex: none;
-  align-self: flex-start; margin-top: 8px; border-radius: 5px;
+  cursor: pointer; font-size: 13px; padding: 4px 6px; flex: none;
+  border-radius: 6px; opacity: 0; transition: opacity 0.12s, color 0.12s, background 0.12s;
 }
-.lib-item-edit:hover { color: var(--accent); }
+.lib-item:hover .lib-item-edit { opacity: 1; }
+.lib-item-edit:hover { color: var(--accent); background: var(--bg-elev2); }
 
 .lib-empty, .lib-noresult {
   text-align: center; color: var(--text-mute); font-size: 12px;
