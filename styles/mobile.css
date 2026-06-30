@@ -189,8 +189,11 @@
   .month-filter button { padding: 3px 8px !important; font-size: 11px !important; min-height: 26px !important; }
   .month-input-overlay { font-size: 11px; left: 8px; }
   .month-filter .reset { padding: 3px 9px !important; }
-  .lib-fab { padding: 4px 6px; }
+  /* Bouton bibliotheque (absolu haut-droite) : un peu plus petit/haut, et on
+     reserve l'espace a droite du selecteur de periode pour eviter le chevauchement. */
+  .lib-fab { width: 28px !important; height: 28px !important; top: 10px !important; right: 10px !important; }
   .lib-fab svg { width: 15px; height: 15px; }
+  .month-filter { padding-right: 44px; }
 
   .week-row-days {
     grid-template-columns: repeat(7, 1fr);
