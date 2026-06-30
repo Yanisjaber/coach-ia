@@ -298,7 +298,7 @@ body.lib-open .lib-fab { background: var(--accent); color: #0b1410; border-color
     border-radius: 14px;
     z-index: 950;
     transform: translateX(calc(100% + 26px));
-    transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+    transition: transform 0.5s cubic-bezier(.4,0,.2,1);
     box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
     max-height: none; overflow-y: auto; overscroll-behavior: contain;
   }
