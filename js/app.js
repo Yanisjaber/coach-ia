@@ -4199,7 +4199,7 @@ function renderCalendar() {
   // Reset button label selon le mode
   const resetBtn = document.getElementById('month-reset');
   if (resetBtn) {
-    resetBtn.textContent = calendarMode === 'prevu' ? '4 sem. à venir' : '4 dernières semaines';
+    resetBtn.textContent = calendarMode === 'prevu' ? '4 sem. à venir' : '4 dern. sem.';
   }
   if (window.__updateMonthOverlay) window.__updateMonthOverlay();
   if (calendarMode === 'prevu') {
