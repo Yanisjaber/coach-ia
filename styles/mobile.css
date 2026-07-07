@@ -380,17 +380,16 @@
   .date-range input[type="date"] { min-height: 36px; }
   .chart-head { flex-wrap: wrap; gap: 8px; }
 
-  /* ===== Modales : bottom sheet avec mini marges latérales ===== */
+  /* ===== Modales : carte centrée avec marges tout autour ===== */
   .modal-overlay { padding: 0; align-items: stretch; }
   .modal-overlay .modal {
     max-width: none;
     width: calc(100% - 12px);
-    margin: auto 6px 0;          /* collée en bas, 6px de marge de chaque côté */
-    border-radius: 18px 18px 0 0;
-    border-bottom: none;
-    max-height: calc(100dvh - 40px);
+    margin: auto 6px;            /* centrée verticalement, 6px de marge de chaque côté */
+    border-radius: 18px;
+    max-height: calc(100dvh - 24px - env(safe-area-inset-bottom, 0px));
     overflow-y: auto;
-    padding: 16px 14px calc(8px + env(safe-area-inset-bottom, 0px));
+    padding: 16px 14px 14px;
   }
   /* En-tête compact : titre réduit, actions resserrées, méta sur une ligne */
   .modal-header { gap: 10px; margin-bottom: 14px; padding-bottom: 12px; }
