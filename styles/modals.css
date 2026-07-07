@@ -1158,7 +1158,10 @@
 
 /* --- Mobile : héros en 2x2, tuiles en 2 colonnes, rien de tronqué --- */
 @media (max-width: 860px) {
-  .act-hero-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 8px; }
+  /* Rangées toujours PLEINES : héros en 2 colonnes (2x2), ou 4 alignés si la
+     place le permet ; jamais 3+1. Tuiles : 2 colonnes par défaut, 3 ou 4 selon
+     leur nombre (data-n) pour que chaque rangée soit complète. */
+  .act-hero-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 8px; }
   .act-hero {
     padding: 10px 8px;
     gap: 8px;
@@ -1168,9 +1171,24 @@
   .act-hero-val { font-size: 17px; }
   .act-hero-unit { font-size: 11px; }
   .act-hero-lab { font-size: 9px; }
-  .act-tile-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; }
+  .act-tile-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
   .act-tile { padding: 8px 9px; }
   .act-tile-val { font-size: 12.5px; }
+}
+/* Largeur moyenne : rangées de 3 quand le nombre s'y prête (3, 5, 6, 9) */
+@media (min-width: 500px) and (max-width: 860px) {
+  .act-tile-grid[data-n="3"],
+  .act-tile-grid[data-n="5"],
+  .act-tile-grid[data-n="6"],
+  .act-tile-grid[data-n="9"] { grid-template-columns: repeat(3, 1fr); }
+}
+/* Grande largeur (plage mobile/tablette) : 4 alignés quand ça tombe juste */
+@media (min-width: 590px) and (max-width: 860px) {
+  .act-hero-row[data-n="4"] { grid-template-columns: repeat(4, 1fr); }
+  .act-hero-row[data-n="3"] { grid-template-columns: repeat(3, 1fr); }
+  .act-tile-grid[data-n="4"],
+  .act-tile-grid[data-n="7"],
+  .act-tile-grid[data-n="8"] { grid-template-columns: repeat(4, 1fr); }
 }
 
 /* ============================================================

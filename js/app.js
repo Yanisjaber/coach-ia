@@ -9307,7 +9307,7 @@ function openSessionModal(iso, source) {
         if (_speedHero) _heroes.push(heroCard(_svgSpeed, _speedHero.val, _speedHero.unit, _speedHero.lab, '#34d399'));
         if (_dplusM) _heroes.push(heroCard(_svgMtn, _dplusM, 'm D+', 'Dénivelé', '#84cc16'));
         if (_heroes.length < 4 && act.np) _heroes.push(heroCard(_svgSpeed, act.np, 'W', 'NP', '#fbbf24'));
-        const _heroRow = _heroes.length ? `<div class="act-hero-row">${_heroes.slice(0, 4).join('')}</div>` : '';
+        const _heroRow = _heroes.length ? `<div class="act-hero-row" data-n="${Math.min(_heroes.length, 4)}">${_heroes.slice(0, 4).join('')}</div>` : '';
 
         const _mut = 'var(--text-mute,#7c879c)';
         const tile = (lab, valHTML, color) =>
@@ -9326,7 +9326,7 @@ function openSessionModal(iso, source) {
         if (act.laps) _tiles.push(tile('Tours', `${act.laps}`, '#9ca3af'));
         const _n = _tiles.length;
         const _cols = _n <= 4 ? Math.max(1, _n) : Math.ceil(_n / 2);   // <=4 -> 1 rangee ; sinon 2 rangees equilibrees (desktop)
-        const _tileGrid = _n ? `<div class="act-tile-grid" style="--tile-cols:${_cols}">${_tiles.join('')}</div>` : '';
+        const _tileGrid = _n ? `<div class="act-tile-grid" data-n="${_n}" style="--tile-cols:${_cols}">${_tiles.join('')}</div>` : '';
         const statsHTML = (_heroRow || _tileGrid) ? `<div class="modal-section">${_heroRow}${_tileGrid}</div>` : '';
 
         // --- Lien Strava ---
