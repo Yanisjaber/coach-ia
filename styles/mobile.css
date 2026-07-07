@@ -449,53 +449,65 @@
   button { touch-action: manipulation; } /* supprime le délai double-tap */
 }
 
-/* ===== Éditeur de structure (session-builder) : responsive =====
-   Le CSS du builder est injecté inline par js/session-builder.js (donc après
-   les feuilles de style) -> !important nécessaire pour les overrides mobile. */
+/* ============================================================
+   Textes FLUIDES (mobile) : interpolation linéaire continue entre
+   320px et 760px de largeur d'écran via clamp(min, a + b*vw, max).
+   Formule : taille = S320 à 320px -> S760 à 760px, sans palier.
+   Le CSS du session-builder est injecté inline par JS -> !important.
+   ============================================================ */
 @media (max-width: 760px) {
-  #sb-root .sb-addbar { grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)) !important; gap: 6px !important; }
-  #sb-root .sb-card { padding: 9px 4px !important; gap: 5px !important; }
-  #sb-root .sb-cico { width: 28px !important; height: 28px !important; font-size: 13px !important; }
-  #sb-root .sb-ct b { font-size: 10px !important; }
-  #sb-root .sb-profile { height: 110px !important; padding: 8px !important; }
-  #sb-root .sb-totals { gap: 6px !important; }
-  #sb-root .sb-tc { padding: 7px 4px !important; }
-  #sb-root .sb-tc .v { font-size: 16px !important; }
-  #sb-root .sb-tc .k { font-size: 9px !important; }
-  #sb-root .sb-blk { padding: 9px 9px !important; }
-  #sb-root .sb-bname { font-size: 12.5px !important; }
-  #sb-root .sb-line { grid-template-columns: 40px 0.8fr 1.2fr !important; gap: 6px !important; }
-  #sb-root .sb-line > * { min-width: 0; }
-  #sb-root .sb-line input, #sb-root .sb-line select { padding: 7px 5px !important; font-size: 11.5px !important; }
-  #sb-root .sb-mini { font-size: 9px !important; }
-  #sb-root .sb-reps { padding: 2px 5px !important; font-size: 11px !important; }
-  #sb-root .sb-reps input { width: 30px !important; }
-  /* Textes restants du builder (selects "Cibles en", pastilles, roles, toggles) */
-  #sb-root .sb-h { font-size: 11px !important; margin: 10px 0 6px !important; }
-  #sb-root .sb-cmode { font-size: 11px !important; gap: 6px !important; }
-  #sb-root .sb-csel { font-size: 11.5px !important; padding: 5px 7px !important; }
-  #sb-root .sb-role { font-size: 9.5px !important; }
-  #sb-root .sb-eqpill { font-size: 11px !important; padding: 5px 8px !important; max-width: 100% !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-  #sb-root .sb-toglab { font-size: 12px !important; }
-  #sb-root .sb-switch { font-size: 11.5px !important; }
-  #sb-root .sb-bico { width: 26px !important; height: 26px !important; font-size: 12px !important; }
-  #sb-root .sb-del { width: 24px !important; height: 24px !important; font-size: 12px !important; }
-  #sb-root .sb-blk-top { gap: 7px !important; }
-}
+  /* --- Formulaires add-modal (bibliothèque / entraînement / compétition) --- */
+  .form-field > span { font-size: clamp(9px, 7.55px + 0.455vw, 11px); }
+  .form-field input, .form-field select, .form-field textarea {
+    font-size: clamp(11.5px, 10.41px + 0.341vw, 13px);
+    height: clamp(33px, 28.64px + 1.364vw, 39px);
+    padding: clamp(7px, 5.55px + 0.455vw, 9px) clamp(9px, 5.36px + 1.136vw, 14px);
+  }
+  .form-field textarea { height: auto; min-height: clamp(54px, 42.4px + 3.64vw, 70px); }
+  .add-sec-h { font-size: clamp(9.5px, 8.41px + 0.341vw, 11px); }
+  .modal-title h2 { font-size: clamp(15px, 13.55px + 0.455vw, 17px); }
+  .btn-primary, .btn-secondary { font-size: clamp(11.5px, 10.41px + 0.341vw, 13px); }
+  .add-form-grid .add-sec { padding: clamp(10px, 6.4px + 1.14vw, 15px) clamp(11px, 6.64px + 1.36vw, 17px); }
 
-/* Encore plus compact sous 420px (petits téléphones) */
-@media (max-width: 420px) {
-  #sb-root .sb-csel { font-size: 10.5px !important; padding: 4px 5px !important; }
-  #sb-root .sb-cmode { font-size: 10px !important; }
-  #sb-root .sb-eqpill { font-size: 10px !important; padding: 4px 6px !important; }
-  #sb-root .sb-bname { font-size: 11.5px !important; }
-  #sb-root .sb-line input, #sb-root .sb-line select { font-size: 11px !important; padding: 6px 4px !important; }
-  #sb-root .sb-line { grid-template-columns: 34px 0.8fr 1.2fr !important; gap: 5px !important; }
-  #sb-root .sb-role { font-size: 8.5px !important; }
-  .form-field > span { font-size: 9px; }
-  .form-field input, .form-field select, .form-field textarea { font-size: 12px; height: 34px; padding: 7px 9px; }
-  .add-sec-h { font-size: 9.5px; }
-  .modal-title h2 { font-size: 15.5px; }
+  /* --- Session-builder (structure d'intervalles) --- */
+  #sb-root .sb-addbar { grid-template-columns: repeat(auto-fit, minmax(clamp(80px, 55px + 7.8vw, 115px), 1fr)) !important; gap: 6px !important; }
+  #sb-root .sb-card { padding: clamp(7px, 3.4px + 1.14vw, 12px) 4px !important; gap: 5px !important; }
+  #sb-root .sb-cico { width: clamp(24px, 16.7px + 2.27vw, 34px) !important; height: clamp(24px, 16.7px + 2.27vw, 34px) !important; font-size: clamp(11px, 8.1px + 0.91vw, 15px) !important; }
+  #sb-root .sb-ct b { font-size: clamp(9.5px, 8.41px + 0.341vw, 11px) !important; }
+  #sb-root .sb-h { font-size: clamp(10.5px, 9.41px + 0.341vw, 12px) !important; }
+  #sb-root .sb-profile { height: clamp(96px, 64px + 10vw, 140px) !important; padding: clamp(7px, 3.36px + 1.14vw, 12px) !important; }
+  #sb-root .sb-totals { gap: clamp(5px, 1.36px + 1.14vw, 10px) !important; }
+  #sb-root .sb-tc { padding: clamp(6px, 3.1px + 0.91vw, 10px) 4px !important; }
+  #sb-root .sb-tc .v { font-size: clamp(15px, 10.64px + 1.364vw, 21px) !important; }
+  #sb-root .sb-tc .k { font-size: clamp(8.5px, 7.41px + 0.341vw, 10px) !important; }
+  #sb-root .sb-blk { padding: clamp(8px, 5.1px + 0.91vw, 12px) !important; }
+  #sb-root .sb-blk-top { gap: clamp(6px, 3.1px + 0.91vw, 10px) !important; }
+  #sb-root .sb-bico { width: clamp(24px, 19.6px + 1.36vw, 30px) !important; height: clamp(24px, 19.6px + 1.36vw, 30px) !important; font-size: clamp(11px, 8.8px + 0.68vw, 14px) !important; }
+  #sb-root .sb-bname { font-size: clamp(11px, 8.82px + 0.68vw, 14px) !important; }
+  #sb-root .sb-del { width: clamp(22px, 19.1px + 0.91vw, 26px) !important; height: clamp(22px, 19.1px + 0.91vw, 26px) !important; font-size: clamp(11px, 9.55px + 0.455vw, 13px) !important; }
+  #sb-root .sb-reps { font-size: clamp(10.5px, 9.41px + 0.341vw, 12px) !important; padding: 2px clamp(4px, 1.8px + 0.68vw, 7px) !important; }
+  #sb-root .sb-reps input { width: clamp(28px, 19.3px + 2.73vw, 40px) !important; }
+  #sb-root .sb-cmode { font-size: clamp(9.5px, 7.68px + 0.57vw, 12px) !important; gap: 6px !important; }
+  #sb-root .sb-csel { font-size: clamp(10px, 8.18px + 0.57vw, 12.5px) !important; padding: clamp(4px, 2.55px + 0.455vw, 6px) clamp(5px, 2.1px + 0.91vw, 9px) !important; }
+  #sb-root .sb-role { font-size: clamp(8.5px, 6.68px + 0.57vw, 11px) !important; }
+  #sb-root .sb-mini { font-size: clamp(8.5px, 7.41px + 0.341vw, 10px) !important; }
+  #sb-root .sb-line { grid-template-columns: clamp(34px, 25.3px + 2.73vw, 46px) 0.8fr 1.2fr !important; gap: clamp(5px, 1.4px + 1.14vw, 10px) !important; }
+  #sb-root .sb-line > * { min-width: 0; }
+  #sb-root .sb-line input, #sb-root .sb-line select { font-size: clamp(10.5px, 9.05px + 0.45vw, 12.5px) !important; padding: clamp(5px, 2.8px + 0.68vw, 8px) clamp(4px, 1.1px + 0.91vw, 8px) !important; }
+  #sb-root .sb-eqpill { font-size: clamp(9.5px, 7.32px + 0.68vw, 12.5px) !important; padding: clamp(3px, 1.55px + 0.455vw, 5px) clamp(6px, 2.36px + 1.14vw, 11px) !important; max-width: 100% !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+  #sb-root .sb-toglab { font-size: clamp(11.5px, 10.05px + 0.455vw, 13.5px) !important; }
+  #sb-root .sb-switch { font-size: clamp(11px, 9.91px + 0.341vw, 12.5px) !important; }
+
+  /* --- Modales note / cycle --- */
+  .day-modal-header h3 { font-size: clamp(13.5px, 12.4px + 0.34vw, 15px); }
+  .day-modal-body textarea { font-size: clamp(11.5px, 10.77px + 0.23vw, 12.5px); }
+  .day-popover-action { font-size: clamp(11.5px, 10.77px + 0.23vw, 12.5px); }
+
+  /* --- Modale jour (stats héros / tuiles) --- */
+  .act-hero-val { font-size: clamp(14px, 11.8px + 0.68vw, 17px); }
+  .act-hero-lab { font-size: clamp(8px, 7.3px + 0.23vw, 9px); }
+  .act-tile-val { font-size: clamp(11px, 9.9px + 0.34vw, 12.5px); }
+  .act-tile-lab { font-size: clamp(9px, 8.3px + 0.23vw, 10px); }
 }
 
 /* ===== Très petits écrans ===== */

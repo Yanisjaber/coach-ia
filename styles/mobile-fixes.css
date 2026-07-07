@@ -8,22 +8,26 @@
    La .topbar gère elle-même son padding-top avec env(safe-area-inset-top),
    sinon la safe-area serait appliquée 2 fois → énorme espace au-dessus du titre. */
 
-/* ===== Empêcher zoom auto iOS sur les inputs (font-size < 16px déclenche zoom) ===== */
-@media (max-width: 860px) {
-  input[type="text"],
-  input[type="email"],
-  input[type="password"],
-  input[type="number"],
-  input[type="tel"],
-  input[type="url"],
-  input[type="search"],
-  input[type="date"],
-  input[type="time"],
-  input[type="month"],
-  input[type="datetime-local"],
-  textarea,
-  select {
-    font-size: 16px !important;
+/* ===== Empêcher zoom auto iOS sur les inputs (font-size < 16px déclenche zoom) =====
+   Scopé iOS uniquement (@supports -webkit-touch-callout) : Android et les autres
+   navigateurs n'ont pas ce zoom -> ils gardent les tailles fluides (clamp). */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 860px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="url"],
+    input[type="search"],
+    input[type="date"],
+    input[type="time"],
+    input[type="month"],
+    input[type="datetime-local"],
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
   }
 }
 
