@@ -75,7 +75,13 @@
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .grid-vol { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 16px; }
-  .vol-head { display: flex; align-items: center; justify-content: space-between; }
+  .vol-head {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap;           /* carte étroite : le toggle passe dessous au lieu d'être rogné */
+    gap: 6px 10px;
+    min-width: 0;
+  }
+  .vol-head .zones-toggle { flex-shrink: 0; }
   .chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .chart-reset {
     display: inline-flex; align-items: center; gap: 6px;
