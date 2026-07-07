@@ -10917,6 +10917,7 @@ try { renderChat(); } catch (e) { console.warn('[renderChat]', e); }
 // ========= INTÉGRATION DES PRÉFÉRENCES DANS LE PLAN =========
 // Patch sur adjustForRecovery pour aussi appliquer les prefs du chat
 const _originalAdjustForRecovery = adjustForRecovery;
+// eslint-disable-next-line no-func-assign -- monkey-patch volontaire (wrap de la fonction d'origine)
 adjustForRecovery = function(proposal, recovery) {
   let p = _originalAdjustForRecovery(proposal, recovery);
   const prefs = loadPrefs();

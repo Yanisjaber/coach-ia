@@ -1,0 +1,40 @@
+name: Lint JS
+
+on:
+  push:
+    branches: [main]
+    paths: ['js/**', '*.js', '.github/workflows/lint.yml', 'eslint.config.mjs']
+  pull_request:
+    paths: ['js/**', '*.js']
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 1) Syntaxe : node --check sur chaque fichier JS du front.
+      #    C'est le filet anti-troncature/corruption (l'incident Edit de juin).
+      - name: Vérification syntaxe (node --check)
+        run: |
+          set -e
+          fail=0
+          for f in js/*.js; do
+            if ! node --check "$f" 2>err.txt; then
+              echo "::error file=$f::$(head -2 err.txt | tr '\n' ' ')"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      # 2) ESLint : uniquement les règles "vrais bugs" (doublons, unreachable,
+      #    réassignation de const...). Pas de règles de style — code existant
+      #    volontairement non touché.
+      - name: ESLint (bugs uniquement)
+        run: |
+          npm install --no-save eslint@9
+          npx eslint js/
