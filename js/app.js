@@ -132,7 +132,18 @@ function applyActivityEditsToDays(days) {
   if (!days || !days.length) return days;
   let anyTss = false;
   for (const d of days) {
-    if (!d.activities || !d.activities.length) continue;
+    if (!d.activities || !d.activities.length) {
+      // Jour SANS activité : daily_metrics peut garder un TSS/durée obsolète
+      // (activité supprimée ou re-datée sans recalcul serveur → « TSS fantôme »
+      // qui fait monter la courbe + point cliquable sur un jour de repos).
+      // Source unique = les activités : un jour sans activité est un jour à zéro.
+      if ((d.tss || 0) !== 0 || (d.duration || 0) !== 0) {
+        d.tss = 0; d.duration = 0;
+        d.sessionName = null; d.sessionType = null;
+        d.np = 0; d.avgW = 0; d.hr = 0; d.ftpPct = 0;
+      }
+      continue;
+    }
     // Activites Strava masquees (poubelle "masquer") : on les retire completement
     // -> elles disparaissent de l'affichage ET des stats/charge (TSS + CTL/ATL recalcules sans elles).
     d.activities = d.activities.filter(a => {
@@ -230,6 +241,8 @@ scheduleMidnightRefresh();
 // L'event 'appModeChange' est dispatché par js/app-mode.js à chaque applyAppMode().
 window.addEventListener('appModeChange', (e) => {
   if (typeof renderCalendar === 'function') renderCalendar();
+  // La projection de la courbe de charge filtre les prévus par mode IA/Manuel
+  if (window.refreshLoadChart) window.refreshLoadChart();
   // L'onglet IA (p7) n'existe qu'en mode IA : si on repasse en Manuel dessus, on rebascule au tableau de bord.
   const mode = e && e.detail && e.detail.mode;
   if (mode === 'manual') {
@@ -700,9 +713,36 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
     datasets: [
       { label: 'CTL', data: [], borderColor: '#60a5fa', backgroundColor: (c) => { const ch = c.chart, a = ch.chartArea; if (!a) return 'rgba(96,165,250,0.12)'; const g = ch.ctx.createLinearGradient(0, a.top, 0, a.bottom); g.addColorStop(0, 'rgba(96,165,250,0.30)'); g.addColorStop(1, 'rgba(96,165,250,0.02)'); return g; }, borderWidth: 2.5, cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#60a5fa', fill: 'origin', order: 3, yAxisID: 'y' },
       { label: 'ATL', data: [], borderColor: '#fbbf24', backgroundColor: 'transparent', borderWidth: 2, cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#fbbf24', fill: false, order: 2, yAxisID: 'y' },
-      { label: 'TSB', data: [], borderColor: '#a78bfa', borderWidth: 2, cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#a78bfa', fill: { target: { value: 0 }, above: 'rgba(167,139,250,0.22)', below: 'rgba(83,74,183,0.30)' }, order: 1, yAxisID: 'y' }
+      { label: 'TSB', data: [], borderColor: '#a78bfa', borderWidth: 2, cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#a78bfa', fill: { target: { value: 0 }, above: 'rgba(167,139,250,0.22)', below: 'rgba(83,74,183,0.30)' }, order: 1, yAxisID: 'y' },
+      // Projection (séances prévues) : mêmes couleurs, atténuées + pointillés
+      { label: 'CTL prévu', data: [], borderColor: 'rgba(96,165,250,0.55)', backgroundColor: 'transparent', borderWidth: 2, borderDash: [6, 5], cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#60a5fa', fill: false, order: 3, yAxisID: 'y', spanGaps: false },
+      { label: 'ATL prévu', data: [], borderColor: 'rgba(251,191,36,0.5)', backgroundColor: 'transparent', borderWidth: 1.5, borderDash: [6, 5], cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#fbbf24', fill: false, order: 2, yAxisID: 'y', spanGaps: false },
+      { label: 'TSB prévu', data: [], borderColor: 'rgba(167,139,250,0.5)', backgroundColor: 'transparent', borderWidth: 1.5, borderDash: [6, 5], cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 0, pointHoverBackgroundColor: '#a78bfa', fill: false, order: 1, yAxisID: 'y', spanGaps: false }
     ]
   },
+  plugins: [{
+    // Séparateur vertical « Aujourd'hui » quand la projection est affichée
+    id: 'todayLine',
+    afterDatasetsDraw(chart) {
+      const rc = chart._realCount;
+      if (!rc || rc >= chart.data.labels.length) return;
+      const x = chart.scales.x.getPixelForValue(rc - 1);
+      if (!isFinite(x)) return;
+      const { top, bottom } = chart.chartArea;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#6b7488';
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText("Aujourd'hui", x + 5, top + 11);
+      ctx.restore();
+    }
+  }],
   options: {
     responsive: true, maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
@@ -712,7 +752,13 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
       const els = loadChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, false);
       if (!els || !els.length) return;
       const d = loadChart._subset && loadChart._subset[els[0].index];
-      if (!d || !dayHasActivity(d)) return;
+      if (!d) return;
+      // Jour projeté : ouvre le calendrier côté Prévu sur ce jour
+      if (d._proj) {
+        if (d.planned && d.planned.length && typeof goToCalendarDay === 'function') goToCalendarDay(toIsoDate(d.date), 'prevu');
+        return;
+      }
+      if (!dayHasActivity(d)) return;
       if (typeof goToCalendarDay === 'function') goToCalendarDay(toIsoDate(d.date));
     },
     onHover: (evt) => {
@@ -724,12 +770,25 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
     plugins: {
       legend: { display: false },
       tooltip: {
+        // Au point de jonction (dernier jour réel), les datasets projetés dupliquent
+        // la valeur réelle pour la continuité du trait : on masque ces doublons.
+        filter: (item) => !(item.datasetIndex >= 3 && loadChart._realCount && item.dataIndex === loadChart._realCount - 1),
         callbacks: {
           // Ajoute le(s) nom(s) de sortie + durée/km sous les valeurs CTL/ATL/TSB.
           afterBody: (items) => {
             if (!items || !items.length) return '';
             const d = loadChart._subset && loadChart._subset[items[0].dataIndex];
             if (!d) return '';
+            // Jour projeté : liste les séances prévues du jour
+            if (d._proj) {
+              const pl = d.planned || [];
+              if (!pl.length) return '';
+              return pl.map(p => {
+                const dur = p.duration ? fmtDur(p.duration) : '';
+                const meta = [dur, p.tss ? Math.round(p.tss) + ' TSS' : ''].filter(Boolean).join(' · ');
+                return `• ${p.isRace ? '🏁 ' : ''}${p.name} (prévu)${meta ? ' — ' + meta : ''}`;
+              });
+            }
             const acts = (d.activities && d.activities.length) ? d.activities : (d.sessionType ? [d] : []);
             if (!acts.length) return '';
             return acts.map(a => {
@@ -795,6 +854,11 @@ function applyLoadChartDragSelection(chart) {
   _loadDragBusy = true;
   try { chart.resetZoom(); } catch (_) {}
   if (i1 - i0 >= 1) {
+    // Si la sélection démarre dans la zone projetée, on recule le début au dernier
+    // jour réel : la projection a besoin de son point d'ancrage (sinon graphe vide).
+    if (sub[i0] && sub[i0]._proj) {
+      while (i0 > 0 && sub[i0]._proj) i0--;
+    }
     const from = toIsoDate(sub[i0].date);
     const to = toIsoDate(sub[i1].date);
     setInputDate('load-from', new Date(from + 'T12:00:00'));
@@ -809,28 +873,123 @@ function dayHasActivity(d) {
   return !!((d.activities && d.activities.length) || d.sessionType || (d.duration > 0));
 }
 
+// ===== Projection du prévu (CTL/ATL/TSB futurs depuis les séances planifiées) =====
+// Séances prévues d'un jour futur : entraînements (filtrés par mode IA/Manuel)
+// + compétitions non réalisées (TSS estimé = minutes cibles, fallback 120 min — même règle que le calendrier).
+function plannedItemsForDay(iso) {
+  const items = [];
+  try {
+    const tr = ((typeof loadTrainings === 'function') ? loadTrainings() : [])
+      .filter(t => !window.coachModeKeep || window.coachModeKeep(t.ia))
+      .filter(t => t.date === iso);
+    for (const t of tr) items.push({ name: t.name || 'Séance prévue', tss: +t.tss || 0, duration: +t.duration || 0, sport: t.sport || 'Ride' });
+  } catch (_) {}
+  try {
+    const comps = (typeof loadCompetitionsExpanded === 'function') ? loadCompetitionsExpanded() : [];
+    for (const c of comps) {
+      if (!c.dateObj || toIsoDate(c.dateObj) !== iso) continue;
+      if (typeof compIsRealised === 'function' && compIsRealised(c)) continue;
+      const mins = (typeof parseTimeToMin === 'function') ? parseTimeToMin(c.target) : null;
+      items.push({ name: c.name || 'Compétition', tss: Math.round(mins || 120), duration: mins || 0, isRace: true, sport: c.sport || 'Ride' });
+    }
+  } catch (_) {}
+  // Filtre sport actif : même règle que le calendrier (cohérent avec la courbe réelle filtrée)
+  if (typeof activeSports !== 'undefined' && !activeSports.has('tout') && activeSports.size > 0 && typeof getSportCategory === 'function') {
+    return items.filter(it => activeSports.has(getSportCategory(it.sport)));
+  }
+  return items;
+}
+
+// Jours projetés après le dernier jour réel, jusqu'à endIso inclus.
+// Mêmes constantes PMC que le réel (CTL 42 j / ATL 7 j), TSB = forme avant la séance du jour.
+function buildProjection(lastRealDay, endIso) {
+  const out = [];
+  if (!lastRealDay) return out;
+  let ctl = +lastRealDay.ctl || 0, atl = +lastRealDay.atl || 0;
+  const d = new Date(lastRealDay.date);
+  d.setHours(12, 0, 0, 0);
+  for (let guard = 0; guard < 120; guard++) {
+    d.setDate(d.getDate() + 1);
+    const iso = toIsoDate(d);
+    if (iso > endIso) break;
+    const items = plannedItemsForDay(iso);
+    const tss = items.reduce((s, it) => s + (it.tss || 0), 0);
+    const prevCtl = ctl, prevAtl = atl;
+    ctl = prevCtl + (tss - prevCtl) / 42;
+    atl = prevAtl + (tss - prevAtl) / 7;
+    out.push({ date: new Date(d), ctl: +ctl.toFixed(1), atl: +atl.toFixed(1), tsb: +(prevCtl - prevAtl).toFixed(1), tss, planned: items, _proj: true });
+  }
+  return out;
+}
+
+// Horizon de projection par défaut quand la plage s'arrête à aujourd'hui
+const LOAD_PROJ_DAYS = 14;
+
 function renderLoadChart(fromIso, toIso) {
   const subset = sliceByDate(data, fromIso, toIso);
-  loadChart._subset = subset; // pour le tooltip + le clic
-  loadChart.data.labels = subset.map(d => fmtDate(d.date));
-  loadChart.data.datasets[0].data = subset.map(d => d.ctl);
-  loadChart.data.datasets[1].data = subset.map(d => d.atl);
-  loadChart.data.datasets[2].data = subset.map(d => d.tsb);
+  const todayIso = toIsoDate(today);
+  const lastReal = data.length ? data[data.length - 1] : null;
+  // Projection uniquement si la plage couvre aujourd'hui (dernier jour réel inclus)
+  let proj = [];
+  if (subset.length && lastReal && toIso >= todayIso && subset[subset.length - 1] === lastReal) {
+    let endIso = toIso;
+    if (toIso <= todayIso) {
+      const e = new Date(today);
+      e.setDate(e.getDate() + LOAD_PROJ_DAYS);
+      endIso = toIsoDate(e);
+    }
+    proj = buildProjection(lastReal, endIso);
+  }
+  loadChart._subset = subset.concat(proj); // pour le tooltip + le clic
+  loadChart._realCount = subset.length;    // pour le séparateur « Aujourd'hui » + filtre tooltip
+  const projNulls = proj.map(() => null);
+  loadChart.data.labels = subset.map(d => fmtDate(d.date)).concat(proj.map(d => fmtDate(d.date)));
+  loadChart.data.datasets[0].data = subset.map(d => d.ctl).concat(projNulls);
+  loadChart.data.datasets[1].data = subset.map(d => d.atl).concat(projNulls);
+  loadChart.data.datasets[2].data = subset.map(d => d.tsb).concat(projNulls);
+  // Datasets projetés : null sur le réel sauf le dernier jour (jonction), puis valeurs projetées
+  const mkProj = (key) => {
+    if (!proj.length) return [];
+    const arr = new Array(subset.length - 1).fill(null);
+    arr.push(subset[subset.length - 1][key]);
+    return arr.concat(proj.map(p => p[key]));
+  };
+  loadChart.data.datasets[3].data = mkProj('ctl');
+  loadChart.data.datasets[4].data = mkProj('atl');
+  loadChart.data.datasets[5].data = mkProj('tsb');
   // Point sur la courbe de forme (CTL) uniquement les jours avec activité
-  loadChart.data.datasets[0].pointRadius = subset.map(d => dayHasActivity(d) ? 3.5 : 0);
-  loadChart.data.datasets[0].pointHoverRadius = subset.map(d => dayHasActivity(d) ? 6 : 0);
+  loadChart.data.datasets[0].pointRadius = subset.map(d => dayHasActivity(d) ? 3.5 : 0).concat(proj.map(() => 0));
+  loadChart.data.datasets[0].pointHoverRadius = subset.map(d => dayHasActivity(d) ? 6 : 0).concat(proj.map(() => 0));
   loadChart.data.datasets[0].pointBackgroundColor = '#60a5fa';
   loadChart.data.datasets[0].pointBorderColor = '#0b0e14';
   loadChart.data.datasets[0].pointBorderWidth = 1.5;
+  // Points creux sur la projection CTL les jours avec séance prévue (cliquables → calendrier Prévu)
+  if (proj.length) {
+    const pr = new Array(subset.length).fill(0).concat(proj.map(p => (p.planned && p.planned.length) ? 3 : 0));
+    loadChart.data.datasets[3].pointRadius = pr;
+    loadChart.data.datasets[3].pointHoverRadius = pr.map(r => (r ? 5.5 : 0));
+    loadChart.data.datasets[3].pointBackgroundColor = '#0b0e14';
+    loadChart.data.datasets[3].pointBorderColor = 'rgba(96,165,250,0.85)';
+    loadChart.data.datasets[3].pointBorderWidth = 1.5;
+  } else {
+    loadChart.data.datasets[3].pointRadius = 0;
+    loadChart.data.datasets[3].pointHoverRadius = 0;
+  }
   loadChart.update();
 }
 
+// Refresh de la courbe de charge sur la plage courante (appelé quand les
+// prévus/compétitions changent : ajout, modif, suppression, pull cloud, bascule IA/Manuel).
+window.refreshLoadChart = function () {
+  try { renderLoadChart(getInputDate('load-from'), getInputDate('load-to')); } catch (_) {}
+};
+
 // Navigue vers un jour précis dans le calendrier (mode Réalisé) et le met en évidence.
-function goToCalendarDay(iso) {
+function goToCalendarDay(iso, mode) {
   const d = new Date(iso + 'T12:00:00');
   if (isNaN(d.getTime())) return;
-  calendarMode = 'realise';
-  document.querySelectorAll('#calendar-subtabs .subtab').forEach(b => b.classList.toggle('active', b.dataset.mode === 'realise'));
+  calendarMode = (mode === 'prevu') ? 'prevu' : 'realise';
+  document.querySelectorAll('#calendar-subtabs .subtab').forEach(b => b.classList.toggle('active', b.dataset.mode === calendarMode));
   // Vue "4 semaines" ancrée sur la semaine de l'activité (en haut), pas le mois.
   selectedMonth = null;
   calendarAnchorDate = d;
@@ -844,7 +1003,7 @@ function goToCalendarDay(iso) {
       card.classList.add('day-flash');
       setTimeout(() => card.classList.remove('day-flash'), 1500);
     }
-    if (typeof openSessionModal === 'function') openSessionModal(iso, 'realise');
+    if (typeof openSessionModal === 'function') openSessionModal(iso, calendarMode);
   }, 300);
 }
 window.goToCalendarDay = goToCalendarDay;
@@ -857,10 +1016,13 @@ window.goToCalendarDay = goToCalendarDay;
   setInputDate('load-from', start);
   setInputDate('load-to', end);
   // bornes min/max sur les inputs
+  // max étendu dans le futur : permet de sélectionner une plage incluant la projection du prévu
+  const _futureMax = new Date(today);
+  _futureMax.setDate(_futureMax.getDate() + 56);
   document.getElementById('load-from').min = toIsoDate(data[0].date);
-  document.getElementById('load-from').max = toIsoDate(data[data.length-1].date);
+  document.getElementById('load-from').max = toIsoDate(_futureMax);
   document.getElementById('load-to').min = toIsoDate(data[0].date);
-  document.getElementById('load-to').max = toIsoDate(data[data.length-1].date);
+  document.getElementById('load-to').max = toIsoDate(_futureMax);
   renderLoadChart(toIsoDate(start), toIsoDate(end));
 
   // Sur mobile : convertit TOUS les date inputs en flatpickr custom pour virer
@@ -1613,6 +1775,8 @@ function saveCompetitions(comps) {
   const deleted = previous.filter(p => !currentIds.has(p.id));
 
   localStorage.setItem(COMP_KEY, JSON.stringify(comps));
+  // La projection de la courbe de charge inclut les compétitions → refresh
+  if (window.refreshLoadChart) window.refreshLoadChart();
 
   // Mirror cloud
   if (window.cloudSync) {
@@ -3192,6 +3356,8 @@ function saveTrainings(arr) {
   const ids = new Set(arr.map(t => t.id));
   const deleted = prev.filter(p => !ids.has(p.id));
   localStorage.setItem(TRAIN_KEY, JSON.stringify(arr));
+  // La projection de la courbe de charge dépend des prévus → refresh
+  if (window.refreshLoadChart) window.refreshLoadChart();
   if (window.cloudSync) {
     for (const t of arr) {
       window.cloudSync.pushTraining(t, 'prevu').then(sbId => {
@@ -3252,6 +3418,15 @@ function openTrainModal(mode) {
   // Reset mode édition par défaut (sera ré-activé par openTrainModalForEdit)
   window._editingTrainId = null;
   window._editingTrainMode = null;
+  // Sortie du mode "modèle bibliothèque" : réaffiche date/heure/GPX masqués
+  window._templateMode = false;
+  window._templateEditing = null;
+  ['train-modal-date', 'train-modal-time'].forEach(id => {
+    const el = document.getElementById(id);
+    const lab = el && el.closest('label');
+    if (lab) lab.style.display = '';
+  });
+  { const g = document.getElementById('train-modal-gpx'); const wrap = g && g.closest('.form-field'); if (wrap) wrap.style.display = ''; }
   const titleEl = document.getElementById('train-modal-title');
   if (titleEl) titleEl.textContent = (trainModalMode === 'realise')
     ? 'Ajouter un entraînement réalisé'
@@ -3353,6 +3528,23 @@ function openTrainModalForEdit(training, mode) {
 const _trainModalDelBtn = document.getElementById('train-modal-delete');
 if (_trainModalDelBtn) {
   _trainModalDelBtn.addEventListener('click', async () => {
+    // Mode "modèle bibliothèque" : suppression du template
+    if (window._templateMode) {
+      const tpl = window._templateEditing;
+      if (!tpl) return;
+      const ok = await appConfirm({
+        title: 'Supprimer cette séance',
+        html: `Supprimer <strong>${window._confirmEscape(tpl.name || 'cette séance')}</strong> de la bibliothèque ?`,
+        confirmLabel: 'Supprimer',
+        danger: true,
+      });
+      if (!ok) return;
+      if (window.libraryDeleteTemplate) window.libraryDeleteTemplate(tpl.id);
+      window._templateMode = false;
+      window._templateEditing = null;
+      closeTrainModal();
+      return;
+    }
     const id = window._editingTrainId;
     const mode = window._editingTrainMode || trainModalMode;
     if (!id) return;
@@ -3409,6 +3601,8 @@ function upsertManualInDashboard(entry) {
 }
 
 function saveTrainFromModal() {
+  // Mode "modèle bibliothèque" : on enregistre un template, pas un entraînement
+  if (window._templateMode) { saveTemplateFromTrainModal(); return; }
   if (typeof _clearAllFieldErrors === 'function') _clearAllFieldErrors('#train-modal');
   const name = document.getElementById('train-modal-name').value.trim();
   const date = document.getElementById('train-modal-date').value;
@@ -3478,6 +3672,83 @@ function saveTrainFromModal() {
   }
 }
 
+// ============================================================
+// Bibliothèque de séances : le modal de création/édition d'un MODÈLE réutilise
+// le train-modal (même design + structure d'intervalles), sans date/heure/GPX.
+// ============================================================
+// Mapping clé bibliothèque -> sport Strava représentatif (pour le select)
+const LIB_KEY_TO_RAW = { cyclisme: 'Ride', vtt: 'MountainBikeRide', course: 'Run', trail: 'TrailRun', natation: 'Swim', musculation: 'WeightTraining', autre: 'Workout' };
+// Mapping inverse : sport Strava -> clé de regroupement bibliothèque
+function rawToLibKey(rawType) {
+  if (rawType === 'MountainBikeRide' || rawType === 'EMountainBikeRide') return 'vtt';
+  if (rawType === 'TrailRun') return 'trail';
+  const cat = (typeof getSportCategory === 'function') ? getSportCategory(rawType) : 'autre';
+  return ['cyclisme', 'course', 'natation', 'musculation'].includes(cat) ? cat : 'autre';
+}
+
+window.openLibraryTemplateModal = function (tpl) {
+  openTrainModal('prevu');            // reset complet (champs, structure, GPX)
+  window._templateMode = true;
+  window._templateEditing = tpl || null;
+  // Masque les champs sans objet pour un modèle : date, heure, GPX
+  ['train-modal-date', 'train-modal-time'].forEach(id => {
+    const el = document.getElementById(id);
+    const lab = el && el.closest('label');
+    if (lab) lab.style.display = 'none';
+  });
+  { const g = document.getElementById('train-modal-gpx'); const wrap = g && g.closest('.form-field'); if (wrap) wrap.style.display = 'none'; }
+  const titleEl = document.getElementById('train-modal-title');
+  if (titleEl) titleEl.textContent = tpl ? 'Modifier la séance (bibliothèque)' : 'Nouvelle séance (bibliothèque)';
+  // Pré-remplissage en édition
+  if (tpl) {
+    document.getElementById('train-modal-name').value = tpl.name || '';
+    document.getElementById('train-modal-duration').value = tpl.duration_min || '';
+    document.getElementById('train-modal-tss').value = tpl.tss || '';
+    document.getElementById('train-modal-notes').value = tpl.description || '';
+    document.getElementById('train-modal-rpe').value = tpl.rpe != null ? tpl.rpe : '';
+    document.getElementById('train-modal-km').value = tpl.km != null ? tpl.km : '';
+    document.getElementById('train-modal-dplus').value = tpl.dplus != null ? tpl.dplus : '';
+    const s = document.getElementById('train-modal-sport');
+    if (s) { s.value = tpl.sport_raw || LIB_KEY_TO_RAW[tpl.sport] || 'Ride'; if (s._customUpdate) s._customUpdate(); }
+    if (typeof window.setWorkoutStructure === 'function') window.setWorkoutStructure(tpl.structure || []);
+    const delBtn = document.getElementById('train-modal-delete');
+    if (delBtn) delBtn.hidden = false;
+  }
+  const saveBtn = document.getElementById('train-modal-save');
+  if (saveBtn) saveBtn.textContent = tpl ? 'Enregistrer les modifications' : 'Enregistrer';
+};
+
+function saveTemplateFromTrainModal() {
+  if (typeof _clearAllFieldErrors === 'function') _clearAllFieldErrors('#train-modal');
+  const name = document.getElementById('train-modal-name').value.trim();
+  if (!name) {
+    if (typeof _markFieldError === 'function') _markFieldError('train-modal-name', 'Champ requis');
+    return;
+  }
+  const rawSport = document.getElementById('train-modal-sport').value || 'Ride';
+  const prev = window._templateEditing;
+  const structure = (typeof window.getCurrentWorkoutStructure === 'function') ? window.getCurrentWorkoutStructure() : null;
+  const entry = {
+    id: (prev && prev.id) || (Date.now().toString() + Math.random().toString(36).slice(2, 5)),
+    _sbId: (prev && prev._sbId) || undefined,
+    sort_order: (prev && prev.sort_order) || 0,
+    sport: rawToLibKey(rawSport),      // clé de regroupement bibliothèque
+    sport_raw: rawSport,               // sport Strava exact (repris à l'insertion calendrier)
+    name,
+    duration_min: parseInt(document.getElementById('train-modal-duration').value, 10) || 0,
+    tss: parseInt(document.getElementById('train-modal-tss').value, 10) || 0,
+    description: document.getElementById('train-modal-notes').value.trim(),
+    rpe: parseFloat(document.getElementById('train-modal-rpe').value) || null,
+    km: parseFloat(document.getElementById('train-modal-km').value) || null,
+    dplus: parseInt(document.getElementById('train-modal-dplus').value, 10) || null,
+    structure: (structure && structure.length) ? structure : null,
+  };
+  if (window.libraryUpsertTemplate) window.libraryUpsertTemplate(entry);
+  window._templateMode = false;
+  window._templateEditing = null;
+  closeTrainModal();
+}
+
 // Insertion d'un modèle de la bibliothèque sur un jour (glisser-déposer).
 // mode 'prevu' → entraînement prévu ; mode 'realise' → activité manuelle réalisée.
 // Les deux passent par le système d'entraînements existant (sync Supabase incluse).
@@ -3488,13 +3759,16 @@ window.coachInsertTemplate = function (iso, tpl, mode, ia) {
     id: Date.now().toString() + Math.random().toString(36).slice(2, 5),
     name: tpl.name || 'Séance',
     date: iso,
-    sport: tpl.sport || 'cyclisme',
+    sport: tpl.sport_raw || tpl.sport || 'cyclisme',
     type: tpl.type || '',
     duration: tpl.duration_min || 0,
     tss: tpl.tss || 0,
     notes: tpl.description || '',
+    rpe: (tpl.rpe != null ? tpl.rpe : null),
+    km: (tpl.km != null ? tpl.km : null),
+    dplus: (tpl.dplus != null ? tpl.dplus : null),
     mode: m,
-    structure: null,
+    structure: tpl.structure || null,
     ia: ia === true,
   };
   const arr = m === 'realise' ? loadRealisedTrainings() : loadTrainings();

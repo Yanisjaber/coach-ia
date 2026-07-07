@@ -264,10 +264,32 @@ function hidePlacingHint() {
 }
 window.renderSeanceLibrary = renderLibrary;
 
+// API pour le modal template hébergé dans app.js (train-modal en mode bibliothèque)
+window.libraryUpsertTemplate = function (entry) {
+  const arr = loadTemplates();
+  const i = arr.findIndex(t => t.id === entry.id);
+  if (i >= 0) {
+    if (arr[i]._sbId && !entry._sbId) entry._sbId = arr[i]._sbId;
+    if (entry.sort_order == null && arr[i].sort_order != null) entry.sort_order = arr[i].sort_order;
+    arr[i] = entry;
+  } else {
+    arr.push(entry);
+  }
+  saveTemplates(arr);
+  renderLibrary();
+};
+window.libraryDeleteTemplate = function (id) {
+  saveTemplates(loadTemplates().filter(t => t.id !== id));
+  renderLibrary();
+};
+
 // ---- Modale créer / éditer ----
 function openTemplateModal(id) {
   const all = loadTemplates();
   const tpl = id ? all.find(t => t.id === id) : null;
+  // Nouveau : réutilise le modal d'entraînement (même design + structure d'intervalles).
+  // L'ancien modal simple reste en fallback si app.js n'est pas chargé.
+  if (window.openLibraryTemplateModal) { window.openLibraryTemplateModal(tpl); return; }
   const overlay = document.createElement('div');
   overlay.className = 'day-modal-overlay active';
   overlay.innerHTML = `

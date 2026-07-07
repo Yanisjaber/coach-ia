@@ -37,6 +37,7 @@ window.addEventListener('coach-ia-auth', async (e) => {
         if (window.renderBilan) window.renderBilan();
         if (window.renderSeanceLibrary) window.renderSeanceLibrary();
         if (window.renderIaPage) window.renderIaPage();
+        if (window.refreshLoadChart) window.refreshLoadChart();
       }, 100);
     } catch (e) {
       console.error('[cloud-sync] Pull error:', e);
@@ -55,6 +56,7 @@ window.addEventListener('coach-view-changed', async () => {
       if (window.renderCompList) window.renderCompList();
       if (window.renderCompetitionsPage) window.renderCompetitionsPage();
       if (window.renderSeanceLibrary) window.renderSeanceLibrary();
+      if (window.refreshLoadChart) window.refreshLoadChart();
     }, 50);
   } catch (e) { console.warn('[cloud-sync] view-changed', e); }
 });
@@ -183,6 +185,11 @@ async function pullAllFromCloud() {
           tss: r.tss || 0,
           description: r.description || '',
           sort_order: r.sort_order || 0,
+          sport_raw: r.sport_raw || null,
+          rpe: (r.rpe != null ? r.rpe : null),
+          km: (r.distance_km != null ? r.distance_km : null),
+          dplus: (r.dplus != null ? r.dplus : null),
+          structure: r.structure || null,
         }));
       localStorage.setItem('coach_ia_templates_v1', JSON.stringify(arr));
     }
@@ -380,6 +387,11 @@ export async function pushTemplate(tpl) {
       sport: tpl.sport || 'autre', name: tpl.name,
       duration_min: tpl.duration_min || 0, tss: tpl.tss || 0,
       description: tpl.description || null, sort_order: tpl.sort_order || 0,
+      sport_raw: tpl.sport_raw || null,
+      rpe: (tpl.rpe != null ? tpl.rpe : null),
+      distance_km: (tpl.km != null ? tpl.km : null),
+      dplus: (tpl.dplus != null ? tpl.dplus : null),
+      structure: (tpl.structure && tpl.structure.length) ? tpl.structure : null,
       updated_at: new Date().toISOString(),
     };
     if (tpl._sbId) row.id = tpl._sbId;
