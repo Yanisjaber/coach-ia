@@ -113,7 +113,11 @@ body {
   overscroll-behavior-y: contain;
 }
 
-/* ===== Pas de scroll horizontal sur mobile : tout doit tenir en largeur ===== */
+/* ===== Pas de scroll horizontal NULLE PART : tout doit tenir en largeur =====
+   (règle globale, toutes tailles d'écran — rien ne doit être coupé ni défiler
+   latéralement ; les panneaux hors-écran translatés ne créent plus d'overflow) */
+html, body { overflow-x: clip; }
+
 @media (max-width: 860px) {
   /* IMPORTANT : pas de overflow-x: hidden sur html/body — ça casse le scroll
      vertical fluide sur iOS Safari. À la place on utilise overflow-x: clip

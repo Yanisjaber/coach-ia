@@ -72,9 +72,13 @@
   }
   .section-subtitle { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
 
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-  .grid-vol { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 16px; }
+  /* minmax(0,1fr) et non 1fr : 1fr = minmax(auto,1fr), le min-content d'une carte
+     (barre de dates non-wrappée...) pouvait pousser la grille PLUS LARGE que
+     l'écran -> défilement latéral + cartes coupées. */
+  .grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .grid-vol { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; }
+  .grid-2 > *, .grid-3 > *, .grid-vol > * { min-width: 0; }
   .vol-head {
     display: flex; align-items: center; justify-content: space-between;
     flex-wrap: wrap;           /* carte étroite : le toggle passe dessous au lieu d'être rogné */

@@ -34,7 +34,7 @@
     margin-bottom: 12px;
     font-size: 12px;
     color: var(--text-dim);
-    flex-wrap: nowrap;   /* tout sur une seule ligne */
+    flex-wrap: wrap;     /* carte étroite : les contrôles passent à la ligne au lieu de déborder */
   }
   .date-range input[type="date"] {
     background: var(--bg-elev2);
