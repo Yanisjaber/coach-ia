@@ -556,6 +556,10 @@
   .grid-1.card .chart-reset {
     padding: 6px;
     font-size: 0;
+    gap: 0;          /* le nœud texte (masqué) reste un item flex : sans ça le gap hérité décale l'icône */
+    line-height: 0;
+    width: 30px;
+    height: 30px;
     min-width: 30px;
     min-height: 30px;
     display: inline-flex;
