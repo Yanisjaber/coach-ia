@@ -616,3 +616,19 @@
   .phase-range-row { grid-template-columns: 1fr; }
   .note-range-row { grid-template-columns: 1fr; }
 }
+
+
+/* --- Mobile : modales note / cycle-phase compactes, sans débordement --- */
+@media (max-width: 760px) {
+  .day-modal-overlay { padding: 10px; }
+  .day-modal { max-height: calc(100dvh - 20px); }
+  .day-modal-header { padding: 13px 15px; }
+  .day-modal-header h3 { font-size: 15px; }
+  .day-modal-body { padding: 13px 15px; }
+  .day-modal-body textarea { font-size: 12.5px; padding: 10px; min-height: 80px; }
+  .day-modal-footer { padding: 11px 15px; flex-wrap: wrap; gap: 8px; }
+  .day-modal-footer button { font-size: 12.5px; }
+  .day-popover { min-width: 200px; max-width: calc(100vw - 16px); }
+  .day-popover-action { font-size: 12.5px; padding: 8px 9px; }
+  .lib-field > span { font-size: 10px; }
+}

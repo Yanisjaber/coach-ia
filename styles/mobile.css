@@ -449,6 +449,29 @@
   button { touch-action: manipulation; } /* supprime le délai double-tap */
 }
 
+/* ===== Éditeur de structure (session-builder) : responsive =====
+   Le CSS du builder est injecté inline par js/session-builder.js (donc après
+   les feuilles de style) -> !important nécessaire pour les overrides mobile. */
+@media (max-width: 760px) {
+  #sb-root .sb-addbar { grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)) !important; gap: 6px !important; }
+  #sb-root .sb-card { padding: 9px 4px !important; gap: 5px !important; }
+  #sb-root .sb-cico { width: 28px !important; height: 28px !important; font-size: 13px !important; }
+  #sb-root .sb-ct b { font-size: 10px !important; }
+  #sb-root .sb-profile { height: 110px !important; padding: 8px !important; }
+  #sb-root .sb-totals { gap: 6px !important; }
+  #sb-root .sb-tc { padding: 7px 4px !important; }
+  #sb-root .sb-tc .v { font-size: 16px !important; }
+  #sb-root .sb-tc .k { font-size: 9px !important; }
+  #sb-root .sb-blk { padding: 9px 9px !important; }
+  #sb-root .sb-bname { font-size: 12.5px !important; }
+  #sb-root .sb-line { grid-template-columns: 40px 0.8fr 1.2fr !important; gap: 6px !important; }
+  #sb-root .sb-line > * { min-width: 0; }
+  #sb-root .sb-line input, #sb-root .sb-line select { padding: 7px 5px !important; font-size: 11.5px !important; }
+  #sb-root .sb-mini { font-size: 9px !important; }
+  #sb-root .sb-reps { padding: 2px 5px !important; font-size: 11px !important; }
+  #sb-root .sb-reps input { width: 30px !important; }
+}
+
 /* ===== Très petits écrans ===== */
 @media (max-width: 380px) {
   .hero { grid-template-columns: 1fr; }
