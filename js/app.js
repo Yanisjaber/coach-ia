@@ -54,6 +54,7 @@ import './power-profile.js';
 // Bouton "+" au hover, popover : ajouter entraînement / note / repos / cycle (phase).
 // Auto-bootstrap + MutationObserver sur #week-calendar pour ré-attacher après chaque render.
 import './day-extras.js';
+import './scroll-lock.js';
 
 // ========= BILAN ANNUEL (nouvelle page p3, remplace Tendances long-terme) =========
 // KPIs YTD vs N-1, objectifs annuels, records, cumul kilométrique annuel.

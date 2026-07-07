@@ -401,6 +401,26 @@
   .modal-header-actions { gap: 0; }
   .modal-action-btn { font-size: 20px; padding: 4px 7px; }
   .modal-close { font-size: 22px; padding: 4px 7px; }
+  /* Scrollbar invisible dans la bottom sheet (le contenu reste scrollable) */
+  .modal-overlay .modal {
+    scrollbar-width: none;            /* Firefox */
+    -ms-overflow-style: none;         /* vieux Edge */
+    overscroll-behavior: contain;     /* pas de scroll-chaining vers la page */
+  }
+  .modal-overlay .modal::-webkit-scrollbar { display: none; }  /* WebKit / Chrome */
+  /* Modale ouverte : l'arrière-plan ne bouge plus du tout */
+  html:has(.modal-overlay.active),
+  html:has(.day-modal-overlay.active),
+  body:has(.modal-overlay.active),
+  body:has(.day-modal-overlay.active) {
+    overflow: hidden;
+    touch-action: none;
+  }
+  /* ...mais la modale elle-même reste scrollable au doigt */
+  .modal-overlay.active .modal,
+  .day-modal-overlay.active .day-modal {
+    touch-action: pan-y;
+  }
   /* Les confirmations restent des petites boîtes centrées */
   .confirm-modal-overlay { padding: 20px; align-items: center; }
 
