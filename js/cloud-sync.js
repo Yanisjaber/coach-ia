@@ -443,6 +443,26 @@ export async function pushCompetition(comp) {
       return data && data.id;
     } else {
       // Compétition réalisée → table activities, category='competition' (modele unifie).
+      let targetId = (comp._sbId && (comp._table === 'activity' || comp._table === 'competition')) ? comp._sbId : null;
+      if (!targetId) targetId = await _resolveId('activities', comp.id);
+      if (!targetId && comp._sbId) targetId = comp._sbId; // _table perdu mais id connu : viser la ligne existante
+      if (targetId) {
+        // Ligne EXISTANTE (souvent la vraie activite Strava) : on ne met a jour que
+        // les champs compet. JAMAIS source/moving_time/start_date_local/distance_km,
+        // sinon on ecrase la vraie activite (duree perdue, source -> manual).
+        const meta = {
+          category: 'competition', name: comp.name,
+          priority: comp.priority ?? null, course_dplus: comp.dplus ?? null, type: comp.type ?? null,
+          target: comp.target ?? null, laps: comp.laps ?? null, user_notes: comp.notes ?? null,
+          gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
+          stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
+          event: comp.event ?? null,
+        };
+        const { data, error } = await window.sb.from('activities').update(meta).eq('id', targetId).eq('user_id', uid()).select().single();
+        if (error) throw error;
+        return data && data.id;
+      }
+      // Aucune ligne existante : creation d'une compet manuelle (stub complet legitime)
       const row = {
         user_id: uid(), source: 'manual', category: 'competition', client_id: comp.id,
         name: comp.name, start_date_local: comp.date + 'T12:00:00', sport: comp.sport ?? null,
@@ -453,10 +473,7 @@ export async function pushCompetition(comp) {
         stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
         event: comp.event ?? null,
       };
-      if (comp._sbId && (comp._table === 'activity' || comp._table === 'competition')) row.id = comp._sbId;
-      if (!row.id) row.id = await _resolveId('activities', comp.id);
-      if (!row.id) delete row.id;
-      const { data, error } = await window.sb.from('activities').upsert(row).select().single();
+      const { data, error } = await window.sb.from('activities').insert(row).select().single();
       if (error) throw error;
       return data && data.id;
     }

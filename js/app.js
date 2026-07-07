@@ -3179,6 +3179,23 @@ function upsertCompInDashboard(comp) {
   let day = window.DASHBOARD_DATA.days.find(d => String(d.date) === iso);
   if (!day) { day = { date: iso, activities: [] }; window.DASHBOARD_DATA.days.push(day); }
   if (!Array.isArray(day.activities)) day.activities = [];
+  // Si la compétition correspond à une VRAIE activité (Strava/import) déjà dans le
+  // jour : mise à jour des champs compet uniquement — ne JAMAIS remplacer par le
+  // stub (sinon durée/TSS/NP/cardio disparaissent jusqu'au rechargement).
+  const existing = day.activities.find(x =>
+    (comp._sbId && String(x._sbId) === String(comp._sbId)) ||
+    (String(x.client_id) === String(comp.id))
+  );
+  if (existing && existing.source !== 'manual') {
+    existing.name = comp.name;
+    existing.category = 'competition';
+    existing.priority = comp.priority || null;
+    existing.target = comp.target || null;
+    existing.laps = comp.laps || null;
+    existing.course_dplus = comp.dplus || null;
+    if (comp.notes) existing.notes = comp.notes;
+    return;
+  }
   day.activities = day.activities.filter(x => !(
     (comp._sbId && String(x._sbId) === String(comp._sbId)) ||
     (String(x.client_id) === String(comp.id))
@@ -3272,6 +3289,10 @@ async function saveCompFromModal() {
       // (sinon le push crée une nouvelle ligne et la modif est perdue au rechargement)
       if (old._sbId) newEntry._sbId = old._sbId;
       if (old.realised != null) newEntry.realised = old.realised;
+      // Conserver aussi la table d'origine + liens : sans _table, le push ne cible
+      // plus la bonne ligne (doublon ou écrasement de la vraie activité Strava).
+      if (old._table) newEntry._table = old._table;
+      if (old.activityIds) newEntry.activityIds = old.activityIds;
       if (!gpxContent && old.gpxContent) {
         newEntry.gpxName = old.gpxName;
         newEntry.gpxContent = old.gpxContent;
