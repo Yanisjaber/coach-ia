@@ -1125,17 +1125,24 @@
   text-overflow: ellipsis;
 }
 .act-tile-grid {
-  /* Grid et non flex : les calc(50% - Xpx) en flex débordent d'un sous-pixel
-     selon la largeur -> retour ligne intempestif (tuiles en 1 colonne). */
+  /* Grid en DEMI-PISTES (cols x 2) : chaque tuile span 2 ; une rangée incomplète
+     peut alors être centrée en décalant sa 1re tuile d'une piste. */
   display: grid;
-  grid-template-columns: repeat(var(--tile-cols, 3), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--tile-tracks, 6), minmax(0, 1fr));
   gap: 8px;
 }
 .act-tile {
+  grid-column: span 2;
   min-width: 0;
   border-radius: 9px;
   padding: 10px 12px;
   text-align: center;
+}
+/* Desktop : centrage de la dernière rangée incomplète (cols JS : 5->3, 7->4, 9->5) */
+@media (min-width: 861px) {
+  .act-tile-grid[data-n="5"] > .act-tile:nth-child(4) { grid-column: 2 / span 2; }
+  .act-tile-grid[data-n="7"] > .act-tile:nth-child(5) { grid-column: 2 / span 2; }
+  .act-tile-grid[data-n="9"] > .act-tile:nth-child(6) { grid-column: 2 / span 2; }
 }
 .act-tile-lab {
   font-size: 10px;
@@ -1158,10 +1165,12 @@
 
 /* --- Mobile : héros en 2x2, tuiles en 2 colonnes, rien de tronqué --- */
 @media (max-width: 860px) {
-  /* Rangées toujours PLEINES : héros en 2 colonnes (2x2), ou 4 alignés si la
-     place le permet ; jamais 3+1. Tuiles : 2 colonnes par défaut, 3 ou 4 selon
-     leur nombre (data-n) pour que chaque rangée soit complète. */
-  .act-hero-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 8px; }
+  /* Rangées toujours PLEINES et orphelines CENTRÉES (demi-pistes + span 2) :
+     héros en 2x2 ou 4 alignés (jamais 3+1) ; tuiles en 2/3/4 colonnes selon
+     leur nombre (data-n), dernière rangée incomplète centrée. */
+  .act-hero-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
+  .act-hero { grid-column: span 2; }
+  .act-hero-row[data-n="3"] > .act-hero:last-child { grid-column: 2 / span 2; }
   .act-hero {
     padding: 10px 8px;
     gap: 8px;
@@ -1171,7 +1180,11 @@
   .act-hero-val { font-size: 17px; }
   .act-hero-unit { font-size: 11px; }
   .act-hero-lab { font-size: 9px; }
-  .act-tile-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .act-tile-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .act-tile-grid[data-n="3"] > .act-tile:last-child,
+  .act-tile-grid[data-n="5"] > .act-tile:last-child,
+  .act-tile-grid[data-n="7"] > .act-tile:last-child,
+  .act-tile-grid[data-n="9"] > .act-tile:last-child { grid-column: 2 / span 2; }
   .act-tile { padding: 8px 9px; }
   .act-tile-val { font-size: 12.5px; }
 }
@@ -1180,15 +1193,23 @@
   .act-tile-grid[data-n="3"],
   .act-tile-grid[data-n="5"],
   .act-tile-grid[data-n="6"],
-  .act-tile-grid[data-n="9"] { grid-template-columns: repeat(3, 1fr); }
+  .act-tile-grid[data-n="9"] { grid-template-columns: repeat(6, 1fr); }
+  /* reset du centrage 2-colonnes, puis centrage propre à 3 colonnes */
+  .act-tile-grid[data-n="3"] > .act-tile:last-child,
+  .act-tile-grid[data-n="9"] > .act-tile:last-child,
+  .act-tile-grid[data-n="5"] > .act-tile:last-child { grid-column: span 2; }
+  .act-tile-grid[data-n="5"] > .act-tile:nth-child(4) { grid-column: 2 / span 2; }
 }
 /* Grande largeur (plage mobile/tablette) : 4 alignés quand ça tombe juste */
 @media (min-width: 590px) and (max-width: 860px) {
-  .act-hero-row[data-n="4"] { grid-template-columns: repeat(4, 1fr); }
-  .act-hero-row[data-n="3"] { grid-template-columns: repeat(3, 1fr); }
+  .act-hero-row[data-n="4"] { grid-template-columns: repeat(8, 1fr); }
+  .act-hero-row[data-n="3"] { grid-template-columns: repeat(6, 1fr); }
+  .act-hero-row[data-n="3"] > .act-hero:last-child { grid-column: span 2; }
   .act-tile-grid[data-n="4"],
   .act-tile-grid[data-n="7"],
-  .act-tile-grid[data-n="8"] { grid-template-columns: repeat(4, 1fr); }
+  .act-tile-grid[data-n="8"] { grid-template-columns: repeat(8, 1fr); }
+  .act-tile-grid[data-n="7"] > .act-tile:last-child { grid-column: span 2; }
+  .act-tile-grid[data-n="7"] > .act-tile:nth-child(5) { grid-column: 2 / span 2; }
 }
 
 /* ============================================================
