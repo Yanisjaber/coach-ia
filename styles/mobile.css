@@ -766,8 +766,8 @@
 
 /* Paddings/gaps fluides des stats de la modale jour (annule les valeurs fixes) */
 @media (max-width: 860px) {
-  .act-hero-row { gap: clamp(6px, 4.55px + 0.455vw, 8px); margin-bottom: clamp(6px, 4.55px + 0.455vw, 8px); }
-  .act-hero { flex: 0 0 calc(50% - clamp(3px, 2.27px + 0.23vw, 4px)); padding: clamp(8px, 6.55px + 0.455vw, 10px) clamp(6px, 4.55px + 0.455vw, 8px); gap: clamp(6px, 4.55px + 0.455vw, 8px); }
-  .act-tile-grid { gap: clamp(5px, 4.27px + 0.23vw, 6px); }
-  .act-tile { flex: 0 1 calc(50% - clamp(2.5px, 2.14px + 0.11vw, 3px)); padding: clamp(6px, 4.55px + 0.455vw, 8px) clamp(7px, 5.55px + 0.455vw, 9px); }
+  .act-hero-row { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(6px, 4.55px + 0.455vw, 8px); margin-bottom: clamp(6px, 4.55px + 0.455vw, 8px); }
+  .act-hero { padding: clamp(8px, 6.55px + 0.455vw, 10px) clamp(6px, 4.55px + 0.455vw, 8px); gap: clamp(6px, 4.55px + 0.455vw, 8px); }
+  .act-tile-grid { grid-template-columns: 1fr 1fr; gap: clamp(5px, 4.27px + 0.23vw, 6px); }
+  .act-tile { padding: clamp(6px, 4.55px + 0.455vw, 8px) clamp(7px, 5.55px + 0.455vw, 9px); }
 }

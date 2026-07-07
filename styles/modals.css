@@ -1125,13 +1125,13 @@
   text-overflow: ellipsis;
 }
 .act-tile-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  /* Grid et non flex : les calc(50% - Xpx) en flex débordent d'un sous-pixel
+     selon la largeur -> retour ligne intempestif (tuiles en 1 colonne). */
+  display: grid;
+  grid-template-columns: repeat(var(--tile-cols, 3), minmax(0, 1fr));
   gap: 8px;
 }
 .act-tile {
-  flex: 0 1 calc((100% - (var(--tile-cols, 3) - 1) * 8px) / var(--tile-cols, 3));
   min-width: 0;
   border-radius: 9px;
   padding: 10px 12px;
@@ -1158,9 +1158,8 @@
 
 /* --- Mobile : héros en 2x2, tuiles en 2 colonnes, rien de tronqué --- */
 @media (max-width: 860px) {
-  .act-hero-row { gap: 8px; margin-bottom: 8px; }
+  .act-hero-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
   .act-hero {
-    flex: 0 0 calc(50% - 4px);   /* 2 par rangée */
     padding: 10px 8px;
     gap: 8px;
     justify-content: center;     /* contenu centré dans la carte */
@@ -1169,11 +1168,8 @@
   .act-hero-val { font-size: 17px; }
   .act-hero-unit { font-size: 11px; }
   .act-hero-lab { font-size: 9px; }
-  .act-tile-grid { gap: 6px; }
-  .act-tile {
-    flex: 0 1 calc(50% - 3px);   /* 2 colonnes */
-    padding: 8px 9px;
-  }
+  .act-tile-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .act-tile { padding: 8px 9px; }
   .act-tile-val { font-size: 12.5px; }
 }
 
