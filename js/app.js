@@ -3330,6 +3330,8 @@ async function saveCompFromModal() {
 // Wire up modal triggers (défensif)
 const openCompBtn = document.getElementById('open-comp-modal');
 if (openCompBtn) openCompBtn.addEventListener('click', openCompModal);
+// Boutons + des en-têtes "Compétitions à venir" (calendrier + page compétitions)
+document.querySelectorAll('.comp-add-btn').forEach(b => b.addEventListener('click', openCompModal));
 const compModalClose = document.getElementById('comp-modal-close');
 if (compModalClose) compModalClose.addEventListener('click', closeCompModal);
 const compModalCancel = document.getElementById('comp-modal-cancel');
