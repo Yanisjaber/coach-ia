@@ -4880,13 +4880,14 @@ async function loadStreams(activityId) {
 async function loadStreamsFromSupabase(activityId) {
   const sb = window.sb;
   const user = window._coachIaUser || (sb && (await sb.auth.getUser()).data.user);
-  if (!sb || !user) return null;
-  const { data, error } = await sb
-    .from('activities')
-    .select('streams_gz, streams_format')
-    .eq('user_id', user.id)
-    .eq('strava_id', activityId)
-    .maybeSingle();
+  if (!sb || !user || activityId == null) return null;
+  // strava_id est un bigint : n'utiliser ce filtre QUE pour un id numérique
+  // (les entrées manuelles/compétitions ont des UUID -> 400 PostgREST sinon).
+  const idStr = String(activityId).replace(/^[si]/, '');
+  let q = sb.from('activities').select('streams_gz, streams_format').eq('user_id', user.id);
+  if (/^\d+$/.test(idStr)) q = q.eq('strava_id', idStr);
+  else q = q.or(`id.eq.${idStr},client_id.eq.${idStr}`);
+  const { data, error } = await q.maybeSingle();
   if (error || !data || !data.streams_gz || data.streams_format === 'none') return null;
   return await gunzipBase64ToJson(data.streams_gz);
 }
@@ -8770,7 +8771,13 @@ function buildRealisedDay(iso) {
     if (!realDay) realDay = { date: iso, activities: [], sessionType: 'vo2' };
     else realDay = { ...realDay, activities: [...(realDay.activities || [])] };
     for (const c of compsToday) {
-      if (realDay.activities.some(x => x._sbId && ((c._sbId && String(x._sbId) === String(c._sbId)) || (c.id && String(x.client_id) === String(c.id))))) continue;
+      // Une vraie activité 'competition' existe déjà ce jour : le registre n'est
+      // qu'un miroir -> ne JAMAIS ajouter de pseudo-entrée (durée 0) en plus.
+      if (realDay.activities.some(x => x.category === 'competition' && !x._comp)) continue;
+      if (realDay.activities.some(x =>
+        (x._sbId && ((c._sbId && String(x._sbId) === String(c._sbId)) || (c.id && String(x.client_id) === String(c.id)))) ||
+        (x.name && c.name && String(x.name).trim() === String(c.name).trim())
+      )) continue;
       const cDur = (typeof parseTimeToMin === 'function' ? parseTimeToMin(c.target) : 0) || 0;
       realDay.activities.push({
         name: c.name, sport: c.sport || 'Ride', raw_type: c.sport || 'Ride',
