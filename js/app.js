@@ -9364,17 +9364,8 @@ function openSessionModal(iso, source) {
         const _tileGrid = _n ? `<div class="act-tile-grid" data-n="${_n}" style="--tile-cols:${_cols};--tile-tracks:${_cols * 2}">${_tiles.join('')}</div>` : '';
         const statsHTML = (_heroRow || _tileGrid) ? `<div class="modal-section">${_heroRow}${_tileGrid}</div>` : '';
 
-        // --- Lien Strava ---
-        const aId = act.id || act.activityId || day.activityId;
-        // Strava utilise des IDs numériques. On retire un préfixe "s" éventuel.
-        const stravaId = aId ? String(aId).replace(/^s/, '').replace(/^i/, '') : '';
-        const intervalsLink = stravaId && /^\d+$/.test(stravaId) ? `
-          <a href="https://www.strava.com/activities/${stravaId}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:rgba(252,76,2,0.12);border:1px solid rgba(252,76,2,0.3);color:#fc5200;padding:8px 14px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500;">
-            Voir le détail complet sur Strava ↗
-          </a>
-          <div style="font-size:11px;color:var(--text-mute);margin-top:6px;">ID activité : <code>${stravaId}</code></div>
-        ` : '';
-
+        // (Lien "Voir sur Strava" supprimé : l'app affiche SA base de données ;
+        // Strava n'est que la source d'alimentation lors des synchros.)
         const comparHTML = (typeof window.renderPrevuVsRealiseHTML === 'function') ? window.renderPrevuVsRealiseHTML(act, iso) : '';
         const _struct = act.structure;
         const _structDet = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(_struct) : '';
