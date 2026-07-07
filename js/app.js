@@ -8273,7 +8273,10 @@ function renderGpxTrack(gpxContent, svgId) {
 function openRestDayModal(iso) {
   const date = new Date(iso + 'T12:00:00');
   if (isNaN(date.getTime())) return;
-  const dateStr = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  // Mobile : date compacte ("mer. 1 juil. 2026") pour que l'heure + le sport tiennent sur la même ligne
+  const dateStr = (window.innerWidth < 860)
+    ? date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+    : date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const titleEl = document.getElementById('modal-title');
   const metaEl = document.getElementById('modal-meta');
   const bodyEl = document.getElementById('modal-body');
@@ -9019,7 +9022,10 @@ function openSessionModal(iso, source) {
   // Reconstruire la date depuis l'iso (les jours futurs ne sont PAS dans data)
   const date = new Date(iso + 'T12:00:00');
   if (isNaN(date.getTime())) return;
-  const dateStr = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  // Mobile : date compacte pour que l'heure + le sport tiennent sur la même ligne
+  const dateStr = (window.innerWidth < 860)
+    ? date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+    : date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   // Lookup data uniquement pour le mode Réalisé (les jours futurs ne sont pas dedans).
   // En réalisé, on reconstruit le jour fusionné (manuelles + compétitions) comme la carte.
