@@ -8867,11 +8867,9 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
     if (!bars) return '';
     var structHTML = '';
     if (Array.isArray(p.structure) && p.structure.length && window.renderWorkoutProfileHTML) {
-      var ratio = (p.tss && act.tss) ? Math.round((+act.tss) / (+p.tss) * 100) : null;
       structHTML = '<div style="margin-top:16px">'
         + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#6b7686);margin-bottom:7px">Structure prévue (objectif)</div>'
         + window.renderWorkoutProfileHTML(p.structure, { height: 56, labels: false })
-        + (ratio != null ? '<div style="font-size:11px;color:var(--text-mute,#6b7686);margin-top:7px">Réalisé : ' + (act.tss || 0) + ' TSS pour ' + p.tss + ' prévus — ' + ratio + ' % de la charge cible.</div>' : '')
         + '</div>';
     }
     return window.__collapsible('pvr', 'Prévu vs Réalisé', bars + structHTML);
