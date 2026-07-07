@@ -55,6 +55,7 @@ import './power-profile.js';
 // Auto-bootstrap + MutationObserver sur #week-calendar pour ré-attacher après chaque render.
 import './day-extras.js';
 import './scroll-lock.js';
+import './adherence.js';
 
 // ========= BILAN ANNUEL (nouvelle page p3, remplace Tendances long-terme) =========
 // KPIs YTD vs N-1, objectifs annuels, records, cumul kilométrique annuel.
@@ -5696,6 +5697,8 @@ async function renderStreamsSection(container, activityId) {
     var _hrMaxA = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && (+window.DASHBOARD_DATA.athlete.hr_max || +window.DASHBOARD_DATA.athlete.hrMax)) || 190;
     var _ftpA = (window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete && +window.DASHBOARD_DATA.athlete.ftp) || 250;
     window.__lastStreams = { watts: watts ? watts.slice() : null, wattsRaw: _wattsRaw, hr: hr ? hr.slice() : null, cadence: cadence ? cadence.slice() : null, altitude: altitude ? altitude.slice() : null, distance: distance ? distance.slice() : null, time: time ? time.slice() : null, ftp: _ftpA, hrMax: _hrMaxA };
+    // Adhérence par intervalle (Prévu vs Réalisé V2) : les streams viennent d'arriver
+    if (window.fillAdherenceSlot) setTimeout(window.fillAdherenceSlot, 50);
   } catch (e) { }
 
   const length = (watts && watts.length) || (hr && hr.length) || (cadence && cadence.length) || 0;
@@ -8870,7 +8873,11 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
       structHTML = '<div style="margin-top:16px">'
         + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#6b7686);margin-bottom:7px">Structure prévue (objectif)</div>'
         + window.renderWorkoutProfileHTML(p.structure, { height: 56, labels: false })
+        // Adhérence par intervalle : rempli par fillAdherenceSlot() quand les streams arrivent
+        + '<div id="pvr-adherence" data-structure="' + encodeURIComponent(JSON.stringify(p.structure)) + '"></div>'
         + '</div>';
+      // Streams déjà en mémoire (réouverture de la même activité) : remplit direct
+      setTimeout(function () { if (window.fillAdherenceSlot) window.fillAdherenceSlot(); }, 100);
     }
     return window.__collapsible('pvr', 'Prévu vs Réalisé', bars + structHTML);
   } catch (e) { console.warn('[prevu vs realise]', e && e.message); return ''; }
