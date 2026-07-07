@@ -1144,7 +1144,7 @@ const hoursChart = new Chart(document.getElementById('chart-hours'), {
       tooltip: { enabled: false }
     },
     scales: {
-      y: { title: { display: true, text: 'Heures', color: '#6b7488' }, beginAtZero: true, ticks: { color: '#6b7488' }, grid: { color: 'rgba(255,255,255,0.045)', drawBorder: false }, border: { display: false } },
+      y: { beginAtZero: true, ticks: { color: '#6b7488', callback: (v) => v + 'h' }, grid: { color: 'rgba(255,255,255,0.045)', drawBorder: false }, border: { display: false } },
       x: { grid: { display: false }, border: { display: false }, ticks: { color: '#6b7488', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } }
     }
   }
@@ -1214,7 +1214,7 @@ function showHoursDetail(week) {
           }
         },
         scales: {
-          y: { title: { display: true, text: 'Heures' }, beginAtZero: true },
+          y: { beginAtZero: true, ticks: { callback: (v) => v + 'h' } },
           x: { grid: { display: false }, ticks: { font: { size: 11 } } }
         }
       }
@@ -10999,7 +10999,7 @@ new Chart(document.getElementById('chart-sleep'), {
       legend: { display: false },
       tooltip: { callbacks: { label: (ctx) => ctx.parsed.y == null ? 'Pas de donnée Whoop' : ctx.parsed.y + ' h' } }
     },
-    scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } }, y: { title: { display: true, text: 'heures' }, min: 0 } }
+    scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } }, y: { min: 0, ticks: { callback: (v) => v + 'h' } } }
   }
 });
 
