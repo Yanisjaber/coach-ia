@@ -1051,3 +1051,98 @@
 #p-analysis .rec-w { width: 62px; font-weight: 700; color: var(--accent); flex: none; }
 #p-analysis .rec-nm { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #p-analysis .rec-dt { color: var(--text-dim); white-space: nowrap; flex: none; }
+
+/* ============================================================
+   Stats d'activité dans la modale jour (héros + tuiles teintées)
+   Markup généré par app.js (openSessionModal). Desktop : 1 rangée
+   de héros + tuiles réparties ; mobile : héros 2x2, tuiles 2 colonnes.
+   ============================================================ */
+.act-hero-row {
+  display: flex;
+  gap: 11px;
+  margin-bottom: 11px;
+  flex-wrap: wrap;
+}
+.act-hero {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-elev2, #1b2230);
+  border-radius: 11px;
+  padding: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+}
+.act-hero-ico { flex: none; line-height: 0; }
+.act-hero-tx { min-width: 0; }
+.act-hero-val {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text, #fff);
+  line-height: 1;
+  white-space: nowrap;
+}
+.act-hero-unit { font-size: 12px; color: var(--text-mute, #7c879c); }
+.act-hero-lab {
+  font-size: 10px;
+  color: var(--text-mute, #7c879c);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.act-tile-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.act-tile {
+  flex: 0 1 calc((100% - (var(--tile-cols, 3) - 1) * 8px) / var(--tile-cols, 3));
+  min-width: 0;
+  border-radius: 9px;
+  padding: 10px 12px;
+  text-align: center;
+}
+.act-tile-lab {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--tile-c, var(--text-mute));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.act-tile-val {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text, #e7ebf3);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Mobile : héros en 2x2, tuiles en 2 colonnes, rien de tronqué --- */
+@media (max-width: 860px) {
+  .act-hero-row { gap: 8px; margin-bottom: 8px; }
+  .act-hero {
+    flex: 0 0 calc(50% - 4px);   /* 2 par rangée */
+    padding: 10px 8px;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+  .act-hero-ico svg { width: 18px; height: 18px; }
+  .act-hero-val { font-size: 17px; }
+  .act-hero-unit { font-size: 11px; }
+  .act-hero-lab { font-size: 9px; }
+  .act-tile-grid { gap: 6px; }
+  .act-tile {
+    flex: 0 1 calc(50% - 3px);   /* 2 colonnes */
+    padding: 8px 9px;
+  }
+  .act-tile-val { font-size: 12.5px; }
+}

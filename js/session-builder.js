@@ -324,7 +324,8 @@
     });
     html += '</div>';
     if (readout) {
-      return '<div class="wp-wrap"><div class="wp-readout" style="min-height:18px;font-size:12px;color:var(--text-mute,#6b7686);margin-bottom:9px;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--text-mute,#6b7686)">Survolez un bloc pour le détail</span></div>' + html + '</div>';
+      var HINT0 = (window.matchMedia && window.matchMedia('(hover: none)').matches) ? 'Touchez un bloc pour le détail' : 'Survolez un bloc pour le détail';
+      return '<div class="wp-wrap"><div class="wp-readout" style="min-height:18px;font-size:12px;color:var(--text-mute,#6b7686);margin-bottom:9px;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--text-mute,#6b7686)">' + HINT0 + '</span></div>' + html + '</div>';
     }
     return html;
   };
@@ -403,7 +404,7 @@
       t.style.left = left + 'px'; t.style.top = top + 'px';
     }
     function hide() { if (tip) tip.style.opacity = '0'; }
-    var PLACE = '<span style="color:var(--text-mute,#6b7686)">Survolez un bloc pour le détail</span>';
+    var PLACE = '<span style="color:var(--text-mute,#6b7686)">' + ((window.matchMedia && window.matchMedia('(hover: none)').matches) ? 'Touchez un bloc pour le détail' : 'Survolez un bloc pour le détail') + '</span>';
     var readoutOf = function (el) { var w = el.closest ? el.closest('.wp-wrap') : null; return w ? w.querySelector('.wp-readout') : null; };
     document.addEventListener('mouseover', function (e) {
       var el = e.target.closest ? e.target.closest('.wp-block') : null; if (!el) return;
