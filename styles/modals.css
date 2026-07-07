@@ -991,7 +991,26 @@
 /* Bande de stats : colonnes égales réparties uniformément sur la largeur */
 #p-analysis .af-band { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 26px 34px; align-items: start; }
 #p-analysis .af-band > div { min-width: 0; }
-@media (max-width: 760px) { #p-analysis .af-band { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); } }
+/* Mobile : chaque groupe devient une carte, la charge (TSS + jauges) en pleine largeur */
+@media (max-width: 760px) {
+  #p-analysis .af-band { grid-template-columns: 1fr 1fr; gap: 8px; }
+  #p-analysis .af-band > div {
+    background: var(--bg-elev2, #1b2230);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 12px 9px;
+  }
+  #p-analysis .af-band > div:first-child {
+    grid-column: 1 / -1;           /* bloc Charge/IF/FC max sur toute la largeur */
+    min-width: 0 !important;
+    padding: 14px;
+  }
+  /* Rangées un peu plus compactes que le desktop (inline styles -> !important) */
+  #p-analysis .af-band > div > div:last-child {
+    font-size: 12.5px !important;
+    line-height: 1.95 !important;
+  }
+}
 #p-analysis .af-tabbar {
   display: flex; gap: 2px; flex-wrap: wrap; justify-content: center;
   border-bottom: 1px solid var(--border); margin-bottom: 20px;
