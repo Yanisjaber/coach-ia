@@ -1133,7 +1133,7 @@
     flex: 0 0 calc(50% - 4px);   /* 2 par rangée */
     padding: 10px 8px;
     gap: 8px;
-    justify-content: flex-start;
+    justify-content: center;     /* contenu centré dans la carte */
   }
   .act-hero-ico svg { width: 18px; height: 18px; }
   .act-hero-val { font-size: 17px; }
