@@ -104,13 +104,9 @@ button, .tab, .subtab, .lib-chip, .day-card, .auth-user-btn, .profile-sidebar-it
   }
 }
 
-/* ===== Modals plein écran : safe area top + bottom ===== */
-@media (max-width: 860px) {
-  .modal-overlay .modal {
-    padding-top: calc(20px + env(safe-area-inset-top, 0px));
-    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-  }
-}
+/* (Supprimé : padding safe-area de l'époque bottom-sheet plein écran.
+   La modale est désormais une carte centrée avec marges — la safe-area
+   est prise en compte dans son max-height, pas dans son padding.) */
 
 /* ===== Empêche le pull-to-refresh accidentel quand on scroll dans la page ===== */
 body {

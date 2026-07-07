@@ -911,14 +911,14 @@
   }
   .btn-trash svg { display: block; }
   @media (max-width: 760px) {
-    .add-form-grid { grid-template-columns: 1fr; gap: 12px; }
+    .add-form-grid { grid-template-columns: 1fr; gap: clamp(9px, 6.82px + 0.68vw, 12px); }
     .form-field.form-col-2 { grid-column: 1; }
-    .modal-overlay.add-modal { padding: 12px; }
+    .modal-overlay.add-modal { padding: clamp(6px, 1.64px + 1.364vw, 12px); }
     .add-sec-grid.g3 { grid-template-columns: 1fr 1fr; }
     /* Textes et paddings réduits pour l'écran étroit */
     .add-form-grid .add-sec { padding: 12px 13px; }
     .add-sec-h { font-size: 10px; margin-bottom: 8px; }
-    .add-sec-grid { gap: 10px; }
+    .add-sec-grid { gap: clamp(7px, 4.82px + 0.68vw, 10px); }
     .form-field > span { font-size: 10px; }
     .form-field input, .form-field select, .form-field textarea { font-size: 12.5px; height: 36px; padding: 8px 11px; }
     .form-field textarea { height: auto; min-height: 60px; }
@@ -927,11 +927,8 @@
     .gpx-btn { font-size: 12px; padding: 7px 11px; }
     .gpx-name { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   }
-  @media (max-width: 460px) {
-    .add-sec-grid.g3 { grid-template-columns: 1fr 1fr; }   /* 2 col : durée/TSS côte à côte, pas de débordement */
-    .add-sec-grid.g3 > .form-field:nth-child(3) { grid-column: 1 / -1; }  /* le 3e champ (RPE / sport) passe en pleine largeur */
-    .modal-overlay.add-modal { padding: 6px; }
-    .add-modal-content { max-height: calc(100dvh - 12px); }
+  @media (max-width: 760px) {
+    .add-modal-content { max-height: calc(100dvh - clamp(12px, 3.27px + 2.73vw, 24px)); }
   }
 
 
@@ -1186,7 +1183,7 @@
    sur les media queries placées avant elles (même spécificité).
    ============================================================ */
 @media (max-width: 760px) {
-  .add-sec-grid { gap: 10px; }
+  .add-sec-grid { gap: clamp(7px, 4.82px + 0.68vw, 10px); }
   .add-sec-grid.g3 { grid-template-columns: 1fr 1fr; }
   /* 3e champ (RPE / sport) en pleine largeur sous les deux premiers */
   .add-sec-grid.g3 > .form-field:nth-child(3) { grid-column: 1 / -1; }
