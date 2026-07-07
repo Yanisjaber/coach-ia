@@ -41,6 +41,35 @@
   color: #0b0e14;
 }
 
+/* --- Vue compacte (mobile / fenêtre étroite) : tuiles ~44px de large ---
+   Le + en haut à droite recouvrait le numéro du jour (superposition moche).
+   À la place : le + est centré et PREND LA PLACE du numéro au survol
+   (le numéro s'efface, échange propre, rien ne se chevauche). */
+@media (max-width: 860px) {
+  .day-add-btn {
+    top: 2px;
+    right: 50%;
+    transform: translateX(50%) scale(0.85);
+    width: 20px;
+    height: 20px;
+    min-width: 0;
+    min-height: 0;   /* neutralise la cible tactile globale de mobile.css (bouton ovale sinon) */
+    font-size: 13px;
+  }
+  .day-card:hover .day-add-btn,
+  .day-add-btn:focus {
+    transform: translateX(50%) scale(1);
+  }
+  /* Le numéro du jour s'efface pendant que le + est affiché */
+  .day-card:hover .day-card-date,
+  .day-card:hover .day-card-date-row,
+  .day-card:has(.day-add-btn:focus) .day-card-date,
+  .day-card:has(.day-add-btn:focus) .day-card-date-row {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+}
+
 /* Indicateur note : petit tag "· note" cliquable à côté du nom du jour */
 .day-note-tag {
   color: var(--accent);
