@@ -2795,6 +2795,7 @@ function updateLapsVisibility() {
   const lab = laps && laps.closest('label');
   if (!lab) return;
   lab.style.display = (typeSel && typeSel.value === 'Circuit') ? '' : 'none';
+  if (typeof reflowCompParcoursRows === 'function') reflowCompParcoursRows();
 }
 document.getElementById('comp-modal-type')?.addEventListener('change', updateLapsVisibility);
 
@@ -3142,8 +3143,36 @@ const adaptTrainSportForm = () => {
   if (triRow) triRow.hidden = !isTri;
   if (kmLab && isTri) kmLab.style.display = 'none';
 };
+// Re-compacte les rangées du bloc Parcours : les champs VISIBLES se regroupent
+// 2 par ligne (les champs masqués par le sport laissaient des lignes à 1 seul champ).
+function reflowCompParcoursRows() {
+  const std = document.getElementById('comp-parcours-std');
+  if (!std) return;
+  const rows = Array.from(std.querySelectorAll('.add-sec-grid.g2'));
+  if (!rows.length) return;
+  const labels = rows.flatMap(r => Array.from(r.children));
+  // Ordre canonique fixe (le déplacement de nœuds ne doit jamais le perturber)
+  const ORDER = ['comp-modal-target', 'comp-modal-km', 'comp-modal-dplus', 'comp-modal-speed', 'comp-modal-laps'];
+  const rank = (l) => { const inp = l.querySelector('input,select'); const i = inp ? ORDER.indexOf(inp.id) : -1; return i === -1 ? 99 : i; };
+  labels.sort((a, b) => rank(a) - rank(b));
+  const visible = labels.filter(l => l.style.display !== 'none');
+  const hidden = labels.filter(l => l.style.display === 'none');
+  const ordered = visible.concat(hidden);
+  rows.forEach(r => { while (r.firstChild) r.removeChild(r.firstChild); });
+  ordered.forEach((l, i) => rows[Math.min(Math.floor(i / 2), rows.length - 1)].appendChild(l));
+  rows.forEach(r => { r.style.display = Array.from(r.children).some(c => c.style.display !== 'none') ? '' : 'none'; });
+}
+
 const adaptCompSportForm = () => {
   adaptSportForm('comp-modal-sport', { km: 'comp-modal-km', dplus: 'comp-modal-dplus', gpx: 'comp-modal-gpx', laps: 'comp-modal-laps' });
+  // Pas de distance pour ce sport -> la vitesse moyenne n'a pas de sens non plus
+  {
+    const sel0 = document.getElementById('comp-modal-sport');
+    const cfg0 = (sel0 && window.SportProfiles && window.SportProfiles.formConfig) ? window.SportProfiles.formConfig(sel0.value) : null;
+    const spd0 = document.getElementById('comp-modal-speed');
+    const spdLab = spd0 && spd0.closest('label');
+    if (spdLab && cfg0) spdLab.style.display = cfg0.dist ? '' : 'none';
+  }
   // Triathlon : bloc standard remplacé par les onglets Nat/T1/Vélo/T2/CAP
   const sel = document.getElementById('comp-modal-sport');
   const isTri = !!sel && typeof getSportCategory === 'function' && getSportCategory(sel.value) === 'triathlon';
@@ -3154,6 +3183,7 @@ const adaptCompSportForm = () => {
   if (std) std.hidden = isTri && !window._compEditLegacyStd;
   if (tri) tri.hidden = !isTri;
   if (typeof updateLapsVisibility === 'function') updateLapsVisibility();
+  reflowCompParcoursRows();
 };
 document.getElementById('train-modal-sport')?.addEventListener('change', adaptTrainSportForm);
 document.getElementById('comp-modal-sport')?.addEventListener('change', adaptCompSportForm);
@@ -3199,7 +3229,12 @@ function wireTrio(cfg) {
   if (!t || !d || !r || t._trioWired) return;
   t._trioWired = true;
   const readTime = () => (cfg.timeParse === 'target' ? parseTimeToMin(t.value) : parseSegTime(t.value));
-  const readDist = () => { const v = parseFloat(String(d.value).replace(',', '.')); return isNaN(v) || v <= 0 ? null : v; };
+  const readDist = () => {
+    let v = parseFloat(String(d.value).replace(',', '.'));
+    if (isNaN(v) || v <= 0) return null;
+    if (d.dataset.distUnit === 'm' && cfg.mode === 'speed') v = v / 1000;  // vitesse km/h depuis des metres
+    return v;
+  };
   const readRate = () => (cfg.mode === 'speed' ? (parseFloat(String(r.value).replace(',', '.')) || null) : parsePace(r.value));
   // dist en km pour speed/pace_km ; en m pour pace_100m
   const compute = (changed) => {
