@@ -468,8 +468,8 @@ export async function pushCompetition(comp) {
         // Ligne EXISTANTE (souvent la vraie activite Strava) : on ne met a jour que
         // les champs compet. JAMAIS source/moving_time/distance_km, sinon on
         // ecrase la vraie activite (duree perdue, source -> manual).
-        // Exception : date+heure de depart, SI saisies (l'utilisateur peut
-        // corriger l'heure ; une resync Strava la re-alignera de toute facon).
+        // Heure de depart : l'heure STRAVA fait foi pour les activites Strava
+        // (jamais reecrite) ; modifiable uniquement pour les compets manuelles.
         const meta = {
           category: 'competition', name: comp.name,
           priority: comp.priority ?? null, course_dplus: comp.dplus ?? null, type: comp.type ?? null,
@@ -481,7 +481,11 @@ export async function pushCompetition(comp) {
         };
         if (comp.tss != null) meta.tss = comp.tss;
         if (comp.rpe != null) meta.rpe = comp.rpe;
-        if (comp.date && comp.time) meta.start_date_local = comp.date + 'T' + comp.time + ':00';
+        if (comp.date && comp.time) {
+          const { data: _cur } = await window.sb.from('activities').select('source, strava_id').eq('id', targetId).maybeSingle();
+          const _isStrava = _cur && (_cur.source === 'strava' || _cur.strava_id != null);
+          if (!_isStrava) meta.start_date_local = comp.date + 'T' + comp.time + ':00';
+        }
         const { data, error } = await window.sb.from('activities').update(meta).eq('id', targetId).eq('user_id', uid()).select().single();
         if (error) throw error;
         return data && data.id;
