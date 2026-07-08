@@ -466,8 +466,10 @@ export async function pushCompetition(comp) {
       if (!targetId && comp._sbId) targetId = comp._sbId; // _table perdu mais id connu : viser la ligne existante
       if (targetId) {
         // Ligne EXISTANTE (souvent la vraie activite Strava) : on ne met a jour que
-        // les champs compet. JAMAIS source/moving_time/start_date_local/distance_km,
-        // sinon on ecrase la vraie activite (duree perdue, source -> manual).
+        // les champs compet. JAMAIS source/moving_time/distance_km, sinon on
+        // ecrase la vraie activite (duree perdue, source -> manual).
+        // Exception : date+heure de depart, SI saisies (l'utilisateur peut
+        // corriger l'heure ; une resync Strava la re-alignera de toute facon).
         const meta = {
           category: 'competition', name: comp.name,
           priority: comp.priority ?? null, course_dplus: comp.dplus ?? null, type: comp.type ?? null,
@@ -479,6 +481,7 @@ export async function pushCompetition(comp) {
         };
         if (comp.tss != null) meta.tss = comp.tss;
         if (comp.rpe != null) meta.rpe = comp.rpe;
+        if (comp.date && comp.time) meta.start_date_local = comp.date + 'T' + comp.time + ':00';
         const { data, error } = await window.sb.from('activities').update(meta).eq('id', targetId).eq('user_id', uid()).select().single();
         if (error) throw error;
         return data && data.id;

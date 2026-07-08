@@ -439,6 +439,7 @@ function stravaToRow(a: any, userId: string, ftp: number | null, lthr: number | 
 
   return {
     user_id: userId,
+    source: "strava",
     strava_id: a.id,
     name: a.name || "Activité",
     sport: sportRaw,
