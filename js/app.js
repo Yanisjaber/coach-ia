@@ -2240,7 +2240,8 @@ function renderCompetitionsPage() {
         const c = it.c;
         const fed = (window.odFedeForCompetition && it.od.competitionId != null)
           ? _fedLab(window.odFedeForCompetition(it.od.competitionId)) : null;
-        const lvl = it.od.raceCode || null;
+        // categorie = catev du resultat (celle affichee sur la medaille : 3, 4, Juniors...)
+        const lvl = it.od.catev || null;
         if (!c.federation && fed) c.federation = fed;
         if (!c.raceLevel && lvl) c.raceLevel = lvl;
         if (c._sbId && c._table === 'activity' && window.sb) {
