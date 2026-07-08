@@ -1993,11 +1993,18 @@ function renderCompetitionsPage() {
       const years = [...new Set(comps.map(c => c.dateObj.getFullYear()))].sort((a, b) => b - a);
       const catLab = { cyclisme: 'Vélo', course: 'CAP', triathlon: 'Tri', natation: 'Natation', musculation: 'Muscu', autre: 'Autre' };
       // 3 selecteurs compacts (les chips en vrac debordaient sur 3 lignes mobile)
-      const sel = (grp, opts, cur) => `<select class="comp-flt-sel${String(cur) !== 'tout' ? ' on' : ''}" data-grp="${grp}">${opts.map(([v, lab]) => `<option value="${v}"${String(cur) === String(v) ? ' selected' : ''}>${lab}</option>`).join('')}</select>`;
+      const sel = (grp, opts, cur) => `<select class="comp-flt-sel${String(cur) !== 'tout' ? ' on' : ''}" id="comp-flt-${grp}" data-grp="${grp}">${opts.map(([v, lab]) => `<option value="${v}"${String(cur) === String(v) ? ' selected' : ''}>${lab}</option>`).join('')}</select>`;
       bar.innerHTML =
-        sel('cat', [['tout', 'Tous les sports']].concat(cats.map(c2 => [c2, catLab[c2] || c2])), _flt.cat)
+        sel('cat', [['tout', 'Tous sports']].concat(cats.map(c2 => [c2, catLab[c2] || c2])), _flt.cat)
         + sel('fed', [['tout', 'Toutes fédés']].concat(feds.map(f => [f, f])), _flt.fed)
         + sel('year', [['tout', 'Toutes années']].concat(years.map(y => [y, y])), _flt.year);
+      // Dropdowns custom (le menu natif des <select> n'est pas stylable)
+      ['cat', 'fed', 'year'].forEach(g => {
+        if (typeof enhanceSelect === 'function') enhanceSelect('comp-flt-' + g);
+        const el = document.getElementById('comp-flt-' + g);
+        const wrap = el && el.nextElementSibling;
+        if (wrap && wrap.classList.contains('custom-select') && String(_flt[g]) !== 'tout') wrap.classList.add('on');
+      });
       if (!bar._wired) {
         bar._wired = true;
         bar.addEventListener('change', (e) => {

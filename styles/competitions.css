@@ -780,3 +780,21 @@
 .tl-tip-line:hover { background: rgba(255, 255, 255, 0.07); }
 
 .comp-flt-sel.on { color: var(--accent, #4ade80); border-color: rgba(74, 222, 128, 0.45); background-color: rgba(74, 222, 128, 0.07); }
+
+/* Filtres : habillage pilule du custom-select maison */
+.comp-filters .custom-select { width: 100%; }
+.comp-filters .custom-select-btn {
+  border-radius: 999px;
+  background: var(--bg-elev, #10151f);
+  border: 1px solid var(--border, #26304a);
+  padding: clamp(6px, 4.8px + 0.37vw, 8px) clamp(12px, 10px + 0.6vw, 16px);
+  font-size: clamp(11px, 10.1px + 0.29vw, 12.5px);
+  font-weight: 600;
+  color: var(--text-dim, #8b93a7);
+}
+.comp-filters .custom-select.on .custom-select-btn {
+  color: var(--accent, #4ade80);
+  border-color: rgba(74, 222, 128, 0.45);
+  background: rgba(74, 222, 128, 0.07);
+}
+.comp-filters .custom-select-panel { min-width: 100%; }
