@@ -1400,31 +1400,47 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ============ Échelle RPE visuelle (js/rpe-scale.js) ============ */
-.rpe-pills {
+/* ============ Jauge RPE compacte (js/rpe-scale.js) ============ */
+.rpe-bar {
   display: flex;
-  gap: clamp(3px, 1.6px + 0.44vw, 6px);
+  gap: 2px;
+  height: clamp(20px, 17.4px + 0.81vw, 26px);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: none;
+  /* meme gabarit vertical qu'un input pour s'aligner a cote du TSS */
+  margin-top: 0;
 }
-.rpe-pill {
+.rpe-seg {
   flex: 1 1 0;
   min-width: 0;
-  height: clamp(30px, 26.5px + 1.1vw, 38px);
-  border-radius: clamp(6px, 5.1px + 0.29vw, 8px);
-  border: 1px solid var(--border, #26304a);
   background: var(--bg-elev2, #141a26);
-  color: var(--text-dim, #8b93a7);
-  font-size: clamp(11px, 10.1px + 0.29vw, 13px);
-  font-weight: 600;
-  padding: 0;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+  border: 1px solid var(--border, #26304a);
+  border-radius: 3px;
+  transition: background 0.12s;
 }
-.rpe-pill:active { transform: scale(0.94); }
-.rpe-pill.on { color: #0b0f17; }
+.rpe-seg.on { border-color: transparent; }
 .rpe-scale-label {
-  margin-top: 6px;
-  min-height: 15px;
+  margin-top: 5px;
+  min-height: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: clamp(10px, 9.1px + 0.29vw, 12px);
   font-weight: 600;
   color: var(--text-mute, #6b7686);
 }
+.rpe-clear {
+  border: none;
+  background: var(--bg-elev2, #141a26);
+  color: var(--text-dim, #8b93a7);
+  border-radius: 50%;
+  width: 15px;
+  height: 15px;
+  line-height: 1;
+  font-size: 11px;
+  padding: 0;
+  cursor: pointer;
+}
+.rpe-clear:hover { color: #fff; }
