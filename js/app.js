@@ -9387,7 +9387,13 @@ function openSessionModal(iso, source) {
           `<div class="act-tile" style="background:${tt2.color}17;--tile-c:${tt2.color}">`
           + `<div class="act-tile-lab">${tt2.lab}</div>`
           + `<div class="act-tile-val">${tt2.val}</div></div>`;
-        const _durStr = dur < 60 ? `${Math.round(dur)}<span style="font-size:13px"> min</span>` : `${h}<span style="font-size:13px">h</span>${m}`;
+        // < 1h : minutes:secondes exactes (depuis moving_time) ; sinon h/min
+        const _durSecTot = act.moving_time || act.elapsed_time || 0;
+        const _durStr = dur < 60
+          ? (_durSecTot > 0
+            ? `${Math.floor(_durSecTot / 60)}<span style="font-size:13px">:${String(Math.round(_durSecTot % 60)).padStart(2, '0')} min</span>`
+            : `${Math.round(dur)}<span style="font-size:13px"> min</span>`)
+          : `${h}<span style="font-size:13px">h</span>${m}`;
         const _spCtx = { durMin: dur, durStr: _durStr, elapsedSub, distKm: _distKm, dplusM: _dplusM };
         const _heroDefs = window.SportProfiles ? window.SportProfiles.heroes(act, _spCtx) : [];
         const _tileDefs = window.SportProfiles ? window.SportProfiles.tiles(act, _spCtx) : [];
