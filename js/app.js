@@ -2225,6 +2225,39 @@ function renderCompetitionsPage() {
       }
       its.forEach(it => { if (it.od) window.__odAssignedByComp[String(it.c.id)] = it.od.id; });
     }
+    // Auto-remplissage federation + categorie de course depuis Open Dossard :
+    // fede via la table competitionId->fede, niveau via raceCode ("1/2/3").
+    // Persiste en base UNE fois, sans jamais ecraser une valeur existante
+    // (guard .is(null) cote serveur).
+    {
+      // suivis SEPARES : on ne marque "pousse" que ce qu'on a reellement pousse
+      // (au premier rendu la table fede n'est souvent pas encore prete)
+      const _pushedFed = window._odFedePush = window._odFedePush || new Set();
+      const _pushedLvl = window._odLvlPush = window._odLvlPush || new Set();
+      const _fedLab = (f) => (f === 'FFVELO' ? 'FFVélo' : f);
+      for (const it of _items) {
+        if (!it.od || it.od._manual) continue;
+        const c = it.c;
+        const fed = (window.odFedeForCompetition && it.od.competitionId != null)
+          ? _fedLab(window.odFedeForCompetition(it.od.competitionId)) : null;
+        const lvl = it.od.raceCode || null;
+        if (!c.federation && fed) c.federation = fed;
+        if (!c.raceLevel && lvl) c.raceLevel = lvl;
+        if (c._sbId && c._table === 'activity' && window.sb) {
+          const k = String(c.id);
+          if (fed && !_pushedFed.has(k)) {
+            _pushedFed.add(k);
+            window.sb.from('activities').update({ federation: fed }).eq('id', c._sbId).is('federation', null)
+              .then(r => { if (r.error) { _pushedFed.delete(k); console.warn('[fede fill]', r.error.message); } });
+          }
+          if (lvl && !_pushedLvl.has(k)) {
+            _pushedLvl.add(k);
+            window.sb.from('activities').update({ race_level: lvl }).eq('id', c._sbId).is('race_level', null)
+              .then(r => { if (r.error) { _pushedLvl.delete(k); console.warn('[lvl fill]', r.error.message); } });
+          }
+        }
+      }
+    }
     // Resultats saisis manuellement : uniquement la ou aucun resultat OD n'est associe
     {
       const _mr = _manualResLoad();
@@ -11669,7 +11702,17 @@ function openCompModalForEdit(comp) {
   {
     if (typeof populateFedSelectForSport === 'function') populateFedSelectForSport(comp.sport || 'Ride');
     const f = document.getElementById('comp-modal-federation');
-    if (f && comp.federation) { f.value = comp.federation; if (f._customUpdate) f._customUpdate(); }
+    if (f && comp.federation) {
+      if (![...f.options].some(o => o.value === comp.federation)) {
+        const o = document.createElement('option');
+        o.value = comp.federation;
+        o.textContent = comp.federation;
+        f.appendChild(o);
+        if (typeof enhanceSelect === 'function') enhanceSelect('comp-modal-federation');
+      }
+      f.value = comp.federation;
+      if (f._customUpdate) f._customUpdate();
+    }
     updateLevelFieldForFed((f && f.value) || comp.federation || '', comp.raceLevel || '');
     const tf = document.getElementById('comp-modal-triformat');
     if (tf) { tf.value = comp.triFormat || ''; if (tf._customUpdate) tf._customUpdate(); }

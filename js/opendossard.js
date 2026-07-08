@@ -75,6 +75,46 @@ function odLicName(r) {
   return n || r.licenceNumber || 'Licence';
 }
 
+// ---- Fede par competition (l'objet competition OD porte `fede`,
+// le palmares non) : table id -> fede, cache permanent, construite en
+// re-questionnant /competitions par date pour les ids manquants. ----
+const OD_FEDE_BASE = 'coach_ia_od_fede_v1';
+function odFedeMapLoad() {
+  try { return JSON.parse(localStorage.getItem(OD_FEDE_BASE) || '{}'); } catch { return {}; }
+}
+window.odFedeForCompetition = function (competitionId) {
+  const v = odFedeMapLoad()[String(competitionId)];
+  return v || null;
+};
+async function odFillFedeMap(results) {
+  const map = odFedeMapLoad();
+  const byDate = {};
+  for (const r of (results || [])) {
+    if (r.competitionId == null || map[String(r.competitionId)] !== undefined) continue;
+    const iso = String(r.date || '').slice(0, 10);
+    if (!iso) continue;
+    (byDate[iso] = byDate[iso] || new Set()).add(String(r.competitionId));
+  }
+  const dates = Object.keys(byDate);
+  if (!dates.length) return;
+  let changed = false;
+  for (const iso of dates) {
+    try {
+      const data = await odCall('competitions', { filters: { startDate: iso, endDate: iso, limit: 100 } });
+      const comps = (data.competitions && (data.competitions.data || data.competitions)) || [];
+      (Array.isArray(comps) ? comps : []).forEach(c => {
+        if (c && c.id != null) { map[String(c.id)] = c.fede || null; changed = true; }
+      });
+      // ids toujours introuvables pour cette date : marques null (pas de boucle infinie)
+      byDate[iso].forEach(id => { if (map[id] === undefined) { map[id] = null; changed = true; } });
+    } catch (e) { console.warn('[od fede]', iso, e.message); }
+  }
+  if (changed) {
+    localStorage.setItem(OD_FEDE_BASE, JSON.stringify(map));
+    if (window.renderCompetitionsPage) window.renderCompetitionsPage();
+  }
+}
+
 // Meilleur résultat officiel OD pour une date donnée (YYYY-MM-DD), ou null.
 window.odResultForDate = function (iso) {
   const a = (window.__odByDate && window.__odByDate[iso]) || [];
@@ -98,6 +138,7 @@ function odApplyResults(results) {
   }
   renderOdRecap();
   if (window.renderCompetitionsPage) window.renderCompetitionsPage();
+  odFillFedeMap(_odResults); // fire-and-forget : re-render quand la table fede est prete
 }
 
 // Récupère le palmarès frais depuis l'edge function (réseau) et met à jour le cache.
