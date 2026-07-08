@@ -390,7 +390,7 @@
   .comp-hero-lbl { font-size: clamp(9px, 8.4px + 0.2vw, 10px); }
   .comp-prep-val { font-size: clamp(15px, 13.7px + 0.4vw, 18px) !important; }
 
-  .comp-timeline.v2 { width: auto; height: clamp(64px, 60px + 1.25vw, 72px) !important; margin: 20px 2px 0; }
+  .comp-timeline.v2 { width: auto; height: clamp(64px, 60px + 1.25vw, 72px) !important; margin: calc(20px + var(--tl-rise, 0px)) 2px 0; }
   .comp-timeline.v2 .comp-tl-month { top: 50px; }
   .comp-timeline.v2 .comp-tl-tick { top: 21px; height: 8px; opacity: 0.4; }
   .comp-timeline.v2 .comp-tl-dot.big { box-shadow: none !important; border: 2px solid var(--bg-elev, #10151f); }

@@ -698,7 +698,17 @@
 
 /* Frise de saison v2 : points + mois, info-bulle unique (fini les
    etiquettes empilees illisibles) */
-.comp-timeline.v2 { height: clamp(58px, 54px + 1.25vw, 68px) !important; margin: 26px 8px 0; }
+.comp-timeline.v2 { height: clamp(58px, 54px + 1.25vw, 68px) !important; margin: calc(26px + var(--tl-rise, 0px)) 8px 0; }
+.comp-tl-rise {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(100% - 5px);
+  width: 1.5px;
+  border-radius: 1px;
+  opacity: 0.45;
+  pointer-events: none;
+}
 .comp-timeline.v2 .comp-tl-axis { top: 26px; }
 .comp-timeline.v2 .comp-tl-today { top: 20px; }
 .comp-tl-tick {

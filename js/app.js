@@ -2098,24 +2098,41 @@ function renderCompetitionsPage() {
       ? [{ s: new Date(yr, 0, 1), e: new Date(yr, 5, 30, 23, 59, 59), m0: 0, n: 6 },
          { s: new Date(yr, 6, 1), e: new Date(yr, 11, 31, 23, 59, 59), m0: 6, n: 6 }]
       : [{ s: new Date(yr, 0, 1), e: new Date(yr, 11, 31, 23, 59, 59), m0: 0, n: 12 }];
+    // Superposition : le point monte d'un etage avec une petite tige vers
+    // sa vraie position sur l'axe (pas de regroupement).
+    const _tlW = Math.max(200, (seasonWrap.getBoundingClientRect().width || 360) - 44);
+    const _laneGapPct = (13 / _tlW) * 100;
+    const _LANE_PX = 13;
     const tlHTML = halves.map(h => {
       const posH = d => Math.max(0, Math.min(100, ((d - h.s) / (h.e - h.s)) * 100));
-      const items = yearComps.filter(c => c.dateObj >= h.s && c.dateObj <= h.e);
-      const markers = items.map(c => {
+      const items = yearComps.filter(c => c.dateObj >= h.s && c.dateObj <= h.e)
+        .map(c => ({ c, p: posH(c.dateObj) })).sort((a, b) => a.p - b.p);
+      const laneLast = [];
+      items.forEach(m => {
+        let lane = 0;
+        while (laneLast[lane] != null && (m.p - laneLast[lane]) < _laneGapPct) lane++;
+        laneLast[lane] = m.p;
+        m.lane = lane;
+      });
+      const maxLane = Math.max(0, laneLast.length - 1);
+      const markers = items.map(m => {
+        const c = m.c;
         const _pi = compPrio(c.priority);
         const isPast = c.endDateObj < today;
         const color = _pi.key === 'principal' ? _pi.color : '#9ca3af';
         const big = _pi.key === 'principal';
         const payload = encodeURIComponent(JSON.stringify([{ id: c.id, lab: _fmtLab(c) }]));
-        return `<button type="button" class="comp-tl-marker${isPast ? ' past' : ''}" style="left:${posH(c.dateObj).toFixed(2)}%;" data-tl-items="${payload}" data-tl-color="${color}" data-tl-comp="${c.id}">
+        const rise = m.lane > 0 ? `<span class="comp-tl-rise" style="height:${m.lane * _LANE_PX - 2}px;background:${color};"></span>` : '';
+        return `<button type="button" class="comp-tl-marker${isPast ? ' past' : ''}" style="left:${m.p.toFixed(2)}%;${m.lane > 0 ? `top:${18 - m.lane * _LANE_PX}px;` : ''}" data-tl-items="${payload}" data-tl-color="${color}" data-tl-comp="${c.id}">
           <span class="comp-tl-dot${big ? ' big' : ''}" style="background:${color};${big ? `box-shadow:0 0 0 2px ${color};` : ''}"></span>
+          ${rise}
         </button>`;
       }).join('');
       const months = [...Array(h.n)].map((_, i) => `<span class="comp-tl-month" data-mi="${h.m0 + i}" style="left:${((i + 0.5) / h.n * 100).toFixed(2)}%"></span>`).join('')
         + [...Array(h.n + 1)].map((_, i) => `<span class="comp-tl-tick" style="left:${(i / h.n * 100).toFixed(2)}%"></span>`).join('');
       const todayHTML = (today >= h.s && today <= h.e)
         ? `<div class="comp-tl-today" style="left:${posH(today).toFixed(1)}%;"><span>auj.</span></div>` : '';
-      return `<div class="comp-timeline v2" data-months="${h.n}">
+      return `<div class="comp-timeline v2" data-months="${h.n}" style="--tl-rise:${Math.max(0, maxLane) * _LANE_PX}px;">
         <div class="comp-tl-axis"></div>
         ${months}
         ${todayHTML}
