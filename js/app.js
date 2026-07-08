@@ -2090,49 +2090,45 @@ function renderCompetitionsPage() {
   // ---- FRISE DE SAISON + chiffres ----
   if (seasonWrap) {
     const yr = (String(_flt.year) !== 'tout') ? +_flt.year : today.getFullYear();
-    const jan1 = new Date(yr, 0, 1), dec31 = new Date(yr, 11, 31);
-    const span = dec31 - jan1;
     const yearComps = comps.filter(c => c.dateObj.getFullYear() === yr).sort((a, b) => a.dateObj - b.dateObj);
-    const pos = d => Math.max(0, Math.min(100, ((d - jan1) / span) * 100));
-    const todayPos = pos(today);
-    // Marqueurs SANS etiquettes permanentes + REGROUPEMENT : les courses
-    // trop proches pour la largeur disponible fusionnent en un point avec
-    // compteur (sinon bouillie de ronds sur mobile avec 38 compets).
-    // Survol/tap = info-bulle (liste du groupe), 2e tap point seul = detail.
-    const _sorted = yearComps.map(c => ({ c, p: pos(c.dateObj) })).sort((a, b) => a.p - b.p);
-    // Pas de regroupement (choix utilisateur) : un point par compet.
-    const clusters = _sorted.map(m => ({ items: [m] }));
     const _fmtLab = (c) => `${c.name} · ${c.dateObj.getDate()}/${c.dateObj.getMonth() + 1}`;
-    const markers = clusters.map(cl => {
-      const items = cl.items;
-      const p = items.reduce((a2, m) => a2 + m.p, 0) / items.length;
-      const anyPrincipal = items.some(m => compPrio(m.c.priority).key === 'principal');
-      const allPast = items.every(m => m.c.endDateObj < today);
-      const color = anyPrincipal ? compPrio(items.find(m => compPrio(m.c.priority).key === 'principal').c.priority).color : '#9ca3af';
-      const payload = encodeURIComponent(JSON.stringify(items.map(m => ({ id: m.c.id, lab: _fmtLab(m.c) }))));
-      const single = items.length === 1;
-      return `<button type="button" class="comp-tl-marker${allPast ? ' past' : ''}" style="left:${p.toFixed(2)}%;" data-tl-items="${payload}" data-tl-color="${color}" data-tl-comp="${single ? items[0].c.id : ''}">
-        <span class="comp-tl-dot${anyPrincipal ? ' big' : ''}" style="background:${color};${anyPrincipal ? `box-shadow:0 0 0 2px ${color};` : ''}"></span>
-        ${single ? '' : `<span class="comp-tl-count">${items.length}</span>`}
-      </button>`;
+    // Mobile : DEUX demi-frises (janv-juin / juil-dec) -> 2x plus de place
+    // par mois ; desktop : une seule ligne.
+    const halves = (window.innerWidth <= 860)
+      ? [{ s: new Date(yr, 0, 1), e: new Date(yr, 5, 30, 23, 59, 59), m0: 0, n: 6 },
+         { s: new Date(yr, 6, 1), e: new Date(yr, 11, 31, 23, 59, 59), m0: 6, n: 6 }]
+      : [{ s: new Date(yr, 0, 1), e: new Date(yr, 11, 31, 23, 59, 59), m0: 0, n: 12 }];
+    const tlHTML = halves.map(h => {
+      const posH = d => Math.max(0, Math.min(100, ((d - h.s) / (h.e - h.s)) * 100));
+      const items = yearComps.filter(c => c.dateObj >= h.s && c.dateObj <= h.e);
+      const markers = items.map(c => {
+        const _pi = compPrio(c.priority);
+        const isPast = c.endDateObj < today;
+        const color = _pi.key === 'principal' ? _pi.color : '#9ca3af';
+        const big = _pi.key === 'principal';
+        const payload = encodeURIComponent(JSON.stringify([{ id: c.id, lab: _fmtLab(c) }]));
+        return `<button type="button" class="comp-tl-marker${isPast ? ' past' : ''}" style="left:${posH(c.dateObj).toFixed(2)}%;" data-tl-items="${payload}" data-tl-color="${color}" data-tl-comp="${c.id}">
+          <span class="comp-tl-dot${big ? ' big' : ''}" style="background:${color};${big ? `box-shadow:0 0 0 2px ${color};` : ''}"></span>
+        </button>`;
+      }).join('');
+      const months = [...Array(h.n)].map((_, i) => `<span class="comp-tl-month" data-mi="${h.m0 + i}" style="left:${((i + 0.5) / h.n * 100).toFixed(2)}%"></span>`).join('')
+        + [...Array(h.n + 1)].map((_, i) => `<span class="comp-tl-tick" style="left:${(i / h.n * 100).toFixed(2)}%"></span>`).join('');
+      const todayHTML = (today >= h.s && today <= h.e)
+        ? `<div class="comp-tl-today" style="left:${posH(today).toFixed(1)}%;"><span>auj.</span></div>` : '';
+      return `<div class="comp-timeline v2" data-months="${h.n}">
+        <div class="comp-tl-axis"></div>
+        ${months}
+        ${todayHTML}
+        ${markers}
+        <div class="comp-tl-tip" hidden></div>
+      </div>`;
     }).join('');
-    // Libelles de mois adaptatifs : initiale / 3-4 lettres / nom complet
-    // selon la place reellement disponible (mesure apres rendu + resize).
-    const months = [...Array(12)].map((_, i) => `<span class="comp-tl-month" data-mi="${i}" style="left:${((i + 0.5) / 12 * 100).toFixed(2)}%"></span>`).join('')
-      + [...Array(13)].map((_, i) => `<span class="comp-tl-tick" style="left:${(i / 12 * 100).toFixed(2)}%"></span>`).join('');
     const nPrincipal = yearComps.filter(c => compPrio(c.priority).key === 'principal').length;
     const nPast = yearComps.filter(c => c.endDateObj < today).length;
     seasonWrap.innerHTML = `
       <div class="grid-1 card">
         <div class="section-title">Saison ${yr}</div>
-        ${yearComps.length === 0 ? '<div class="comp-empty">Aucune compétition cette saison.</div>' : `
-        <div class="comp-timeline v2">
-          <div class="comp-tl-axis"></div>
-          ${months}
-          <div class="comp-tl-today" style="left:${todayPos.toFixed(1)}%;"><span>auj.</span></div>
-          ${markers}
-          <div class="comp-tl-tip" hidden></div>
-        </div>
+        ${yearComps.length === 0 ? '<div class="comp-empty">Aucune compétition cette saison.</div>' : tlHTML + `
         <div class="comp-season-stats">
           <div><span class="comp-ss-val">${yearComps.length}</span> <span class="comp-ss-k">compétition${yearComps.length > 1 ? 's' : ''}</span></div>
           <div><span class="comp-ss-val" style="color:#fbbf24;">${nPrincipal}</span> <span class="comp-ss-k">objectif${nPrincipal > 1 ? 's' : ''} ${nPrincipal > 1 ? 'principaux' : 'principal'}</span></div>
@@ -2140,42 +2136,36 @@ function renderCompetitionsPage() {
           <div><span class="comp-ss-val">${nPast}</span> <span class="comp-ss-k">déjà courue${nPast > 1 ? 's' : ''}</span></div>
         </div>`}
       </div>`;
-    // Libelles de mois selon la largeur d'un douzieme de frise
+    // Libelles de mois selon la place reelle (nom complet / abrege / initiale)
     const _updateTlMonths = (retry) => {
-      const tl2 = seasonWrap.querySelector('.comp-timeline.v2');
-      if (!tl2) return;
-      const w = tl2.getBoundingClientRect().width;
-      if (!w) {
-        // panneau cache au rendu (largeur 0) : re-essaie jusqu'a affichage
-        // (setTimeout, pas rAF : gele en arriere-plan)
-        if ((retry || 0) < 40) setTimeout(() => _updateTlMonths((retry || 0) + 1), 250);
-        return;
-      }
-      const slot = w / 12;
+      const tls = seasonWrap.querySelectorAll('.comp-timeline.v2');
+      if (!tls.length) return;
       const FULL = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
       const ABBR = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
       const MINI = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-      const set = slot >= 78 ? FULL : slot >= 36 ? ABBR : MINI;
-      tl2.querySelectorAll('.comp-tl-month').forEach(m => { m.textContent = set[+m.dataset.mi] || ''; });
+      let anyZero = false;
+      tls.forEach(tl2 => {
+        const w = tl2.getBoundingClientRect().width;
+        if (!w) { anyZero = true; return; }
+        const slot = w / (+tl2.dataset.months || 12);
+        const set = slot >= 78 ? FULL : slot >= 36 ? ABBR : MINI;
+        tl2.querySelectorAll('.comp-tl-month').forEach(m => { m.textContent = set[+m.dataset.mi] || ''; });
+      });
+      if (anyZero && (retry || 0) < 40) setTimeout(() => _updateTlMonths((retry || 0) + 1), 250);
     };
     _updateTlMonths();
+    window._tlUpdateMonths = _updateTlMonths;
     if (!window._tlMonthsResizeWired) {
       window._tlMonthsResizeWired = true;
       window.addEventListener('resize', () => {
         clearTimeout(window._tlMonthsRzT);
-        window._tlMonthsRzT = setTimeout(() => {
-          const sw = document.getElementById('comp-season');
-          if (sw && sw.querySelector('.comp-timeline.v2') && window._tlUpdateMonths) window._tlUpdateMonths();
-        }, 150);
+        window._tlMonthsRzT = setTimeout(() => { if (window._tlUpdateMonths) window._tlUpdateMonths(); }, 150);
       });
-      window._tlUpdateMonths = _updateTlMonths;
     }
-    window._tlUpdateMonths = _updateTlMonths;
-
-    // Info-bulle unique (survol desktop, tap mobile ; 2e tap = detail du jour)
-    const _tl = seasonWrap.querySelector('.comp-timeline');
-    const _tip = seasonWrap.querySelector('.comp-tl-tip');
-    if (_tl && _tip) {
+    // Info-bulle par demi-frise : 1er tap = bulle, 2e = detail ; ligne cliquable
+    seasonWrap.querySelectorAll('.comp-timeline.v2').forEach(_tl => {
+      const _tip = _tl.querySelector('.comp-tl-tip');
+      if (!_tip) return;
       const _show = (b) => {
         let items = [];
         try { items = JSON.parse(decodeURIComponent(b.dataset.tlItems || '[]')); } catch (_) {}
@@ -2183,7 +2173,7 @@ function renderCompetitionsPage() {
         _tip.style.color = b.dataset.tlColor;
         _tip.style.left = Math.max(10, Math.min(90, parseFloat(b.style.left))) + '%';
         _tip.hidden = false;
-        _tip.dataset.for = b.dataset.tlComp || 'cluster-' + b.style.left;
+        _tip.dataset.for = b.dataset.tlComp || '';
       };
       _tip.addEventListener('click', (e) => {
         const ln = e.target.closest('.tl-tip-line');
@@ -2202,17 +2192,15 @@ function renderCompetitionsPage() {
         const b = e.target.closest('.comp-tl-marker');
         if (!b) { _tip.hidden = true; _tip.dataset.for = ''; return; }
         e.stopPropagation();
-        const key = b.dataset.tlComp || 'cluster-' + b.style.left;
-        // 1er tap/clic : bulle. 2e sur le meme point : detail (point seul)
-        // ou rien (groupe : on clique une ligne de la bulle).
+        const key = b.dataset.tlComp;
         if (_tip.hidden || _tip.dataset.for !== key) { _show(b); return; }
-        const comp = b.dataset.tlComp ? loadCompetitions().find(c2 => c2.id === b.dataset.tlComp) : null;
+        const comp = loadCompetitions().find(c2 => c2.id === key);
         if (comp && comp.date && typeof openSessionModal === 'function') {
           const isPast2 = new Date(comp.date + 'T12:00:00') < today;
           openSessionModal(comp.date, isPast2 ? 'realise' : 'prevu');
         }
       });
-    }
+    });
   }
 
   // ---- À venir (avec jauge de prépa) ----
