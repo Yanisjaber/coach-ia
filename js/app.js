@@ -3535,9 +3535,12 @@ async function saveCompFromModal() {
   }
 
   const comps = loadCompetitions();
+  // Une compétition à date FUTURE n'est JAMAIS "réalisée", même créée depuis
+  // l'onglet Réalisé (sinon elle part dans activities et disparaît du calendrier Prévu).
+  const _isFutureComp = date > toIsoDate(today);
   const newEntry = {
     id: window._editingCompId || Date.now().toString(),
-    realised: (window.coachCalendarMode ? window.coachCalendarMode() === 'realise' : false),
+    realised: _isFutureComp ? false : (window.coachCalendarMode ? window.coachCalendarMode() === 'realise' : false),
     name, date, time, priority, sport,
     type: typeEpr, km,
     dplus: (tri ? (triDplus != null ? triDplus : null) : dplus),
@@ -3557,7 +3560,7 @@ async function saveCompFromModal() {
       // IMPORTANT : conserver l'id Supabase pour METTRE À JOUR la ligne existante
       // (sinon le push crée une nouvelle ligne et la modif est perdue au rechargement)
       if (old._sbId) newEntry._sbId = old._sbId;
-      if (old.realised != null) newEntry.realised = old.realised;
+      if (old.realised != null && !_isFutureComp) newEntry.realised = old.realised;
       // Conserver aussi la table d'origine + liens : sans _table, le push ne cible
       // plus la bonne ligne (doublon ou écrasement de la vraie activité Strava).
       if (old._table) newEntry._table = old._table;
