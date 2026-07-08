@@ -471,7 +471,7 @@ export async function pushCompetition(comp) {
         // Heure de depart : l'heure STRAVA fait foi pour les activites Strava
         // (jamais reecrite) ; modifiable uniquement pour les compets manuelles.
         const meta = {
-          category: 'competition', name: comp.name,
+          category: 'competition', category_set_by_user: true, name: comp.name,
           priority: comp.priority ?? null, course_dplus: comp.dplus ?? null, type: comp.type ?? null,
           target: comp.target ?? null, laps: comp.laps ?? null, user_notes: comp.notes ?? null,
           gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
@@ -492,7 +492,7 @@ export async function pushCompetition(comp) {
       }
       // Aucune ligne existante : creation d'une compet manuelle (stub complet legitime)
       const row = {
-        user_id: uid(), source: 'manual', category: 'competition', client_id: comp.id,
+        user_id: uid(), source: 'manual', category: 'competition', category_set_by_user: true, client_id: comp.id,
         name: comp.name, start_date_local: comp.date + 'T' + (comp.time || '12:00') + ':00', sport: comp.sport ?? null,
         priority: comp.priority ?? null, distance_km: comp.km ?? null, course_dplus: comp.dplus ?? null, type: comp.type ?? null,
         target: comp.target ?? null, moving_time: comp.target ? comp.target * 60 : null,

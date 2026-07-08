@@ -9040,7 +9040,8 @@ function openActivityEditModal(activityId, iso) {
 async function setActivityCategory(act, category, iso) {
   if (!act || !act._sbId || !window.sb) return;
   try {
-    const { error } = await window.sb.from('activities').update({ category }).eq('id', act._sbId);
+    // category_set_by_user : la synchro Strava ne reclassera plus jamais cette ligne
+    const { error } = await window.sb.from('activities').update({ category, category_set_by_user: true }).eq('id', act._sbId);
     if (error) throw error;
     act.category = category;
     // Refléter dans DASHBOARD_DATA (source des reconstructions) sinon l'affichage
@@ -9239,7 +9240,7 @@ function openStageRaceBuilder(currentActivityId) {
     try {
       // Étapes sélectionnées (ordre chronologique) → activités en catégorie compétition
       const selActs = allActs.filter(a => selected.includes(a.sbId)).sort((x, y) => (x.iso < y.iso ? -1 : 1));
-      await Promise.all(selActs.map(a => window.sb.from('activities').update({ category: 'competition' }).eq('id', a.sbId)));
+      await Promise.all(selActs.map(a => window.sb.from('activities').update({ category: 'competition', category_set_by_user: true }).eq('id', a.sbId)));
       // Supprime les compét "1 jour" (act-…) des activités qui deviennent des étapes
       await Promise.all(selActs.map(a => window.sb.from('competitions').delete().eq('client_id', 'act-' + a.sbId)));
       // UNE ligne dans le registre competitions reliant ces activités

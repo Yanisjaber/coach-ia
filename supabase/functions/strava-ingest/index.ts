@@ -251,8 +251,9 @@ Deno.serve(async (req) => {
     }
 
     // ===== 6a-bis) Courses Strava -> categorie competition =====
-    // workout_type Strava : Ride 11 = course, Run 1 = course. On ne marque que
-    // les lignes SANS categorie (jamais d'ecrasement d'un choix utilisateur).
+    // workout_type Strava : Ride 11 = course, Run 1 = course. On reclasse
+    // toute ligne dont la categorie n'a JAMAIS ete choisie par l'utilisateur
+    // (category_set_by_user faux) — un choix manuel n'est jamais ecrase.
     {
       const raceIds = all
         .filter((a: any) => a && a.id && (a.workout_type === 11 || a.workout_type === 1))
@@ -262,7 +263,7 @@ Deno.serve(async (req) => {
           .from("activities")
           .update({ category: "competition" })
           .eq("user_id", user.id)
-          .is("category", null)
+          .neq("category_set_by_user", true)
           .in("strava_id", raceIds.slice(i, i + 200));
         if (rcErr) console.error("Categorie course:", rcErr.message);
       }
