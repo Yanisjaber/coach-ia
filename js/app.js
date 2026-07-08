@@ -3149,7 +3149,9 @@ const adaptCompSportForm = () => {
   const isTri = !!sel && typeof getSportCategory === 'function' && getSportCategory(sel.value) === 'triathlon';
   const std = document.getElementById('comp-parcours-std');
   const tri = document.getElementById('comp-parcours-tri');
-  if (std) std.hidden = isTri;
+  // Compét tri "legacy" (données dans temps cible/distance/D+ mais pas de segments) :
+  // on laisse le bloc standard visible pour ne pas masquer les données existantes.
+  if (std) std.hidden = isTri && !window._compEditLegacyStd;
   if (tri) tri.hidden = !isTri;
   if (typeof updateLapsVisibility === 'function') updateLapsVisibility();
 };
@@ -3307,6 +3309,7 @@ function openCompModal() {
   const sportEl = document.getElementById('comp-modal-sport');
   if (sportEl) sportEl.value = 'Ride';
   if (typeof resetTriPanes === 'function') resetTriPanes();
+  window._compEditLegacyStd = false;
   { const sp = document.getElementById('comp-modal-speed'); if (sp) { sp.value = ''; delete sp.dataset.auto; } }
   setTimeout(() => { if (typeof adaptCompSportForm === 'function') adaptCompSportForm(); }, 0);
   if (sportEl && sportEl._customUpdate) sportEl._customUpdate();
@@ -10929,6 +10932,9 @@ function openCompModalForEdit(comp) {
   document.getElementById('comp-modal-dplus').value = effDplus != null ? effDplus : '';
   {
     if (typeof resetTriPanes === 'function') resetTriPanes();
+    // Tri legacy : donnees globales presentes mais aucun segment -> bloc standard visible
+    const _hasSeg = comp.tri && (comp.tri.swim || comp.tri.bike || comp.tri.run || comp.tri.swim_m || comp.tri.bike_km || comp.tri.run_km);
+    window._compEditLegacyStd = !_hasSeg && !!(comp.km || comp.target || comp.dplus);
     const t = comp.tri || {};
     const setV = (id, v) => { const e = document.getElementById(id); if (e && v != null && v !== '') e.value = v; };
     const sw = t.swim || {}, bk = t.bike || {}, rn = t.run || {};
