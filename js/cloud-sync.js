@@ -210,7 +210,9 @@ async function pullAllFromCloud() {
         _seen.add(cid);
         comps.push({
           id: r.client_id || r.id, _sbId: r.id, _table: 'activity', realised: true,
-          name: r.name, date: r.start_date_local ? String(r.start_date_local).slice(0, 10) : null, sport: r.sport ?? null,
+          name: r.name, date: r.start_date_local ? String(r.start_date_local).slice(0, 10) : null,
+          time: r.start_date_local ? ((String(r.start_date_local).match(/[T ](\d{2}:\d{2})/) || [])[1] || null) : null,
+          sport: r.sport ?? null,
           priority: r.priority ?? null, km: r.distance_km ?? null, dplus: r.course_dplus ?? null,
           target: r.target ?? null, laps: r.laps ?? null, notes: r.user_notes ?? null,
           gpxName: r.gpx_name ?? null,
@@ -223,7 +225,9 @@ async function pullAllFromCloud() {
     const { data: pc } = await sb.from('activity_planned').select('*').eq('user_id', userId).eq('category', 'competition');
     for (const r of (pc || [])) comps.push({
       id: r.client_id || r.id, _sbId: r.id, _table: 'planned', realised: false,
-      name: r.name, date: r.date, sport: r.sport ?? null,
+      name: r.name, date: r.date,
+      time: r.start_date_local ? ((String(r.start_date_local).match(/[T ](\d{2}:\d{2})/) || [])[1] || null) : null,
+      sport: r.sport ?? null,
       priority: r.priority ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
       target: (r.duration != null ? r.duration : parseTimeToMin(r.target)), laps: r.laps ?? null, notes: r.notes ?? null,
       gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null,
@@ -430,7 +434,9 @@ export async function pushCompetition(comp) {
     if (!isRealised) {
       const row = {
         user_id: uid(), client_id: comp.id, category: 'competition',
-        name: comp.name, date: comp.date, sport: comp.sport ?? null,
+        name: comp.name, date: comp.date,
+        start_date_local: comp.date + 'T' + (comp.time || '12:00') + ':00',
+        sport: comp.sport ?? null,
         priority: comp.priority ?? null, km: comp.km ?? null, d_plus: comp.dplus ?? null, type: comp.type ?? null,
         duration: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
         gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
@@ -469,7 +475,7 @@ export async function pushCompetition(comp) {
       // Aucune ligne existante : creation d'une compet manuelle (stub complet legitime)
       const row = {
         user_id: uid(), source: 'manual', category: 'competition', client_id: comp.id,
-        name: comp.name, start_date_local: comp.date + 'T12:00:00', sport: comp.sport ?? null,
+        name: comp.name, start_date_local: comp.date + 'T' + (comp.time || '12:00') + ':00', sport: comp.sport ?? null,
         priority: comp.priority ?? null, distance_km: comp.km ?? null, course_dplus: comp.dplus ?? null, type: comp.type ?? null,
         target: comp.target ?? null, moving_time: comp.target ? comp.target * 60 : null,
         laps: comp.laps ?? null, user_notes: comp.notes ?? null,
