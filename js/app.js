@@ -1870,7 +1870,9 @@ function renderCompList() {
     list.innerHTML = `<div class="comp-empty">Aucune compétition enregistrée. Ajoute ton prochain objectif pour structurer ton plan.</div>`;
     return;
   }
-  list.innerHTML = comps.map(c => {
+  const _expanded = window._compListExpanded === true;
+  list.classList.toggle('comp-expanded', _expanded);
+  list.innerHTML = comps.map((c, _ci) => {
     const daysUntil = Math.ceil((c.dateObj - today) / 86400000);
     let dateStr;
     if (c.stages && c.endDateObj.getTime() !== c.dateObj.getTime()) {
@@ -1895,7 +1897,7 @@ function renderCompList() {
     const totalMs = c.dateObj - seasonStart;
     let fillPct = totalMs > 0 ? ((today - seasonStart) / totalMs) * 100 : 100;
     fillPct = Math.max(0, Math.min(100, fillPct));
-    return `<div class="comp-item" data-prio="${_pi.key}" data-comp-id="${c.id}" title="Voir le détail de la compétition">
+    return `<div class="comp-item${_ci >= 2 ? ' comp-extra' : ''}" data-prio="${_pi.key}" data-comp-id="${c.id}" title="Voir le détail de la compétition">
       <div class="comp-row">
         <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span></span>
         <span class="comp-date">${dateStr}</span>
@@ -1906,6 +1908,17 @@ function renderCompList() {
       <div class="comp-phase-track"><div class="comp-phase-fill" style="width:${fillPct.toFixed(1)}%"></div></div>
     </div>`;
   }).join('');
+  // Mobile : au-dela de 2 compets, le reste se deroule a la demande
+  if (comps.length > 2) {
+    list.insertAdjacentHTML('beforeend',
+      `<button type="button" class="comp-more-btn">${_expanded ? 'Réduire ▴' : (comps.length - 2 === 1 ? 'Voir 1 autre ▾' : `Voir les ${comps.length - 2} autres ▾`)}</button>`);
+    const _mb = list.querySelector('.comp-more-btn');
+    if (_mb) _mb.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window._compListExpanded = !_expanded;
+      renderCompList();
+    });
+  }
 }
 
 // Page "Compétitions" (onglet dédié) : hero prochain objectif + frise de saison

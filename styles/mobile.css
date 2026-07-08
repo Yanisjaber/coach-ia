@@ -772,3 +772,23 @@
   .act-tile-grid { gap: clamp(5px, 4.27px + 0.23vw, 6px); }
   .act-tile { padding: clamp(6px, 4.55px + 0.455vw, 8px) clamp(7px, 5.55px + 0.455vw, 9px); }
 }
+
+/* ============ Compets a venir : pliees au-dela de 2 sur mobile ============ */
+.comp-more-btn { display: none; }
+@media (max-width: 860px) {
+  #comp-list:not(.comp-expanded) .comp-item.comp-extra { display: none; }
+  #comp-list .comp-more-btn {
+    display: block;
+    width: 100%;
+    margin-top: clamp(6px, 4.5px + 0.44vw, 9px);
+    padding: clamp(7px, 5.5px + 0.44vw, 10px) 0;
+    background: var(--bg-elev2, #141a26);
+    border: 1px solid var(--border, #26304a);
+    border-radius: 9px;
+    color: var(--text-dim, #8b93a7);
+    font-size: clamp(11px, 10.1px + 0.29vw, 13px);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #comp-list .comp-more-btn:active { background: var(--bg-elev, #10151f); }
+}
