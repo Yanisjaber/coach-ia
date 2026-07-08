@@ -2102,51 +2102,104 @@ function renderCompetitionsPage() {
 
   // ---- Passées enrichies (résultats réels) ----
   if (pastWrap) {
-    // Regroupe les compets d'un MEME jour partageant le meme nom d'epreuve
-    // (2 activites Strava marquees Course le meme jour -> 1 seule carte,
-    // ex: CLM du matin + etape en ligne l'apres-midi).
-    const _groups = new Map();
-    for (const c of past) {
+    // 1) Chaque compet -> ses activites liees + heure de depart
+    const _items = past.map(c => {
       const iso = toIsoDate(c.dateObj);
-      const od = window.odResultForDate ? window.odResultForDate(iso) : null;
-      const disp = (od && od.competitionName) ? od.competitionName : (c.name || '');
-      const key = iso + '|' + disp.trim().toLowerCase();
-      if (!_groups.has(key)) _groups.set(key, { main: c, others: [], iso, od, disp });
-      else _groups.get(key).others.push(c);
-    }
-    pastWrap.innerHTML = past.length ? [..._groups.values()].map(g => {
-      const c = g.main;
-      const _pi = compPrio(c.priority);
-      const iso = g.iso;
       const day = Array.isArray(data) ? data.find(d => toIsoDate(d.date) === iso) : null;
       const acts = (day && day.activities) ? day.activities : [];
-      // Cible les activites DE LA COURSE, pas toute la journee :
-      // 1) liees par id (_sbId / activityIds / client_id) — couvre le multisport
-      //    et l'union des compets regroupees
-      // 2) sinon les activites category='competition' du jour
-      // 3) sinon rapprochement par nom
-      // 4) dernier recours : toutes les activites du jour (ancien comportement)
-      const _all = [c].concat(g.others);
-      const _wanted = new Set();
-      const _cids = new Set();
-      for (const cc of _all) {
-        [cc._sbId].concat(Array.isArray(cc.activityIds) ? cc.activityIds : []).filter(Boolean).forEach(id => _wanted.add(String(id)));
-        _cids.add(String(cc.id));
-      }
-      let raceActs = acts.filter(a => _wanted.has(String(a._sbId)) || _cids.has(String(a.client_id)));
+      const _wanted = new Set([c._sbId].concat(Array.isArray(c.activityIds) ? c.activityIds : []).filter(Boolean).map(String));
+      let raceActs = acts.filter(a => _wanted.has(String(a._sbId)) || String(a.client_id) === String(c.id));
+      let dayFallback = false;
       if (!raceActs.length) raceActs = acts.filter(a => a.category === 'competition');
       if (!raceActs.length && c.name) {
         const _n = c.name.trim().toLowerCase();
         raceActs = acts.filter(a => (a.name || '').trim().toLowerCase() === _n);
       }
-      if (!raceActs.length) raceActs = acts;
-      let dist = 0, dur = 0, elev = 0, tssV = 0, hrSum = 0, hrN = 0;
+      if (!raceActs.length) { raceActs = acts; dayFallback = true; }
+      let startMs = null;
       for (const a of raceActs) {
+        const t = a.start_date_local ? new Date(String(a.start_date_local).replace(' ', 'T')).getTime() : NaN;
+        if (isFinite(t) && (startMs == null || t < startMs)) startMs = t;
+      }
+      return { c, iso, day, raceActs, dayFallback, startMs, od: null };
+    });
+
+    // 2) Resultats OD apparies par proximite HORAIRE (od.date porte l'heure).
+    //    Un resultat par carte ; les resultats sans activite (ex: classement
+    //    General, epreuve non enregistree) deviennent des cartes a part.
+    const _byIso = new Map();
+    _items.forEach(it => { (_byIso.get(it.iso) || _byIso.set(it.iso, []).get(it.iso)).push(it); });
+    const _leftovers = new Map(); // iso -> [od results sans activite]
+    for (const [iso, its] of _byIso) {
+      const odAll = ((window.__odByDate && window.__odByDate[iso]) || []).slice();
+      if (!odAll.length) continue;
+      // Les classements GENERAUX n'ont jamais d'activite propre : jamais
+      // apparies, toujours en carte dediee.
+      const odGeneral = odAll.filter(r => /g[ée]n[ée]ral/i.test(r.competitionName || ''));
+      const odList = odAll.filter(r => !/g[ée]n[ée]ral/i.test(r.competitionName || ''));
+      if (odGeneral.length) _leftovers.set(iso, odGeneral.slice());
+      if (!odList.length) continue;
+      if (odList.length === 1) {
+        its.forEach(it => { it.od = odList[0]; });
+        continue;
+      }
+      // appariement glouton par ecart de temps minimal
+      const pairs = [];
+      its.forEach((it, ii) => odList.forEach((r, ri) => {
+        const rt = r.date ? new Date(r.date).getTime() : NaN;
+        const d = (isFinite(rt) && it.startMs != null) ? Math.abs(rt - it.startMs) : 1e15;
+        pairs.push({ ii, ri, d });
+      }));
+      pairs.sort((a, b) => a.d - b.d);
+      const usedI = new Set(), usedR = new Set();
+      for (const pr of pairs) {
+        if (usedI.has(pr.ii) || usedR.has(pr.ri)) continue;
+        usedI.add(pr.ii); usedR.add(pr.ri);
+        its[pr.ii].od = odList[pr.ri];
+      }
+      const rest = odList.filter((r, ri) => !usedR.has(ri));
+      if (rest.length) _leftovers.set(iso, (_leftovers.get(iso) || []).concat(rest));
+    }
+
+    // 3) Filet de securite : deux cartes memes jour + meme nom -> fusion
+    const _groups = new Map();
+    for (const it of _items) {
+      const disp = (it.od && it.od.competitionName) ? it.od.competitionName : (it.c.name || '');
+      const key = it.iso + '|' + disp.trim().toLowerCase();
+      if (!_groups.has(key)) _groups.set(key, { ...it, disp, all: [it.c] });
+      else {
+        const g = _groups.get(key);
+        const seen = new Set(g.raceActs.map(a => String(a._sbId)));
+        it.raceActs.forEach(a => { if (!seen.has(String(a._sbId))) g.raceActs.push(a); });
+        g.all.push(it.c);
+      }
+    }
+
+    const _medalHTML = (od, color) => {
+      if (od && od.rankingScratch != null) {
+        const podium = od.rankingScratch === 1 ? ' gold' : (od.rankingScratch <= 3 ? ' podium' : '');
+        const cat = (od.rankingInCategory != null && od.totalInCategory != null)
+          ? `${od.rankingInCategory}/${od.totalInCategory}${od.catev ? ' · ' + od.catev : ''}`
+          : (od.catev ? od.catev : 'scratch');
+        return `<div class="comp-res-medal${podium}" title="Résultat officiel Open Dossard">
+          <div class="comp-res-medal-rank">${od.rankingScratch}<sup>${od.rankingScratch === 1 ? 'er' : 'e'}</sup></div>
+          <div class="comp-res-medal-cat">${cat}</div>
+        </div>`;
+      }
+      return `<div class="comp-res-medal none">${trophySvg(color, 22)}</div>`;
+    };
+    const _fmtIsoDate = (iso) => { try { return new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); } catch { return iso; } };
+
+    const _emittedIso = new Set();
+    pastWrap.innerHTML = past.length ? [..._groups.values()].map(g => {
+      const c = g.c;
+      const _pi = compPrio(c.priority);
+      let dist = 0, dur = 0, elev = 0, tssV = 0, hrSum = 0, hrN = 0;
+      for (const a of g.raceActs) {
         dist += a.distance_km || 0; dur += a.duration || 0; elev += a.elevation_gain || 0;
         tssV += a.tss || 0; if (a.hr) { hrSum += a.hr; hrN++; }
       }
-      if (!tssV && day && raceActs === acts) tssV = day.tss || 0;
-      // Stats en ligne légère (valeurs + unités), pas de boîtes
+      if (!tssV && g.day && g.dayFallback) tssV = g.day.tss || 0;
       const metrics = [];
       if (dist) metrics.push(Math.round(dist) + ' km');
       if (dur) metrics.push(fmtDur(dur));
@@ -2156,28 +2209,10 @@ function renderCompetitionsPage() {
       const metricsHtml = metrics.length
         ? `<div class="comp-res-metrics">${metrics.map(m => `<span class="comp-res-m">${m}</span>`).join('<span class="comp-res-sep">·</span>')}</div>`
         : '<div class="comp-res-metrics comp-res-nodata">Pas de données d\'activité</div>';
-
-      // Médaille = résultat officiel Open Dossard (lié par date), sinon trophée neutre
-      const od = g.od;
-      let medal;
-      if (od && od.rankingScratch != null) {
-        const podium = od.rankingScratch === 1 ? ' gold' : (od.rankingScratch <= 3 ? ' podium' : '');
-        const cat = (od.rankingInCategory != null && od.totalInCategory != null)
-          ? `${od.rankingInCategory}/${od.totalInCategory}${od.catev ? ' · ' + od.catev : ''}`
-          : (od.catev ? od.catev : 'scratch');
-        medal = `<div class="comp-res-medal${podium}" title="Résultat officiel Open Dossard">
-          <div class="comp-res-medal-rank">${od.rankingScratch}<sup>${od.rankingScratch === 1 ? 'er' : 'e'}</sup></div>
-          <div class="comp-res-medal-cat">${cat}</div>
-        </div>`;
-      } else {
-        medal = `<div class="comp-res-medal none">${trophySvg(_pi.color, 22)}</div>`;
-      }
-
-      // Nom officiel Open Dossard si dispo (le titre Strava reste en infobulle)
       const _dispName = g.disp || c.name;
-      const _tooltipNames = _all.map(cc => cc.name).filter(Boolean).join(' + ');
-      return `<div class="comp-result-card" data-prio="${_pi.key}" data-comp-id="${c.id}" style="--pc:${_pi.color};" title="Voir le détail">
-        ${medal}
+      const _tooltipNames = g.all.map(cc => cc.name).filter(Boolean).join(' + ');
+      let html = `<div class="comp-result-card" data-prio="${_pi.key}" data-comp-id="${c.id}" style="--pc:${_pi.color};" title="Voir le détail">
+        ${_medalHTML(g.od, _pi.color)}
         <div class="comp-res-content">
           <div class="comp-res-top">
             <span class="comp-res-name" title="${String(_tooltipNames || '').replace(/"/g, '&quot;')}"><span style="color:${_pi.color};">${_dispName}</span></span>
@@ -2187,6 +2222,22 @@ function renderCompetitionsPage() {
           ${metricsHtml}
         </div>
       </div>`;
+      // Resultats OD du jour SANS activite (classement General, epreuve non
+      // enregistree) : cartes dediees, une seule fois par date.
+      if (!_emittedIso.has(g.iso) && _leftovers.has(g.iso)) {
+        _emittedIso.add(g.iso);
+        html += _leftovers.get(g.iso).map(r => `<div class="comp-result-card od-only" data-prio="${_pi.key}" style="--pc:${_pi.color};" title="Résultat officiel Open Dossard">
+          ${_medalHTML(r, _pi.color)}
+          <div class="comp-res-content">
+            <div class="comp-res-top">
+              <span class="comp-res-name"><span style="color:${_pi.color};">${r.competitionName || 'Résultat officiel'}</span></span>
+              <span class="comp-res-date">${_fmtIsoDate(g.iso)}</span>
+            </div>
+            <div class="comp-res-metrics comp-res-nodata">Résultat officiel (pas d'activité liée)</div>
+          </div>
+        </div>`).join('');
+      }
+      return html;
     }).join('') : '<div class="comp-empty">Aucune compétition passée.</div>';
   }
 }
