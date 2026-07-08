@@ -2096,17 +2096,9 @@ function renderCompetitionsPage() {
     // trop proches pour la largeur disponible fusionnent en un point avec
     // compteur (sinon bouillie de ronds sur mobile avec 38 compets).
     // Survol/tap = info-bulle (liste du groupe), 2e tap point seul = detail.
-    const _tlW = (seasonWrap.getBoundingClientRect().width || 360) - 16;
-    const _minGapPct = (15 / Math.max(200, _tlW)) * 100; // 15px entre centres
     const _sorted = yearComps.map(c => ({ c, p: pos(c.dateObj) })).sort((a, b) => a.p - b.p);
-    // Fenetres FIXES (pas de chainage : sinon les courses hebdo du printemps
-    // fusionnent en un mega-groupe de 15) : un groupe par tranche de _minGapPct.
-    const _buckets = new Map();
-    for (const m of _sorted) {
-      const k = Math.floor(m.p / _minGapPct);
-      (_buckets.get(k) || _buckets.set(k, []).get(k)).push(m);
-    }
-    const clusters = [..._buckets.values()].map(items => ({ items }));
+    // Pas de regroupement (choix utilisateur) : un point par compet.
+    const clusters = _sorted.map(m => ({ items: [m] }));
     const _fmtLab = (c) => `${c.name} · ${c.dateObj.getDate()}/${c.dateObj.getMonth() + 1}`;
     const markers = clusters.map(cl => {
       const items = cl.items;
