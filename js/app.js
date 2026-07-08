@@ -6903,9 +6903,10 @@ async function renderStreamsSection(container, activityId) {
   // Chart.js avec le plugin decimation (LTTB) gérera l'affichage : décime à ~1500 points
   // pour la performance, mais redécime à la résolution réelle au zoom in.
 
-  // Formatter de l'axe X selon le mode (2 décimales pour ticks et tooltip)
+  // Formatter de l'axe X : ticks SANS unite (le 'km' est le titre de l'axe,
+  // affiche une seule fois sous le graphe)
   const fmtXTick = useDistance
-    ? (val) => (val / 1000).toFixed(2) + ' km'
+    ? (val) => (val / 1000).toFixed(2)
     : (val) => formatHMS(val);
   const fmtXTooltip = useDistance
     ? (val) => (val / 1000).toFixed(2) + ' km'
@@ -7372,12 +7373,14 @@ async function renderStreamsSection(container, activityId) {
   const xMax = fullX[fullX.length - 1];
 
   // Axe X linéaire : positions proportionnelles à la distance (ou au temps)
+  const _mobileCharts = window.innerWidth <= 860;
   const sharedX = {
     type: 'linear',
     min: xMin,
     max: xMax,
+    title: useDistance ? { display: true, text: 'km', color: '#6b7686', font: { size: 10 }, padding: { top: 2 } } : undefined,
     ticks: {
-      maxTicksLimit: 8,
+      maxTicksLimit: _mobileCharts ? 6 : 8,
       callback: (val) => fmtXTick(val),
       font: { size: 10 }
     },
@@ -7485,8 +7488,10 @@ async function renderStreamsSection(container, activityId) {
 
   // Largeurs fixes pour aligner pixel-perfect les chartAreas entre tous les
   // graphiques (sinon le label "900" est plus large que "60" → décalage).
-  const LEFT_Y_WIDTH = 55;
-  const RIGHT_Y_WIDTH = 60;
+  // Mobile : graphes etires au maximum -> axes Y etroits, sans titre lateral
+  const LEFT_Y_WIDTH = _mobileCharts ? 34 : 55;
+  const RIGHT_Y_WIDTH = _mobileCharts ? 36 : 60;
+  const yTitle = (txt) => (_mobileCharts ? { display: false } : { display: true, text: txt });
   const forceLeftWidth = (scale) => { scale.width = LEFT_Y_WIDTH; };
   const forceRightWidth = (scale) => { scale.width = RIGHT_Y_WIDTH; };
 
@@ -7572,8 +7577,8 @@ async function renderStreamsSection(container, activityId) {
         },
         scales: {
           x: sharedX,
-          y: { position: 'left', title: { display: true, text: 'Watts' }, suggestedMin: 0, suggestedMax: 600, ...intY, afterFit: forceLeftWidth },
-          ...(hrPts.length ? { y1: { position: 'right', title: { display: true, text: 'FC' }, grid: { display: false }, suggestedMin: 80, suggestedMax: 200, ...intY, afterFit: forceRightWidth } } : {})
+          y: { position: 'left', title: yTitle('Watts'), suggestedMin: 0, suggestedMax: 600, ...intY, afterFit: forceLeftWidth },
+          ...(hrPts.length ? { y1: { position: 'right', title: yTitle('FC'), grid: { display: false }, suggestedMin: 80, suggestedMax: 200, ...intY, afterFit: forceRightWidth } } : {})
         }
       }
     }));
@@ -7632,7 +7637,7 @@ async function renderStreamsSection(container, activityId) {
         },
         scales: {
           x: sharedX,
-          y: { title: { display: true, text: "W'bal (kJ)" }, suggestedMin: 0, suggestedMax: wPrime / 1000, ticks: { callback: (v) => v.toFixed(0) }, afterFit: forceLeftWidth },
+          y: { title: yTitle("W'bal (kJ)"), suggestedMin: 0, suggestedMax: wPrime / 1000, ticks: { callback: (v) => v.toFixed(0) }, afterFit: forceLeftWidth },
           y1: phantomY1
         }
       }
@@ -7675,7 +7680,7 @@ async function renderStreamsSection(container, activityId) {
         interaction: { intersect: false, mode: 'nearest', axis: 'x' },
         elements: { point: { hoverRadius: 0 } },
         plugins: { legend: { display: false }, tooltip: { enabled: false }, zoom: zoomConfig, decimation: decimationConfig },
-        scales: { x: sharedX, y: { title: { display: true, text: 'rpm' }, suggestedMin: 0, suggestedMax: 110, ...intY, afterFit: forceLeftWidth }, y1: phantomY1 }
+        scales: { x: sharedX, y: { title: yTitle('rpm'), suggestedMin: 0, suggestedMax: 110, ...intY, afterFit: forceLeftWidth }, y1: phantomY1 }
       }
     }));
     // Wire la légende HTML custom pour Cadence
@@ -7734,8 +7739,8 @@ async function renderStreamsSection(container, activityId) {
         },
         scales: {
           x: sharedX,
-          y: { position: 'left', title: { display: true, text: 'km/h' }, suggestedMin: 0, suggestedMax: 50, afterFit: forceLeftWidth },
-          ...(altPts.length ? { y1: { position: 'right', title: { display: true, text: 'm' }, grid: { display: false }, ...intY, afterFit: forceRightWidth } } : { y1: phantomY1 })
+          y: { position: 'left', title: yTitle('km/h'), suggestedMin: 0, suggestedMax: 50, afterFit: forceLeftWidth },
+          ...(altPts.length ? { y1: { position: 'right', title: yTitle('m'), grid: { display: false }, ...intY, afterFit: forceRightWidth } } : { y1: phantomY1 })
         }
       }
     }));
