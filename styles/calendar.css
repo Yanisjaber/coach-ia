@@ -221,6 +221,7 @@
   /* Couleur de la barre d'accent = couleur du sport
      (on garde :not(.rest) pour egaler la specificite de la regle de base ci-dessus,
       sinon var(--accent) l'emporte et tout reste vert) */
+  .day-card:not(.rest)[data-sport-cat="triathlon"]::before   { background: #f43f5e; }
   .day-card:not(.rest)[data-sport-cat="cyclisme"]::before    { background: #3b82f6; }
   .day-card:not(.rest)[data-sport-cat="vtt"]::before          { background: #b45309; }
   .day-card:not(.rest)[data-sport-cat="course"]::before       { background: #fc4c02; }
@@ -685,3 +686,23 @@
 /* En-tete jours + resume de semaine : reserves au mobile (voir mobile.css) */
 .week-dow-head { display: none; }
 .week-row-sum { display: none; }
+
+/* Jour multisport (triathlon/brick) : liseré + badge discret */
+.day-card--multi[data-sport-cat="triathlon"] { border-color: rgba(244, 63, 94, 0.45); }
+.day-card--multi[data-sport-cat="triathlon"]::before {
+  content: ""; display: block; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: #f43f5e;
+}
+.day-ms-badge {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.14);
+  border-radius: 5px;
+  padding: 1px 4px;
+  pointer-events: none;
+}

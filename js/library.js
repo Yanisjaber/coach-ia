@@ -13,6 +13,7 @@
 const LIB_KEY = 'coach_ia_templates_v1';
 
 const SPORTS = [
+  { key: 'triathlon',   label: 'Triathlon',    color: '#f43f5e' },
   { key: 'cyclisme',    label: 'Cyclisme',     color: '#3b82f6' },
   { key: 'vtt',         label: 'VTT',          color: '#b45309' },
   { key: 'course',      label: 'Course à pied', color: '#fc4c02' },
@@ -23,6 +24,7 @@ const SPORTS = [
 ];
 const SPORT_BY = Object.fromEntries(SPORTS.map(s => [s.key, s]));
 const _SPORT_SVG = {
+  triathlon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7c1.3-1.3 2.7-1.3 4 0s2.7 1.3 4 0"/><circle cx="7" cy="16" r="2.6"/><circle cx="17" cy="16" r="2.6"/><path d="M7 16l3.5-5h2L11 16"/><path d="M17 6.5 21 4"/></svg>',
   cyclisme: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l5-9h3l-2 9"/><path d="M11 8h4l2 5"/></svg>',
   vtt:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l5-9h3l-2 9"/><path d="M11 8h4l2 5"/></svg>',
   course:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="5" r="1.6"/><path d="M6 21l3-5 2-3 2 2 1 4"/><path d="M11 13l-2-3 4-2 2 3 3 1"/></svg>',

@@ -189,7 +189,7 @@
       tss: chain.reduce(function (x, l) { return x + (+l.act.tss || 0); }, 0),
       kcal: chain.reduce(function (x, l) { return x + (+l.act.calories || 0); }, 0),
     };
-    return { kind: kind, legs: chain, transitions: transitions, totals: totals };
+    return { kind: kind, legs: chain, transitions: transitions, totals: totals, sport: 'Triathlon', category: 'triathlon' };
   }
 
   function fmtDurShort(min) {

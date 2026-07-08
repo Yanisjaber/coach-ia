@@ -558,7 +558,7 @@ function getSportCategory(sport) {
   if (!sport) return 'cyclisme'; // par défaut (templates AI sans sport = cyclisme)
   const s = String(sport);
   const lower = s.toLowerCase();
-  if (['cyclisme', 'course', 'musculation', 'natation', 'autre', 'mobilite'].includes(lower)) return lower;
+  if (['cyclisme', 'course', 'musculation', 'natation', 'triathlon', 'autre', 'mobilite'].includes(lower)) return lower;
   const entry = window.SPORTS_CATALOG && window.SPORTS_CATALOG[s];
   return entry ? entry.category : 'autre';
 }
@@ -2357,8 +2357,9 @@ function populateSportSelect(selectId, defaultValue) {
     groups[cat].push({ rawType, fr: info.fr, icon: info.icon || '' });
   }
   // Ordre d'affichage des catégories
-  const catOrder = ['cyclisme', 'course', 'natation', 'musculation', 'autre'];
+  const catOrder = ['triathlon', 'cyclisme', 'course', 'natation', 'musculation', 'autre'];
   const catLabels = {
+    triathlon: '🏊🚴🏃 Triathlon',
     cyclisme: '🚴 Cyclisme',
     course: '🏃 Course à pied',
     natation: '🏊 Natation',
@@ -3703,13 +3704,13 @@ function saveTrainFromModal() {
 // le train-modal (même design + structure d'intervalles), sans date/heure/GPX.
 // ============================================================
 // Mapping clé bibliothèque -> sport Strava représentatif (pour le select)
-const LIB_KEY_TO_RAW = { cyclisme: 'Ride', vtt: 'MountainBikeRide', course: 'Run', trail: 'TrailRun', natation: 'Swim', musculation: 'WeightTraining', autre: 'Workout' };
+const LIB_KEY_TO_RAW = { triathlon: 'Triathlon', cyclisme: 'Ride', vtt: 'MountainBikeRide', course: 'Run', trail: 'TrailRun', natation: 'Swim', musculation: 'WeightTraining', autre: 'Workout' };
 // Mapping inverse : sport Strava -> clé de regroupement bibliothèque
 function rawToLibKey(rawType) {
   if (rawType === 'MountainBikeRide' || rawType === 'EMountainBikeRide') return 'vtt';
   if (rawType === 'TrailRun') return 'trail';
   const cat = (typeof getSportCategory === 'function') ? getSportCategory(rawType) : 'autre';
-  return ['cyclisme', 'course', 'natation', 'musculation'].includes(cat) ? cat : 'autre';
+  return ['cyclisme', 'course', 'natation', 'musculation', 'triathlon'].includes(cat) ? cat : 'autre';
 }
 
 window.openLibraryTemplateModal = function (tpl) {
@@ -4398,10 +4399,20 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
         + `<div class="dmc-body">${g ? `<span class="dmc-glyph" style="line-height:0">${g}</span>` : ''}${t ? `<span class="dmc-time">${t}</span>` : ''}</div>`
         + `</div>`;
     }).join('');
+    // Jour multisport (triathlon/brick...) : badge + attribut pour la couleur dédiée
+    let _msAttr = '', _msBadge = '';
+    if (window.SportProfiles && window.SportProfiles.detectMultisport) {
+      const _g = window.SportProfiles.detectMultisport(_acts);
+      if (_g && _g.legs.length === _acts.length) {
+        _msAttr = ' data-sport-cat="triathlon"';
+        _msBadge = `<div class="day-ms-badge">${_g.kind === 'Triathlon' ? 'TRI' : _g.kind.split(' ')[0].toUpperCase()}</div>`;
+      }
+    }
     return `
-    <div class="day-card past${isToday ? ' today' : ''} day-card--multi" data-iso="${iso}" data-source="realise">
+    <div class="day-card past${isToday ? ' today' : ''} day-card--multi"${_msAttr} data-iso="${iso}" data-source="realise">
       <div class="day-card-dow">${dowFr[dow]}${isToday ? '<span class="dow-suffix"> · auj.</span>' : ''}</div>
       <div class="day-card-date">${d.getDate()}</div>
+      ${_msBadge}
       <div class="day-multi-grid">${cols}</div>
     </div>
   `;
@@ -4424,8 +4435,15 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   const aName = act.name || act.sessionName || 'Séance';
   const km = act.distance_km ? Math.round(act.distance_km) + ' km' : '';
   // Nom de sport Strava exact + clé couleur pour la pill
-  const sportLabel = window.activitySportLabel ? window.activitySportLabel(act) : '';
-  const sportCat = window.activitySportColorKey ? window.activitySportColorKey(act) : 'autre';
+  let sportLabel = window.activitySportLabel ? window.activitySportLabel(act) : '';
+  let sportCat = window.activitySportColorKey ? window.activitySportColorKey(act) : 'autre';
+  // Jour multisport détecté (enchaînement nat/vélo/course) : le jour EST un
+  // triathlon/brick — pastille et couleur du sport Triathlon sur la tuile.
+  if (realDay && Array.isArray(realDay.activities) && realDay.activities.length > 1
+      && window.SportProfiles && window.SportProfiles.detectMultisport) {
+    const _g = window.SportProfiles.detectMultisport(realDay.activities);
+    if (_g && _g.legs.length === realDay.activities.length) { sportLabel = _g.kind; sportCat = 'triathlon'; }
+  }
 
   // Jour de compétition : détecté par la CATÉGORIE de l'activité (fiable pour
   // toutes les étapes), avec repli sur la liste compétitions par date.
@@ -4984,6 +5002,11 @@ function formatHMS(seconds) {
 // ============================================================
 // Catalogue aligné sur les libellés FR officiels Strava (ce que tu vois sur strava.com)
 window.SPORTS_CATALOG = {
+  // Triathlon & enchaînements (sport à part entière)
+  Triathlon: { fr: 'Triathlon', category: 'triathlon', icon: '🏊🚴🏃' },
+  Duathlon: { fr: 'Duathlon', category: 'triathlon', icon: '🏃🚴🏃' },
+  Aquathlon: { fr: 'Aquathlon', category: 'triathlon', icon: '🏊🏃' },
+  Aquabike: { fr: 'Aquabike', category: 'triathlon', icon: '🏊🚴' },
   // Cyclisme
   Ride: { fr: 'Cyclisme', category: 'cyclisme', icon: '🚴' },
   VirtualRide: { fr: 'Cyclisme virtuel', category: 'cyclisme', icon: '🚴' },
@@ -5067,12 +5090,14 @@ const SPORT_CATEGORY_FR = {
   course: 'Course à pied',
   natation: 'Natation',
   musculation: 'Musculation',
+  triathlon: 'Triathlon',
   autre: 'Autre',
 };
 
 // Catégorie de couleur fine (pour les pills colorées dans le calendrier)
 // Bcp plus granulaire que la catégorie interne — chaque "famille" a sa teinte
 const SPORT_COLOR_KEY = {
+  Triathlon: 'triathlon', Duathlon: 'triathlon', Aquathlon: 'triathlon', Aquabike: 'triathlon',
   Ride: 'cyclisme', VirtualRide: 'cyclisme', GravelRide: 'cyclisme',
   EBikeRide: 'cyclisme', Velomobile: 'cyclisme', Handcycle: 'cyclisme',
   MountainBikeRide: 'vtt', EMountainBikeRide: 'vtt',
@@ -5111,6 +5136,7 @@ const SPORT_COLOR_FROM_CATEGORY = {
 // Accepte un raw_type Strava (Ride, TrailRun...) OU une categorie interne.
 // ============================================================
 const SPORT_CAT_COLOR = {
+  triathlon: '#f43f5e',
   cyclisme: '#3b82f6', vtt: '#b45309', course: '#fc4c02', trail: '#15803d',
   natation: '#06b6d4', musculation: '#ef4444', marche: '#65a30d', ski: '#60a5fa',
   nautique: '#0284c7', football: '#22c55e', collectif: '#c026d3', raquette: '#eab308',
@@ -5163,7 +5189,7 @@ window.sportFr = (rawTypeOrCategory) => {
 };
 
 // Helper : emoji du sport (accepte un raw_type Strava OU une categorie interne)
-const SPORT_CATEGORY_EMOJI = { cyclisme: '🚴', course: '🏃', natation: '🏊', musculation: '🏋️', autre: '🏅' };
+const SPORT_CATEGORY_EMOJI = { cyclisme: '🚴', course: '🏃', natation: '🏊', musculation: '🏋️', triathlon: '🏊🚴🏃', autre: '🏅' };
 window.sportEmoji = (rawTypeOrCategory) => {
   if (!rawTypeOrCategory) return '';
   const entry = window.SPORTS_CATALOG[rawTypeOrCategory];
@@ -11326,7 +11352,7 @@ document.querySelectorAll('#sport-filter .sport-btn').forEach(btn => {
       // Si plus rien de sélectionné, revenir sur Tout
       if (activeSports.size === 0) activeSports.add('tout');
       // Si TOUS les sports individuels sont sélectionnés → bascule sur Tout
-      const individuals = ['cyclisme', 'course', 'musculation', 'natation', 'autre'];
+      const individuals = ['cyclisme', 'course', 'musculation', 'natation', 'triathlon', 'autre'];
       if (individuals.every(s => activeSports.has(s))) {
         activeSports.clear();
         activeSports.add('tout');
