@@ -2107,13 +2107,25 @@ function renderCompetitionsPage() {
       const iso = toIsoDate(c.dateObj);
       const day = Array.isArray(data) ? data.find(d => toIsoDate(d.date) === iso) : null;
       const acts = (day && day.activities) ? day.activities : [];
-      // Agrège les activités du jour (course par étapes : on prend le jour de départ)
+      // Cible les activites DE LA COURSE, pas toute la journee :
+      // 1) liees par id (_sbId / activityIds / client_id) — couvre le multisport
+      // 2) sinon les activites category='competition' du jour
+      // 3) sinon rapprochement par nom
+      // 4) dernier recours : toutes les activites du jour (ancien comportement)
+      const _wanted = new Set([c._sbId].concat(Array.isArray(c.activityIds) ? c.activityIds : []).filter(Boolean).map(String));
+      let raceActs = acts.filter(a => _wanted.has(String(a._sbId)) || String(a.client_id) === String(c.id));
+      if (!raceActs.length) raceActs = acts.filter(a => a.category === 'competition');
+      if (!raceActs.length && c.name) {
+        const _n = c.name.trim().toLowerCase();
+        raceActs = acts.filter(a => (a.name || '').trim().toLowerCase() === _n);
+      }
+      if (!raceActs.length) raceActs = acts;
       let dist = 0, dur = 0, elev = 0, tssV = 0, hrSum = 0, hrN = 0;
-      for (const a of acts) {
+      for (const a of raceActs) {
         dist += a.distance_km || 0; dur += a.duration || 0; elev += a.elevation_gain || 0;
         tssV += a.tss || 0; if (a.hr) { hrSum += a.hr; hrN++; }
       }
-      if (!tssV && day) tssV = day.tss || 0;
+      if (!tssV && day && raceActs === acts) tssV = day.tss || 0;
       // Stats en ligne légère (valeurs + unités), pas de boîtes
       const metrics = [];
       if (dist) metrics.push(Math.round(dist) + ' km');
