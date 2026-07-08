@@ -216,6 +216,16 @@ async function handleActivityUpsert(sb: any, conn: any, activityId: number) {
   if (upErr) throw upErr;
   console.log(`[webhook] activité ${activityId} (${row.name}) upserted pour user ${conn.user_id}`);
 
+  // Course Strava (workout_type Ride 11 / Run 1) -> categorie competition,
+  // seulement si aucune categorie posee par l'utilisateur.
+  if (activity.workout_type === 11 || activity.workout_type === 1) {
+    await sb.from("activities")
+      .update({ category: "competition" })
+      .eq("user_id", conn.user_id)
+      .eq("strava_id", activityId)
+      .is("category", null);
+  }
+
   // 5) Recalculer les daily_metrics depuis la date de cette activité
   const startIso = String(row.start_date_local).slice(0, 10);
   await recomputeDailyMetricsFrom(sb, conn.user_id, startIso);

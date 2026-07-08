@@ -250,6 +250,24 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ===== 6a-bis) Courses Strava -> categorie competition =====
+    // workout_type Strava : Ride 11 = course, Run 1 = course. On ne marque que
+    // les lignes SANS categorie (jamais d'ecrasement d'un choix utilisateur).
+    {
+      const raceIds = all
+        .filter((a: any) => a && a.id && (a.workout_type === 11 || a.workout_type === 1))
+        .map((a: any) => a.id);
+      for (let i = 0; i < raceIds.length; i += 200) {
+        const { error: rcErr } = await sbAdmin
+          .from("activities")
+          .update({ category: "competition" })
+          .eq("user_id", user.id)
+          .is("category", null)
+          .in("strava_id", raceIds.slice(i, i + 200));
+        if (rcErr) console.error("Categorie course:", rcErr.message);
+      }
+    }
+
     // ===== 6b) Purge des activités à date aberrante déjà en base (toutes sources) =====
     {
       const { error: delActErr } = await sbAdmin
