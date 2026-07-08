@@ -3110,7 +3110,16 @@ function readDistAsKm(inputId) {
   if (isNaN(v) || v <= 0) return null;
   return el.dataset.distUnit === 'm' ? +(v / 1000).toFixed(3) : v;
 }
-const adaptTrainSportForm = () => adaptSportForm('train-modal-sport', { km: 'train-modal-km', dplus: 'train-modal-dplus', gpx: 'train-modal-gpx', hideSection: true });
+const adaptTrainSportForm = () => {
+  adaptSportForm('train-modal-sport', { km: 'train-modal-km', dplus: 'train-modal-dplus', gpx: 'train-modal-gpx', hideSection: true });
+  // Triathlon : 3 distances par discipline (pas en mode modèle bibliothèque)
+  const sel = document.getElementById('train-modal-sport');
+  const isTri = !window._templateMode && !!sel && typeof getSportCategory === 'function' && getSportCategory(sel.value) === 'triathlon';
+  const triRow = document.getElementById('train-tri-fields');
+  const kmLab = document.getElementById('train-modal-km')?.closest('label');
+  if (triRow) triRow.hidden = !isTri;
+  if (kmLab && isTri) kmLab.style.display = 'none';
+};
 const adaptCompSportForm = () => {
   adaptSportForm('comp-modal-sport', { km: 'comp-modal-km', dplus: 'comp-modal-dplus', gpx: 'comp-modal-gpx', laps: 'comp-modal-laps' });
   // Triathlon : 3 distances par discipline a la place de la distance unique
@@ -3572,6 +3581,7 @@ function openTrainModal(mode) {
   // Poubelle cachée par défaut (visible seulement en édition)
   const delBtn = document.getElementById('train-modal-delete');
   if (delBtn) delBtn.hidden = true;
+  ['train-tri-swim', 'train-tri-bike', 'train-tri-run'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
   ['name','date','time','duration','tss','notes','rpe','km','dplus'].forEach(k => {
     const el = document.getElementById('train-modal-' + k);
     if (el) el.value = '';
@@ -3584,7 +3594,7 @@ function openTrainModal(mode) {
   const s = document.getElementById('train-modal-sport');
   if (s) s.value = 'Ride';
   if (s && s._customUpdate) s._customUpdate();
-  if (typeof adaptSportForm === 'function') adaptSportForm('train-modal-sport', { km: 'train-modal-km', dplus: 'train-modal-dplus', gpx: 'train-modal-gpx', hideSection: true });
+  if (typeof adaptTrainSportForm === 'function') adaptTrainSportForm();
   // Date par défaut : aujourd'hui pour réalisé, demain pour prévu
   const dateInput = document.getElementById('train-modal-date');
   if (dateInput) {
@@ -3627,13 +3637,18 @@ function openTrainModalForEdit(training, mode) {
   document.getElementById('train-modal-rpe').value = training.rpe != null ? training.rpe : '';
   document.getElementById('train-modal-km').value = training.km != null ? training.km : '';
   document.getElementById('train-modal-dplus').value = training.dplus != null ? training.dplus : '';
+  {
+    const t = training.tri || {};
+    const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = (v != null ? v : ''); };
+    setV('train-tri-swim', t.swim_m); setV('train-tri-bike', t.bike_km); setV('train-tri-run', t.run_km);
+  }
   if (window.setTrainGpx) window.setTrainGpx(training.gpxName || null, training.gpxContent || null);
   // Charger la structure si présente (mode édition)
   if (typeof window.setWorkoutStructure === 'function') {
     window.setWorkoutStructure(training.structure || []);
   }
   // Adapte le formulaire au sport (convertit l'affichage km->m si natation)
-  if (typeof adaptSportForm === 'function') adaptSportForm('train-modal-sport', { km: 'train-modal-km', dplus: 'train-modal-dplus', gpx: 'train-modal-gpx', hideSection: true });
+  if (typeof adaptTrainSportForm === 'function') adaptTrainSportForm();
   // Controles "activite" (mode realise edite) : exclusions records + transformer en compet
   {
     const _ctrls = document.getElementById('train-modal-act-controls');
@@ -3759,7 +3774,20 @@ function saveTrainFromModal() {
   const tss = parseInt(document.getElementById('train-modal-tss').value, 10) || 0;
   const notes = document.getElementById('train-modal-notes').value.trim();
   const rpe = parseFloat(document.getElementById('train-modal-rpe').value) || null;
-  const km = (typeof readDistAsKm === 'function') ? readDistAsKm('train-modal-km') : (parseFloat(document.getElementById('train-modal-km').value) || null);
+  let km = (typeof readDistAsKm === 'function') ? readDistAsKm('train-modal-km') : (parseFloat(document.getElementById('train-modal-km').value) || null);
+  let tri = null;
+  {
+    const triRow = document.getElementById('train-tri-fields');
+    if (triRow && !triRow.hidden) {
+      const swim = parseFloat(document.getElementById('train-tri-swim').value) || null;
+      const bike = parseFloat(document.getElementById('train-tri-bike').value) || null;
+      const run = parseFloat(document.getElementById('train-tri-run').value) || null;
+      if (swim || bike || run) {
+        tri = { swim_m: swim, bike_km: bike, run_km: run };
+        km = +(((swim || 0) / 1000) + (bike || 0) + (run || 0)).toFixed(1) || null;
+      }
+    }
+  }
   const dplus = parseInt(document.getElementById('train-modal-dplus').value, 10) || null;
   const laps = null; // champ 'nombre de tours' retire des entrainements (garde pour les competitions)
   const _gpx = (window.getTrainGpx ? window.getTrainGpx() : { name: null, content: null });
@@ -3774,7 +3802,7 @@ function saveTrainFromModal() {
   const entry = {
     id: editingId || Date.now().toString(),
     name, date, time, sport, type, duration, tss, notes,
-    rpe, km, dplus, laps, gpxName: _gpx.name, gpxContent: _gpx.content,
+    rpe, km, dplus, laps, tri, gpxName: _gpx.name, gpxContent: _gpx.content,
     exclPower, exclHr, exclDistance,
     sportCategory: (typeof getSportCategory === 'function' ? getSportCategory(sport) : sport),
     mode: trainModalMode,
@@ -3848,7 +3876,7 @@ window.openLibraryTemplateModal = function (tpl) {
     const s = document.getElementById('train-modal-sport');
     if (s) { s.value = tpl.sport_raw || LIB_KEY_TO_RAW[tpl.sport] || 'Ride'; if (s._customUpdate) s._customUpdate(); }
     if (typeof window.setWorkoutStructure === 'function') window.setWorkoutStructure(tpl.structure || []);
-    if (typeof adaptSportForm === 'function') adaptSportForm('train-modal-sport', { km: 'train-modal-km', dplus: 'train-modal-dplus', gpx: 'train-modal-gpx', hideSection: true });
+    if (typeof adaptTrainSportForm === 'function') adaptTrainSportForm();
     const delBtn = document.getElementById('train-modal-delete');
     if (delBtn) delBtn.hidden = false;
   }

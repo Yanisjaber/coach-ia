@@ -1041,6 +1041,12 @@
 
       <div class="form-field form-col-2 add-sec">
         <div class="add-sec-h parc">Parcours</div>
+        <!-- Triathlon : distances par discipline (remplace la distance unique) -->
+        <div class="add-sec-grid g3" id="train-tri-fields" hidden>
+          <label class="form-field"><span>Natation (m)</span><input type="number" id="train-tri-swim" min="0" step="50" placeholder="ex : 1500"></label>
+          <label class="form-field"><span>Vélo (km)</span><input type="number" id="train-tri-bike" min="0" step="0.1" placeholder="ex : 40"></label>
+          <label class="form-field"><span>Course (km)</span><input type="number" id="train-tri-run" min="0" step="0.1" placeholder="ex : 10"></label>
+        </div>
         <div class="add-sec-grid g3">
           <label class="form-field"><span>Distance (km)</span><input type="number" id="train-modal-km" min="0" step="0.1" placeholder="km"></label>
           <label class="form-field"><span>Dénivelé D+ (m)</span><input type="number" id="train-modal-dplus" min="0" placeholder="mètres"></label>
