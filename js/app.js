@@ -2132,35 +2132,50 @@ function renderCompetitionsPage() {
     const _byIso = new Map();
     _items.forEach(it => { (_byIso.get(it.iso) || _byIso.set(it.iso, []).get(it.iso)).push(it); });
     const _leftovers = new Map(); // iso -> [od results sans activite]
+    window.__odAssignedByComp = {};
+    const _odOv = _odOverridesLoad();
     for (const [iso, its] of _byIso) {
       const odAll = ((window.__odByDate && window.__odByDate[iso]) || []).slice();
       if (!odAll.length) continue;
-      // Les classements GENERAUX n'ont jamais d'activite propre : jamais
-      // apparies, toujours en carte dediee.
-      const odGeneral = odAll.filter(r => /g[ée]n[ée]ral/i.test(r.competitionName || ''));
-      const odList = odAll.filter(r => !/g[ée]n[ée]ral/i.test(r.competitionName || ''));
+      // 1) Overrides MANUELS (menu "Associer a une epreuve...") : prioritaires.
+      //    null = dissocie de tout resultat ; un id = ce resultat precis.
+      const usedIds = new Set();
+      const freeIts = [];
+      for (const it of its) {
+        const o = _odOv[String(it.c.id)];
+        if (o === null) { it._odLocked = true; continue; }
+        if (o !== undefined) {
+          const r = odAll.find(x => String(x.id) === String(o));
+          if (r) { it.od = r; it._odLocked = true; usedIds.add(String(r.id)); continue; }
+        }
+        freeIts.push(it);
+      }
+      // 2) Les classements GENERAUX n'ont jamais d'activite propre : jamais
+      //    apparies automatiquement, toujours en carte dediee.
+      const odGeneral = odAll.filter(r => /g[ée]n[ée]ral/i.test(r.competitionName || '') && !usedIds.has(String(r.id)));
+      const odList = odAll.filter(r => !/g[ée]n[ée]ral/i.test(r.competitionName || '') && !usedIds.has(String(r.id)));
       if (odGeneral.length) _leftovers.set(iso, odGeneral.slice());
-      if (!odList.length) continue;
-      if (odList.length === 1) {
-        its.forEach(it => { it.od = odList[0]; });
-        continue;
+      if (odList.length === 1 && freeIts.length) {
+        freeIts.forEach(it => { it.od = odList[0]; });
+      } else if (odList.length > 1) {
+        // appariement glouton par ecart de temps minimal
+        const pairs = [];
+        freeIts.forEach((it, ii) => odList.forEach((r, ri) => {
+          const rt = r.date ? new Date(r.date).getTime() : NaN;
+          const d = (isFinite(rt) && it.startMs != null) ? Math.abs(rt - it.startMs) : 1e15;
+          pairs.push({ ii, ri, d });
+        }));
+        pairs.sort((a, b) => a.d - b.d);
+        const usedI = new Set(), usedR = new Set();
+        for (const pr of pairs) {
+          if (usedI.has(pr.ii) || usedR.has(pr.ri)) continue;
+          usedI.add(pr.ii); usedR.add(pr.ri);
+          freeIts[pr.ii].od = odList[pr.ri];
+        }
+        const rest = odList.filter((r, ri) => !usedR.has(ri));
+        if (rest.length) _leftovers.set(iso, (_leftovers.get(iso) || []).concat(rest));
       }
-      // appariement glouton par ecart de temps minimal
-      const pairs = [];
-      its.forEach((it, ii) => odList.forEach((r, ri) => {
-        const rt = r.date ? new Date(r.date).getTime() : NaN;
-        const d = (isFinite(rt) && it.startMs != null) ? Math.abs(rt - it.startMs) : 1e15;
-        pairs.push({ ii, ri, d });
-      }));
-      pairs.sort((a, b) => a.d - b.d);
-      const usedI = new Set(), usedR = new Set();
-      for (const pr of pairs) {
-        if (usedI.has(pr.ii) || usedR.has(pr.ri)) continue;
-        usedI.add(pr.ii); usedR.add(pr.ri);
-        its[pr.ii].od = odList[pr.ri];
-      }
-      const rest = odList.filter((r, ri) => !usedR.has(ri));
-      if (rest.length) _leftovers.set(iso, (_leftovers.get(iso) || []).concat(rest));
+      its.forEach(it => { if (it.od) window.__odAssignedByComp[String(it.c.id)] = it.od.id; });
     }
 
     // 3) Filet de securite : deux cartes memes jour + meme nom -> fusion
@@ -2333,6 +2348,15 @@ document.getElementById('comp-add').addEventListener('click', async () => {
   renderCalendar();
 });
 
+// Associations manuelles compet <-> resultat Open Dossard (priment sur
+// l'appariement automatique par heure). { [compId]: odResultId | null }
+function _odOverridesLoad() {
+  try { return JSON.parse(localStorage.getItem('coach_ia_od_overrides_v1') || '{}'); } catch { return {}; }
+}
+function _odOverridesSave(m) {
+  localStorage.setItem('coach_ia_od_overrides_v1', JSON.stringify(m || {}));
+}
+
 // Menu d'actions (⋯) d'une carte compet : Modifier / Transformer / Supprimer.
 function _closeCompActionsMenu() {
   if (window._compMenuEl) { window._compMenuEl.remove(); window._compMenuEl = null; }
@@ -2345,6 +2369,45 @@ function _openCompActionsMenu(btn, id) {
   const isRealised = comp.realised === true || comp._table === 'activity' || comp._table === 'competition';
   const items = [];
   items.push({ lab: 'Modifier', fn: () => openCompModalForEdit(comp) });
+  // Association manuelle a un resultat Open Dossard du meme jour
+  const _odAll = (window.__odByDate && comp.date && window.__odByDate[comp.date]) || [];
+  if (isRealised && _odAll.length) {
+    items.push({ lab: 'Associer à une épreuve…', keepOpen: true, fn: () => {
+      const cur = (_odOverridesLoad()[String(comp.id)] !== undefined)
+        ? _odOverridesLoad()[String(comp.id)]
+        : ((window.__odAssignedByComp || {})[String(comp.id)] ?? undefined);
+      const menu = document.createElement('div');
+      menu.className = 'comp-actions-menu';
+      const addOpt = (label, apply, checked) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = (checked ? '✓ ' : '') + label;
+        b.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          _closeCompActionsMenu();
+          const m = _odOverridesLoad();
+          apply(m);
+          _odOverridesSave(m);
+          renderCompetitionsPage();
+        });
+        menu.appendChild(b);
+      };
+      addOpt('Automatique (par heure)', (m) => { delete m[String(comp.id)]; }, cur === undefined);
+      for (const r of _odAll) {
+        const rk = r.rankingScratch != null ? ` · ${r.rankingScratch}e` : '';
+        addOpt((r.competitionName || 'Épreuve') + rk, (m) => { m[String(comp.id)] = r.id; }, cur != null && String(cur) === String(r.id));
+      }
+      addOpt('Dissocier de tout résultat', (m) => { m[String(comp.id)] = null; }, cur === null);
+      _closeCompActionsMenu();
+      document.body.appendChild(menu);
+      window._compMenuEl = menu;
+      const r2 = btn.getBoundingClientRect();
+      const mw = menu.offsetWidth || 240;
+      menu.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, r2.right - mw)) + 'px';
+      menu.style.top = Math.min(window.innerHeight - menu.offsetHeight - 8, r2.bottom + 6) + 'px';
+      setTimeout(() => document.addEventListener('click', _closeCompActionsMenu, true), 0);
+    } });
+  }
   if (isRealised && comp._sbId) {
     items.push({ lab: 'Transformer en entraînement', fn: async () => {
       // Dissocie l'epreuve : l'activite redevient un entrainement
@@ -2368,7 +2431,7 @@ function _openCompActionsMenu(btn, id) {
     b.type = 'button';
     b.textContent = it.lab;
     if (it.danger) b.classList.add('danger');
-    b.addEventListener('click', (ev) => { ev.stopPropagation(); _closeCompActionsMenu(); it.fn(); });
+    b.addEventListener('click', (ev) => { ev.stopPropagation(); if (!it.keepOpen) _closeCompActionsMenu(); it.fn(); });
     menu.appendChild(b);
   });
   document.body.appendChild(menu);
