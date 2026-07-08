@@ -152,6 +152,13 @@
     align-items: center;
     gap: 4px;
   }
+  /* Modal jour (#session-modal) : les icônes (lien/⋯/poubelle/×) sont posées
+     en absolu en haut à droite. Seule la ligne de TITRE leur réserve la place ;
+     la méta (date · heure · pastille sport) peut filer SOUS les icônes au lieu
+     de casser la pastille à la ligne. */
+  #session-modal .modal-header { position: relative; display: block; }
+  #session-modal .modal-header-actions { position: absolute; top: 0; right: 0; }
+  #session-modal .modal-title h2 { padding-right: clamp(96px, 88px + 2.5vw, 124px); }
   .modal-action-btn {
     background: none;
     border: none;
