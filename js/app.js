@@ -57,6 +57,7 @@ import './sport-profiles.js';
 import './day-extras.js';
 import './scroll-lock.js';
 import './adherence.js';
+import './rpe-scale.js';
 
 // ========= BILAN ANNUEL (nouvelle page p3, remplace Tendances long-terme) =========
 // KPIs YTD vs N-1, objectifs annuels, records, cumul kilométrique annuel.
