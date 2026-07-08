@@ -10956,6 +10956,30 @@ function _setCompModalGpxVisual(gpxName) {
 
 function openCompModalForEdit(comp) {
   if (typeof openCompModal !== 'function') return;
+  // Compet REALISEE adossee a une vraie activite : la fiche compet (meta) est
+  // souvent vide en base (target/dplus/notes/tss null) alors que l'activite a
+  // tout. Fallback : on complete chaque champ manquant depuis l'activite,
+  // pour que la modif affiche les memes infos que la fiche de detail.
+  const _isRealisedComp = comp.realised === true || comp._table === 'activity' || comp._table === 'competition';
+  if (_isRealisedComp && typeof _findActBySbId === 'function') {
+    const _ids = [comp._sbId].concat(Array.isArray(comp.activityIds) ? comp.activityIds : []).filter(Boolean);
+    let _f = null;
+    for (const _id of _ids) { _f = _findActBySbId(_id); if (_f) break; }
+    if (_f) {
+      const a = _f.act;
+      const _actTime = (String(a.start_date_local || '').match(/[T ](\d{2}:\d{2})/) || [])[1] || null;
+      const _has = (v) => v != null && v !== '';
+      comp = Object.assign({}, comp, {
+        km: _has(comp.km) ? comp.km : (a.distance_km || a.km || null),
+        dplus: _has(comp.dplus) ? comp.dplus : (Math.round(a.elevation_gain || a.total_elevation_gain || a.dplus || 0) || null),
+        target: _has(comp.target) ? comp.target : (a.moving_time ? Math.round(a.moving_time / 60) : (a.duration ? Math.round(a.duration) : null)),
+        tss: _has(comp.tss) ? comp.tss : (a.tss != null ? Math.round(a.tss) : null),
+        rpe: _has(comp.rpe) ? comp.rpe : (a.rpe != null ? a.rpe : null),
+        notes: comp.notes || a.notes || '',
+        time: comp.time || _actTime,
+      });
+    }
+  }
   openCompModal();
   // Marque le mode édition
   window._editingCompId = comp.id;
