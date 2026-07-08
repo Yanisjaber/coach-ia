@@ -2207,14 +2207,15 @@ function renderCompetitionsPage() {
         const b = e.target.closest('.comp-tl-marker');
         if (!b) { _tip.hidden = true; _tip.dataset.for = ''; return; }
         e.stopPropagation();
-        if (!_tip.hidden && _tip.dataset.for === b.dataset.tlComp && e.pointerType !== 'mouse') { _show(b); return; }
+        const key = b.dataset.tlComp || 'cluster-' + b.style.left;
+        // 1er tap/clic : bulle. 2e sur le meme point : detail (point seul)
+        // ou rien (groupe : on clique une ligne de la bulle).
+        if (_tip.hidden || _tip.dataset.for !== key) { _show(b); return; }
         const comp = b.dataset.tlComp ? loadCompetitions().find(c2 => c2.id === b.dataset.tlComp) : null;
-        if (!_tip.hidden && _tip.dataset.for === b.dataset.tlComp && comp && comp.date && typeof openSessionModal === 'function') {
+        if (comp && comp.date && typeof openSessionModal === 'function') {
           const isPast2 = new Date(comp.date + 'T12:00:00') < today;
           openSessionModal(comp.date, isPast2 ? 'realise' : 'prevu');
-          return;
         }
-        _show(b);
       });
     }
   }
