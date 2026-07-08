@@ -209,7 +209,18 @@ function renderOdRecap() {
 function renderOdRecapStats() {
   const el = document.getElementById('od-recap-stats');
   if (!el) return;
-  const s = odComputeStats(_odResults, _odRecapYear);
+  // Filtre global de la page Competitions (sport + fede) : le palmares suit.
+  // Les resultats OD sont des courses velo -> un filtre CAP/Tri vide le recap.
+  const flt = window._compPageFilter || { cat: 'tout', fed: 'tout' };
+  let rs = _odResults;
+  if (flt.cat !== 'tout' && flt.cat !== 'cyclisme') rs = [];
+  if (rs.length && flt.fed !== 'tout') {
+    rs = rs.filter(r => {
+      const f = window.odFedeForCompetition ? window.odFedeForCompetition(r.competitionId) : null;
+      return (f === 'FFVELO' ? 'FFVélo' : f) === flt.fed;
+    });
+  }
+  const s = odComputeStats(rs, _odRecapYear);
   const fmtD = (d) => { try { return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return d || ''; } };
   const rate = s.races ? Math.round((s.top10 / s.races) * 100) : 0;
   const C = 213.6;
@@ -250,6 +261,8 @@ function renderOdRecapStats() {
 }
 
 // ============ Liaison de la licence (appelée depuis la modale Connexions) ============
+window.odRecapRefresh = renderOdRecapStats;
+
 window.odUnlinkLicence = function () {
   odSaveLicence(null);
   odRefresh();

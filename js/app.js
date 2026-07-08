@@ -1953,7 +1953,7 @@ function renderCompetitionsPage() {
   const fmtShortDayMonth = d => d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
   const fmtYear = d => d.getFullYear();
 
-  const comps = loadCompetitions().map(c => {
+  let comps = loadCompetitions().map(c => {
     let startDate = c.date, endDate = c.date;
     if (c.stages && Array.isArray(c.stagesList) && c.stagesList.length) {
       const dates = c.stagesList.map(s => s.date).filter(Boolean).sort();
@@ -1982,9 +1982,9 @@ function renderCompetitionsPage() {
     if (!bar && upWrap) {
       bar = document.createElement('div');
       bar.id = 'comp-filters';
-      bar.className = 'comp-filters';
-      const host = upWrap.closest('.card');
-      if (host && host.parentElement) host.parentElement.insertBefore(bar, host);
+      bar.className = 'comp-filters comp-filters-top';
+      const page = document.getElementById('p6');
+      if (page) page.insertBefore(bar, page.firstChild);
     }
     if (bar) {
       const cats = [...new Set(comps.map(_catOfComp))].sort();
@@ -2010,8 +2010,11 @@ function renderCompetitionsPage() {
   }
   const _match = (c) => (_flt.cat === 'tout' || _catOfComp(c) === _flt.cat)
     && (_flt.fed === 'tout' || (c.federation || null) === _flt.fed);
-  const upcoming = comps.filter(c => c.endDateObj >= today).filter(_match).sort((a, b) => a.dateObj - b.dateObj);
-  const past = comps.filter(c => c.endDateObj < today).filter(_match).sort((a, b) => b.dateObj - a.dateObj);
+  // Filtre GLOBAL : hero, frise de saison et listes travaillent sur le sous-ensemble
+  comps = comps.filter(_match);
+  if (window.odRecapRefresh) window.odRecapRefresh(); // le palmares suit le filtre
+  const upcoming = comps.filter(c => c.endDateObj >= today).sort((a, b) => a.dateObj - b.dateObj);
+  const past = comps.filter(c => c.endDateObj < today).sort((a, b) => b.dateObj - a.dateObj);
 
   // Métriques de forme les plus récentes
   const last = (Array.isArray(data) && data.length) ? data[data.length - 1] : null;
