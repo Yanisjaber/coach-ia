@@ -2105,8 +2105,9 @@ function renderCompetitionsPage() {
         <span class="comp-tl-dot${big ? ' big' : ''}" style="background:${color};${big ? `box-shadow:0 0 0 2px ${color};` : ''}"></span>
       </button>`;
     }).join('');
-    const MONTH_L = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-    const months = MONTH_L.map((m, i) => `<span class="comp-tl-month" style="left:${((i + 0.5) / 12 * 100).toFixed(2)}%">${m}</span>`).join('')
+    // Libelles de mois adaptatifs : initiale / 3-4 lettres / nom complet
+    // selon la place reellement disponible (mesure apres rendu + resize).
+    const months = [...Array(12)].map((_, i) => `<span class="comp-tl-month" data-mi="${i}" style="left:${((i + 0.5) / 12 * 100).toFixed(2)}%"></span>`).join('')
       + [...Array(13)].map((_, i) => `<span class="comp-tl-tick" style="left:${(i / 12 * 100).toFixed(2)}%"></span>`).join('');
     const nPrincipal = yearComps.filter(c => compPrio(c.priority).key === 'principal').length;
     const nPast = yearComps.filter(c => c.endDateObj < today).length;
@@ -2128,6 +2129,38 @@ function renderCompetitionsPage() {
           <div><span class="comp-ss-val">${nPast}</span> <span class="comp-ss-k">déjà courue${nPast > 1 ? 's' : ''}</span></div>
         </div>`}
       </div>`;
+    // Libelles de mois selon la largeur d'un douzieme de frise
+    const _updateTlMonths = (retry) => {
+      const tl2 = seasonWrap.querySelector('.comp-timeline.v2');
+      if (!tl2) return;
+      const w = tl2.getBoundingClientRect().width;
+      if (!w) {
+        // panneau cache au rendu (largeur 0) : re-essaie jusqu'a affichage
+        // (setTimeout, pas rAF : gele en arriere-plan)
+        if ((retry || 0) < 40) setTimeout(() => _updateTlMonths((retry || 0) + 1), 250);
+        return;
+      }
+      const slot = w / 12;
+      const FULL = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+      const ABBR = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+      const MINI = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+      const set = slot >= 78 ? FULL : slot >= 36 ? ABBR : MINI;
+      tl2.querySelectorAll('.comp-tl-month').forEach(m => { m.textContent = set[+m.dataset.mi] || ''; });
+    };
+    _updateTlMonths();
+    if (!window._tlMonthsResizeWired) {
+      window._tlMonthsResizeWired = true;
+      window.addEventListener('resize', () => {
+        clearTimeout(window._tlMonthsRzT);
+        window._tlMonthsRzT = setTimeout(() => {
+          const sw = document.getElementById('comp-season');
+          if (sw && sw.querySelector('.comp-timeline.v2') && window._tlUpdateMonths) window._tlUpdateMonths();
+        }, 150);
+      });
+      window._tlUpdateMonths = _updateTlMonths;
+    }
+    window._tlUpdateMonths = _updateTlMonths;
+
     // Info-bulle unique (survol desktop, tap mobile ; 2e tap = detail du jour)
     const _tl = seasonWrap.querySelector('.comp-timeline');
     const _tip = seasonWrap.querySelector('.comp-tl-tip');
