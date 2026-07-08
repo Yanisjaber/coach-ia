@@ -1233,8 +1233,11 @@
 @media (max-width: 760px) {
   .add-sec-grid { gap: clamp(7px, 4.82px + 0.68vw, 10px); }
   .add-sec-grid.g3 { grid-template-columns: 1fr 1fr; }
-  /* 3e champ (RPE / sport) en pleine largeur sous les deux premiers */
-  .add-sec-grid.g3 > .form-field:nth-child(3) { grid-column: 1 / -1; }
+  /* 3e champ (RPE / sport) en pleine largeur sous les deux premiers.
+     data-vis (pose par reflowSecGrids) = nb de champs VISIBLES :
+     si seulement 2 visibles -> ils restent cote a cote, pas de span. */
+  .add-sec-grid.g3:not([data-vis="2"]):not([data-vis="1"]) > .form-field:nth-child(3) { grid-column: 1 / -1; }
+  .add-sec-grid[data-vis="1"] { grid-template-columns: 1fr; }
 }
 
 /* ============================================================

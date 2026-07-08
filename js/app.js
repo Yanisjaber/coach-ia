@@ -3098,6 +3098,21 @@ function _autofillKmDplusFromCompGpx() {
 // Conversion m<->km à l'affichage UNIQUEMENT : le stockage reste en km
 // (input.dataset.distUnit porte l'unité affichée, lue au moment du save).
 // ============================================================
+// Pose data-vis = nb de champs visibles sur chaque .add-sec-grid.
+// Le CSS mobile s'en sert : 2 champs visibles -> meme ligne (PARTOUT),
+// au lieu de compter les enfants caches via nth-child.
+function reflowSecGrids() {
+  document.querySelectorAll('.add-sec-grid').forEach(g => {
+    let vis = 0;
+    for (const c of g.children) {
+      if (c.hidden || c.style.display === 'none' || getComputedStyle(c).display === 'none') continue;
+      vis++;
+    }
+    g.dataset.vis = String(vis);
+  });
+}
+window.reflowSecGrids = reflowSecGrids;
+
 function adaptSportForm(selectId, ids) {
   const sel = document.getElementById(selectId);
   if (!sel || !window.SportProfiles || !window.SportProfiles.formConfig) return;
@@ -3155,6 +3170,7 @@ function adaptSportForm(selectId, ids) {
     const sec = kmInput.closest('.add-sec');
     if (sec) sec.style.display = (cfg.dist || cfg.dplus || cfg.gpx) ? '' : 'none';
   }
+  reflowSecGrids();
 }
 // Lit une distance saisie en respectant l'unité affichée -> renvoie des KM
 function readDistAsKm(inputId) {
