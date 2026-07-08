@@ -552,37 +552,61 @@
     color-scheme: dark;
     min-width: 150px;
   }
+  /* Plage min-max : UNE capsule (les deux inputs dedans, tiret central) */
   .act-range {
     display: flex;
     align-items: center;
-    gap: 6px;
-  }
-  .act-range span { color: var(--text-mute); font-size: 12px; }
-  .act-range input {
-    width: 64px;
     background: var(--bg-elev2);
     border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 9px;
+    border-radius: 999px;
     height: 36px;
+    padding: 0 4px;
+    transition: border-color 0.12s, box-shadow 0.12s;
+  }
+  .act-range:focus-within {
+    border-color: rgba(74, 222, 128, 0.5);
+    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.08);
+  }
+  .act-range span { color: var(--text-mute); font-size: 12px; flex: 0 0 auto; }
+  .act-range input {
+    width: 58px;
+    min-width: 0;
+    flex: 1 1 0;
+    background: none;
+    border: none;
+    color: var(--text);
+    height: 100%;
     padding: 0 8px;
     font-family: inherit;
     font-size: 13px;
+    text-align: center;
     color-scheme: dark;
     -moz-appearance: textfield;
   }
+  .act-range input:focus { outline: none; }
   .act-range input::-webkit-outer-spin-button,
   .act-range input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .act-filter select:focus,
-  .act-range input:focus { outline: none; border-color: rgba(74, 222, 128, 0.5); }
+  .act-filter select:focus { outline: none; border-color: rgba(74, 222, 128, 0.5); }
   .act-range input::placeholder { color: var(--text-mute); }
-  .act-filter-reset {
+  /* Select Sport en pilule + habillage du custom-select */
+  .act-filter select, .act-filter .custom-select-btn { border-radius: 999px; }
+  .act-filter .custom-select { min-width: 150px; }
+  .act-filter .custom-select-btn {
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
     height: 36px;
     padding: 0 14px;
-    background: var(--bg-elev2);
-    color: var(--text-dim);
-    border: 1px solid var(--border);
-    border-radius: 9px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+  }
+  .act-filter-reset {
+    height: 36px;
+    padding: 0 16px;
+    background: none;
+    color: var(--text-mute);
+    border: 1px dashed var(--border);
+    border-radius: 999px;
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;

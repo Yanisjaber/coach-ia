@@ -12382,6 +12382,8 @@ function populateActSportFilter(allActs) {
   sel.innerHTML = '<option value="">Tous les sports</option>'
     + opts.map(o => `<option value="${o}">${o}</option>`).join('');
   sel.dataset.filled = '1';
+  // Dropdown custom (menu natif non stylable)
+  if (typeof enhanceSelect === 'function') { enhanceSelect('act-sport-filter'); if (sel._customUpdate) sel._customUpdate(); }
 }
 
 const fmtSearchDate = d => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
