@@ -73,6 +73,8 @@
   };
 
   var T = {
+    // cible : retiree des tuiles (le 'temps cible' d'une compet realisee est
+    // rempli avec le temps roule au pull -> redondant et trompeur a l'affichage)
     cible: function (act) { return (act.category === 'competition' && act.target != null && act.target !== '') ? { lab: 'Temps cible', val: fmtMinToTime(act.target), color: C.violet } : null; },
     puissance: function (act) { return act.avg_watts ? { lab: 'Puissance · W', val: act.avg_watts + ' moy' + (act.max_watts ? ' · ' + act.max_watts + ' max' : ''), color: C.amber } : null; },
     np: function (act) { return act.np ? { lab: 'NP' + (act.ftpPct ? ' · ' + act.ftpPct + '% FTP' : ''), val: act.np + ' W' + (act.intensity ? ' · IF ' + act.intensity : ''), color: C.yellow } : null; },
@@ -91,12 +93,12 @@
   var PROFILES = {
     cyclisme: {
       heroes: [H.duree, H.distanceKm, H.vitesse, H.deniv, H.np],
-      tiles: [T.cible, T.puissance, T.np, T.cardio, T.cadenceRpm, T.tss, T.energie, T.rpe, T.tours],
+      tiles: [T.puissance, T.np, T.cardio, T.cadenceRpm, T.tss, T.energie, T.rpe, T.tours],
       shortMeta: function (act, ctx) { return [ctx.durShort, ctx.distKm ? Math.round(ctx.distKm) + ' km' : null]; },
     },
     course: {
       heroes: [H.duree, H.distanceKm, H.allureKm, H.deniv, H.cardio],
-      tiles: [T.cible, T.cardio, T.cadencePas, T.tss, T.energie, T.rpe, T.tours],
+      tiles: [T.cardio, T.cadencePas, T.tss, T.energie, T.rpe, T.tours],
       shortMeta: function (act, ctx) {
         var p = (ctx.distKm && ctx.durMin) ? fmtPace((ctx.durMin * 60) / ctx.distKm) : null;
         return [ctx.durShort, ctx.distKm ? (+ctx.distKm).toFixed(1) + ' km' : null, p ? p + '/km' : null];
@@ -104,7 +106,7 @@
     },
     natation: {
       heroes: [H.duree, H.distanceM, H.allure100m, H.cardio, H.charge],
-      tiles: [T.cible, T.cardio, T.tss, T.energie, T.rpe, T.longueurs],
+      tiles: [T.cardio, T.tss, T.energie, T.rpe, T.longueurs],
       shortMeta: function (act, ctx) { return [ctx.durShort, ctx.distKm ? Math.round(ctx.distKm * 1000) + ' m' : null]; },
     },
     musculation: {
@@ -117,12 +119,12 @@
     // attendant chaque segment garde le profil de SA discipline.
     triathlon: {
       heroes: [H.duree, H.distanceKm, H.vitesse, H.cardio],
-      tiles: [T.cible, T.cardio, T.tss, T.energie, T.rpe],
+      tiles: [T.cardio, T.tss, T.energie, T.rpe],
       shortMeta: function (act, ctx) { return [ctx.durShort, ctx.distKm ? Math.round(ctx.distKm) + ' km' : null]; },
     },
     autre: {
       heroes: [H.duree, H.distanceKm, H.vitesse, H.deniv, H.cardio],
-      tiles: [T.cible, T.puissance, T.np, T.cardio, T.cadenceRpm, T.tss, T.energie, T.rpe, T.tours],
+      tiles: [T.puissance, T.np, T.cardio, T.cadenceRpm, T.tss, T.energie, T.rpe, T.tours],
       shortMeta: function (act, ctx) { return [ctx.durShort, ctx.distKm ? Math.round(ctx.distKm) + ' km' : null]; },
     },
   };
