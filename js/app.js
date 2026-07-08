@@ -3237,33 +3237,51 @@ function wireTrio(cfg) {
   };
   const readRate = () => (cfg.mode === 'speed' ? (parseFloat(String(r.value).replace(',', '.')) || null) : parsePace(r.value));
   // dist en km pour speed/pace_km ; en m pour pace_100m
+  // Règle DÉTERMINISTE (recalcul même si les 3 champs sont remplis) :
+  // - je modifie le TEMPS      -> la vitesse/allure se recalcule (distance = fait de terrain)
+  // - je modifie la DISTANCE   -> la vitesse/allure se recalcule
+  // - je modifie la VITESSE    -> le temps se recalcule
+  // (si le champ prioritaire manque, on calcule celui qui est possible)
+  const setRate = (tm, dv) => {
+    if (cfg.mode === 'speed') r.value = +(dv / (tm / 60)).toFixed(1);
+    else if (cfg.mode === 'pace_km') r.value = fmtPaceSec(tm * 60 / dv);
+    else r.value = fmtPaceSec(tm * 60 / (dv / 100));
+    r.dataset.auto = '1';
+  };
+  const setDist = (tm, rv) => {
+    let dv;
+    if (cfg.mode === 'speed') dv = +(rv * tm / 60).toFixed(1);
+    else if (cfg.mode === 'pace_km') dv = +(tm * 60 / rv).toFixed(1);
+    else dv = Math.round(tm * 60 / rv * 100);
+    if (dv > 0) { d.value = (cfg.mode === 'speed' && d.dataset.distUnit === 'm') ? Math.round(dv * 1000) : dv; d.dataset.auto = '1'; }
+  };
+  const setTime = (dv, rv) => {
+    let mins;
+    if (cfg.mode === 'speed') mins = dv / rv * 60;
+    else if (cfg.mode === 'pace_km') mins = dv * rv / 60;
+    else mins = (dv / 100) * rv / 60;
+    const out = cfg.timeParse === 'target' ? fmtMinToTime(Math.round(mins)) : fmtSegTime(mins);
+    if (out) { t.value = out; t.dataset.auto = '1'; }
+  };
   const compute = (changed) => {
     const tm = readTime(), dv = readDist(), rv = readRate();
-    const setV = (el, val) => { if (val) { el.value = val; el.dataset.auto = '1'; } };
-    const isAuto = (el) => !el.value || el.dataset.auto === '1';
-    if (changed !== 'time' && tm == null || changed === 'time') { /* time est source */ }
-    // calcule le champ manquant/auto parmi les deux non-modifiés
-    if (tm != null && dv != null && (changed === 'time' || changed === 'dist') && isAuto(r)) {
-      if (cfg.mode === 'speed') setV(r, +( dv / (tm / 60) ).toFixed(1));
-      else if (cfg.mode === 'pace_km') setV(r, fmtPaceSec(tm * 60 / dv));
-      else setV(r, fmtPaceSec(tm * 60 / (dv / 100)));
-    } else if (tm != null && rv != null && (changed === 'time' || changed === 'rate') && isAuto(d)) {
-      if (cfg.mode === 'speed') setV(d, +( rv * tm / 60 ).toFixed(1));
-      else if (cfg.mode === 'pace_km') setV(d, +( tm * 60 / rv ).toFixed(1));
-      else setV(d, Math.round(tm * 60 / rv * 100));
-    } else if (dv != null && rv != null && (changed === 'dist' || changed === 'rate') && isAuto(t)) {
-      let mins = null;
-      if (cfg.mode === 'speed') mins = dv / rv * 60;
-      else if (cfg.mode === 'pace_km') mins = dv * rv / 60;
-      else mins = (dv / 100) * rv / 60;
-      const out = cfg.timeParse === 'target' ? fmtMinToTime(Math.round(mins)) : fmtSegTime(mins);
-      if (out) { t.value = out; t.dataset.auto = '1'; }
+    if (changed === 'time') {
+      if (tm == null) return;
+      if (dv != null) setRate(tm, dv);
+      else if (rv != null) setDist(tm, rv);
+    } else if (changed === 'dist') {
+      if (dv == null) return;
+      if (tm != null) setRate(tm, dv);
+      else if (rv != null) setTime(dv, rv);
+    } else {
+      if (rv == null) return;
+      if (dv != null) setTime(dv, rv);
+      else if (tm != null) setDist(tm, rv);
     }
   };
-  const mark = (el) => () => { delete el.dataset.auto; };
-  t.addEventListener('input', () => { mark(t)(); compute('time'); });
-  d.addEventListener('input', () => { mark(d)(); compute('dist'); });
-  r.addEventListener('input', () => { mark(r)(); compute('rate'); });
+  t.addEventListener('input', () => { delete t.dataset.auto; compute('time'); });
+  d.addEventListener('input', () => { delete d.dataset.auto; compute('dist'); });
+  r.addEventListener('input', () => { delete r.dataset.auto; compute('rate'); });
 }
 function wireCompTrios() {
   wireTrio({ timeId: 'comp-modal-target', distId: 'comp-modal-km', rateId: 'comp-modal-speed', mode: 'speed', timeParse: 'target' });
