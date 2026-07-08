@@ -2102,18 +2102,38 @@ function renderCompetitionsPage() {
 
   // ---- Passées enrichies (résultats réels) ----
   if (pastWrap) {
-    pastWrap.innerHTML = past.length ? past.map(c => {
-      const _pi = compPrio(c.priority);
+    // Regroupe les compets d'un MEME jour partageant le meme nom d'epreuve
+    // (2 activites Strava marquees Course le meme jour -> 1 seule carte,
+    // ex: CLM du matin + etape en ligne l'apres-midi).
+    const _groups = new Map();
+    for (const c of past) {
       const iso = toIsoDate(c.dateObj);
+      const od = window.odResultForDate ? window.odResultForDate(iso) : null;
+      const disp = (od && od.competitionName) ? od.competitionName : (c.name || '');
+      const key = iso + '|' + disp.trim().toLowerCase();
+      if (!_groups.has(key)) _groups.set(key, { main: c, others: [], iso, od, disp });
+      else _groups.get(key).others.push(c);
+    }
+    pastWrap.innerHTML = past.length ? [..._groups.values()].map(g => {
+      const c = g.main;
+      const _pi = compPrio(c.priority);
+      const iso = g.iso;
       const day = Array.isArray(data) ? data.find(d => toIsoDate(d.date) === iso) : null;
       const acts = (day && day.activities) ? day.activities : [];
       // Cible les activites DE LA COURSE, pas toute la journee :
       // 1) liees par id (_sbId / activityIds / client_id) — couvre le multisport
+      //    et l'union des compets regroupees
       // 2) sinon les activites category='competition' du jour
       // 3) sinon rapprochement par nom
       // 4) dernier recours : toutes les activites du jour (ancien comportement)
-      const _wanted = new Set([c._sbId].concat(Array.isArray(c.activityIds) ? c.activityIds : []).filter(Boolean).map(String));
-      let raceActs = acts.filter(a => _wanted.has(String(a._sbId)) || String(a.client_id) === String(c.id));
+      const _all = [c].concat(g.others);
+      const _wanted = new Set();
+      const _cids = new Set();
+      for (const cc of _all) {
+        [cc._sbId].concat(Array.isArray(cc.activityIds) ? cc.activityIds : []).filter(Boolean).forEach(id => _wanted.add(String(id)));
+        _cids.add(String(cc.id));
+      }
+      let raceActs = acts.filter(a => _wanted.has(String(a._sbId)) || _cids.has(String(a.client_id)));
       if (!raceActs.length) raceActs = acts.filter(a => a.category === 'competition');
       if (!raceActs.length && c.name) {
         const _n = c.name.trim().toLowerCase();
@@ -2138,7 +2158,7 @@ function renderCompetitionsPage() {
         : '<div class="comp-res-metrics comp-res-nodata">Pas de données d\'activité</div>';
 
       // Médaille = résultat officiel Open Dossard (lié par date), sinon trophée neutre
-      const od = window.odResultForDate ? window.odResultForDate(iso) : null;
+      const od = g.od;
       let medal;
       if (od && od.rankingScratch != null) {
         const podium = od.rankingScratch === 1 ? ' gold' : (od.rankingScratch <= 3 ? ' podium' : '');
@@ -2154,12 +2174,13 @@ function renderCompetitionsPage() {
       }
 
       // Nom officiel Open Dossard si dispo (le titre Strava reste en infobulle)
-      const _dispName = (od && od.competitionName) ? od.competitionName : c.name;
+      const _dispName = g.disp || c.name;
+      const _tooltipNames = _all.map(cc => cc.name).filter(Boolean).join(' + ');
       return `<div class="comp-result-card" data-prio="${_pi.key}" data-comp-id="${c.id}" style="--pc:${_pi.color};" title="Voir le détail">
         ${medal}
         <div class="comp-res-content">
           <div class="comp-res-top">
-            <span class="comp-res-name" title="${String(c.name || '').replace(/"/g, '&quot;')}"><span style="color:${_pi.color};">${_dispName}</span></span>
+            <span class="comp-res-name" title="${String(_tooltipNames || '').replace(/"/g, '&quot;')}"><span style="color:${_pi.color};">${_dispName}</span></span>
             <span class="comp-res-date">${dateLabel(c)}</span>
             <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
           </div>
