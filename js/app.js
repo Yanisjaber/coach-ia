@@ -2331,7 +2331,18 @@ function enhanceSelect(selectId) {
   }
   function updateLabel() {
     const selected = sel.options[sel.selectedIndex];
-    btn.querySelector('.custom-select-label').textContent = selected ? selected.textContent : '—';
+    const labEl = btn.querySelector('.custom-select-label');
+    const full = selected ? selected.textContent : '—';
+    labEl.textContent = full;
+    // Pas la place pour le nom complet ? on retire les emojis de tête
+    // (ex : "🏊🚴🏃 Triathlon" tronqué -> "Triathlon" lisible)
+    // setTimeout et non rAF : rAF est gelé fenêtre en arrière-plan
+    setTimeout(() => {
+      if (labEl.scrollWidth > labEl.clientWidth + 1) {
+        const noEmoji = full.replace(/^[^\p{L}\p{N}]+\s*/u, '');
+        if (noEmoji && noEmoji !== full) labEl.textContent = noEmoji;
+      }
+    }, 0);
   }
   function openPanel() {
     rebuildPanel();
