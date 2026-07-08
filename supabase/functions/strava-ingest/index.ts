@@ -111,8 +111,13 @@ Deno.serve(async (req) => {
     let reqBody: any = {};
     try { reqBody = await req.json(); } catch (_) { reqBody = {}; }
     const fullResync = reqBody && reqBody.full === true;
+    // Mode { hours_only: true } : relit TOUT l'historique Strava mais ne met a
+    // jour QUE start_date_local (les heures font foi cote Strava). Aucun impact
+    // sur tss/intensity/ftp_at_time/category — repare les heures falsifiees a
+    // 12:00 par d'anciennes versions sans toucher a l'historique de charge.
+    const hoursOnly = reqBody && reqBody.hours_only === true;
     let afterEpoch: number | null = null;
-    if (!fullResync) {
+    if (!fullResync && !hoursOnly) {
       const { data: latestAct } = await sbAdmin
         .from("activities")
         .select("start_date_local")
@@ -159,6 +164,25 @@ Deno.serve(async (req) => {
       all.push(...acts);
       if (acts.length < PER_PAGE) break;
       page++;
+    }
+
+    if (hoursOnly) {
+      let updated = 0;
+      for (const a of all) {
+        const sdl = a && (a.start_date_local || a.start_date);
+        if (!a || !a.id || !sdl) continue;
+        const { error: hErr, count } = await sbAdmin
+          .from("activities")
+          .update({ start_date_local: sdl }, { count: "exact" })
+          .eq("user_id", user.id)
+          .eq("strava_id", a.id);
+        if (!hErr && count) updated += count;
+      }
+      await sbAdmin.from("connexions_app").update({
+        last_sync_status: "ok",
+        last_sync_at: new Date().toISOString(),
+      }).eq("user_id", user.id).eq("app", "strava");
+      return json({ ok: true, hours_only: true, fetched: all.length, updated });
     }
 
     // ===== 4b) FTP effectif : profil sinon ESTIMÉ (comme le LTHR) =====
