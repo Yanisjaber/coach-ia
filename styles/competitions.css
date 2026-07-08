@@ -486,3 +486,33 @@
   margin: 2px 0 4px 26px;   /* aligné sous le nom (après le trophée) */
   letter-spacing: 0.2px;
 }
+
+/* Onglets triathlon de la modale compétition (Nat / T1 / Vélo / T2 / CAP) */
+.tri-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.tri-tab {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 8px;
+  padding: clamp(6px, 4.5px + 0.45vw, 8px) 4px;
+  font-size: clamp(11px, 10px + 0.34vw, 12.5px);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+  white-space: nowrap;
+}
+.tri-tab:hover { color: var(--text); }
+.tri-tab.active {
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.5);
+  background: rgba(244, 63, 94, 0.10);
+}
+.tri-tab.filled:not(.active) { color: var(--text); border-color: var(--text-mute); }
