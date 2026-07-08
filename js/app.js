@@ -2183,7 +2183,7 @@ function renderCompetitionsPage() {
       const _mr = _manualResLoad();
       for (const it of _items) {
         if (it.od) continue;
-        const r = _mr[String(it.c.id)];
+        const r = (it.c.result && it.c.result.place != null) ? it.c.result : _mr[String(it.c.id)];
         if (r && r.place != null) {
           it.od = { rankingScratch: r.place, rankingInCategory: r.place, totalInCategory: r.total || null, catev: r.catev || null, _manual: true };
         }
@@ -2369,14 +2369,41 @@ function _odOverridesLoad() {
 }
 function _odOverridesSave(m) {
   localStorage.setItem('coach_ia_od_overrides_v1', JSON.stringify(m || {}));
+  _odPrefsPush();
 }
 // Resultats saisis MANUELLEMENT (compets sans resultat Open Dossard)
-// { [compId]: { place, total, catev } }
+// { [compId]: { place, total, catev } } — cache local ; la VERITE est en base
+// (colonnes result_place/result_total/result_catev de activities).
 function _manualResLoad() {
   try { return JSON.parse(localStorage.getItem('coach_ia_manual_results_v1') || '{}'); } catch { return {}; }
 }
 function _manualResSave(m) {
   localStorage.setItem('coach_ia_manual_results_v1', JSON.stringify(m || {}));
+}
+// Pousse le resultat manuel sur la ligne activities (fire-and-forget)
+async function _manualResPush(comp, r) {
+  if (!window.sb || !comp || !comp._sbId) return;
+  try {
+    await window.sb.from('activities').update({
+      result_place: r ? r.place : null,
+      result_total: r ? (r.total || null) : null,
+      result_catev: r ? (r.catev || null) : null,
+    }).eq('id', comp._sbId);
+  } catch (e) { console.warn('[result push]', e.message || e); }
+}
+// Pousse les prefs Open Dossard (associations + masques) — 1 ligne par user
+async function _odPrefsPush() {
+  if (!window.sb) return;
+  try {
+    const { data: { user } } = await window.sb.auth.getUser();
+    if (!user) return;
+    await window.sb.from('od_prefs').upsert({
+      user_id: user.id,
+      overrides: _odOverridesLoad(),
+      hidden: [..._odHiddenLoad()],
+      updated_at: new Date().toISOString(),
+    });
+  } catch (e) { console.warn('[od prefs push]', e.message || e); }
 }
 // Resultats OD masques par l'utilisateur (cartes 'resultat officiel' supprimees)
 function _odHiddenLoad() {
@@ -2386,6 +2413,7 @@ function _odHiddenAdd(id) {
   const a = [..._odHiddenLoad()];
   if (!a.includes(String(id))) a.push(String(id));
   localStorage.setItem('coach_ia_od_hidden_v1', JSON.stringify(a));
+  _odPrefsPush();
 }
 
 // Mini-formulaire flottant : saisir/modifier un resultat manuel
@@ -2418,6 +2446,7 @@ function _openManualResultForm(btn, comp) {
     if (place) m[String(comp.id)] = { place, total, catev };
     else delete m[String(comp.id)];
     _manualResSave(m);
+    _manualResPush(comp, place ? { place, total, catev } : null);
     _closeCompActionsMenu();
     renderCompetitionsPage();
   });
@@ -2490,6 +2519,7 @@ function _openCompActionsMenu(btn, id) {
         const m = _manualResLoad();
         delete m[String(comp.id)];
         _manualResSave(m);
+        _manualResPush(comp, null);
         renderCompetitionsPage();
       } });
     } else if (!_hasOd) {

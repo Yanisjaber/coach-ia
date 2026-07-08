@@ -202,7 +202,7 @@ async function pullAllFromCloud() {
     {
       const _seen = new Set();
       const { data: ra } = await sb.from('activities')
-        .select('id, client_id, name, sport, start_date_local, priority, distance_km, course_dplus, target, laps, user_notes, gpx_name, stages, event, type, tss, rpe, moving_time, total_elevation_gain, tri')
+        .select('id, client_id, name, sport, start_date_local, priority, distance_km, course_dplus, target, laps, user_notes, gpx_name, stages, event, type, tss, rpe, moving_time, total_elevation_gain, tri, result_place, result_total, result_catev')
         .eq('user_id', userId).eq('category', 'competition');
       for (const r of (ra || [])) {
         const cid = String(r.client_id || r.id);
@@ -222,6 +222,7 @@ async function pullAllFromCloud() {
           laps: r.laps ?? null, notes: r.user_notes ?? null,
           tss: r.tss ?? null, rpe: r.rpe ?? null,
           tri: r.tri ?? null,
+          result: (r.result_place != null) ? { place: r.result_place, total: r.result_total ?? null, catev: r.result_catev ?? null } : null,
           gpxName: r.gpx_name ?? null,
           stages: Array.isArray(r.stages) && r.stages.length > 0,
           stagesList: Array.isArray(r.stages) ? r.stages.map(function (st) { return Object.assign({}, st, { target: parseTimeToMin(st.target) }); }) : null,
@@ -266,6 +267,15 @@ async function pullAllFromCloud() {
     localStorage.setItem('coach_ia_trainings_v1', JSON.stringify(prevu));
     localStorage.setItem('coach_ia_trainings_realise_v1', JSON.stringify([]));
   } catch (e) { console.warn('[pull planned]', e); }
+
+  // ----- prefs Open Dossard (associations manuelles + resultats masques) -----
+  try {
+    const { data: op } = await sb.from('od_prefs').select('overrides, hidden').eq('user_id', userId).maybeSingle();
+    if (op) {
+      localStorage.setItem('coach_ia_od_overrides_v1', JSON.stringify(op.overrides || {}));
+      localStorage.setItem('coach_ia_od_hidden_v1', JSON.stringify(op.hidden || []));
+    }
+  } catch (e) { console.warn('[pull od prefs]', e); }
 
   // ----- rest_day → array d'isos (kind passe/prevu ignoré côté client) -----
   try {
