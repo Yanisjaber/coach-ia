@@ -2092,47 +2092,69 @@ function renderCompetitionsPage() {
     const yearComps = comps.filter(c => c.dateObj.getFullYear() === yr).sort((a, b) => a.dateObj - b.dateObj);
     const pos = d => Math.max(0, Math.min(100, ((d - jan1) / span) * 100));
     const todayPos = pos(today);
-    // Répartition des étiquettes en "lanes" verticales pour éviter le chevauchement
-    const GAP = 16; // % minimal entre 2 étiquettes sur la même lane
-    const laneLast = [];
-    const tlItems = yearComps.map(c => ({ c, p: pos(c.dateObj) })).sort((a, b) => a.p - b.p);
-    tlItems.forEach(m => {
-      let lane = 0;
-      while (laneLast[lane] != null && m.p - laneLast[lane] < GAP) lane++;
-      laneLast[lane] = m.p; m.lane = lane;
-    });
-    const maxLane = Math.max(0, laneLast.length - 1);
-    const tlHeight = 34 + (maxLane + 1) * 15 + 4;
-    const markers = tlItems.map(m => {
-      const c = m.c;
+    // Marqueurs SANS etiquettes permanentes (illisible des ~10 compets,
+    // pire sur mobile) : un point par compet, survol/tap = info-bulle
+    // unique, 2e tap = ouvre le detail du jour.
+    const markers = yearComps.map(c => {
       const _pi = compPrio(c.priority);
       const isPast = c.endDateObj < today;
       const color = _pi.key === 'principal' ? _pi.color : '#9ca3af';
       const big = _pi.key === 'principal';
-      return `<div class="comp-tl-marker${isPast ? ' past' : ''}" style="left:${m.p.toFixed(1)}%;">
+      const label = `${c.name} · ${c.dateObj.getDate()}/${c.dateObj.getMonth() + 1}`;
+      return `<button type="button" class="comp-tl-marker${isPast ? ' past' : ''}" style="left:${pos(c.dateObj).toFixed(2)}%;" data-tl-label="${label.replace(/"/g, '&quot;')}" data-tl-color="${color}" data-tl-comp="${c.id}">
         <span class="comp-tl-dot${big ? ' big' : ''}" style="background:${color};${big ? `box-shadow:0 0 0 2px ${color};` : ''}"></span>
-        <span class="comp-tl-stem" style="top:13px;height:${5 + m.lane * 15}px;background:${color};"></span>
-        <span class="comp-tl-cap" style="margin-top:${5 + m.lane * 15}px;${big ? `color:${color};font-weight:700;` : ''}">${c.name} · ${c.dateObj.getDate()}/${c.dateObj.getMonth() + 1}</span>
-      </div>`;
+      </button>`;
     }).join('');
+    const MONTH_L = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+    const months = MONTH_L.map((m, i) => `<span class="comp-tl-month" style="left:${((i + 0.5) / 12 * 100).toFixed(2)}%">${m}</span>`).join('')
+      + [...Array(13)].map((_, i) => `<span class="comp-tl-tick" style="left:${(i / 12 * 100).toFixed(2)}%"></span>`).join('');
     const nPrincipal = yearComps.filter(c => compPrio(c.priority).key === 'principal').length;
     const nPast = yearComps.filter(c => c.endDateObj < today).length;
     seasonWrap.innerHTML = `
       <div class="grid-1 card">
         <div class="section-title">Saison ${yr}</div>
         ${yearComps.length === 0 ? '<div class="comp-empty">Aucune compétition cette saison.</div>' : `
-        <div class="comp-timeline" style="height:${tlHeight}px;">
+        <div class="comp-timeline v2">
           <div class="comp-tl-axis"></div>
+          ${months}
           <div class="comp-tl-today" style="left:${todayPos.toFixed(1)}%;"><span>auj.</span></div>
           ${markers}
+          <div class="comp-tl-tip" hidden></div>
         </div>
         <div class="comp-season-stats">
           <div><span class="comp-ss-val">${yearComps.length}</span> <span class="comp-ss-k">compétition${yearComps.length > 1 ? 's' : ''}</span></div>
-          <div><span class="comp-ss-val" style="color:#fbbf24;">${nPrincipal}</span> <span class="comp-ss-k">objectif${nPrincipal > 1 ? 's' : ''} principal${nPrincipal > 1 ? 'aux' : ''}</span></div>
+          <div><span class="comp-ss-val" style="color:#fbbf24;">${nPrincipal}</span> <span class="comp-ss-k">objectif${nPrincipal > 1 ? 's' : ''} ${nPrincipal > 1 ? 'principaux' : 'principal'}</span></div>
           <div><span class="comp-ss-val">${yearComps.length - nPrincipal}</span> <span class="comp-ss-k">préparation</span></div>
           <div><span class="comp-ss-val">${nPast}</span> <span class="comp-ss-k">déjà courue${nPast > 1 ? 's' : ''}</span></div>
         </div>`}
       </div>`;
+    // Info-bulle unique (survol desktop, tap mobile ; 2e tap = detail du jour)
+    const _tl = seasonWrap.querySelector('.comp-timeline');
+    const _tip = seasonWrap.querySelector('.comp-tl-tip');
+    if (_tl && _tip) {
+      const _show = (b) => {
+        _tip.textContent = b.dataset.tlLabel;
+        _tip.style.color = b.dataset.tlColor;
+        _tip.style.left = Math.max(8, Math.min(92, parseFloat(b.style.left))) + '%';
+        _tip.hidden = false;
+        _tip.dataset.for = b.dataset.tlComp;
+      };
+      _tl.addEventListener('mouseover', (e) => { const b = e.target.closest('.comp-tl-marker'); if (b) _show(b); });
+      _tl.addEventListener('mouseleave', () => { _tip.hidden = true; _tip.dataset.for = ''; });
+      _tl.addEventListener('click', (e) => {
+        const b = e.target.closest('.comp-tl-marker');
+        if (!b) { _tip.hidden = true; _tip.dataset.for = ''; return; }
+        e.stopPropagation();
+        if (!_tip.hidden && _tip.dataset.for === b.dataset.tlComp && e.pointerType !== 'mouse') { _show(b); return; }
+        const comp = loadCompetitions().find(c2 => c2.id === b.dataset.tlComp);
+        if (!_tip.hidden && _tip.dataset.for === b.dataset.tlComp && comp && comp.date && typeof openSessionModal === 'function') {
+          const isPast2 = new Date(comp.date + 'T12:00:00') < today;
+          openSessionModal(comp.date, isPast2 ? 'realise' : 'prevu');
+          return;
+        }
+        _show(b);
+      });
+    }
   }
 
   // ---- À venir (avec jauge de prépa) ----

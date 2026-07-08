@@ -677,3 +677,53 @@
   background: var(--border, #26304a);
   margin: 0 4px;
 }
+
+/* Frise de saison v2 : points + mois, info-bulle unique (fini les
+   etiquettes empilees illisibles) */
+.comp-timeline.v2 { height: clamp(58px, 54px + 1.25vw, 68px) !important; margin: 26px 8px 0; }
+.comp-timeline.v2 .comp-tl-axis { top: 26px; }
+.comp-timeline.v2 .comp-tl-today { top: 20px; }
+.comp-tl-tick {
+  position: absolute;
+  top: 22px;
+  width: 1px;
+  height: 10px;
+  background: var(--border, #26304a);
+  opacity: 0.55;
+}
+.comp-tl-month {
+  position: absolute;
+  top: 42px;
+  transform: translateX(-50%);
+  font-size: clamp(8.5px, 8px + 0.15vw, 9.5px);
+  color: var(--text-mute, #6b7686);
+  letter-spacing: 0.5px;
+}
+.comp-timeline.v2 .comp-tl-marker {
+  background: none;
+  border: none;
+  top: 18px;
+  padding: 3px;
+  cursor: pointer;
+}
+.comp-timeline.v2 .comp-tl-dot { width: clamp(9px, 8px + 0.3vw, 12px); height: clamp(9px, 8px + 0.3vw, 12px); transition: transform 0.12s; }
+.comp-timeline.v2 .comp-tl-dot.big { width: clamp(12px, 11px + 0.3vw, 15px); height: clamp(12px, 11px + 0.3vw, 15px); }
+.comp-timeline.v2 .comp-tl-marker:hover .comp-tl-dot { transform: scale(1.3); }
+.comp-tl-tip {
+  position: absolute;
+  top: -22px;
+  transform: translateX(-50%);
+  background: var(--bg-elev2, #141a26);
+  border: 1px solid var(--border, #26304a);
+  border-radius: 7px;
+  padding: 3px 10px;
+  font-size: clamp(10px, 9.4px + 0.2vw, 11.5px);
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 92%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 6;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}

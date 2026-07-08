@@ -373,6 +373,7 @@
   /* ===== Frise de saison : largeur fixe + scroll horizontal de la carte ===== */
   .grid-1.card:has(> .comp-timeline) { overflow-x: auto; }
   .comp-timeline { width: 560px; }
+  .comp-timeline.v2 { width: auto; }
 
   /* ===== Toolbars de graphiques : passage à la ligne propre ===== */
   .date-range { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; row-gap: 8px; }
