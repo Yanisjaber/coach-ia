@@ -4367,14 +4367,38 @@ function getDisplayedActivity(realDay) {
 function renderRealisedDayCard(d, dow, realDay, isToday) {
   const dispo = getDisplayedActivity(realDay);
   // Si pas de tableau activities (ancien data.js), fallback sur les champs racine du day
-  const act = dispo ? dispo.activity : realDay;
+  let act = dispo ? dispo.activity : realDay;
   const total = dispo ? dispo.total : 1;
   const idx = dispo ? dispo.idx : 0;
   const iso = toIsoDate(d);
 
-  const dur = act.duration || 0;
+  let dur = act.duration || 0;
 
-  const hasMulti = total > 1;
+  let hasMulti = total > 1;
+
+  // Jour multisport COMPLET (triathlon/brick...) : il se comporte comme
+  // N'IMPORTE QUEL SPORT -> une seule tuile classique (pastille Triathlon,
+  // durée/distance totales). Le détail par discipline vit dans la modale.
+  if (hasMulti && window.SportProfiles && window.SportProfiles.detectMultisport) {
+    const _g0 = window.SportProfiles.detectMultisport(realDay.activities);
+    if (_g0 && _g0.legs.length === realDay.activities.length) {
+      hasMulti = false;
+      act = {
+        name: _g0.kind,
+        raw_type: 'Triathlon', sport: 'Triathlon',
+        type: 'vo2', sessionType: 'vo2',
+        duration: _g0.totals.durMin,
+        distance_km: +(realDay.activities.reduce((s2, a2) => s2 + (+a2.distance_km || 0), 0).toFixed(1)),
+        elevation_gain: realDay.activities.reduce((s2, a2) => s2 + (+a2.elevation_gain || 0), 0),
+        tss: Math.round(_g0.totals.tss),
+        calories: Math.round(_g0.totals.kcal),
+        category: realDay.activities.some(a2 => a2.category === 'competition') ? 'competition' : undefined,
+        priority: (realDay.activities.find(a2 => a2.category === 'competition') || {}).priority,
+        structure: null,
+      };
+      dur = act.duration;
+    }
+  }
 
   // Jour multi-activites : on divise la 2e partie de la case en colonnes pleine
   // hauteur (1 par activite : liisere couleur du sport + glyph + duree). Clic = ouvre l'activite.
@@ -5153,6 +5177,7 @@ function _sportCatKey(v) {
   return 'autre';
 }
 const _SPORT_ICON_GROUP = {
+  triathlon: 'run',
   cyclisme: 'bike', vtt: 'bike',
   course: 'run', trail: 'run', marche: 'walk',
   natation: 'swim', nautique: 'swim',
