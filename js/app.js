@@ -53,6 +53,7 @@ import './power-profile.js';
 // ========= DAY EXTRAS (actions rapides sur un jour du calendrier) =========
 // Bouton "+" au hover, popover : ajouter entraînement / note / repos / cycle (phase).
 // Auto-bootstrap + MutationObserver sur #week-calendar pour ré-attacher après chaque render.
+import './sport-profiles.js';
 import './day-extras.js';
 import './scroll-lock.js';
 import './adherence.js';
@@ -4434,13 +4435,17 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   const raceClass = isCompAct ? ' race' : '';
   const raceAttr = isCompAct ? ` data-prio="${compPrio(compToday ? compToday.priority : null).key}"` : '';
 
-  // Meta : durée + km (Strava) OU durée + TSS (manuel sans km, ex: muscu/yoga)
+  // Meta : pilotée par le profil du sport (course → allure, natation → m, muscu → TSS...)
   let metaParts = [];
-  if (dur) metaParts.push(fmtDur(dur));
-  if (km) metaParts.push(km);
-  else if (act.tss) metaParts.push(act.tss + ' TSS'); // pas de km → on met TSS
-  if (act.elevation_gain) metaParts.push(Math.round(act.elevation_gain) + ' m D+');
-  if (act.rpe != null && act.rpe !== '') metaParts.push('RPE ' + act.rpe);
+  if (window.SportProfiles) {
+    metaParts = window.SportProfiles.shortMeta(act);
+  } else {
+    if (dur) metaParts.push(fmtDur(dur));
+    if (km) metaParts.push(km);
+    else if (act.tss) metaParts.push(act.tss + ' TSS');
+    if (act.elevation_gain) metaParts.push(Math.round(act.elevation_gain) + ' m D+');
+    if (act.rpe != null && act.rpe !== '') metaParts.push('RPE ' + act.rpe);
+  }
   // Chaque item dans son propre span → CSS peut stacker en colonne sur petits écrans
   // sans wrap moche au milieu de "36 km".
   const metaLine = metaParts.map(p => `<span class="dst-meta-item">${p}</span>`).join('');
@@ -9309,65 +9314,32 @@ function openSessionModal(iso, source) {
         // Fallbacks de cles : Strava (distance_km / elevation_gain) ou saisie manuelle (km / dplus).
         const _distKm = act.distance_km || act.km;
         const _dplusM = act.elevation_gain || act.total_elevation_gain || act.dplus;
-        // Allure (course/natation) ou vitesse (cyclisme) calculee depuis distance + duree,
-        // si Strava ne fournit pas deja la vitesse moyenne.
-        let _allureCard = '';
-        if (_distKm && dur && !act.avg_speed_kmh) {
-          const _cat = (typeof getSportCategory === 'function') ? getSportCategory(act.raw_type || act.sport_raw || act.sport || '') : 'cyclisme';
-          const _fmtPace = (secPer) => Math.floor(secPer / 60) + ':' + String(Math.round(secPer % 60)).padStart(2, '0');
-          if (_cat === 'course') _allureCard = card('Allure', _fmtPace((dur * 60) / _distKm), '/km');
-          else if (_cat === 'natation') _allureCard = card('Allure', _fmtPace((dur * 60) / (_distKm * 10)), '/100m');
-          else _allureCard = card('Vitesse moy', (+(_distKm / (dur / 60)).toFixed(1)), 'km/h');
-        }
-        // === Bloc stats : 3 heros (Duree, Distance, Vitesse) + sous-stats teintees par categorie ===
-        const _svgClock = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
-        const _svgRoute = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg>';
-        const _svgSpeed = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14" r="2"/><path d="M13.4 12.6 19 7"/><path d="M3.6 19a9 9 0 1 1 16.8 0"/></svg>';
-        const _svgMtn = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20 9 8l3.5 6 2.5-4.5L21 20Z"/></svg>';
-        const _durStr = dur < 60 ? `${Math.round(dur)}<span style="font-size:13px"> min</span>` : `${h}<span style="font-size:13px">h</span>${m}`;
-        let _speedHero = null;
-        if (act.avg_speed_kmh) _speedHero = { val: act.avg_speed_kmh, unit: 'km/h', lab: 'Vitesse moy' };
-        else if (_distKm && dur) {
-          const _cat = (typeof getSportCategory === 'function') ? getSportCategory(act.raw_type || act.sport || '') : 'cyclisme';
-          const _fp = (s) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
-          if (_cat === 'course') _speedHero = { val: _fp((dur * 60) / _distKm), unit: '/km', lab: 'Allure' };
-          else if (_cat === 'natation') _speedHero = { val: _fp((dur * 60) / (_distKm * 10)), unit: '/100m', lab: 'Allure' };
-          else _speedHero = { val: +(_distKm / (dur / 60)).toFixed(1), unit: 'km/h', lab: 'Vitesse moy' };
-        }
-        const heroCard = (svg, val, unit, lab, color) =>
+        // === Bloc stats piloté par le PROFIL DU SPORT (js/sport-profiles.js) ===
+        // course -> allure /km, natation -> distance m + /100m, muscu -> pas de
+        // distance/vitesse... Ajouter un sport = ajouter un profil dans le module.
+        const heroCard = (hh2) =>
           `<div class="act-hero">`
-          + `<span class="act-hero-ico" style="color:${color}">${svg}</span>`
-          + `<div class="act-hero-tx"><div class="act-hero-val">${val}${unit ? `<span class="act-hero-unit"> ${unit}</span>` : ''}</div>`
-          + `<div class="act-hero-lab">${lab}</div></div></div>`;
-        const _heroes = [heroCard(_svgClock, _durStr, '', elapsedSub ? ('Durée · ' + elapsedSub) : 'Durée', '#60a5fa')];
-        if (_distKm) _heroes.push(heroCard(_svgRoute, _distKm, 'km', 'Distance', '#22d3ee'));
-        if (_speedHero) _heroes.push(heroCard(_svgSpeed, _speedHero.val, _speedHero.unit, _speedHero.lab, '#34d399'));
-        if (_dplusM) _heroes.push(heroCard(_svgMtn, _dplusM, 'm D+', 'Dénivelé', '#84cc16'));
-        if (_heroes.length < 4 && act.np) _heroes.push(heroCard(_svgSpeed, act.np, 'W', 'NP', '#fbbf24'));
-        const _heroRow = _heroes.length ? `<div class="act-hero-row" data-n="${Math.min(_heroes.length, 4)}">${_heroes.slice(0, 4).join('')}</div>` : '';
-
-        const _mut = 'var(--text-mute,#7c879c)';
-        const tile = (lab, valHTML, color) =>
-          `<div class="act-tile" style="background:${color}17;--tile-c:${color}">`
-          + `<div class="act-tile-lab">${lab}</div>`
-          + `<div class="act-tile-val">${valHTML}</div></div>`;
-        const _tiles = [];
-        if (act.category === 'competition' && act.target != null && act.target !== '') _tiles.push(tile('Temps cible', fmtMinToTime(act.target), '#c084fc'));
-        if (act.avg_watts) _tiles.push(tile('Puissance · W', `${act.avg_watts} moy` + (act.max_watts ? ` · ${act.max_watts} max` : ''), '#f59e0b'));
-        if (act.np) _tiles.push(tile('NP' + (act.ftpPct ? ` · ${act.ftpPct}% FTP` : ''), `${act.np} W` + (act.intensity ? ` · IF ${act.intensity}` : ''), '#fbbf24'));
-        if (act.hr) _tiles.push(tile('Cardio · bpm', `${act.hr} moy` + (act.max_hr ? ` · ${act.max_hr} max` : ''), '#f87171'));
-        if (act.cadence) _tiles.push(tile('Cadence · rpm', `${act.cadence}` + (act.max_cadence ? ` · ${act.max_cadence} max` : ''), '#a78bfa'));
-        if (act.tss) _tiles.push(tile('TSS', `${act.tss}`, '#9ca3af'));
-        if (act.kj) _tiles.push(tile('Énergie', `${act.kj} kJ` + (act.calories ? ` · ${act.calories} kcal` : ''), '#9ca3af'));
-        if (act.rpe) _tiles.push(tile('RPE', `${act.rpe}/10`, '#9ca3af'));
-        if (act.laps) _tiles.push(tile('Tours', `${act.laps}`, '#9ca3af'));
-        const _n = _tiles.length;
+          + `<span class="act-hero-ico" style="color:${hh2.color}">${hh2.svg}</span>`
+          + `<div class="act-hero-tx"><div class="act-hero-val">${hh2.val}${hh2.unit ? `<span class="act-hero-unit"> ${hh2.unit}</span>` : ''}</div>`
+          + `<div class="act-hero-lab">${hh2.lab}</div></div></div>`;
+        const tile = (tt2) =>
+          `<div class="act-tile" style="background:${tt2.color}17;--tile-c:${tt2.color}">`
+          + `<div class="act-tile-lab">${tt2.lab}</div>`
+          + `<div class="act-tile-val">${tt2.val}</div></div>`;
+        const _durStr = dur < 60 ? `${Math.round(dur)}<span style="font-size:13px"> min</span>` : `${h}<span style="font-size:13px">h</span>${m}`;
+        const _spCtx = { durMin: dur, durStr: _durStr, elapsedSub, distKm: _distKm, dplusM: _dplusM };
+        const _heroDefs = window.SportProfiles ? window.SportProfiles.heroes(act, _spCtx) : [];
+        const _tileDefs = window.SportProfiles ? window.SportProfiles.tiles(act, _spCtx) : [];
+        const _heroRow = _heroDefs.length ? `<div class="act-hero-row" data-n="${Math.min(_heroDefs.length, 4)}">${_heroDefs.slice(0, 4).map(heroCard).join('')}</div>` : '';
+        const _n = _tileDefs.length;
         const _cols = _n <= 4 ? Math.max(1, _n) : Math.ceil(_n / 2);   // <=4 -> 1 rangee ; sinon 2 rangees equilibrees (desktop)
-        const _tileGrid = _n ? `<div class="act-tile-grid" data-n="${_n}" style="--tile-cols:${_cols};--tile-tracks:${_cols * 2}">${_tiles.join('')}</div>` : '';
+        const _tileGrid = _n ? `<div class="act-tile-grid" data-n="${_n}" style="--tile-cols:${_cols};--tile-tracks:${_cols * 2}">${_tileDefs.map(tile).join('')}</div>` : '';
         const statsHTML = (_heroRow || _tileGrid) ? `<div class="modal-section">${_heroRow}${_tileGrid}</div>` : '';
 
-        // (Lien "Voir sur Strava" supprimé : l'app affiche SA base de données ;
-        // Strava n'est que la source d'alimentation lors des synchros.)
+        // Id Strava : uniquement pour savoir si des streams existent (section graphique).
+        // (le lien externe a été retiré : l'app n'affiche que SA base de données)
+        const aId = act.id || act.activityId || day.activityId;
+        const stravaId = aId ? String(aId).replace(/^s/, '').replace(/^i/, '') : '';
         const comparHTML = (typeof window.renderPrevuVsRealiseHTML === 'function') ? window.renderPrevuVsRealiseHTML(act, iso) : '';
         const _struct = act.structure;
         const _structDet = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(_struct) : '';
