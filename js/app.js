@@ -3034,6 +3034,65 @@ function _autofillKmDplusFromCompGpx() {
   }
 }
 
+// ============================================================
+// Adaptation des FORMULAIRES au sport sélectionné (natation -> distance en m,
+// pas de D+/GPX ; musculation -> section Parcours masquée ; etc.).
+// Conversion m<->km à l'affichage UNIQUEMENT : le stockage reste en km
+// (input.dataset.distUnit porte l'unité affichée, lue au moment du save).
+// ============================================================
+function adaptSportForm(selectId, ids) {
+  const sel = document.getElementById(selectId);
+  if (!sel || !window.SportProfiles || !window.SportProfiles.formConfig) return;
+  const cfg = window.SportProfiles.formConfig(sel.value);
+  const kmInput = ids.km ? document.getElementById(ids.km) : null;
+  if (kmInput) {
+    const lab = kmInput.closest('label');
+    const span = lab && lab.querySelector('span');
+    const prev = kmInput.dataset.distUnit || 'km';
+    const next = cfg.dist || 'km';
+    if (prev !== next && kmInput.value !== '') {
+      const v = parseFloat(kmInput.value);
+      if (!isNaN(v)) kmInput.value = next === 'm' ? Math.round(v * 1000) : +(v / 1000).toFixed(2);
+    }
+    kmInput.dataset.distUnit = next;
+    if (span) span.textContent = next === 'm' ? 'Distance (m)' : 'Distance (km)';
+    if (lab) lab.style.display = cfg.dist ? '' : 'none';
+  }
+  if (ids.dplus) {
+    const el = document.getElementById(ids.dplus);
+    const lab = el && el.closest('label');
+    if (lab) lab.style.display = cfg.dplus ? '' : 'none';
+  }
+  if (ids.gpx) {
+    const g = document.getElementById(ids.gpx);
+    const wrap = g && g.closest('.form-field');
+    if (wrap) wrap.style.display = cfg.gpx ? '' : 'none';
+  }
+  if (ids.laps) {
+    const l = document.getElementById(ids.laps);
+    const lab2 = l && l.closest('label');
+    const span2 = lab2 && lab2.querySelector('span');
+    if (span2 && cfg.laps) span2.textContent = cfg.laps;
+  }
+  // Section Parcours entière (train-modal) : masquée si plus aucun champ dedans
+  if (ids.hideSection && kmInput) {
+    const sec = kmInput.closest('.add-sec');
+    if (sec) sec.style.display = (cfg.dist || cfg.dplus || cfg.gpx) ? '' : 'none';
+  }
+}
+// Lit une distance saisie en respectant l'unité affichée -> renvoie des KM
+function readDistAsKm(inputId) {
+  const el = document.getElementById(inputId);
+  if (!el) return null;
+  const v = parseFloat(el.value);
+  if (isNaN(v) || v <= 0) return null;
+  return el.dataset.distUnit === 'm' ? +(v / 1000).toFixed(3) : v;
+}
+const adaptTrainSportForm = () => adaptSportForm('train-modal-sport', { km: 'train-modal-km', dplus: 'train-modal-dplus', gpx: 'train-modal-gpx', hideSection: true });
+const adaptCompSportForm = () => adaptSportForm('comp-modal-sport', { km: 'comp-modal-km', dplus: 'comp-modal-dplus', gpx: 'comp-modal-gpx', laps: 'comp-modal-laps' });
+document.getElementById('train-modal-sport')?.addEventListener('change', adaptTrainSportForm);
+document.getElementById('comp-modal-sport')?.addEventListener('change', adaptCompSportForm);
+
 function openCompModal() {
   const modal = document.getElementById('comp-modal');
   if (!modal) return;
@@ -3076,6 +3135,7 @@ function openCompModal() {
   if (typeof populateSportSelect === 'function') populateSportSelect('comp-modal-sport', 'Ride');
   const sportEl = document.getElementById('comp-modal-sport');
   if (sportEl) sportEl.value = 'Ride';
+  setTimeout(() => { if (typeof adaptCompSportForm === 'function') adaptCompSportForm(); }, 0);
   if (sportEl && sportEl._customUpdate) sportEl._customUpdate();
   // Peuple le select Type d'épreuve selon le sport actif
   if (typeof populateTypeSelectForSport === 'function') populateTypeSelectForSport('Ride');
@@ -3220,7 +3280,7 @@ async function saveCompFromModal() {
   const priority = document.getElementById('comp-modal-priority').value;
   const sport = document.getElementById('comp-modal-sport').value;
   const typeEpr = document.getElementById('comp-modal-type').value.trim();
-  const km = parseFloat(document.getElementById('comp-modal-km').value) || null;
+  const km = (typeof readDistAsKm === 'function') ? readDistAsKm('comp-modal-km') : (parseFloat(document.getElementById('comp-modal-km').value) || null);
   const dplus = parseInt(document.getElementById('comp-modal-dplus').value, 10) || null;
   const target = parseTimeToMin(document.getElementById('comp-modal-target').value);
   const laps = parseInt(document.getElementById('comp-modal-laps').value, 10) || null;
@@ -3477,6 +3537,7 @@ function openTrainModal(mode) {
   const s = document.getElementById('train-modal-sport');
   if (s) s.value = 'Ride';
   if (s && s._customUpdate) s._customUpdate();
+  if (typeof adaptSportForm === 'function') adaptSportForm('train-modal-sport', { km: 'train-modal-km', dplus: 'train-modal-dplus', gpx: 'train-modal-gpx', hideSection: true });
   // Date par défaut : aujourd'hui pour réalisé, demain pour prévu
   const dateInput = document.getElementById('train-modal-date');
   if (dateInput) {
@@ -3524,6 +3585,8 @@ function openTrainModalForEdit(training, mode) {
   if (typeof window.setWorkoutStructure === 'function') {
     window.setWorkoutStructure(training.structure || []);
   }
+  // Adapte le formulaire au sport (convertit l'affichage km->m si natation)
+  if (typeof adaptSportForm === 'function') adaptSportForm('train-modal-sport', { km: 'train-modal-km', dplus: 'train-modal-dplus', gpx: 'train-modal-gpx', hideSection: true });
   // Controles "activite" (mode realise edite) : exclusions records + transformer en compet
   {
     const _ctrls = document.getElementById('train-modal-act-controls');
@@ -3649,7 +3712,7 @@ function saveTrainFromModal() {
   const tss = parseInt(document.getElementById('train-modal-tss').value, 10) || 0;
   const notes = document.getElementById('train-modal-notes').value.trim();
   const rpe = parseFloat(document.getElementById('train-modal-rpe').value) || null;
-  const km = parseFloat(document.getElementById('train-modal-km').value) || null;
+  const km = (typeof readDistAsKm === 'function') ? readDistAsKm('train-modal-km') : (parseFloat(document.getElementById('train-modal-km').value) || null);
   const dplus = parseInt(document.getElementById('train-modal-dplus').value, 10) || null;
   const laps = null; // champ 'nombre de tours' retire des entrainements (garde pour les competitions)
   const _gpx = (window.getTrainGpx ? window.getTrainGpx() : { name: null, content: null });
@@ -3738,6 +3801,7 @@ window.openLibraryTemplateModal = function (tpl) {
     const s = document.getElementById('train-modal-sport');
     if (s) { s.value = tpl.sport_raw || LIB_KEY_TO_RAW[tpl.sport] || 'Ride'; if (s._customUpdate) s._customUpdate(); }
     if (typeof window.setWorkoutStructure === 'function') window.setWorkoutStructure(tpl.structure || []);
+    if (typeof adaptSportForm === 'function') adaptSportForm('train-modal-sport', { km: 'train-modal-km', dplus: 'train-modal-dplus', gpx: 'train-modal-gpx', hideSection: true });
     const delBtn = document.getElementById('train-modal-delete');
     if (delBtn) delBtn.hidden = false;
   }
@@ -3766,7 +3830,7 @@ function saveTemplateFromTrainModal() {
     tss: parseInt(document.getElementById('train-modal-tss').value, 10) || 0,
     description: document.getElementById('train-modal-notes').value.trim(),
     rpe: parseFloat(document.getElementById('train-modal-rpe').value) || null,
-    km: parseFloat(document.getElementById('train-modal-km').value) || null,
+    km: (typeof readDistAsKm === 'function') ? readDistAsKm('train-modal-km') : (parseFloat(document.getElementById('train-modal-km').value) || null),
     dplus: parseInt(document.getElementById('train-modal-dplus').value, 10) || null,
     structure: (structure && structure.length) ? structure : null,
   };
@@ -10613,6 +10677,7 @@ function openCompModalForEdit(comp) {
   }
   document.getElementById('comp-modal-km').value = effKm != null ? effKm : '';
   document.getElementById('comp-modal-dplus').value = effDplus != null ? effDplus : '';
+  setTimeout(() => { if (typeof adaptCompSportForm === 'function') adaptCompSportForm(); }, 0);
   document.getElementById('comp-modal-target').value = fmtMinToTime(comp.target);
   document.getElementById('comp-modal-laps').value = comp.laps != null ? comp.laps : '';
   document.getElementById('comp-modal-notes').value = comp.notes || '';

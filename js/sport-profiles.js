@@ -225,10 +225,25 @@
     return '<div class="modal-section msg-group">' + head + '<div class="msg-segs">' + rows.join('') + '</div></div>';
   }
 
+  // ---- Config des FORMULAIRES de création (entraînement / compétition / bibliothèque) ----
+  // dist : 'km' | 'm' | null (champ masqué) ; dplus/gpx : bool ; laps : libellé custom
+  var FORM = {
+    cyclisme: { dist: 'km', dplus: true, gpx: true, laps: 'Nombre de tours' },
+    course: { dist: 'km', dplus: true, gpx: true, laps: 'Nombre de tours' },
+    natation: { dist: 'm', dplus: false, gpx: false, laps: 'Longueurs' },
+    musculation: { dist: null, dplus: false, gpx: false, laps: 'Séries' },
+    triathlon: { dist: 'km', dplus: true, gpx: true, laps: 'Nombre de tours' },
+    autre: { dist: 'km', dplus: true, gpx: true, laps: 'Nombre de tours' },
+  };
+
   window.SportProfiles = {
     categoryOf: catOf,
     detectMultisport: detectMultisport,
     renderMultisportHTML: renderMultisportHTML,
+    formConfig: function (sportVal) {
+      var cat = (typeof window.getSportCategory === 'function') ? window.getSportCategory(sportVal || '') : 'autre';
+      return FORM[cat] || FORM.autre;
+    },
     profiles: PROFILES,   // extensible : SportProfiles.profiles.escalade = {...}
     bricks: { heroes: H, tiles: T, svg: SVG, colors: C },
     heroes: function (act, ctx) { return build(profileFor(act).heroes, act, ctx); },
