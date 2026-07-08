@@ -7739,8 +7739,9 @@ async function renderStreamsSection(container, activityId) {
         },
         scales: {
           x: sharedX,
-          y: { position: 'left', title: yTitle('km/h'), suggestedMin: 0, suggestedMax: 50, afterFit: forceLeftWidth },
-          ...(altPts.length ? { y1: { position: 'right', title: yTitle('m'), grid: { display: false }, ...intY, afterFit: forceRightWidth } } : { y1: phantomY1 })
+          // Cotes inverses (demande utilisateur) : altitude a GAUCHE, vitesse a DROITE
+          y: { position: 'right', title: yTitle('km/h'), suggestedMin: 0, suggestedMax: 50, grid: { display: false }, afterFit: forceRightWidth },
+          ...(altPts.length ? { y1: { position: 'left', title: yTitle('m'), ...intY, afterFit: forceLeftWidth } } : { y1: { ...phantomY1, position: 'left', afterFit: forceLeftWidth } })
         }
       }
     }));
