@@ -2419,7 +2419,7 @@ function _odHiddenAdd(id) {
 // Mini-formulaire flottant : saisir/modifier un resultat manuel
 function _openManualResultForm(btn, comp) {
   _closeCompActionsMenu();
-  const cur = _manualResLoad()[String(comp.id)] || {};
+  const cur = (comp.result && comp.result.place != null) ? comp.result : (_manualResLoad()[String(comp.id)] || {});
   const menu = document.createElement('div');
   menu.className = 'comp-actions-menu comp-res-form';
   menu.innerHTML = `
@@ -2512,7 +2512,8 @@ function _openCompActionsMenu(btn, id) {
   // Resultat manuel (si aucun resultat OD n'est deja associe)
   if (isRealised) {
     const _hasOd = (window.__odAssignedByComp || {})[String(comp.id)] != null;
-    const _mr = _manualResLoad()[String(comp.id)];
+    // verite = base (comp.result, pulle depuis activities) ; cache local en repli
+    const _mr = (comp.result && comp.result.place != null) ? comp.result : _manualResLoad()[String(comp.id)];
     if (_mr) {
       items.push({ lab: 'Modifier le résultat…', keepOpen: true, fn: () => _openManualResultForm(btn, comp) });
       items.push({ lab: 'Retirer le résultat', fn: () => {
