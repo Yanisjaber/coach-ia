@@ -9704,7 +9704,14 @@ function openSessionModal(iso, source) {
         const _inGroup = _msGroup ? _msGroup.legs.some(l => l.idx === idx) : false;
         const switchHTML = (acts.length > 1 && !(groupHTML && _inGroup && acts.length === _msGroup.legs.length)) ? `
           <div class="modal-activity-switch">
-            ${acts.map((a, i) => `<button class="${i === idx ? 'active' : ''}" data-i="${i}">${a.name || 'Séance'} (${a.tss || 0} TSS)</button>`).join('')}
+            ${acts.map((a, i) => {
+    const _ck = window.activitySportColorKey ? window.activitySportColorKey(a) : 'autre';
+    return `<button class="${i === idx ? 'active' : ''}" data-i="${i}" title="${(a.name || 'Séance').replace(/"/g, '&quot;')}">
+              <span class="mas-dot" data-c="${_ck}"></span>
+              <span class="mas-name">${a.name || 'Séance'}</span>
+              ${a.tss ? `<span class="mas-tss">${a.tss}</span>` : ''}
+            </button>`;
+  }).join('')}
           </div>` : '';
 
         // Palettes vertes : 5 nuances pour FC, 7 pour Puissance (Coggan)

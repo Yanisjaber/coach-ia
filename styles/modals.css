@@ -668,29 +668,61 @@
     font-style: italic;
   }
   .modal-activity-switch {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(clamp(140px, 128px + 3.75vw, 170px), 1fr));
+    gap: clamp(5px, 4.1px + 0.29vw, 7px);
     margin-bottom: 16px;
-    padding: 4px;
-    background: var(--bg-elev2);
-    border-radius: 6px;
-    width: fit-content;
+    width: 100%;
   }
   .modal-activity-switch button {
-    background: transparent;
-    border: none;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border, #26304a);
+    border-radius: 9px;
     color: var(--text-dim);
-    padding: 5px 12px;
-    border-radius: 4px;
-    font-size: 11px;
+    padding: clamp(7px, 5.5px + 0.44vw, 9px) clamp(9px, 7.5px + 0.44vw, 12px);
+    font-size: clamp(11px, 10.1px + 0.29vw, 12px);
     cursor: pointer;
     font-family: inherit;
+    transition: border-color 0.12s, background 0.12s, color 0.12s;
   }
+  .modal-activity-switch button:hover { color: var(--text); }
   .modal-activity-switch button.active {
-    background: rgba(74, 222, 128, 0.15);
-    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(74, 222, 128, 0.08);
+    color: var(--text);
   }
+  .mas-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #9ca3af; }
+  .mas-dot[data-c="triathlon"]   { background: #f43f5e; }
+  .mas-dot[data-c="cyclisme"]    { background: #3b82f6; }
+  .mas-dot[data-c="vtt"]         { background: #b45309; }
+  .mas-dot[data-c="course"]      { background: #fc4c02; }
+  .mas-dot[data-c="trail"]       { background: #15803d; }
+  .mas-dot[data-c="natation"]    { background: #06b6d4; }
+  .mas-dot[data-c="musculation"] { background: #ef4444; }
+  .mas-dot[data-c="marche"]      { background: #65a30d; }
+  .mas-dot[data-c="ski"]         { background: #60a5fa; }
+  .mas-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+  .mas-tss {
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-mute, #6b7686);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 7px;
+    border-radius: 999px;
+  }
+  .mas-tss::after { content: " TSS"; font-weight: 600; }
   .day-card { cursor: pointer; }
   .day-card.empty-past { cursor: default; }
   .day-card.empty-past.rest-clickable { cursor: pointer; }
