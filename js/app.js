@@ -2153,11 +2153,13 @@ function renderCompetitionsPage() {
         medal = `<div class="comp-res-medal none">${trophySvg(_pi.color, 22)}</div>`;
       }
 
+      // Nom officiel Open Dossard si dispo (le titre Strava reste en infobulle)
+      const _dispName = (od && od.competitionName) ? od.competitionName : c.name;
       return `<div class="comp-result-card" data-prio="${_pi.key}" data-comp-id="${c.id}" style="--pc:${_pi.color};" title="Voir le détail">
         ${medal}
         <div class="comp-res-content">
           <div class="comp-res-top">
-            <span class="comp-res-name"><span style="color:${_pi.color};">${c.name}</span></span>
+            <span class="comp-res-name" title="${String(c.name || '').replace(/"/g, '&quot;')}"><span style="color:${_pi.color};">${_dispName}</span></span>
             <span class="comp-res-date">${dateLabel(c)}</span>
             <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
           </div>
