@@ -4382,10 +4382,14 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
     const _acts = (realDay && realDay.activities && realDay.activities.length) ? realDay.activities : [act];
     // Pas la place d'afficher toutes les activites -> on garde les 3 plus longues
     // (evite les icones coupees en bas de case). Le tap ouvre le detail complet.
-    let _list = _acts.map((a, i) => ({ a, i }));
+    // Ordre d'affichage : CHRONOLOGIQUE (heure de depart) — un triathlon se lit
+    // natation -> velo -> course, pas par TSS decroissant.
+    const _startMin = (a) => { const m = a.start_date_local && String(a.start_date_local).match(/T(\d{2}):(\d{2})/); return m ? (+m[1]) * 60 + (+m[2]) : 9999; };
+    let _list = _acts.map((a, i) => ({ a, i, t: _startMin(a) }));
     if (_list.length > 3) {
-      _list = _list.slice().sort((x, y) => (y.a.duration || 0) - (x.a.duration || 0)).slice(0, 3).sort((x, y) => x.i - y.i);
+      _list = _list.slice().sort((x, y) => (y.a.duration || 0) - (x.a.duration || 0)).slice(0, 3);
     }
+    _list.sort((x, y) => (x.t - y.t) || (x.i - y.i));
     const cols = _list.map(({ a, i }) => {
       const isComp = a.category === 'competition';
       const hex = isComp ? compPrio(a.priority).color : (window.sportColor ? window.sportColor(a.raw_type || a.sport) : '#9ca3af');
@@ -4405,14 +4409,13 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
       const _g = window.SportProfiles.detectMultisport(_acts);
       if (_g && _g.legs.length === _acts.length) {
         _msAttr = ' data-sport-cat="triathlon"';
-        _msBadge = `<div class="day-ms-badge">${_g.kind === 'Triathlon' ? 'TRI' : _g.kind.split(' ')[0].toUpperCase()}</div>`;
+        _msBadge = `<span class="day-ms-badge">${_g.kind === 'Triathlon' ? 'TRI' : _g.kind.split(' ')[0].toUpperCase()}</span>`;
       }
     }
     return `
     <div class="day-card past${isToday ? ' today' : ''} day-card--multi"${_msAttr} data-iso="${iso}" data-source="realise">
       <div class="day-card-dow">${dowFr[dow]}${isToday ? '<span class="dow-suffix"> · auj.</span>' : ''}</div>
-      <div class="day-card-date">${d.getDate()}</div>
-      ${_msBadge}
+      <div class="day-card-date">${d.getDate()}${_msBadge}</div>
       <div class="day-multi-grid">${cols}</div>
     </div>
   `;

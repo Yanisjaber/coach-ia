@@ -694,12 +694,13 @@
   width: 3px; background: #f43f5e;
 }
 .day-ms-badge {
-  position: absolute;
-  top: 3px;
-  right: 4px;
-  font-size: 7.5px;
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 5px;
+  font-size: clamp(7px, 6px + 0.3vw, 8.5px);
   font-weight: 800;
   letter-spacing: 0.5px;
+  line-height: 1.4;
   color: #f43f5e;
   background: rgba(244, 63, 94, 0.14);
   border-radius: 5px;
