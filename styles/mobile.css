@@ -786,3 +786,9 @@
   /* conteneur flex : sans ca les cartes se COMPRESSENT au lieu de deborder */
   #comp-list .comp-item { flex-shrink: 0; }
 }
+
+/* ============ Segments GPX : masques sur mobile (drag-select impossible au doigt) ============ */
+@media (max-width: 860px) {
+  .gpx-segments-section,
+  .add-segment-btn { display: none !important; }
+}

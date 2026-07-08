@@ -10185,7 +10185,7 @@ function openSessionModal(iso, source) {
       // Section "Segments" : la liste des segments AJOUTÉS manuellement par l'utilisateur
       // (via drag-select + bouton "Ajouter segment")
       if (c.gpxContent) {
-        sections.push(`<div class="modal-section">
+        sections.push(`<div class="modal-section gpx-segments-section">
           <div class="modal-section-title">Segments</div>
           <div class="climbs-list" id="gpx-segments-list"></div>
         </div>`);
