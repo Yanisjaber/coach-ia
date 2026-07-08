@@ -2092,17 +2092,36 @@ function renderCompetitionsPage() {
     const yearComps = comps.filter(c => c.dateObj.getFullYear() === yr).sort((a, b) => a.dateObj - b.dateObj);
     const pos = d => Math.max(0, Math.min(100, ((d - jan1) / span) * 100));
     const todayPos = pos(today);
-    // Marqueurs SANS etiquettes permanentes (illisible des ~10 compets,
-    // pire sur mobile) : un point par compet, survol/tap = info-bulle
-    // unique, 2e tap = ouvre le detail du jour.
-    const markers = yearComps.map(c => {
-      const _pi = compPrio(c.priority);
-      const isPast = c.endDateObj < today;
-      const color = _pi.key === 'principal' ? _pi.color : '#9ca3af';
-      const big = _pi.key === 'principal';
-      const label = `${c.name} · ${c.dateObj.getDate()}/${c.dateObj.getMonth() + 1}`;
-      return `<button type="button" class="comp-tl-marker${isPast ? ' past' : ''}" style="left:${pos(c.dateObj).toFixed(2)}%;" data-tl-label="${label.replace(/"/g, '&quot;')}" data-tl-color="${color}" data-tl-comp="${c.id}">
-        <span class="comp-tl-dot${big ? ' big' : ''}" style="background:${color};${big ? `box-shadow:0 0 0 2px ${color};` : ''}"></span>
+    // Marqueurs SANS etiquettes permanentes + REGROUPEMENT : les courses
+    // trop proches pour la largeur disponible fusionnent en un point avec
+    // compteur (sinon bouillie de ronds sur mobile avec 38 compets).
+    // Survol/tap = info-bulle (liste du groupe), 2e tap point seul = detail.
+    const _tlW = (seasonWrap.getBoundingClientRect().width || 360) - 16;
+    const _minGapPct = (15 / Math.max(200, _tlW)) * 100; // 15px entre centres
+    const _sorted = yearComps.map(c => ({ c, p: pos(c.dateObj) })).sort((a, b) => a.p - b.p);
+    // Fenetres FIXES (pas de chainage : sinon les courses hebdo du printemps
+    // fusionnent en un mega-groupe de 15) : un groupe par tranche de _minGapPct.
+    const _buckets = new Map();
+    for (const m of _sorted) {
+      const k = Math.floor(m.p / _minGapPct);
+      (_buckets.get(k) || _buckets.set(k, []).get(k)).push(m);
+    }
+    const clusters = [..._buckets.values()].map(items => ({ items }));
+    const _fmtLab = (c) => `${c.name} · ${c.dateObj.getDate()}/${c.dateObj.getMonth() + 1}`;
+    const markers = clusters.map(cl => {
+      const items = cl.items;
+      const p = items.reduce((a2, m) => a2 + m.p, 0) / items.length;
+      const anyPrincipal = items.some(m => compPrio(m.c.priority).key === 'principal');
+      const allPast = items.every(m => m.c.endDateObj < today);
+      const color = anyPrincipal ? compPrio(items.find(m => compPrio(m.c.priority).key === 'principal').c.priority).color : '#9ca3af';
+      const labels = items.map(m => _fmtLab(m.c));
+      const shown = labels.slice(0, 5);
+      const more = labels.length - shown.length;
+      const tipHTML = shown.join('<br>') + (more > 0 ? `<br>+ ${more} autre${more > 1 ? 's' : ''}` : '');
+      const single = items.length === 1;
+      return `<button type="button" class="comp-tl-marker${allPast ? ' past' : ''}" style="left:${p.toFixed(2)}%;" data-tl-tip="${tipHTML.replace(/"/g, '&quot;')}" data-tl-color="${color}" data-tl-comp="${single ? items[0].c.id : ''}">
+        <span class="comp-tl-dot${anyPrincipal ? ' big' : ''}" style="background:${color};${anyPrincipal ? `box-shadow:0 0 0 2px ${color};` : ''}"></span>
+        ${single ? '' : `<span class="comp-tl-count">${items.length}</span>`}
       </button>`;
     }).join('');
     // Libelles de mois adaptatifs : initiale / 3-4 lettres / nom complet
@@ -2166,11 +2185,11 @@ function renderCompetitionsPage() {
     const _tip = seasonWrap.querySelector('.comp-tl-tip');
     if (_tl && _tip) {
       const _show = (b) => {
-        _tip.textContent = b.dataset.tlLabel;
+        _tip.innerHTML = b.dataset.tlTip;
         _tip.style.color = b.dataset.tlColor;
-        _tip.style.left = Math.max(8, Math.min(92, parseFloat(b.style.left))) + '%';
+        _tip.style.left = Math.max(10, Math.min(90, parseFloat(b.style.left))) + '%';
         _tip.hidden = false;
-        _tip.dataset.for = b.dataset.tlComp;
+        _tip.dataset.for = b.dataset.tlComp || 'cluster-' + b.style.left;
       };
       _tl.addEventListener('mouseover', (e) => { const b = e.target.closest('.comp-tl-marker'); if (b) _show(b); });
       _tl.addEventListener('mouseleave', () => { _tip.hidden = true; _tip.dataset.for = ''; });
@@ -2179,7 +2198,7 @@ function renderCompetitionsPage() {
         if (!b) { _tip.hidden = true; _tip.dataset.for = ''; return; }
         e.stopPropagation();
         if (!_tip.hidden && _tip.dataset.for === b.dataset.tlComp && e.pointerType !== 'mouse') { _show(b); return; }
-        const comp = loadCompetitions().find(c2 => c2.id === b.dataset.tlComp);
+        const comp = b.dataset.tlComp ? loadCompetitions().find(c2 => c2.id === b.dataset.tlComp) : null;
         if (!_tip.hidden && _tip.dataset.for === b.dataset.tlComp && comp && comp.date && typeof openSessionModal === 'function') {
           const isPast2 = new Date(comp.date + 'T12:00:00') < today;
           openSessionModal(comp.date, isPast2 ? 'realise' : 'prevu');

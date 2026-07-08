@@ -727,3 +727,22 @@
   pointer-events: none;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
+
+/* Compteur des points regroupes de la frise */
+.comp-tl-count {
+  position: absolute;
+  top: -7px;
+  left: 60%;
+  min-width: 14px;
+  height: 14px;
+  line-height: 14px;
+  border-radius: 999px;
+  background: var(--bg-elev2, #141a26);
+  border: 1px solid var(--border, #26304a);
+  color: var(--text-dim, #8b93a7);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 0 3px;
+  pointer-events: none;
+}
+.comp-tl-tip { text-align: left; line-height: 1.45; }
