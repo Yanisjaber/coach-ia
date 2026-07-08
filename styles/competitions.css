@@ -538,3 +538,43 @@
 }
 .comp-name .sport-ico span { display: inline-flex; }
 .comp-name .sport-ico svg { display: block; }
+
+/* Bouton ⋯ + menu d'actions des cartes compet */
+.comp-more {
+  background: none;
+  border: none;
+  color: var(--text-mute, #6b7686);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 7px;
+  border-radius: 6px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.comp-more:hover { color: var(--text, #e7ecf3); background: var(--bg-elev2, #141a26); }
+.comp-actions-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 200px;
+  background: var(--bg-elev, #10151f);
+  border: 1px solid var(--border, #26304a);
+  border-radius: 10px;
+  padding: 5px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.comp-actions-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-dim, #8b93a7);
+  font-size: 12.5px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.comp-actions-menu button:hover { background: var(--bg-elev2, #141a26); color: var(--text, #e7ecf3); }
+.comp-actions-menu button.danger { color: var(--danger, #f87171); }
+.comp-actions-menu button.danger:hover { background: rgba(248, 113, 113, 0.1); }

@@ -1900,6 +1900,7 @@ function renderCompList() {
         <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span>${(window.SportProfiles && window.SportProfiles.sportIconHTML) ? window.SportProfiles.sportIconHTML(c.sport) : ''}</span>
         <span class="comp-date">${dateStr}</span>
         <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'J‑' + daysUntil}</span>
+        <button class="comp-more" data-id="${c.id}" title="Actions">⋯</button>
         <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
       </div>
       ${window.compDistLabel(c) ? `<div class="comp-tri-mini"><span class="ctm-dist">${window.compDistLabel(c)}</span>${c.target ? `<span class="ctm-obj">Objectif · ${fmtMinToTime(c.target)}</span>` : ''}</div>` : ''}
@@ -2092,6 +2093,7 @@ function renderCompetitionsPage() {
           <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span>${(window.SportProfiles && window.SportProfiles.sportIconHTML) ? window.SportProfiles.sportIconHTML(c.sport) : ''}</span>
           <span class="comp-date">${dateLabel(c)}</span>
           <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'J‑' + daysUntil}</span>
+          <button class="comp-more" data-id="${c.id}" title="Actions">⋯</button>
           <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
         </div>
         ${window.compDistLabel(c) ? `<div class="comp-tri-mini"><span class="ctm-dist">${window.compDistLabel(c)}</span>${c.target ? `<span class="ctm-obj">Objectif · ${fmtMinToTime(c.target)}</span>` : ''}</div>` : ''}
@@ -2217,6 +2219,7 @@ function renderCompetitionsPage() {
           <div class="comp-res-top">
             <span class="comp-res-name" title="${String(_tooltipNames || '').replace(/"/g, '&quot;')}"><span style="color:${_pi.color};">${_dispName}</span></span>
             <span class="comp-res-date">${dateLabel(c)}</span>
+            <button class="comp-more" data-id="${c.id}" title="Actions">⋯</button>
             <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
           </div>
           ${metricsHtml}
@@ -2330,8 +2333,62 @@ document.getElementById('comp-add').addEventListener('click', async () => {
   renderCalendar();
 });
 
+// Menu d'actions (⋯) d'une carte compet : Modifier / Transformer / Supprimer.
+function _closeCompActionsMenu() {
+  if (window._compMenuEl) { window._compMenuEl.remove(); window._compMenuEl = null; }
+  document.removeEventListener('click', _closeCompActionsMenu, true);
+}
+function _openCompActionsMenu(btn, id) {
+  _closeCompActionsMenu();
+  const comp = loadCompetitions().find(c => c.id === id);
+  if (!comp) return;
+  const isRealised = comp.realised === true || comp._table === 'activity' || comp._table === 'competition';
+  const items = [];
+  items.push({ lab: 'Modifier', fn: () => openCompModalForEdit(comp) });
+  if (isRealised && comp._sbId) {
+    items.push({ lab: 'Transformer en entraînement', fn: async () => {
+      // Dissocie l'epreuve : l'activite redevient un entrainement
+      // (category_set_by_user=true -> la synchro ne la remettra pas en compet)
+      await setActivityCategory({ _sbId: comp._sbId }, 'entrainement', comp.date);
+      const rest = loadCompetitions().filter(c => c.id !== id);
+      saveCompetitions(rest);
+      renderCompList(); renderCompetitionsPage(); renderCalendar();
+    } });
+  }
+  items.push({ lab: 'Supprimer', danger: true, fn: () => {
+    const rest = loadCompetitions().filter(c => c.id !== id);
+    saveCompetitions(rest);
+    if (comp) removeCompFromDashboard(comp);
+    renderCompList(); renderCompetitionsPage(); renderCalendar();
+  } });
+  const menu = document.createElement('div');
+  menu.className = 'comp-actions-menu';
+  items.forEach(it => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = it.lab;
+    if (it.danger) b.classList.add('danger');
+    b.addEventListener('click', (ev) => { ev.stopPropagation(); _closeCompActionsMenu(); it.fn(); });
+    menu.appendChild(b);
+  });
+  document.body.appendChild(menu);
+  window._compMenuEl = menu;
+  const r = btn.getBoundingClientRect();
+  const mw = menu.offsetWidth || 200;
+  menu.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, r.right - mw)) + 'px';
+  menu.style.top = Math.min(window.innerHeight - menu.offsetHeight - 8, r.bottom + 6) + 'px';
+  setTimeout(() => document.addEventListener('click', _closeCompActionsMenu, true), 0);
+}
+
 // Handler de clic partagé entre la carte du calendrier (#comp-list) et la page Compétitions.
 function _handleCompClick(e) {
+  // Menu d'actions
+  if (e.target.classList.contains('comp-more')) {
+    e.stopPropagation();
+    e.preventDefault();
+    _openCompActionsMenu(e.target, e.target.dataset.id);
+    return;
+  }
   // Clic sur la croix de suppression
   if (e.target.classList.contains('comp-del')) {
     e.stopPropagation();
