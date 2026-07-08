@@ -230,6 +230,7 @@ async function pullAllFromCloud() {
       stages: Array.isArray(r.stages) && r.stages.length > 0,
       stagesList: Array.isArray(r.stages) ? r.stages.map(function (st) { return Object.assign({}, st, { target: parseTimeToMin(st.target) }); }) : null,
       event: r.event ?? null, type: r.type ?? null,
+      tri: r.tri ?? null,
     });
     localStorage.setItem('coach_ia_competitions_v1', JSON.stringify(comps));
   } catch (e) { console.warn('[pull comps]', e); }
@@ -434,6 +435,7 @@ export async function pushCompetition(comp) {
         gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
         stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
         event: comp.event ?? null,
+        tri: comp.tri ?? null,
       };
       if (comp._sbId && comp._table === 'planned') row.id = comp._sbId;
       if (!row.id) row.id = await _resolveId('activity_planned', comp.id);
@@ -457,6 +459,7 @@ export async function pushCompetition(comp) {
           gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
           stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
           event: comp.event ?? null,
+          tri: comp.tri ?? null,
         };
         const { data, error } = await window.sb.from('activities').update(meta).eq('id', targetId).eq('user_id', uid()).select().single();
         if (error) throw error;
@@ -472,6 +475,7 @@ export async function pushCompetition(comp) {
         gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
         stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
         event: comp.event ?? null,
+        tri: comp.tri ?? null,
       };
       const { data, error } = await window.sb.from('activities').insert(row).select().single();
       if (error) throw error;

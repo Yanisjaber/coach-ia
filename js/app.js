@@ -3089,7 +3089,16 @@ function readDistAsKm(inputId) {
   return el.dataset.distUnit === 'm' ? +(v / 1000).toFixed(3) : v;
 }
 const adaptTrainSportForm = () => adaptSportForm('train-modal-sport', { km: 'train-modal-km', dplus: 'train-modal-dplus', gpx: 'train-modal-gpx', hideSection: true });
-const adaptCompSportForm = () => adaptSportForm('comp-modal-sport', { km: 'comp-modal-km', dplus: 'comp-modal-dplus', gpx: 'comp-modal-gpx', laps: 'comp-modal-laps' });
+const adaptCompSportForm = () => {
+  adaptSportForm('comp-modal-sport', { km: 'comp-modal-km', dplus: 'comp-modal-dplus', gpx: 'comp-modal-gpx', laps: 'comp-modal-laps' });
+  // Triathlon : 3 distances par discipline a la place de la distance unique
+  const sel = document.getElementById('comp-modal-sport');
+  const isTri = !!sel && typeof getSportCategory === 'function' && getSportCategory(sel.value) === 'triathlon';
+  const triRow = document.getElementById('comp-tri-fields');
+  const kmLab = document.getElementById('comp-modal-km')?.closest('label');
+  if (triRow) triRow.hidden = !isTri;
+  if (kmLab && isTri) kmLab.style.display = 'none';
+};
 document.getElementById('train-modal-sport')?.addEventListener('change', adaptTrainSportForm);
 document.getElementById('comp-modal-sport')?.addEventListener('change', adaptCompSportForm);
 
@@ -3135,6 +3144,7 @@ function openCompModal() {
   if (typeof populateSportSelect === 'function') populateSportSelect('comp-modal-sport', 'Ride');
   const sportEl = document.getElementById('comp-modal-sport');
   if (sportEl) sportEl.value = 'Ride';
+  ['comp-tri-swim', 'comp-tri-bike', 'comp-tri-run'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
   setTimeout(() => { if (typeof adaptCompSportForm === 'function') adaptCompSportForm(); }, 0);
   if (sportEl && sportEl._customUpdate) sportEl._customUpdate();
   // Peuple le select Type d'épreuve selon le sport actif
@@ -3280,7 +3290,21 @@ async function saveCompFromModal() {
   const priority = document.getElementById('comp-modal-priority').value;
   const sport = document.getElementById('comp-modal-sport').value;
   const typeEpr = document.getElementById('comp-modal-type').value.trim();
-  const km = (typeof readDistAsKm === 'function') ? readDistAsKm('comp-modal-km') : (parseFloat(document.getElementById('comp-modal-km').value) || null);
+  let km = (typeof readDistAsKm === 'function') ? readDistAsKm('comp-modal-km') : (parseFloat(document.getElementById('comp-modal-km').value) || null);
+  // Triathlon : distances par discipline (stockees dans comp.tri, km = total)
+  let tri = null;
+  {
+    const triRow = document.getElementById('comp-tri-fields');
+    if (triRow && !triRow.hidden) {
+      const swim = parseFloat(document.getElementById('comp-tri-swim').value) || null;
+      const bike = parseFloat(document.getElementById('comp-tri-bike').value) || null;
+      const run = parseFloat(document.getElementById('comp-tri-run').value) || null;
+      if (swim || bike || run) {
+        tri = { swim_m: swim, bike_km: bike, run_km: run };
+        km = +(((swim || 0) / 1000) + (bike || 0) + (run || 0)).toFixed(1) || null;
+      }
+    }
+  }
   const dplus = parseInt(document.getElementById('comp-modal-dplus').value, 10) || null;
   const target = parseTimeToMin(document.getElementById('comp-modal-target').value);
   const laps = parseInt(document.getElementById('comp-modal-laps').value, 10) || null;
@@ -3337,6 +3361,7 @@ async function saveCompFromModal() {
     realised: (window.coachCalendarMode ? window.coachCalendarMode() === 'realise' : false),
     name, date, time, priority, sport,
     type: typeEpr, km, dplus, target, laps, notes, event,
+    tri,
     stages,
     stagesList,
     gpxName, gpxContent
@@ -10677,6 +10702,11 @@ function openCompModalForEdit(comp) {
   }
   document.getElementById('comp-modal-km').value = effKm != null ? effKm : '';
   document.getElementById('comp-modal-dplus').value = effDplus != null ? effDplus : '';
+  {
+    const t = comp.tri || {};
+    const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = (v != null ? v : ''); };
+    setV('comp-tri-swim', t.swim_m); setV('comp-tri-bike', t.bike_km); setV('comp-tri-run', t.run_km);
+  }
   setTimeout(() => { if (typeof adaptCompSportForm === 'function') adaptCompSportForm(); }, 0);
   document.getElementById('comp-modal-target').value = fmtMinToTime(comp.target);
   document.getElementById('comp-modal-laps').value = comp.laps != null ? comp.laps : '';
