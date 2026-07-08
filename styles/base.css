@@ -4,6 +4,10 @@
    Extrait de dashboard.html (L20-174)
    ============================================================ */
 
+/* L'attribut hidden DOIT toujours masquer, meme si une classe pose un display
+   (flex/grid ecrase le style UA sinon - source de boutons/sections fantomes) */
+[hidden] { display: none !important; }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   /* === SCROLLBARS CUSTOM (page + dropdowns + tous les scrolls) === */

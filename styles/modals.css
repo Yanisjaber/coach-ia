@@ -747,6 +747,8 @@
     font-family: inherit;
   }
   .ae-transform-btn:hover { background: rgba(251, 191, 36, 0.2); }
+  /* display:flex écrase l'attribut hidden -> on force (même piège que .form-field) */
+  .ae-transform-btn[hidden] { display: none !important; }
   .ae-stagerace-btn {
     width: 100%;
     margin-top: 12px;
