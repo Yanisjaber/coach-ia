@@ -202,13 +202,23 @@
   }
 
   // HTML du bandeau groupé (segments cliquables -> data-leg-idx = index activité)
-  function renderMultisportHTML(group, activeIdx) {
+  // comp (optionnel) : compétition planifiée rapprochée { name, target (min), priority }
+  function renderMultisportHTML(group, activeIdx, comp) {
     var head = '<div class="msg-head">'
-      + '<span class="msg-kind">' + group.kind + '</span>'
+      + '<span class="msg-kind">' + group.kind + (comp && comp.name ? ' · ' + comp.name : '') + '</span>'
       + '<span class="msg-totals">' + fmtDurShort(group.totals.durMin)
       + (group.totals.tss ? ' · ' + Math.round(group.totals.tss) + ' TSS' : '')
       + (group.totals.kcal ? ' · ' + Math.round(group.totals.kcal) + ' kcal' : '') + '</span>'
       + '</div>';
+    // Comparaison au temps cible de la compétition
+    if (comp && comp.target > 0) {
+      var delta = group.totals.durMin - comp.target;
+      var ok = delta <= comp.target * 0.02;
+      var col = ok ? 'var(--accent)' : (delta <= comp.target * 0.08 ? 'var(--warn)' : 'var(--danger)');
+      head += '<div class="msg-comp-target">Cible ' + fmtDurShort(comp.target) + ' · réalisé '
+        + fmtDurShort(group.totals.durMin)
+        + ' <b style="color:' + col + '">(' + (delta > 0 ? '+' : '−') + fmtDurShort(Math.abs(delta)) + ')</b></div>';
+    }
     var rows = [];
     for (var i = 0; i < group.legs.length; i++) {
       var l = group.legs[i];

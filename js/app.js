@@ -1810,6 +1810,25 @@ function saveCompetitions(comps) {
 // (Les snapshots de plan ont été supprimés : les jours passés lisent désormais
 //  uniquement les vraies données depuis la base.)
 
+// Compétition TRIATHLON planifiée pour une date donnée (rapprochement du réalisé)
+window.__triCompForDate = function (iso) {
+  try {
+    const comps = (typeof loadCompetitionsExpanded === 'function') ? loadCompetitionsExpanded() : [];
+    return comps.find(c => c.date === iso && typeof getSportCategory === 'function' && getSportCategory(c.sport) === 'triathlon') || null;
+  } catch (e) { return null; }
+};
+
+// Libellé compact des distances triathlon d'une compétition : "750m · 20km · 5km"
+window.triDistLabel = function (c) {
+  const t = c && c.tri;
+  if (!t || (!t.swim_m && !t.bike_km && !t.run_km)) return '';
+  const parts = [];
+  if (t.swim_m) parts.push(Math.round(t.swim_m) + 'm');
+  if (t.bike_km) parts.push((+t.bike_km) + 'km');
+  if (t.run_km) parts.push((+t.run_km) + 'km');
+  return parts.join(' · ');
+};
+
 function renderCompList() {
   // Helpers de format
   const fmtFullDate = d => d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
@@ -1870,6 +1889,7 @@ function renderCompList() {
         <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'J‑' + daysUntil}</span>
         <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
       </div>
+      ${window.triDistLabel(c) ? `<div class="comp-tri-mini">${window.triDistLabel(c)}</div>` : ''}
       <div class="comp-phase-track"><div class="comp-phase-fill" style="width:${fillPct.toFixed(1)}%"></div></div>
     </div>`;
   }).join('');
@@ -1975,6 +1995,7 @@ function renderCompetitionsPage() {
               </div>
               <div class="comp-hero-sub">${dateLabel(next)}</div>
               <div class="comp-hero-tags">
+                ${window.triDistLabel(next) ? `<span class="comp-pill" style="background:rgba(244,63,94,0.18);color:#f43f5e;">${window.triDistLabel(next)}</span>` : ''}
                 <span class="comp-pill" style="background:${phColor}28;color:${phColor};">Phase : ${phLabel}</span>
                 <span class="comp-pill" style="background:color-mix(in srgb, ${form.c} 22%, transparent);color:${form.c};">Forme ${tsb == null ? '—' : (tsb >= 0 ? '+' : '') + tsb} · ${form.t}</span>
               </div>
@@ -2060,6 +2081,7 @@ function renderCompetitionsPage() {
           <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'J‑' + daysUntil}</span>
           <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
         </div>
+        ${window.triDistLabel(c) ? `<div class="comp-tri-mini">${window.triDistLabel(c)}</div>` : ''}
         <div class="comp-phase-track"><div class="comp-phase-fill" style="width:${fillPct.toFixed(1)}%"></div></div>
       </div>`;
     }).join('') : '<div class="comp-empty">Aucune compétition à venir.</div>';
@@ -4472,8 +4494,9 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
     const _g0 = window.SportProfiles.detectMultisport(realDay.activities);
     if (_g0 && _g0.legs.length === realDay.activities.length) {
       hasMulti = false;
+      const _triComp = window.__triCompForDate ? window.__triCompForDate(iso) : null;
       act = {
-        name: _g0.kind,
+        name: (_triComp && _triComp.name) || _g0.kind,
         raw_type: 'Triathlon', sport: 'Triathlon',
         type: 'vo2', sessionType: 'vo2',
         duration: _g0.totals.durMin,
@@ -4481,8 +4504,8 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
         elevation_gain: realDay.activities.reduce((s2, a2) => s2 + (+a2.elevation_gain || 0), 0),
         tss: Math.round(_g0.totals.tss),
         calories: Math.round(_g0.totals.kcal),
-        category: realDay.activities.some(a2 => a2.category === 'competition') ? 'competition' : undefined,
-        priority: (realDay.activities.find(a2 => a2.category === 'competition') || {}).priority,
+        category: (_triComp || realDay.activities.some(a2 => a2.category === 'competition')) ? 'competition' : undefined,
+        priority: (_triComp && _triComp.priority) || (realDay.activities.find(a2 => a2.category === 'competition') || {}).priority,
         structure: null,
       };
       dur = act.duration;
@@ -4795,7 +4818,19 @@ function renderRealiseCalendar() {
           if (!realDay) realDay = { date: iso, activities: [], sessionType: 'vo2' };
           else realDay = { ...realDay, activities: [...(realDay.activities || [])] };
           for (const c of compsRealisedToday) {
-            if (realDay.activities.some(x => x._sbId && ((c._sbId && String(x._sbId) === String(c._sbId)) || (c.id && String(x.client_id) === String(c.id))))) continue;
+            // Mêmes garde-fous que buildRealisedDay : jamais de pseudo-entrée si
+            // une vraie activité compétition existe, ni si l'enchaînement tri
+            // réalisé EST la compétition ; dédup par nom en secours.
+            if (realDay.activities.some(x => x.category === 'competition' && !x._comp)) continue;
+            if (typeof getSportCategory === 'function' && getSportCategory(c.sport) === 'triathlon'
+                && window.SportProfiles && window.SportProfiles.detectMultisport) {
+              const _gg2 = window.SportProfiles.detectMultisport(realDay.activities.filter(x => !x._comp));
+              if (_gg2 && _gg2.legs.length >= 2) continue;
+            }
+            if (realDay.activities.some(x =>
+              (x._sbId && ((c._sbId && String(x._sbId) === String(c._sbId)) || (c.id && String(x.client_id) === String(c.id)))) ||
+              (x.name && c.name && String(x.name).trim() === String(c.name).trim())
+            )) continue;
             const cDur = (typeof parseTimeToMin === 'function' ? parseTimeToMin(c.target) : 0) || 0;
             realDay.activities.push({
               name: c.name, sport: c.sport || 'Ride', raw_type: c.sport || 'Ride',
@@ -8945,6 +8980,13 @@ function buildRealisedDay(iso) {
       // Une vraie activité 'competition' existe déjà ce jour : le registre n'est
       // qu'un miroir -> ne JAMAIS ajouter de pseudo-entrée (durée 0) en plus.
       if (realDay.activities.some(x => x.category === 'competition' && !x._comp)) continue;
+      // Compétition TRIATHLON dont l'enchaînement réalisé couvre le jour :
+      // les 3 activités SONT la compétition -> pas de pseudo-entrée non plus.
+      if (typeof getSportCategory === 'function' && getSportCategory(c.sport) === 'triathlon'
+          && window.SportProfiles && window.SportProfiles.detectMultisport) {
+        const _gg = window.SportProfiles.detectMultisport(realDay.activities.filter(x => !x._comp));
+        if (_gg && _gg.legs.length >= 2) continue;
+      }
       if (realDay.activities.some(x =>
         (x._sbId && ((c._sbId && String(x._sbId) === String(c._sbId)) || (c.id && String(x.client_id) === String(c.id)))) ||
         (x.name && c.name && String(x.name).trim() === String(c.name).trim())
@@ -9339,7 +9381,8 @@ function openSessionModal(iso, source) {
 
         // Enchaînement multisport détecté : bandeau groupé (segments cliquables)
         // à la place du switch générique ; sinon switch classique.
-        const groupHTML = _msGroup ? window.SportProfiles.renderMultisportHTML(_msGroup, idx) : '';
+        const _msComp = _msGroup && window.__triCompForDate ? window.__triCompForDate(iso) : null;
+        const groupHTML = _msGroup ? window.SportProfiles.renderMultisportHTML(_msGroup, idx, _msComp) : '';
         const _inGroup = _msGroup ? _msGroup.legs.some(l => l.idx === idx) : false;
         const switchHTML = (acts.length > 1 && !(groupHTML && _inGroup && acts.length === _msGroup.legs.length)) ? `
           <div class="modal-activity-switch">

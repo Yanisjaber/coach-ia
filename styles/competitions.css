@@ -477,3 +477,12 @@
   color: #0b0e14;
   transform: scale(1.06);
 }
+
+/* Distances triathlon sur les cartes de compétition (750m · 20km · 5km) */
+.comp-tri-mini {
+  font-size: clamp(9.5px, 8.6px + 0.28vw, 11px);
+  font-weight: 600;
+  color: #f43f5e;
+  margin: 2px 0 4px 26px;   /* aligné sous le nom (après le trophée) */
+  letter-spacing: 0.2px;
+}

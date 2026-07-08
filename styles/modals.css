@@ -1296,3 +1296,10 @@
   color: var(--text-mute);
   padding: 1px 0 1px clamp(26px, 18px + 2.5vw, 38px);
 }
+
+/* Ligne cible vs réalisé dans le bandeau multisport (jour de compétition tri) */
+.msg-comp-target {
+  font-size: clamp(10.5px, 9.6px + 0.28vw, 12px);
+  color: var(--text-dim);
+  margin: -3px 0 8px;
+}
