@@ -893,7 +893,7 @@ function plannedItemsForDay(iso) {
       if (!c.dateObj || toIsoDate(c.dateObj) !== iso) continue;
       if (typeof compIsRealised === 'function' && compIsRealised(c)) continue;
       const mins = (typeof parseTimeToMin === 'function') ? parseTimeToMin(c.target) : null;
-      items.push({ name: c.name || 'Compétition', tss: Math.round(mins || 120), duration: mins || 0, isRace: true, sport: c.sport || 'Ride' });
+      items.push({ name: c.name || 'Compétition', tss: (+c.tss > 0 ? Math.round(+c.tss) : Math.round(mins || 120)), duration: mins || 0, isRace: true, sport: c.sport || 'Ride' });
     }
   } catch (_) {}
   // Filtre sport actif : même règle que le calendrier (cohérent avec la courbe réelle filtrée)
@@ -3338,7 +3338,7 @@ function openCompModal() {
   { const _tt = document.getElementById('comp-modal-to-training'); if (_tt) _tt.hidden = true; }
   window._compToTrainingAct = null; window._compToTrainingIso = null;
   // Reset form (sauf "time" qui est géré par le stepper)
-  ['name','date','type','km','dplus','target','laps','notes','speed'].forEach(k => {
+  ['name','date','type','km','dplus','target','laps','notes','speed','tss','rpe'].forEach(k => {
     const el = document.getElementById('comp-modal-' + k);
     if (el) el.value = '';
   });
@@ -3540,6 +3540,8 @@ async function saveCompFromModal() {
   const target = parseTimeToMin(document.getElementById('comp-modal-target').value);
   const laps = parseInt(document.getElementById('comp-modal-laps').value, 10) || null;
   const notes = document.getElementById('comp-modal-notes').value.trim();
+  const compTss = parseInt((document.getElementById('comp-modal-tss') || {}).value, 10) || null;
+  const compRpe = parseFloat(String((document.getElementById('comp-modal-rpe') || {}).value || '').replace(',', '.')) || null;
   // (champ Événement supprimé de la modale ; on préserve la valeur existante en édition)
   const event = (window._editingCompId ? ((loadCompetitions().find(c => c.id === window._editingCompId) || {}).event || '') : '');
   const stagesEl = document.getElementById('comp-modal-stages-toggle');
@@ -3602,6 +3604,7 @@ async function saveCompFromModal() {
     dplus: (tri ? (triDplus != null ? triDplus : null) : dplus),
     target: (tri && triTargetMin ? triTargetMin : target),
     laps: (tri ? null : laps), notes, event,
+    tss: compTss, rpe: compRpe,
     tri,
     stages,
     stagesList,
@@ -10137,6 +10140,8 @@ function openSessionModal(iso, source) {
       if (effectiveDplus != null && !gpxStats) cards.push({ label: 'Dénivelé +', value: effectiveDplus, unit: 'm' });
       if (allure) cards.push({ label: allureLabel, value: allure });
       if (c.laps != null) cards.push({ label: 'Tours', value: c.laps, unit: '' });
+      if (c.tss != null && c.tss !== '') cards.push({ label: 'TSS estimé', value: c.tss, unit: '' });
+      if (c.rpe != null && c.rpe !== '') cards.push({ label: 'RPE estimé', value: c.rpe, unit: '/10' });
 
       // Sections détaillées
       const sections = [];
@@ -10182,12 +10187,15 @@ function openSessionModal(iso, source) {
       // Triathlon avec segments : timeline du déroulé de course à la place des tuiles génériques
       const triPlanHTML = (typeof getSportCategory === 'function' && getSportCategory(c.sport) === 'triathlon'
         && window.SportProfiles && window.SportProfiles.renderTriPlanHTML) ? window.SportProfiles.renderTriPlanHTML(c) : '';
+      const mkCards = (arr) => `<div class="modal-metrics">
+          ${arr.map(card => `<div class="modal-metric${card.accent ? ' accent' : ''}"><div class="m-label">${card.label}</div><div class="m-value" style="${card.isText ? 'font-size:16px;' : ''}">${card.value}${card.unit ? `<span style="font-size:13px;font-weight:500;margin-left:2px;">${card.unit}</span>` : ''}</div></div>`).join('')}
+        </div>`;
+      // Timeline tri : les tuiles generiques disparaissent, mais TSS/RPE restent affiches dessous
+      const chargeCards = cards.filter(cd => cd.label === 'TSS estimé' || cd.label === 'RPE estimé');
       bodyEl.innerHTML = `
         ${switchHTML}
         ${typeTitle}
-        ${triPlanHTML || `<div class="modal-metrics">
-          ${cards.map(card => `<div class="modal-metric${card.accent ? ' accent' : ''}"><div class="m-label">${card.label}</div><div class="m-value" style="${card.isText ? 'font-size:16px;' : ''}">${card.value}${card.unit ? `<span style="font-size:13px;font-weight:500;margin-left:2px;">${card.unit}</span>` : ''}</div></div>`).join('')}
-        </div>`}
+        ${triPlanHTML ? (triPlanHTML + (chargeCards.length ? mkCards(chargeCards) : '')) : mkCards(cards)}
         ${sections.join('')}
       `;
       wireSwitchButtons();
@@ -11014,6 +11022,8 @@ function openCompModalForEdit(comp) {
   setTimeout(() => { if (typeof adaptCompSportForm === 'function') adaptCompSportForm(); }, 0);
   document.getElementById('comp-modal-target').value = fmtMinToTime(comp.target);
   document.getElementById('comp-modal-laps').value = comp.laps != null ? comp.laps : '';
+  { const e1 = document.getElementById('comp-modal-tss'); if (e1) e1.value = comp.tss != null ? comp.tss : ''; }
+  { const e2 = document.getElementById('comp-modal-rpe'); if (e2) e2.value = comp.rpe != null ? comp.rpe : ''; }
   document.getElementById('comp-modal-notes').value = comp.notes || '';
   // Toggle stages + remplissage stagesData si applicable
   const stagesToggle = document.getElementById('comp-modal-stages-toggle');

@@ -202,7 +202,7 @@ async function pullAllFromCloud() {
     {
       const _seen = new Set();
       const { data: ra } = await sb.from('activities')
-        .select('id, client_id, name, sport, start_date_local, priority, distance_km, course_dplus, target, laps, user_notes, gpx_name, stages, event, type')
+        .select('id, client_id, name, sport, start_date_local, priority, distance_km, course_dplus, target, laps, user_notes, gpx_name, stages, event, type, tss, rpe')
         .eq('user_id', userId).eq('category', 'competition');
       for (const r of (ra || [])) {
         const cid = String(r.client_id || r.id);
@@ -215,6 +215,7 @@ async function pullAllFromCloud() {
           sport: r.sport ?? null,
           priority: r.priority ?? null, km: r.distance_km ?? null, dplus: r.course_dplus ?? null,
           target: r.target ?? null, laps: r.laps ?? null, notes: r.user_notes ?? null,
+          tss: r.tss ?? null, rpe: r.rpe ?? null,
           gpxName: r.gpx_name ?? null,
           stages: Array.isArray(r.stages) && r.stages.length > 0,
           stagesList: Array.isArray(r.stages) ? r.stages.map(function (st) { return Object.assign({}, st, { target: parseTimeToMin(st.target) }); }) : null,
@@ -230,6 +231,7 @@ async function pullAllFromCloud() {
       sport: r.sport ?? null,
       priority: r.priority ?? null, km: r.km ?? null, dplus: r.d_plus ?? null,
       target: (r.duration != null ? r.duration : parseTimeToMin(r.target)), laps: r.laps ?? null, notes: r.notes ?? null,
+      tss: r.tss ?? null, rpe: r.rpe ?? null,
       gpxName: r.gpx_name ?? null, gpxContent: r.gpx_content ?? null,
       stages: Array.isArray(r.stages) && r.stages.length > 0,
       stagesList: Array.isArray(r.stages) ? r.stages.map(function (st) { return Object.assign({}, st, { target: parseTimeToMin(st.target) }); }) : null,
@@ -439,6 +441,7 @@ export async function pushCompetition(comp) {
         sport: comp.sport ?? null,
         priority: comp.priority ?? null, km: comp.km ?? null, d_plus: comp.dplus ?? null, type: comp.type ?? null,
         duration: comp.target ?? null, laps: comp.laps ?? null, notes: comp.notes ?? null,
+        tss: comp.tss ?? null, rpe: comp.rpe ?? null,
         gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
         stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
         event: comp.event ?? null,
@@ -468,6 +471,8 @@ export async function pushCompetition(comp) {
           event: comp.event ?? null,
           tri: comp.tri ?? null,
         };
+        if (comp.tss != null) meta.tss = comp.tss;
+        if (comp.rpe != null) meta.rpe = comp.rpe;
         const { data, error } = await window.sb.from('activities').update(meta).eq('id', targetId).eq('user_id', uid()).select().single();
         if (error) throw error;
         return data && data.id;
@@ -479,6 +484,7 @@ export async function pushCompetition(comp) {
         priority: comp.priority ?? null, distance_km: comp.km ?? null, course_dplus: comp.dplus ?? null, type: comp.type ?? null,
         target: comp.target ?? null, moving_time: comp.target ? comp.target * 60 : null,
         laps: comp.laps ?? null, user_notes: comp.notes ?? null,
+        tss: comp.tss ?? null, rpe: comp.rpe ?? null,
         gpx_name: comp.gpxName ?? null, gpx_content: comp.gpxContent ?? null,
         stages: (comp.stages && Array.isArray(comp.stagesList)) ? comp.stagesList : (Array.isArray(comp.stages) ? comp.stages : null),
         event: comp.event ?? null,
