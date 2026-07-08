@@ -397,6 +397,55 @@
   /* stats de saison : 2x2 centre (rangees pleines) au lieu de 3+1 bancal */
   .comp-season-stats { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px 10px; text-align: center; }
 
+  /* ===== Recherche d'activite : tableau -> cartes empilees =====
+     7 colonnes impossibles a caser : titre + temps en 1re ligne,
+     pill sport / date / distance / D+ / TSS en ligne muette dessous. */
+  .session-table { display: block; }
+  .session-table thead { display: none; }
+  .session-table tbody { display: block; }
+  .session-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 10px;
+    row-gap: 3px;
+    padding: clamp(8px, 6.5px + 0.44vw, 11px) 2px;
+    border-bottom: 1px solid var(--border, #26304a);
+  }
+  .session-table tbody td {
+    display: inline-flex;
+    align-items: baseline;
+    padding: 0 !important;
+    border: none !important;
+    white-space: nowrap;
+  }
+  .session-table tbody td:nth-child(3) { /* titre */
+    order: 1;
+    /* titre + temps remplissent toute la 1re ligne -> la pill sport
+       et les stats passent forcement en 2e ligne */
+    flex: 1 1 calc(100% - 96px);
+    min-width: 0;
+    white-space: normal;
+    font-weight: 600;
+    color: var(--text, #e7ecf3);
+    font-size: clamp(12px, 11.1px + 0.29vw, 13.5px);
+  }
+  .session-table tbody td:nth-child(4) { /* temps */
+    order: 2;
+    margin-left: auto;
+    font-weight: 700;
+    color: var(--text, #e7ecf3);
+  }
+  .session-table tbody td:nth-child(1) { order: 3; } /* pill sport */
+  .session-table tbody td:nth-child(2),
+  .session-table tbody td:nth-child(5),
+  .session-table tbody td:nth-child(6),
+  .session-table tbody td:nth-child(7) {
+    order: 4;
+    font-size: clamp(10px, 9.4px + 0.2vw, 11px);
+    color: var(--text-mute, #6b7686);
+  }
+
   /* ===== Analyse detaillee : en-tetes de graphes (Puissance/FC, W'bal,
      Cadence, Vitesse/Alt). La grille 1fr auto 1fr inline superpose les
      textes sur ecran etroit -> legende centree pleine largeur, stats
