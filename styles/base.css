@@ -238,3 +238,6 @@
     font-weight: 500;
   }
 
+
+/* Unites en coin de graphe : uniquement mobile (voir mobile.css) */
+@media (min-width: 861px) { .chart-unit { display: none; } }

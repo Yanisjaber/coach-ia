@@ -7030,7 +7030,7 @@ async function renderStreamsSection(container, activityId) {
           <span style="white-space:nowrap;"><span style="color:#f87171;">max</span> <strong id="stat-fcmaxx" style="color:var(--text);font-size:11px;">—</strong></span>
         </div>
       </div>
-      <div class="chart-wrap" style="height:180px;margin-bottom:14px;"><canvas id="streams-power-hr"></canvas></div>` : ''}
+      <div class="chart-wrap" style="height:180px;margin-bottom:14px;position:relative;"><canvas id="streams-power-hr"></canvas><span class="chart-unit left" style="color:#fbbf24;">W</span><span class="chart-unit right" style="color:#f87171;">bpm</span></div>` : ''}
     ${wbalPts.length ? `
       <div id="wbal-header" style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;font-size:10px;margin-bottom:6px;padding-left:55px;padding-right:60px;gap:8px;overflow:hidden;">
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;color:var(--text-dim);min-width:0;">
@@ -7044,7 +7044,7 @@ async function renderStreamsSection(container, activityId) {
         </div>
         <div style="justify-self:end;"></div>
       </div>
-      <div class="chart-wrap" style="height:180px;margin-bottom:14px;"><canvas id="streams-wbal"></canvas></div>` : ''}
+      <div class="chart-wrap" style="height:180px;margin-bottom:14px;position:relative;"><canvas id="streams-wbal"></canvas><span class="chart-unit left" style="color:#60a5fa;">kJ</span></div>` : ''}
     ${cadencePts.length ? `
       <div id="cadence-header" style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;font-size:10px;margin-bottom:6px;padding-left:55px;padding-right:60px;gap:8px;overflow:hidden;">
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;color:var(--text-dim);min-width:0;">
@@ -7058,7 +7058,7 @@ async function renderStreamsSection(container, activityId) {
         </div>
         <div style="justify-self:end;"></div>
       </div>
-      <div class="chart-wrap" style="height:180px;margin-bottom:14px;"><canvas id="streams-cadence"></canvas></div>` : ''}
+      <div class="chart-wrap" style="height:180px;margin-bottom:14px;position:relative;"><canvas id="streams-cadence"></canvas><span class="chart-unit left" style="color:#a78bfa;">rpm</span></div>` : ''}
     ${(speedPts.length || altPts.length) ? `
       <div id="speed-alt-header" style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;font-size:10px;margin-bottom:6px;padding-left:55px;padding-right:60px;gap:8px;overflow:hidden;">
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;color:var(--text-dim);min-width:0;">
@@ -7082,7 +7082,7 @@ async function renderStreamsSection(container, activityId) {
           <span style="white-space:nowrap;"><span style="color:#22d3ee;">max</span> <strong id="stat-vmax" style="color:var(--text);font-size:11px;">—</strong></span>
         </div>
       </div>
-      <div class="chart-wrap" style="height:180px;"><canvas id="streams-speed-alt"></canvas></div>` : ''}
+      <div class="chart-wrap" style="height:180px;position:relative;"><canvas id="streams-speed-alt"></canvas><span class="chart-unit left" style="color:#34d399;">km/h</span><span class="chart-unit right" style="color:#9ca3af;">m</span></div>` : ''}
   ` + '</div>';
 
   // Compute stats sur la plage [minX, maxX] (en m si distance, en s si temps)
