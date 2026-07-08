@@ -188,22 +188,15 @@ function renderOdRecap() {
   const wrap = document.getElementById('od-recap');
   if (!wrap) return;
   if (!_odResults || !_odResults.length) { wrap.innerHTML = ''; return; }
-  const years = odYears(_odResults);
-  if (_odRecapYear !== 'all' && !years.includes(+_odRecapYear)) _odRecapYear = 'all';
+  // Plus de selecteur d'annee propre : le palmares suit le filtre GLOBAL
+  // (barre de la page Competitions : annee + sport + fede).
   wrap.innerHTML = `
     <div class="grid-1 card od-recap-card">
       <div class="od-recap-head">
         <div class="section-title">Mon palmarès</div>
-        <select id="od-recap-year" class="od-recap-year" aria-label="Année">
-          <option value="all"${_odRecapYear === 'all' ? ' selected' : ''}>Toutes les années</option>
-          ${years.map(y => `<option value="${y}"${String(_odRecapYear) === String(y) ? ' selected' : ''}>${y}</option>`).join('')}
-        </select>
       </div>
       <div id="od-recap-stats"></div>
     </div>`;
-  document.getElementById('od-recap-year').addEventListener('change', (e) => {
-    _odRecapYear = e.target.value; renderOdRecapStats();
-  });
   renderOdRecapStats();
 }
 function renderOdRecapStats() {
@@ -220,7 +213,7 @@ function renderOdRecapStats() {
       return (f === 'FFVELO' ? 'FFVélo' : f) === flt.fed;
     });
   }
-  const _gYear = (flt.year !== undefined && String(flt.year) !== 'tout') ? String(flt.year) : _odRecapYear;
+  const _gYear = (flt.year !== undefined && String(flt.year) !== 'tout') ? String(flt.year) : 'all';
   const s = odComputeStats(rs, _gYear);
   const fmtD = (d) => { try { return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return d || ''; } };
   const rate = s.races ? Math.round((s.top10 / s.races) * 100) : 0;
