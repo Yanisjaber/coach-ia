@@ -482,8 +482,8 @@
 .comp-tri-mini {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;   /* objectif collé aux distances, pas à l'autre bout */
+  gap: 12px;
   font-size: clamp(9.5px, 8.6px + 0.28vw, 11px);
   font-weight: 600;
   margin: 2px 0 4px 26px;   /* aligné sous le nom (après le trophée) */
