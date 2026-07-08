@@ -220,7 +220,8 @@ function renderOdRecapStats() {
       return (f === 'FFVELO' ? 'FFVélo' : f) === flt.fed;
     });
   }
-  const s = odComputeStats(rs, _odRecapYear);
+  const _gYear = (flt.year !== undefined && String(flt.year) !== 'tout') ? String(flt.year) : _odRecapYear;
+  const s = odComputeStats(rs, _gYear);
   const fmtD = (d) => { try { return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return d || ''; } };
   const rate = s.races ? Math.round((s.top10 / s.races) * 100) : 0;
   const C = 213.6;

@@ -1974,7 +1974,8 @@ function renderCompetitionsPage() {
   };
 
   // ---- Barre de filtres (sport + federation) ----
-  window._compPageFilter = window._compPageFilter || { cat: 'tout', fed: 'tout' };
+  window._compPageFilter = window._compPageFilter || { cat: 'tout', fed: 'tout', year: 'tout' };
+  if (window._compPageFilter.year === undefined) window._compPageFilter.year = 'tout';
   const _flt = window._compPageFilter;
   const _catOfComp = (c) => (typeof getSportCategory === 'function' ? getSportCategory(c.sport || '') : 'autre');
   {
@@ -1989,6 +1990,7 @@ function renderCompetitionsPage() {
     if (bar) {
       const cats = [...new Set(comps.map(_catOfComp))].sort();
       const feds = [...new Set(comps.map(c => c.federation).filter(Boolean))].sort();
+      const years = [...new Set(comps.map(c => c.dateObj.getFullYear()))].sort((a, b) => b - a);
       const catLab = { cyclisme: 'Vélo', course: 'CAP', triathlon: 'Tri', natation: 'Natation', musculation: 'Muscu', autre: 'Autre' };
       const chip = (grp, val, lab, on) => `<button type="button" class="comp-flt-chip${on ? ' on' : ''}" data-grp="${grp}" data-val="${val}">${lab}</button>`;
       bar.innerHTML =
@@ -1996,7 +1998,10 @@ function renderCompetitionsPage() {
         + cats.map(c2 => chip('cat', c2, catLab[c2] || c2, _flt.cat === c2)).join('')
         + (feds.length ? '<span class="comp-flt-sep"></span>'
           + chip('fed', 'tout', 'Toutes fédés', _flt.fed === 'tout')
-          + feds.map(f => chip('fed', f, f, _flt.fed === f)).join('') : '');
+          + feds.map(f => chip('fed', f, f, _flt.fed === f)).join('') : '')
+        + (years.length > 1 ? '<span class="comp-flt-sep"></span>'
+          + chip('year', 'tout', 'Toutes années', String(_flt.year) === 'tout')
+          + years.map(y => chip('year', y, String(y), String(_flt.year) === String(y))).join('') : '');
       if (!bar._wired) {
         bar._wired = true;
         bar.addEventListener('click', (e) => {
@@ -2009,7 +2014,8 @@ function renderCompetitionsPage() {
     }
   }
   const _match = (c) => (_flt.cat === 'tout' || _catOfComp(c) === _flt.cat)
-    && (_flt.fed === 'tout' || (c.federation || null) === _flt.fed);
+    && (_flt.fed === 'tout' || (c.federation || null) === _flt.fed)
+    && (String(_flt.year) === 'tout' || c.dateObj.getFullYear() === +_flt.year);
   // Filtre GLOBAL : hero, frise de saison et listes travaillent sur le sous-ensemble
   comps = comps.filter(_match);
   if (window.odRecapRefresh) window.odRecapRefresh(); // le palmares suit le filtre
@@ -2080,7 +2086,7 @@ function renderCompetitionsPage() {
 
   // ---- FRISE DE SAISON + chiffres ----
   if (seasonWrap) {
-    const yr = today.getFullYear();
+    const yr = (String(_flt.year) !== 'tout') ? +_flt.year : today.getFullYear();
     const jan1 = new Date(yr, 0, 1), dec31 = new Date(yr, 11, 31);
     const span = dec31 - jan1;
     const yearComps = comps.filter(c => c.dateObj.getFullYear() === yr).sort((a, b) => a.dateObj - b.dateObj);
