@@ -202,20 +202,26 @@ async function pullAllFromCloud() {
     {
       const _seen = new Set();
       const { data: ra } = await sb.from('activities')
-        .select('id, client_id, name, sport, start_date_local, priority, distance_km, course_dplus, target, laps, user_notes, gpx_name, stages, event, type, tss, rpe')
+        .select('id, client_id, name, sport, start_date_local, priority, distance_km, course_dplus, target, laps, user_notes, gpx_name, stages, event, type, tss, rpe, moving_time, total_elevation_gain, tri')
         .eq('user_id', userId).eq('category', 'competition');
       for (const r of (ra || [])) {
         const cid = String(r.client_id || r.id);
         if (_seen.has(cid)) continue;
         _seen.add(cid);
+        // Les colonnes "meta compet" (target/course_dplus...) sont souvent NULL
+        // pour une compet issue d'une vraie activite Strava : la fiche est alors
+        // completee depuis les donnees de l'ACTIVITE (temps roule, D+ mesure).
         comps.push({
           id: r.client_id || r.id, _sbId: r.id, _table: 'activity', realised: true,
           name: r.name, date: r.start_date_local ? String(r.start_date_local).slice(0, 10) : null,
           time: r.start_date_local ? ((String(r.start_date_local).match(/[T ](\d{2}:\d{2})/) || [])[1] || null) : null,
           sport: r.sport ?? null,
-          priority: r.priority ?? null, km: r.distance_km ?? null, dplus: r.course_dplus ?? null,
-          target: r.target ?? null, laps: r.laps ?? null, notes: r.user_notes ?? null,
+          priority: r.priority ?? null, km: r.distance_km ?? null,
+          dplus: r.course_dplus ?? (r.total_elevation_gain != null ? Math.round(r.total_elevation_gain) : null),
+          target: r.target ?? (r.moving_time ? Math.round(r.moving_time / 60) : null),
+          laps: r.laps ?? null, notes: r.user_notes ?? null,
           tss: r.tss ?? null, rpe: r.rpe ?? null,
+          tri: r.tri ?? null,
           gpxName: r.gpx_name ?? null,
           stages: Array.isArray(r.stages) && r.stages.length > 0,
           stagesList: Array.isArray(r.stages) ? r.stages.map(function (st) { return Object.assign({}, st, { target: parseTimeToMin(st.target) }); }) : null,
