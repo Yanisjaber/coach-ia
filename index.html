@@ -963,13 +963,16 @@
 
         <!-- Standard (tous sports sauf triathlon) -->
         <div id="comp-parcours-std">
-          <div class="add-sec-grid g3">
-            <label class="form-field"><span>Distance (km)</span><input type="number" id="comp-modal-km" step="0.1" min="0" placeholder="km"></label>
-            <label class="form-field"><span>Vitesse moyenne (km/h)</span><input type="number" id="comp-modal-speed" step="0.1" min="0" placeholder="km/h"></label>
+          <!-- Ordre : Temps · Distance / Dénivelé · Vitesse (2-2) -->
+          <div class="add-sec-grid g2">
             <label class="form-field"><span>Temps cible</span><input type="text" id="comp-modal-target" placeholder="ex : 3h45"></label>
+            <label class="form-field"><span>Distance (km)</span><input type="number" id="comp-modal-km" step="0.1" min="0" placeholder="km"></label>
           </div>
-          <div class="add-sec-grid g3" style="margin-top:10px">
+          <div class="add-sec-grid g2" style="margin-top:10px">
             <label class="form-field"><span>Dénivelé + (m)</span><input type="number" id="comp-modal-dplus" min="0" placeholder="mètres"></label>
+            <label class="form-field"><span>Vitesse moyenne (km/h)</span><input type="number" id="comp-modal-speed" step="0.1" min="0" placeholder="km/h"></label>
+          </div>
+          <div class="add-sec-grid g2" style="margin-top:10px">
             <label class="form-field"><span>Nombre de tours</span><input type="number" id="comp-modal-laps" min="1" step="1" placeholder="tours"></label>
           </div>
           <div class="form-field" style="margin-top:11px">

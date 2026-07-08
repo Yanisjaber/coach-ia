@@ -954,6 +954,7 @@
 .add-sec-h.parc { color: var(--warn); }
 .add-sec-grid { display: grid; gap: 14px; }
 .add-sec-grid.g3 { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
+.add-sec-grid.g2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .add-sec input, .add-sec select, .add-sec textarea { background: var(--bg); }
 .gpx-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .gpx-btn {
