@@ -110,26 +110,14 @@ Deno.serve(async (req) => {
     // sauf si le front demande un resync complet ({ full: true }).
     let reqBody: any = {};
     try { reqBody = await req.json(); } catch (_) { reqBody = {}; }
-    const fullResync = reqBody && reqBody.full === true;
-    // Mode { hours_only: true } : relit TOUT l'historique Strava mais ne met a
-    // jour QUE start_date_local (les heures font foi cote Strava). Aucun impact
-    // sur tss/intensity/ftp_at_time/category — repare les heures falsifiees a
-    // 12:00 par d'anciennes versions sans toucher a l'historique de charge.
+    // Toute resynchro repart du JOUR 0 : les faits Strava (heures, durees,
+    // distances, noms) sont rafraichis sur tout l'historique. Les champs
+    // CALCULES des lignes existantes (ftp_at_time / intensity / tss) sont
+    // preserves plus bas — l'historique de charge n'est jamais recalcule
+    // avec le FTP du jour.
+    // Mode { hours_only: true } : ne met a jour QUE start_date_local.
     const hoursOnly = reqBody && reqBody.hours_only === true;
-    let afterEpoch: number | null = null;
-    if (!fullResync && !hoursOnly) {
-      const { data: latestAct } = await sbAdmin
-        .from("activities")
-        .select("start_date_local")
-        .eq("user_id", user.id)
-        .order("start_date_local", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (latestAct && latestAct.start_date_local) {
-        afterEpoch = Math.floor(new Date(latestAct.start_date_local).getTime() / 1000) - 7 * 86400;
-      }
-    }
-    const afterParam = afterEpoch ? `&after=${afterEpoch}` : "";
+    const afterParam = "";
     const all: any[] = [];
     let page = 1;
     while (page <= 50) { // garde-fou
@@ -211,6 +199,31 @@ Deno.serve(async (req) => {
         const iso = String(r.start_date_local || "").slice(0, 10);
         return /^\d{4}-\d{2}-\d{2}$/.test(iso) && iso >= ACT_DATE_FLOOR;
       });
+
+    // ===== 5b) Preserve l'historique calcule des lignes existantes =====
+    // (sinon un resync jour-0 recalculerait tout au FTP du jour et
+    // falsifierait la courbe de charge passee)
+    {
+      const prev = new Map<string, any>();
+      for (let off = 0; ; off += 1000) {
+        const { data: ex } = await sbAdmin
+          .from("activities")
+          .select("strava_id, ftp_at_time, intensity, tss")
+          .eq("user_id", user.id)
+          .not("strava_id", "is", null)
+          .range(off, off + 999);
+        (ex || []).forEach((r: any) => prev.set(String(r.strava_id), r));
+        if (!ex || ex.length < 1000) break;
+      }
+      for (const r of rows) {
+        const old = prev.get(String(r.strava_id));
+        if (old && old.ftp_at_time) {
+          r.ftp_at_time = old.ftp_at_time;
+          r.intensity = old.intensity;
+          r.tss = old.tss;
+        }
+      }
+    }
 
     // ===== 6) Upsert par batches =====
     let inserted = 0;
