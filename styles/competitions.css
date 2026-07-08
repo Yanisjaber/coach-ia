@@ -480,11 +480,22 @@
 
 /* Distances triathlon sur les cartes de compétition (750m · 20km · 5km) */
 .comp-tri-mini {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
   font-size: clamp(9.5px, 8.6px + 0.28vw, 11px);
   font-weight: 600;
-  color: #f43f5e;
   margin: 2px 0 4px 26px;   /* aligné sous le nom (après le trophée) */
   letter-spacing: 0.2px;
+}
+.comp-tri-mini .ctm-dist { color: var(--text, #e7ecf3); }   /* distances en blanc */
+.comp-tri-mini .ctm-obj {
+  color: #f43f5e;
+  text-transform: uppercase;
+  font-size: 0.9em;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 /* Onglets triathlon de la modale compétition (Nat / T1 / Vélo / T2 / CAP) */

@@ -1889,7 +1889,7 @@ function renderCompList() {
         <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'J‑' + daysUntil}</span>
         <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
       </div>
-      ${window.triDistLabel(c) ? `<div class="comp-tri-mini">${window.triDistLabel(c)}</div>` : ''}
+      ${window.triDistLabel(c) ? `<div class="comp-tri-mini"><span class="ctm-dist">${window.triDistLabel(c)}</span>${c.target ? `<span class="ctm-obj">Objectif · ${fmtMinToTime(c.target)}</span>` : ''}</div>` : ''}
       <div class="comp-phase-track"><div class="comp-phase-fill" style="width:${fillPct.toFixed(1)}%"></div></div>
     </div>`;
   }).join('');
@@ -2081,7 +2081,7 @@ function renderCompetitionsPage() {
           <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'J‑' + daysUntil}</span>
           <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
         </div>
-        ${window.triDistLabel(c) ? `<div class="comp-tri-mini">${window.triDistLabel(c)}</div>` : ''}
+        ${window.triDistLabel(c) ? `<div class="comp-tri-mini"><span class="ctm-dist">${window.triDistLabel(c)}</span>${c.target ? `<span class="ctm-obj">Objectif · ${fmtMinToTime(c.target)}</span>` : ''}</div>` : ''}
         <div class="comp-phase-track"><div class="comp-phase-fill" style="width:${fillPct.toFixed(1)}%"></div></div>
       </div>`;
     }).join('') : '<div class="comp-empty">Aucune compétition à venir.</div>';
