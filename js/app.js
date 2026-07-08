@@ -1992,22 +1992,18 @@ function renderCompetitionsPage() {
       const feds = [...new Set(comps.map(c => c.federation).filter(Boolean))].sort();
       const years = [...new Set(comps.map(c => c.dateObj.getFullYear()))].sort((a, b) => b - a);
       const catLab = { cyclisme: 'Vélo', course: 'CAP', triathlon: 'Tri', natation: 'Natation', musculation: 'Muscu', autre: 'Autre' };
-      const chip = (grp, val, lab, on) => `<button type="button" class="comp-flt-chip${on ? ' on' : ''}" data-grp="${grp}" data-val="${val}">${lab}</button>`;
+      // 3 selecteurs compacts (les chips en vrac debordaient sur 3 lignes mobile)
+      const sel = (grp, opts, cur) => `<select class="comp-flt-sel${String(cur) !== 'tout' ? ' on' : ''}" data-grp="${grp}">${opts.map(([v, lab]) => `<option value="${v}"${String(cur) === String(v) ? ' selected' : ''}>${lab}</option>`).join('')}</select>`;
       bar.innerHTML =
-        chip('cat', 'tout', 'Tous', _flt.cat === 'tout')
-        + cats.map(c2 => chip('cat', c2, catLab[c2] || c2, _flt.cat === c2)).join('')
-        + (feds.length ? '<span class="comp-flt-sep"></span>'
-          + chip('fed', 'tout', 'Toutes fédés', _flt.fed === 'tout')
-          + feds.map(f => chip('fed', f, f, _flt.fed === f)).join('') : '')
-        + (years.length > 1 ? '<span class="comp-flt-sep"></span>'
-          + chip('year', 'tout', 'Toutes années', String(_flt.year) === 'tout')
-          + years.map(y => chip('year', y, String(y), String(_flt.year) === String(y))).join('') : '');
+        sel('cat', [['tout', 'Tous les sports']].concat(cats.map(c2 => [c2, catLab[c2] || c2])), _flt.cat)
+        + sel('fed', [['tout', 'Toutes fédés']].concat(feds.map(f => [f, f])), _flt.fed)
+        + sel('year', [['tout', 'Toutes années']].concat(years.map(y => [y, y])), _flt.year);
       if (!bar._wired) {
         bar._wired = true;
-        bar.addEventListener('click', (e) => {
-          const b = e.target.closest('.comp-flt-chip');
-          if (!b) return;
-          window._compPageFilter[b.dataset.grp] = b.dataset.val;
+        bar.addEventListener('change', (e) => {
+          const el = e.target.closest('.comp-flt-sel');
+          if (!el) return;
+          window._compPageFilter[el.dataset.grp] = el.value;
           renderCompetitionsPage();
         });
       }
