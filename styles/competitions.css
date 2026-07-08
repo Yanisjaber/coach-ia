@@ -625,3 +625,55 @@
 }
 .comp-res-form #crf-save { background: rgba(74, 222, 128, 0.12); color: var(--accent, #4ade80); border-color: rgba(74, 222, 128, 0.35); }
 .comp-res-form .crf-btns button:hover { color: var(--text, #e7ecf3); }
+
+/* Badges federation / niveau / format sur les cartes compet */
+.comp-fed-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: clamp(8.5px, 8px + 0.15vw, 9.5px);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-dim, #8b93a7);
+  border: 1px solid var(--border, #26304a);
+  background: var(--bg-elev2, #141a26);
+  vertical-align: middle;
+  flex: 0 0 auto;
+}
+.comp-fed-badge.fmt { color: #f43f5e; border-color: rgba(244, 63, 94, 0.35); }
+.comp-fed-badge.lvl { text-transform: none; letter-spacing: 0; }
+
+/* Barre de filtres de la page Competitions */
+.comp-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: clamp(5px, 4.1px + 0.29vw, 7px);
+  margin: 2px 0 4px;
+}
+.comp-flt-chip {
+  background: var(--bg-elev, #10151f);
+  border: 1px solid var(--border, #26304a);
+  color: var(--text-dim, #8b93a7);
+  border-radius: 999px;
+  padding: clamp(4px, 3.1px + 0.29vw, 6px) clamp(9px, 7.5px + 0.44vw, 12px);
+  font-size: clamp(10.5px, 9.6px + 0.29vw, 12px);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.comp-flt-chip:hover { color: var(--text, #e7ecf3); }
+.comp-flt-chip.on {
+  color: var(--accent, #4ade80);
+  border-color: rgba(74, 222, 128, 0.45);
+  background: rgba(74, 222, 128, 0.08);
+}
+.comp-flt-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border, #26304a);
+  margin: 0 4px;
+}

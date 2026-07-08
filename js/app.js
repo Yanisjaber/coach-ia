@@ -1842,6 +1842,16 @@ window.compDistLabel = function (c) {
   return (isClm || isRun) ? ((+c.km) + ' km') : '';
 };
 
+// Badges federation / format tri / niveau d'une compet (cartes + filtres)
+window.compFedBadges = function (c) {
+  if (!c) return '';
+  let h = '';
+  if (c.federation) h += `<span class="comp-fed-badge">${c.federation}</span>`;
+  if (c.triFormat) h += `<span class="comp-fed-badge fmt">${c.triFormat}</span>`;
+  if (c.raceLevel) h += `<span class="comp-fed-badge lvl">${c.raceLevel}</span>`;
+  return h;
+};
+
 function renderCompList() {
   // Helpers de format
   const fmtFullDate = d => d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
@@ -1897,7 +1907,7 @@ function renderCompList() {
     fillPct = Math.max(0, Math.min(100, fillPct));
     return `<div class="comp-item" data-prio="${_pi.key}" data-comp-id="${c.id}" title="Voir le détail de la compétition">
       <div class="comp-row">
-        <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span>${(window.SportProfiles && window.SportProfiles.sportIconHTML) ? window.SportProfiles.sportIconHTML(c.sport) : ''}</span>
+        <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span>${(window.SportProfiles && window.SportProfiles.sportIconHTML) ? window.SportProfiles.sportIconHTML(c.sport) : ''}${window.compFedBadges ? window.compFedBadges(c) : ''}</span>
         <span class="comp-date">${dateStr}</span>
         <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'J‑' + daysUntil}</span>
         <button class="comp-more" data-id="${c.id}" title="Actions">⋯</button>
@@ -1963,8 +1973,45 @@ function renderCompetitionsPage() {
     return fmtFullDate(c.dateObj);
   };
 
-  const upcoming = comps.filter(c => c.endDateObj >= today).sort((a, b) => a.dateObj - b.dateObj);
-  const past = comps.filter(c => c.endDateObj < today).sort((a, b) => b.dateObj - a.dateObj);
+  // ---- Barre de filtres (sport + federation) ----
+  window._compPageFilter = window._compPageFilter || { cat: 'tout', fed: 'tout' };
+  const _flt = window._compPageFilter;
+  const _catOfComp = (c) => (typeof getSportCategory === 'function' ? getSportCategory(c.sport || '') : 'autre');
+  {
+    let bar = document.getElementById('comp-filters');
+    if (!bar && upWrap) {
+      bar = document.createElement('div');
+      bar.id = 'comp-filters';
+      bar.className = 'comp-filters';
+      const host = upWrap.closest('.card');
+      if (host && host.parentElement) host.parentElement.insertBefore(bar, host);
+    }
+    if (bar) {
+      const cats = [...new Set(comps.map(_catOfComp))].sort();
+      const feds = [...new Set(comps.map(c => c.federation).filter(Boolean))].sort();
+      const catLab = { cyclisme: 'Vélo', course: 'CAP', triathlon: 'Tri', natation: 'Natation', musculation: 'Muscu', autre: 'Autre' };
+      const chip = (grp, val, lab, on) => `<button type="button" class="comp-flt-chip${on ? ' on' : ''}" data-grp="${grp}" data-val="${val}">${lab}</button>`;
+      bar.innerHTML =
+        chip('cat', 'tout', 'Tous', _flt.cat === 'tout')
+        + cats.map(c2 => chip('cat', c2, catLab[c2] || c2, _flt.cat === c2)).join('')
+        + (feds.length ? '<span class="comp-flt-sep"></span>'
+          + chip('fed', 'tout', 'Toutes fédés', _flt.fed === 'tout')
+          + feds.map(f => chip('fed', f, f, _flt.fed === f)).join('') : '');
+      if (!bar._wired) {
+        bar._wired = true;
+        bar.addEventListener('click', (e) => {
+          const b = e.target.closest('.comp-flt-chip');
+          if (!b) return;
+          window._compPageFilter[b.dataset.grp] = b.dataset.val;
+          renderCompetitionsPage();
+        });
+      }
+    }
+  }
+  const _match = (c) => (_flt.cat === 'tout' || _catOfComp(c) === _flt.cat)
+    && (_flt.fed === 'tout' || (c.federation || null) === _flt.fed);
+  const upcoming = comps.filter(c => c.endDateObj >= today).filter(_match).sort((a, b) => a.dateObj - b.dateObj);
+  const past = comps.filter(c => c.endDateObj < today).filter(_match).sort((a, b) => b.dateObj - a.dateObj);
 
   // Métriques de forme les plus récentes
   const last = (Array.isArray(data) && data.length) ? data[data.length - 1] : null;
@@ -2090,7 +2137,7 @@ function renderCompetitionsPage() {
       fillPct = Math.max(0, Math.min(100, fillPct));
       return `<div class="comp-item" data-prio="${_pi.key}" data-comp-id="${c.id}" title="Voir le détail">
         <div class="comp-row">
-          <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span>${(window.SportProfiles && window.SportProfiles.sportIconHTML) ? window.SportProfiles.sportIconHTML(c.sport) : ''}</span>
+          <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span>${(window.SportProfiles && window.SportProfiles.sportIconHTML) ? window.SportProfiles.sportIconHTML(c.sport) : ''}${window.compFedBadges ? window.compFedBadges(c) : ''}</span>
           <span class="comp-date">${dateLabel(c)}</span>
           <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'J‑' + daysUntil}</span>
           <button class="comp-more" data-id="${c.id}" title="Actions">⋯</button>
@@ -2244,7 +2291,7 @@ function renderCompetitionsPage() {
         ${_medalHTML(g.od, _pi.color)}
         <div class="comp-res-content">
           <div class="comp-res-top">
-            <span class="comp-res-name" title="${String(_tooltipNames || '').replace(/"/g, '&quot;')}"><span style="color:${_pi.color};">${_dispName}</span></span>
+            <span class="comp-res-name" title="${String(_tooltipNames || '').replace(/"/g, '&quot;')}"><span style="color:${_pi.color};">${_dispName}</span>${window.compFedBadges ? window.compFedBadges(c) : ''}</span>
             <span class="comp-res-date">${dateLabel(c)}</span>
             <button class="comp-more" data-id="${c.id}" title="Actions">⋯</button>
             <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
@@ -3172,6 +3219,58 @@ function populateTypeSelectForSport(rawType) {
   if (typeof updateLapsVisibility === 'function') updateLapsVisibility();
 }
 
+// Fédérations par catégorie de sport (filtres futurs : FFC vs UFOLEP etc.)
+const FEDERATIONS_BY_CAT = {
+  cyclisme: ['FFC', 'UFOLEP', 'FSGT'],
+  course: ['FFA', 'Hors stade'],
+  triathlon: ['FFTri'],
+  natation: ['FFN'],
+};
+const LEVEL_PLACEHOLDER_BY_FED = {
+  FFC: 'ex : Open 1-3, Access 3-4',
+  UFOLEP: 'ex : 2e-3e cat',
+  FSGT: 'ex : 3e-4e cat',
+  FFA: 'ex : label régional',
+  FFTri: 'ex : D3, Open',
+};
+function populateFedSelectForSport(rawType) {
+  const sel = document.getElementById('comp-modal-federation');
+  if (!sel) return;
+  const cat = (typeof getSportCategory === 'function') ? getSportCategory(rawType) : 'autre';
+  const opts = (FEDERATIONS_BY_CAT[cat] || []).concat('Autre');
+  const prev = sel.value;
+  sel.innerHTML = '';
+  const empty = document.createElement('option');
+  empty.value = '';
+  empty.textContent = 'Non précisée';
+  sel.appendChild(empty);
+  opts.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o;
+    opt.textContent = o;
+    sel.appendChild(opt);
+  });
+  if (prev && Array.from(sel.options).some(o => o.value === prev)) sel.value = prev;
+  else sel.value = '';
+  if (typeof enhanceSelect === 'function') enhanceSelect('comp-modal-federation');
+  if (sel._customUpdate) sel._customUpdate();
+  // Placeholder du niveau adapte a la fede choisie
+  const lvl = document.getElementById('comp-modal-level');
+  if (lvl) lvl.placeholder = LEVEL_PLACEHOLDER_BY_FED[sel.value] || 'ex : Open 1-3';
+  // Format : uniquement pour le triathlon
+  const tfWrap = document.getElementById('comp-modal-triformat-wrap');
+  if (tfWrap) {
+    const holder = (tfWrap.querySelector('.custom-select') && tfWrap) || tfWrap;
+    holder.style.display = (cat === 'triathlon') ? '' : 'none';
+  }
+  if (typeof reflowSecGrids === 'function') reflowSecGrids();
+}
+document.getElementById('comp-modal-federation')?.addEventListener('change', () => {
+  const lvl = document.getElementById('comp-modal-level');
+  const sel = document.getElementById('comp-modal-federation');
+  if (lvl && sel) lvl.placeholder = LEVEL_PLACEHOLDER_BY_FED[sel.value] || 'ex : Open 1-3';
+});
+
 // « Nombre de tours » : uniquement pour une épreuve en Circuit
 function updateLapsVisibility() {
   const typeSel = document.getElementById('comp-modal-type');
@@ -3187,7 +3286,7 @@ document.getElementById('comp-modal-type')?.addEventListener('change', updateLap
 (function wireTypeSelectToSport() {
   const sportSel = document.getElementById('comp-modal-sport');
   if (!sportSel) return;
-  sportSel.addEventListener('change', () => populateTypeSelectForSport(sportSel.value));
+  sportSel.addEventListener('change', () => { populateTypeSelectForSport(sportSel.value); populateFedSelectForSport(sportSel.value); });
 })();
 
 // ========= GESTION DES ÉTAPES (course par étapes) =========
@@ -3770,7 +3869,7 @@ function openCompModal() {
   { const _tt = document.getElementById('comp-modal-to-training'); if (_tt) _tt.hidden = true; }
   window._compToTrainingAct = null; window._compToTrainingIso = null;
   // Reset form (sauf "time" qui est géré par le stepper)
-  ['name','date','type','km','dplus','target','laps','notes','speed','tss','rpe'].forEach(k => {
+  ['name','date','type','km','dplus','target','laps','notes','speed','tss','rpe','level'].forEach(k => {
     const el = document.getElementById('comp-modal-' + k);
     if (el) el.value = '';
   });
@@ -3800,6 +3899,8 @@ function openCompModal() {
   if (sportEl && sportEl._customUpdate) sportEl._customUpdate();
   // Peuple le select Type d'épreuve selon le sport actif
   if (typeof populateTypeSelectForSport === 'function') populateTypeSelectForSport('Ride');
+  if (typeof populateFedSelectForSport === 'function') populateFedSelectForSport('Ride');
+  { const tf = document.getElementById('comp-modal-triformat'); if (tf) { tf.value = ''; if (tf._customUpdate) tf._customUpdate(); } }
   // Reset AGRESSIF du file-picker GPX (l'input file peut garder son state entre ouvertures)
   const gpxEl = document.getElementById('comp-modal-gpx');
   if (gpxEl) {
@@ -3972,6 +4073,9 @@ async function saveCompFromModal() {
   const target = parseTimeToMin(document.getElementById('comp-modal-target').value);
   const laps = parseInt(document.getElementById('comp-modal-laps').value, 10) || null;
   const notes = document.getElementById('comp-modal-notes').value.trim();
+  const federation = (document.getElementById('comp-modal-federation') || {}).value || null;
+  const raceLevel = ((document.getElementById('comp-modal-level') || {}).value || '').trim() || null;
+  const triFormat = (document.getElementById('comp-modal-triformat') || {}).value || null;
   const compTss = parseInt((document.getElementById('comp-modal-tss') || {}).value, 10) || null;
   const compRpe = parseFloat(String((document.getElementById('comp-modal-rpe') || {}).value || '').replace(',', '.')) || null;
   // (champ Événement supprimé de la modale ; on préserve la valeur existante en édition)
@@ -4037,6 +4141,7 @@ async function saveCompFromModal() {
     target: (tri && triTargetMin ? triTargetMin : target),
     laps: (tri ? null : laps), notes, event,
     tss: compTss, rpe: compRpe,
+    federation, raceLevel, triFormat: (tri || getSportCategory(sport) === 'triathlon') ? triFormat : null,
     tri,
     stages,
     stagesList,
@@ -11503,6 +11608,15 @@ function openCompModalForEdit(comp) {
   document.getElementById('comp-modal-target').value = fmtMinToTime(comp.target);
   document.getElementById('comp-modal-laps').value = comp.laps != null ? comp.laps : '';
   { const e1 = document.getElementById('comp-modal-tss'); if (e1) e1.value = comp.tss != null ? comp.tss : ''; }
+  {
+    if (typeof populateFedSelectForSport === 'function') populateFedSelectForSport(comp.sport || 'Ride');
+    const f = document.getElementById('comp-modal-federation');
+    if (f && comp.federation) { f.value = comp.federation; if (f._customUpdate) f._customUpdate(); }
+    const l = document.getElementById('comp-modal-level');
+    if (l) l.value = comp.raceLevel || '';
+    const tf = document.getElementById('comp-modal-triformat');
+    if (tf) { tf.value = comp.triFormat || ''; if (tf._customUpdate) tf._customUpdate(); }
+  }
   { const e2 = document.getElementById('comp-modal-rpe'); if (e2) e2.value = comp.rpe != null ? comp.rpe : ''; }
   document.getElementById('comp-modal-notes').value = comp.notes || '';
   // Toggle stages + remplissage stagesData si applicable
