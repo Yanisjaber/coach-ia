@@ -3132,6 +3132,24 @@ function adaptSportForm(selectId, ids) {
     const span2 = lab2 && lab2.querySelector('span');
     if (span2 && cfg.laps) span2.textContent = cfg.laps;
   }
+  if (ids.speed) {
+    const sp = document.getElementById(ids.speed);
+    const lab3 = sp && sp.closest('label');
+    const span3 = document.getElementById(ids.speed + '-label') || (lab3 && lab3.querySelector('span'));
+    const cat = (typeof getSportCategory === 'function') ? getSportCategory(sel.value) : 'autre';
+    const conf = (cat === 'course') ? { mode: 'pace_km', lab: 'Allure (min/km)', ph: 'ex : 4:30' }
+      : (cat === 'natation') ? { mode: 'pace_100m', lab: 'Allure (/100m)', ph: 'ex : 1:45' }
+      : { mode: 'speed', lab: 'Vitesse moy (km/h)', ph: 'km/h' };
+    // triathlon / muscu : pas de champ vitesse global
+    const show = !!cfg.dist && cat !== 'triathlon';
+    if (lab3) lab3.style.display = show ? '' : 'none';
+    if (sp) {
+      if (window._trainSpeedMode && window._trainSpeedMode !== conf.mode) sp.value = ''; // unite changee
+      sp.placeholder = conf.ph;
+    }
+    if (span3) span3.textContent = conf.lab;
+    window._trainSpeedMode = conf.mode;
+  }
   // Section Parcours entière (train-modal) : masquée si plus aucun champ dedans
   if (ids.hideSection && kmInput) {
     const sec = kmInput.closest('.add-sec');
@@ -3147,7 +3165,7 @@ function readDistAsKm(inputId) {
   return el.dataset.distUnit === 'm' ? +(v / 1000).toFixed(3) : v;
 }
 const adaptTrainSportForm = () => {
-  adaptSportForm('train-modal-sport', { km: 'train-modal-km', dplus: 'train-modal-dplus', gpx: 'train-modal-gpx', hideSection: true });
+  adaptSportForm('train-modal-sport', { km: 'train-modal-km', dplus: 'train-modal-dplus', gpx: 'train-modal-gpx', speed: 'train-modal-speed', hideSection: true });
   // Triathlon : 3 distances par discipline (pas en mode modèle bibliothèque)
   const sel = document.getElementById('train-modal-sport');
   const isTri = !window._templateMode && !!sel && typeof getSportCategory === 'function' && getSportCategory(sel.value) === 'triathlon';
@@ -3241,14 +3259,20 @@ function wireTrio(cfg) {
   const t = document.getElementById(cfg.timeId), d = document.getElementById(cfg.distId), r = document.getElementById(cfg.rateId);
   if (!t || !d || !r || t._trioWired) return;
   t._trioWired = true;
-  const readTime = () => (cfg.timeParse === 'target' ? parseTimeToMin(t.value) : parseSegTime(t.value));
+  // mode statique ('speed'|'pace_km'|'pace_100m') OU fonction (sport dynamique)
+  const modeOf = () => (typeof cfg.mode === 'function' ? cfg.mode() : cfg.mode);
+  const readTime = () => {
+    if (cfg.timeParse === 'target') return parseTimeToMin(t.value);
+    if (cfg.timeParse === 'minutes') { const v = parseFloat(String(t.value).replace(',', '.')); return (isNaN(v) || v <= 0) ? null : v; }
+    return parseSegTime(t.value);
+  };
   const readDist = () => {
     let v = parseFloat(String(d.value).replace(',', '.'));
     if (isNaN(v) || v <= 0) return null;
-    if (d.dataset.distUnit === 'm' && cfg.mode === 'speed') v = v / 1000;  // vitesse km/h depuis des metres
+    if (d.dataset.distUnit === 'm' && modeOf() === 'speed') v = v / 1000;  // vitesse km/h depuis des metres
     return v;
   };
-  const readRate = () => (cfg.mode === 'speed' ? (parseFloat(String(r.value).replace(',', '.')) || null) : parsePace(r.value));
+  const readRate = () => (modeOf() === 'speed' ? (parseFloat(String(r.value).replace(',', '.')) || null) : parsePace(r.value));
   // dist en km pour speed/pace_km ; en m pour pace_100m
   // Règle DÉTERMINISTE (recalcul même si les 3 champs sont remplis) :
   // - je modifie le TEMPS      -> la vitesse/allure se recalcule (distance = fait de terrain)
@@ -3256,24 +3280,30 @@ function wireTrio(cfg) {
   // - je modifie la VITESSE    -> le temps se recalcule
   // (si le champ prioritaire manque, on calcule celui qui est possible)
   const setRate = (tm, dv) => {
-    if (cfg.mode === 'speed') r.value = +(dv / (tm / 60)).toFixed(1);
-    else if (cfg.mode === 'pace_km') r.value = fmtPaceSec(tm * 60 / dv);
+    const m = modeOf();
+    if (m === 'speed') r.value = +(dv / (tm / 60)).toFixed(1);
+    else if (m === 'pace_km') r.value = fmtPaceSec(tm * 60 / dv);
     else r.value = fmtPaceSec(tm * 60 / (dv / 100));
     r.dataset.auto = '1';
   };
   const setDist = (tm, rv) => {
+    const m = modeOf();
     let dv;
-    if (cfg.mode === 'speed') dv = +(rv * tm / 60).toFixed(1);
-    else if (cfg.mode === 'pace_km') dv = +(tm * 60 / rv).toFixed(1);
+    if (m === 'speed') dv = +(rv * tm / 60).toFixed(1);
+    else if (m === 'pace_km') dv = +(tm * 60 / rv).toFixed(1);
     else dv = Math.round(tm * 60 / rv * 100);
-    if (dv > 0) { d.value = (cfg.mode === 'speed' && d.dataset.distUnit === 'm') ? Math.round(dv * 1000) : dv; d.dataset.auto = '1'; }
+    if (dv > 0) { d.value = (m === 'speed' && d.dataset.distUnit === 'm') ? Math.round(dv * 1000) : dv; d.dataset.auto = '1'; }
   };
   const setTime = (dv, rv) => {
+    const m = modeOf();
     let mins;
-    if (cfg.mode === 'speed') mins = dv / rv * 60;
-    else if (cfg.mode === 'pace_km') mins = dv * rv / 60;
+    if (m === 'speed') mins = dv / rv * 60;
+    else if (m === 'pace_km') mins = dv * rv / 60;
     else mins = (dv / 100) * rv / 60;
-    const out = cfg.timeParse === 'target' ? fmtMinToTime(Math.round(mins)) : fmtSegTime(mins);
+    let out;
+    if (cfg.timeParse === 'target') out = fmtMinToTime(Math.round(mins));
+    else if (cfg.timeParse === 'minutes') out = String(Math.round(mins));
+    else out = fmtSegTime(mins);
     if (out) { t.value = out; t.dataset.auto = '1'; }
   };
   const compute = (changed) => {
@@ -3298,6 +3328,8 @@ function wireTrio(cfg) {
 }
 function wireCompTrios() {
   wireTrio({ timeId: 'comp-modal-target', distId: 'comp-modal-km', rateId: 'comp-modal-speed', mode: 'speed', timeParse: 'target' });
+  wireTrio({ timeId: 'train-modal-duration', distId: 'train-modal-km', rateId: 'train-modal-speed', timeParse: 'minutes',
+    mode: () => window._trainSpeedMode || 'speed' });
   wireTrio({ timeId: 'comp-tri-nat-time', distId: 'comp-tri-nat-dist', rateId: 'comp-tri-nat-pace', mode: 'pace_100m' });
   wireTrio({ timeId: 'comp-tri-bike-time', distId: 'comp-tri-bike-dist', rateId: 'comp-tri-bike-speed', mode: 'speed' });
   wireTrio({ timeId: 'comp-tri-run-time', distId: 'comp-tri-run-dist', rateId: 'comp-tri-run-pace', mode: 'pace_km' });
@@ -3808,7 +3840,7 @@ function openTrainModal(mode) {
   const delBtn = document.getElementById('train-modal-delete');
   if (delBtn) delBtn.hidden = true;
   ['train-tri-swim', 'train-tri-bike', 'train-tri-run'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
-  ['name','date','time','duration','tss','notes','rpe','km','dplus'].forEach(k => {
+  ['name','date','time','duration','tss','notes','rpe','km','dplus','speed'].forEach(k => {
     const el = document.getElementById('train-modal-' + k);
     if (el) el.value = '';
   });
@@ -3875,6 +3907,22 @@ function openTrainModalForEdit(training, mode) {
   }
   // Adapte le formulaire au sport (convertit l'affichage km->m si natation)
   if (typeof adaptTrainSportForm === 'function') adaptTrainSportForm();
+  // Vitesse/allure recalculee depuis duree + distance (comme la modale compet)
+  {
+    const sp = document.getElementById('train-modal-speed');
+    const mins = +training.duration || 0, km2 = +training.km || 0;
+    if (sp) {
+      let v = '';
+      if (mins > 0 && km2 > 0) {
+        const m = window._trainSpeedMode || 'speed';
+        if (m === 'speed') v = +(km2 / (mins / 60)).toFixed(1);
+        else if (m === 'pace_km') v = fmtPaceSec(mins * 60 / km2);
+        else v = fmtPaceSec(mins * 60 / (km2 * 10));
+      }
+      sp.value = v;
+      if (v) sp.dataset.auto = '1';
+    }
+  }
   // Controles "activite" (mode realise edite) : exclusions records + transformer en compet
   {
     const _ctrls = document.getElementById('train-modal-act-controls');
