@@ -2178,6 +2178,17 @@ function renderCompetitionsPage() {
       }
       its.forEach(it => { if (it.od) window.__odAssignedByComp[String(it.c.id)] = it.od.id; });
     }
+    // Resultats saisis manuellement : uniquement la ou aucun resultat OD n'est associe
+    {
+      const _mr = _manualResLoad();
+      for (const it of _items) {
+        if (it.od) continue;
+        const r = _mr[String(it.c.id)];
+        if (r && r.place != null) {
+          it.od = { rankingScratch: r.place, rankingInCategory: r.place, totalInCategory: r.total || null, catev: r.catev || null, _manual: true };
+        }
+      }
+    }
 
     // 3) Filet de securite : deux cartes memes jour + meme nom -> fusion
     const _groups = new Map();
@@ -2359,6 +2370,14 @@ function _odOverridesLoad() {
 function _odOverridesSave(m) {
   localStorage.setItem('coach_ia_od_overrides_v1', JSON.stringify(m || {}));
 }
+// Resultats saisis MANUELLEMENT (compets sans resultat Open Dossard)
+// { [compId]: { place, total, catev } }
+function _manualResLoad() {
+  try { return JSON.parse(localStorage.getItem('coach_ia_manual_results_v1') || '{}'); } catch { return {}; }
+}
+function _manualResSave(m) {
+  localStorage.setItem('coach_ia_manual_results_v1', JSON.stringify(m || {}));
+}
 // Resultats OD masques par l'utilisateur (cartes 'resultat officiel' supprimees)
 function _odHiddenLoad() {
   try { return new Set(JSON.parse(localStorage.getItem('coach_ia_od_hidden_v1') || '[]').map(String)); } catch { return new Set(); }
@@ -2369,10 +2388,51 @@ function _odHiddenAdd(id) {
   localStorage.setItem('coach_ia_od_hidden_v1', JSON.stringify(a));
 }
 
+// Mini-formulaire flottant : saisir/modifier un resultat manuel
+function _openManualResultForm(btn, comp) {
+  _closeCompActionsMenu();
+  const cur = _manualResLoad()[String(comp.id)] || {};
+  const menu = document.createElement('div');
+  menu.className = 'comp-actions-menu comp-res-form';
+  menu.innerHTML = `
+    <div class="crf-title">Résultat — ${(comp.name || '').replace(/</g, '&lt;')}</div>
+    <label>Place<input type="number" id="crf-place" min="1" step="1" value="${cur.place != null ? cur.place : ''}" placeholder="ex : 7"></label>
+    <label>Partants<input type="number" id="crf-total" min="1" step="1" value="${cur.total != null ? cur.total : ''}" placeholder="ex : 62"></label>
+    <label>Catégorie<input type="text" id="crf-catev" value="${cur.catev ? String(cur.catev).replace(/"/g, '&quot;') : ''}" placeholder="ex : 3 / Open 2"></label>
+    <div class="crf-btns">
+      <button type="button" id="crf-cancel">Annuler</button>
+      <button type="button" id="crf-save">Enregistrer</button>
+    </div>`;
+  document.body.appendChild(menu);
+  window._compMenuEl = menu;
+  const r = btn.getBoundingClientRect();
+  const mw = menu.offsetWidth || 240;
+  menu.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, r.right - mw)) + 'px';
+  menu.style.top = Math.min(window.innerHeight - menu.offsetHeight - 8, r.bottom + 6) + 'px';
+  menu.querySelector('#crf-cancel').addEventListener('click', _closeCompActionsMenu);
+  menu.querySelector('#crf-save').addEventListener('click', () => {
+    const place = parseInt(menu.querySelector('#crf-place').value, 10) || null;
+    const total = parseInt(menu.querySelector('#crf-total').value, 10) || null;
+    const catev = menu.querySelector('#crf-catev').value.trim() || null;
+    const m = _manualResLoad();
+    if (place) m[String(comp.id)] = { place, total, catev };
+    else delete m[String(comp.id)];
+    _manualResSave(m);
+    _closeCompActionsMenu();
+    renderCompetitionsPage();
+  });
+  setTimeout(() => document.addEventListener('click', _compMenuOutside, true), 0);
+  menu.querySelector('#crf-place').focus();
+}
+
 // Menu d'actions (⋯) d'une carte compet : Modifier / Transformer / Supprimer.
+function _compMenuOutside(ev) {
+  if (window._compMenuEl && window._compMenuEl.contains(ev.target)) return;
+  _closeCompActionsMenu();
+}
 function _closeCompActionsMenu() {
   if (window._compMenuEl) { window._compMenuEl.remove(); window._compMenuEl = null; }
-  document.removeEventListener('click', _closeCompActionsMenu, true);
+  document.removeEventListener('click', _compMenuOutside, true);
 }
 function _openCompActionsMenu(btn, id) {
   _closeCompActionsMenu();
@@ -2417,8 +2477,24 @@ function _openCompActionsMenu(btn, id) {
       const mw = menu.offsetWidth || 240;
       menu.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, r2.right - mw)) + 'px';
       menu.style.top = Math.min(window.innerHeight - menu.offsetHeight - 8, r2.bottom + 6) + 'px';
-      setTimeout(() => document.addEventListener('click', _closeCompActionsMenu, true), 0);
+      setTimeout(() => document.addEventListener('click', _compMenuOutside, true), 0);
     } });
+  }
+  // Resultat manuel (si aucun resultat OD n'est deja associe)
+  if (isRealised) {
+    const _hasOd = (window.__odAssignedByComp || {})[String(comp.id)] != null;
+    const _mr = _manualResLoad()[String(comp.id)];
+    if (_mr) {
+      items.push({ lab: 'Modifier le résultat…', keepOpen: true, fn: () => _openManualResultForm(btn, comp) });
+      items.push({ lab: 'Retirer le résultat', fn: () => {
+        const m = _manualResLoad();
+        delete m[String(comp.id)];
+        _manualResSave(m);
+        renderCompetitionsPage();
+      } });
+    } else if (!_hasOd) {
+      items.push({ lab: 'Ajouter un résultat…', keepOpen: true, fn: () => _openManualResultForm(btn, comp) });
+    }
   }
   if (isRealised && comp._sbId) {
     items.push({ lab: 'Transformer en entraînement', fn: async () => {
@@ -2452,7 +2528,7 @@ function _openCompActionsMenu(btn, id) {
   const mw = menu.offsetWidth || 200;
   menu.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, r.right - mw)) + 'px';
   menu.style.top = Math.min(window.innerHeight - menu.offsetHeight - 8, r.bottom + 6) + 'px';
-  setTimeout(() => document.addEventListener('click', _closeCompActionsMenu, true), 0);
+  setTimeout(() => document.addEventListener('click', _compMenuOutside, true), 0);
 }
 
 // Menu d'actions d'une carte 'resultat officiel' OD sans activite :
@@ -2485,7 +2561,7 @@ function _openOdOnlyMenu(btn, odId, iso) {
   const mw = menu.offsetWidth || 220;
   menu.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, r.right - mw)) + 'px';
   menu.style.top = Math.min(window.innerHeight - menu.offsetHeight - 8, r.bottom + 6) + 'px';
-  setTimeout(() => document.addEventListener('click', _closeCompActionsMenu, true), 0);
+  setTimeout(() => document.addEventListener('click', _compMenuOutside, true), 0);
 }
 
 // Handler de clic partagé entre la carte du calendrier (#comp-list) et la page Compétitions.
