@@ -4510,6 +4510,7 @@ function renderWeekPlan() {
     let weekTotalDur = 0;
     let weekTotalTss = 0;
     let weekTotalSessions = 0;
+    let weekTotalKm = 0;
     let weekKind = 'past'; // 'past' = entièrement passée, 'current' = en cours, 'future' = à venir
 
     for (let i = 0; i < 7; i++) {
@@ -4623,6 +4624,8 @@ function renderWeekPlan() {
         weekTotalTss += proposal.tss || 0;
         weekTotalSessions += 1;
       }
+      // Km prévus (compés + séances manuelles avec distance renseignée)
+      if (!isPast) weekTotalKm += proposal.km || 0;
       // L'item actuellement affiché peut être une compé ou un entraînement manuel
       const isRace = !!proposal.isRace;
       const raceClass = isRace ? ' race' : '';
@@ -4730,7 +4733,10 @@ function renderWeekPlan() {
       ? `${Math.round(weekTotalDur)}<span style="font-size:11px;font-weight:500;"> min</span>`
       : `${_wh}<span style="font-size:11px;font-weight:500;">h</span>${_wm.toString().padStart(2, '0')}`;
     const totalsLabel = weekKind === 'future' ? 'Prévu' : (weekKind === 'current' ? 'En cours' : 'Bilan');
-    // Prévu : pas de km réels (à venir), pas de CTL/ATL projetés (complexe)
+    // Km prévus : somme des distances renseignées (compés + manuels). 0 si aucune (comme Réalisé).
+    const _kmPrevu = Math.round(weekTotalKm);
+    const kmVal = `${_kmPrevu}<span style="font-size:11px;font-weight:500;">km</span>`;
+    // Prévu : pas de CTL/ATL projetés (complexe)
     const totalsCard = `
       <div class="week-totals" data-view="volume">
         <div class="wt-header">
@@ -4740,13 +4746,13 @@ function renderWeekPlan() {
         </div>
         <div class="wt-view wt-view-volume">
           <div class="wt-row"><span class="wt-ic">${_WT_IC.vol}</span><span class="wt-val">${totalHours}</span><span class="wt-lbl">Volume</span></div>
-          <div class="wt-row"><span class="wt-ic">${_WT_IC.km}</span><span class="wt-val">—</span><span class="wt-lbl">Km</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.km}</span><span class="wt-val">${kmVal}</span><span class="wt-lbl">Distance</span></div>
           <div class="wt-row"><span class="wt-ic">${_WT_IC.sea}</span><span class="wt-val">${weekTotalSessions}</span><span class="wt-lbl">Séances</span></div>
         </div>
         <div class="wt-view wt-view-charge">
-          <div class="wt-row"><span class="wt-ic">${_WT_IC.tss}</span><span class="wt-val">${weekTotalTss}</span><span class="wt-lbl">TSS prévu</span></div>
-          <div class="wt-row"><span class="wt-ic">${_WT_IC.ctl}</span><span class="wt-val">—</span><span class="wt-lbl">CTL</span></div>
-          <div class="wt-row"><span class="wt-ic">${_WT_IC.atl}</span><span class="wt-val">—</span><span class="wt-lbl">ATL</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.tss}</span><span class="wt-val">${weekTotalTss}</span><span class="wt-lbl">TSS</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.ctl}</span><span class="wt-val">0</span><span class="wt-lbl">CTL</span></div>
+          <div class="wt-row"><span class="wt-ic">${_WT_IC.atl}</span><span class="wt-val">0</span><span class="wt-lbl">ATL</span></div>
         </div>
         <div class="wt-dots">
           <span class="wt-dot d-volume"></span>
@@ -4757,7 +4763,7 @@ function renderWeekPlan() {
     dayCards.push(totalsCard);
 
     const _wsumDur = weekTotalDur <= 0 ? '' : (weekTotalDur < 60 ? `${Math.round(weekTotalDur)}min` : `${Math.floor(weekTotalDur/60)}h${Math.round(weekTotalDur%60).toString().padStart(2,'0')}`);
-    const _wsumKm = (typeof totalKm !== 'undefined' && totalKm > 0) ? ` \u00b7 ${totalKm} km` : '';
+    const _wsumKm = _kmPrevu > 0 ? ` \u00b7 ${_kmPrevu} km` : '';
     const weekSum = weekTotalSessions > 0 ? `<span class="week-row-sum">${weekTotalSessions} s\u00e9ance${weekTotalSessions>1?'s':''}${_wsumDur?` \u00b7 ${_wsumDur}`:''}${_wsumKm}</span>` : '';
     weeksHtml.push(`
       <div class="week-row">
@@ -4769,6 +4775,7 @@ function renderWeekPlan() {
 
   const _dowHead = '<div class="week-dow-head">' + ['L','M','M','J','V','S','D'].map(function(x){return '<span>'+x+'</span>';}).join('') + '</div>';
   document.getElementById('week-calendar').innerHTML = `<div class="month-plan">${_dowHead}${weeksHtml.join('')}</div>`;
+  enforceWtLabels();
 }
 
 // ========= MODE PRÉVU vs RÉALISÉ =========
@@ -5197,8 +5204,8 @@ function renderRealiseCalendar() {
       ? `${Math.round(weekTotalDur)}<span style="font-size:11px;font-weight:500;"> min</span>`
       : `${_rh}<span style="font-size:11px;font-weight:500;">h</span>${_rm.toString().padStart(2, '0')}`;
     const totalKm = Math.round(weekTotalKm);
-    const lastCtl = lastDayWithMetrics && lastDayWithMetrics.ctl != null ? Math.round(lastDayWithMetrics.ctl) : '—';
-    const lastAtl = lastDayWithMetrics && lastDayWithMetrics.atl != null ? Math.round(lastDayWithMetrics.atl) : '—';
+    const lastCtl = lastDayWithMetrics && lastDayWithMetrics.ctl != null ? Math.round(lastDayWithMetrics.ctl) : 0;
+    const lastAtl = lastDayWithMetrics && lastDayWithMetrics.atl != null ? Math.round(lastDayWithMetrics.atl) : 0;
     const totalsCard = `
       <div class="week-totals" data-view="volume">
         <div class="wt-header">
@@ -5237,6 +5244,36 @@ function renderRealiseCalendar() {
 
   const _dowHead = '<div class="week-dow-head">' + ['L','M','M','J','V','S','D'].map(function(x){return '<span>'+x+'</span>';}).join('') + '</div>';
   document.getElementById('week-calendar').innerHTML = `<div class="month-plan">${_dowHead}${weeksHtml.join('')}</div>`;
+  enforceWtLabels();
+}
+
+// ========= BILAN HEBDO : suppression des intitulés quand ça déborde =========
+// Règle : si un intitulé (Volume/Distance/Séances…) est tronqué, ou si l'unité
+// de la valeur passe à la ligne (ex. « 0 \n min »), on supprime TOUS les
+// intitulés de la carte (classe .wt-no-lbl → voir calendar.css).
+// Détection sur le contenu réel (pas sur la largeur de la fenêtre), donc ça
+// marche aussi quand le calendrier est écrasé par le panneau Bibliothèque.
+function enforceWtLabels() {
+  document.querySelectorAll('#week-calendar .week-totals').forEach(card => {
+    card.classList.remove('wt-no-lbl');
+    let overflow = false;
+    card.querySelectorAll('.wt-view .wt-row').forEach(row => {
+      if (overflow || row.clientWidth === 0) return; // vue masquée : non mesurable
+      // 1) intitulé/contenu tronqué horizontalement
+      if (row.scrollWidth > row.clientWidth + 1) { overflow = true; return; }
+      // 2) unité passée à la ligne : la valeur fait plus d'une ligne de haut
+      const val = row.querySelector('.wt-val');
+      if (val && val.offsetHeight > parseFloat(getComputedStyle(val).fontSize) * 1.5) overflow = true;
+    });
+    if (overflow) card.classList.add('wt-no-lbl');
+  });
+}
+// Re-vérifie quand la largeur du calendrier change (resize fenêtre, ouverture
+// de la bibliothèque…), pas seulement au re-render.
+if (window.ResizeObserver) {
+  const _wtRo = new ResizeObserver(() => enforceWtLabels());
+  const _wtCal = document.getElementById('week-calendar');
+  if (_wtCal) _wtRo.observe(_wtCal);
 }
 
 // Handler flèches + clic carte (event delegation sur le calendrier)
@@ -5253,6 +5290,7 @@ document.getElementById('week-calendar').addEventListener('click', (e) => {
     const dir = e.target.classList.contains('wt-next') ? 1 : -1;
     let next = (idx + dir + views.length) % views.length;
     card.setAttribute('data-view', views[next]);
+    enforceWtLabels(); // la vue affichée change → re-mesurer les intitulés
     return;
   }
 
@@ -8324,6 +8362,51 @@ function renderGpxElevationChart(gpxContent, canvasId, laps = 1) {
           },
         },
       },
+      // Lignes de départ (drapeau vert) / arrivée (drapeau damier) sur le profil.
+      // Masquées automatiquement si hors de la fenêtre de zoom (drag-select).
+      plugins: [{
+        id: 'gpxStartFinishFlags',
+        afterDatasetsDraw(chart) {
+          const xs = chart.scales.x, ca = chart.chartArea;
+          if (!xs || !ca || !plot.length) return;
+          const ctx = chart.ctx;
+          const drawFlag = (km, kind) => {
+            if (km < xs.min - 1e-9 || km > xs.max + 1e-9) return;
+            const x = xs.getPixelForValue(km);
+            const color = kind === 'start' ? '#4ade80' : '#e5e7eb';
+            ctx.save();
+            // ligne verticale pointillée sur toute la hauteur
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.55;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath(); ctx.moveTo(x, ca.top + 2); ctx.lineTo(x, ca.bottom); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
+            // drapeau en haut (retourné vers l'intérieur près du bord droit)
+            const w = 12, h = 9, cell = 3;
+            const dir = (x + w + 3 > ca.right) ? -1 : 1;
+            const fx = dir === 1 ? x + 1.5 : x - w - 1.5;
+            const fy = ca.top + 2;
+            if (kind === 'start') {
+              ctx.fillStyle = '#4ade80';
+              ctx.fillRect(fx, fy, w, h);
+            } else {
+              for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
+                ctx.fillStyle = (r + c) % 2 ? '#111827' : '#e5e7eb';
+                ctx.fillRect(fx + c * cell, fy + r * cell, cell, cell);
+              }
+            }
+            // mât
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(x, fy); ctx.lineTo(x, fy + 15); ctx.stroke();
+            ctx.restore();
+          };
+          drawFlag(plot[0].x, 'start');
+          drawFlag(plot[plot.length - 1].x, 'finish');
+        },
+      }],
     });
 
     // Pas de badge D+ : l'info est déjà dans la barre de stats au-dessus du graphique
@@ -8652,9 +8735,33 @@ function renderGpxLeafletMap(gpxContent, divId) {
         iconAnchor: [8, 8],
       });
     }
+    // === Lignes de départ / arrivée perpendiculaires au tracé (style vraie course) ===
+    // Ligne verte au départ, damier noir/blanc à l'arrivée (dash sur fond clair).
+    function perpLinePts(anchor, toward, halfM) {
+      const cosLat = Math.cos(anchor[0] * Math.PI / 180) || 1;
+      let dx = (toward[1] - anchor[1]) * cosLat, dy = toward[0] - anchor[0];
+      const n = Math.hypot(dx, dy) || 1;
+      const px = -dy / n, py = dx / n;            // perpendiculaire normalisée
+      return [
+        [anchor[0] + (py * halfM) / 111111, anchor[1] + (px * halfM) / (111111 * cosLat)],
+        [anchor[0] - (py * halfM) / 111111, anchor[1] - (px * halfM) / (111111 * cosLat)],
+      ];
+    }
+    function addRaceLine(pts, kind) {
+      const base = kind === 'start' ? '#4ade80' : '#f8fafc';
+      const dash = kind === 'start' ? '#166534' : '#111827';
+      L.polyline(pts, { color: base, weight: 6, opacity: 1, lineCap: 'butt', interactive: false }).addTo(_gpxLeafletMap);
+      L.polyline(pts, { color: dash, weight: 6, opacity: 1, dashArray: '5 5', lineCap: 'butt', interactive: false }).addTo(_gpxLeafletMap);
+    }
+    // Direction prise quelques points plus loin pour une perpendiculaire stable
+    const _dirStart = coords[Math.min(5, coords.length - 1)];
+    const _dirEnd = coords[Math.max(coords.length - 6, 0)];
     if (isLoop) {
+      addRaceLine(perpLinePts(start, _dirStart, 20), 'finish');
       L.marker(start, { icon: makeIcon('#fbbf24', 'DÉPART / ARRIVÉE') }).addTo(_gpxLeafletMap);
     } else {
+      addRaceLine(perpLinePts(start, _dirStart, 20), 'start');
+      addRaceLine(perpLinePts(end, _dirEnd, 20), 'finish');
       L.marker(start, { icon: makeIcon('#4ade80', 'DÉPART') }).addTo(_gpxLeafletMap);
       L.marker(end, { icon: makeIcon('#ef4444', 'ARRIVÉE') }).addTo(_gpxLeafletMap);
     }
@@ -9539,24 +9646,25 @@ window.__estKjFromStructure = function (blks, ftp) {
   return total / 1000;
 };
 
+// Même markup/classes que la modale réalisé (openSessionModal) : .act-hero-row /
+// .act-hero / .act-tile-grid / .act-tile -> les styles desktop + mobile
+// (modals.css, mobile.css) s'appliquent à l'identique, aucun style inline.
 window.renderStatsBlockHTML = function (heroes, tiles) {
-  var mut = 'var(--text-mute,#7c879c)';
   var heroCard = function (hh) {
-    return '<div style="flex:1;min-width:0;background:var(--bg-elev2,#1b2230);border-radius:11px;padding:13px;display:flex;align-items:center;justify-content:center;gap:11px;">'
-      + (hh.svg ? '<span style="color:' + hh.color + ';flex:none;line-height:0">' + hh.svg + '</span>' : '')
-      + '<div style="min-width:0"><div style="font-size:22px;font-weight:700;color:var(--text,#fff);line-height:1;white-space:nowrap">' + hh.val + (hh.unit ? '<span style="font-size:12px;color:' + mut + '"> ' + hh.unit + '</span>' : '') + '</div>'
-      + '<div style="font-size:10px;color:' + mut + ';text-transform:uppercase;letter-spacing:.4px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + hh.lab + '</div></div></div>';
+    return '<div class="act-hero">'
+      + (hh.svg ? '<span class="act-hero-ico" style="color:' + hh.color + '">' + hh.svg + '</span>' : '')
+      + '<div class="act-hero-tx"><div class="act-hero-val">' + hh.val + (hh.unit ? '<span class="act-hero-unit"> ' + hh.unit + '</span>' : '') + '</div>'
+      + '<div class="act-hero-lab">' + hh.lab + '</div></div></div>';
   };
-  var tileHTML = function (tt, basis) {
-    return '<div style="flex:0 1 ' + basis + ';background:' + tt.color + '17;border-radius:9px;padding:10px 12px;text-align:center;min-width:0;">'
-      + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:' + tt.color + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + tt.lab + '</div>'
-      + '<div style="font-size:14px;font-weight:600;color:var(--text,#e7ebf3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + tt.val + '</div></div>';
+  var tileHTML = function (tt) {
+    return '<div class="act-tile" style="background:' + tt.color + '17;--tile-c:' + tt.color + '">'
+      + '<div class="act-tile-lab">' + tt.lab + '</div>'
+      + '<div class="act-tile-val">' + tt.val + '</div></div>';
   };
   heroes = (heroes || []).filter(Boolean); tiles = (tiles || []).filter(Boolean);
-  var heroRow = heroes.length ? '<div style="display:flex;gap:11px;margin-bottom:11px;flex-wrap:wrap">' + heroes.slice(0, 4).map(heroCard).join('') + '</div>' : '';
+  var heroRow = heroes.length ? '<div class="act-hero-row" data-n="' + Math.min(heroes.length, 4) + '">' + heroes.slice(0, 4).map(heroCard).join('') + '</div>' : '';
   var n = tiles.length, cols = n <= 4 ? Math.max(1, n) : Math.ceil(n / 2);
-  var basis = 'calc((100% - ' + ((cols - 1) * 8) + 'px) / ' + cols + ')';
-  var grid = n ? '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px">' + tiles.map(function (t) { return tileHTML(t, basis); }).join('') + '</div>' : '';
+  var grid = n ? '<div class="act-tile-grid" data-n="' + n + '" style="--tile-cols:' + cols + ';--tile-tracks:' + (cols * 2) + '">' + tiles.map(tileHTML).join('') + '</div>' : '';
   return (heroRow || grid) ? '<div class="modal-section">' + heroRow + grid + '</div>' : '';
 };
 

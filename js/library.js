@@ -184,6 +184,7 @@ function renderLibrary() {
           <div class="lib-item-name">${esc(t.name)}</div>
           ${[t.duration_min ? fmtDur(t.duration_min) : null, t.tss ? (t.tss + ' TSS') : null].filter(Boolean).join(' · ') ? `<div class="lib-item-meta">${[t.duration_min ? fmtDur(t.duration_min) : null, t.tss ? (t.tss + ' TSS') : null].filter(Boolean).join(' · ')}</div>` : ''}
         </div>
+        <button class="lib-item-eye" data-view="${t.id}" title="Aperçu" type="button"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
         <button class="lib-item-edit" data-edit="${t.id}" title="Modifier" type="button">✎</button>
       </div>
     `).join('');
@@ -205,13 +206,17 @@ function renderLibrary() {
   body.querySelectorAll('.lib-item-edit').forEach(b => b.addEventListener('click', (e) => {
     e.stopPropagation(); openTemplateModal(b.dataset.edit);
   }));
+  // Aperçu (lecture seule, sans passer par le modal d'édition)
+  body.querySelectorAll('.lib-item-eye').forEach(b => b.addEventListener('click', (e) => {
+    e.stopPropagation(); openTemplatePreview(b.dataset.view);
+  }));
   // Drag (desktop) + tap-to-place (touch / mobile)
   body.querySelectorAll('.lib-item').forEach(it => {
     it.draggable = false;   // drag gere par pointer events (wirePointerDrag), fiable en overlay
     it.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'touch') return;   // tactile -> pas de drag (tap-to-place a la place)
       if (e.button != null && e.button > 0) return;
-      if (e.target.closest && e.target.closest('.lib-item-edit')) return;   // clic crayon -> pas de capture (sinon le clic part sur la carte)
+      if (e.target.closest && (e.target.closest('.lib-item-edit') || e.target.closest('.lib-item-eye'))) return;   // clic crayon/oeil -> pas de capture (sinon le clic part sur la carte)
       _ptr = { id: it.dataset.id, item: it, x: e.clientX, y: e.clientY, started: false, ghost: null, pid: e.pointerId };
       // Capture le pointeur : empeche le conteneur scrollable (overlay) de "voler" le geste
       // et de declencher pointercancel, ce qui tuait le drag dans l'overlay.
@@ -284,6 +289,59 @@ window.libraryDeleteTemplate = function (id) {
   saveTemplates(loadTemplates().filter(t => t.id !== id));
   renderLibrary();
 };
+
+// ---- Aperçu lecture seule (œil) ----
+function openTemplatePreview(id) {
+  const t = loadTemplates().find(x => x.id === id);
+  if (!t) return;
+  const k = t.sport || 'autre';
+  const info = sportInfo(k);
+  const meta = [
+    t.duration_min ? fmtDur(t.duration_min) : null,
+    t.tss ? t.tss + ' TSS' : null,
+    t.km ? t.km + ' km' : null,
+    t.dplus ? t.dplus + ' m D+' : null,
+    (t.rpe != null && t.rpe !== '') ? 'RPE ' + t.rpe : null,
+  ].filter(Boolean).join(' · ');
+  const _hasStruct = Array.isArray(t.structure) && t.structure.length;
+  const profile = (_hasStruct && window.renderWorkoutProfileHTML)
+    ? `<div class="lib-preview-profile">${window.renderWorkoutProfileHTML(t.structure, { height: 56, labels: false })}</div>`
+    : '';
+  // Détail du profil (liste des blocs/intervalles) sous le graphique
+  const detail = (_hasStruct && typeof window.renderWorkoutDetailHTML === 'function')
+    ? `<div class="lib-preview-detail">${window.renderWorkoutDetailHTML(t.structure)}</div>`
+    : '';
+  const overlay = document.createElement('div');
+  overlay.className = 'day-modal-overlay active';
+  overlay.innerHTML = `
+    <div class="day-modal lib-preview-modal">
+      <div class="day-modal-header">
+        <h3 style="display:flex;align-items:center;gap:8px;min-width:0;">
+          <span class="lib-ic" style="background:${info.color}22;color:${info.color};flex:none;">${sportIcon(k)}</span>
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.name)}</span>
+        </h3>
+        <button class="day-modal-close" type="button" title="Fermer">×</button>
+      </div>
+      <div class="day-modal-body">
+        ${profile}
+        ${detail}
+        ${meta ? `<div class="lib-preview-meta">${esc(meta)}</div>` : ''}
+        ${t.description ? `<div class="lib-preview-desc">${esc(t.description)}</div>` : ''}
+        ${(!meta && !profile && !t.description) ? '<div class="lib-noresult">Aucun détail pour cette séance.</div>' : ''}
+      </div>
+      <div class="day-modal-footer">
+        <div style="flex:1;"></div>
+        <button class="day-modal-cancel" type="button">Fermer</button>
+        <button class="day-modal-save" type="button">Modifier</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector('.day-modal-close').addEventListener('click', close);
+  overlay.querySelector('.day-modal-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  overlay.querySelector('.day-modal-save').addEventListener('click', () => { close(); openTemplateModal(id); });
+}
 
 // ---- Modale créer / éditer ----
 function openTemplateModal(id) {
@@ -487,10 +545,18 @@ function injectLibraryOverlay() {
   const _card = _subtabs ? _subtabs.parentNode : null;
   (_card || document.body).appendChild(fab);
 
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    // Un modal (aperçu/édition) est ouvert : Échap le ferme lui, pas la bibli.
+    const modal = document.querySelector('.day-modal-overlay.active');
+    if (modal) { modal.remove(); return; }
+    close();
+  });
   document.addEventListener('mousedown', (e) => {
     if (!document.body.classList.contains('lib-open')) return;
     if (e.target.closest('#seance-library') || e.target.closest('#lib-fab')) return;
+    // Clic dans un modal (aperçu œil, édition…) → ne pas fermer la bibli
+    if (e.target.closest('.day-modal-overlay')) return;
     close();
   });
 }

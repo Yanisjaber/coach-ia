@@ -175,6 +175,12 @@
     letter-spacing: 0.4px;
     margin-left: auto;
   }
+  /* Carte trop étroite (intitulé tronqué ou unité à la ligne) : le JS pose
+     .wt-no-lbl → intitulés supprimés, lignes icône+valeur centrées. */
+  .week-totals.wt-no-lbl .wt-lbl { display: none; }
+  .week-totals.wt-no-lbl .wt-view { align-items: center; }
+  .week-totals.wt-no-lbl .wt-row { justify-content: center; gap: 7px; }
+  .week-totals.wt-no-lbl .wt-val { white-space: nowrap; }
   .wt-dots {
     display: flex;
     justify-content: center;
