@@ -745,4 +745,18 @@
   padding: 0 3px;
   pointer-events: none;
 }
-.comp-tl-tip { text-align: left; line-height: 1.45; }
+.comp-tl-tip { text-align: left; line-height: 1.45; pointer-events: auto; max-height: 148px; overflow-y: auto; }
+.tl-tip-line {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 3px 4px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tl-tip-line:hover { background: rgba(255, 255, 255, 0.07); }

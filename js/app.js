@@ -2114,12 +2114,9 @@ function renderCompetitionsPage() {
       const anyPrincipal = items.some(m => compPrio(m.c.priority).key === 'principal');
       const allPast = items.every(m => m.c.endDateObj < today);
       const color = anyPrincipal ? compPrio(items.find(m => compPrio(m.c.priority).key === 'principal').c.priority).color : '#9ca3af';
-      const labels = items.map(m => _fmtLab(m.c));
-      const shown = labels.slice(0, 5);
-      const more = labels.length - shown.length;
-      const tipHTML = shown.join('<br>') + (more > 0 ? `<br>+ ${more} autre${more > 1 ? 's' : ''}` : '');
+      const payload = encodeURIComponent(JSON.stringify(items.map(m => ({ id: m.c.id, lab: _fmtLab(m.c) }))));
       const single = items.length === 1;
-      return `<button type="button" class="comp-tl-marker${allPast ? ' past' : ''}" style="left:${p.toFixed(2)}%;" data-tl-tip="${tipHTML.replace(/"/g, '&quot;')}" data-tl-color="${color}" data-tl-comp="${single ? items[0].c.id : ''}">
+      return `<button type="button" class="comp-tl-marker${allPast ? ' past' : ''}" style="left:${p.toFixed(2)}%;" data-tl-items="${payload}" data-tl-color="${color}" data-tl-comp="${single ? items[0].c.id : ''}">
         <span class="comp-tl-dot${anyPrincipal ? ' big' : ''}" style="background:${color};${anyPrincipal ? `box-shadow:0 0 0 2px ${color};` : ''}"></span>
         ${single ? '' : `<span class="comp-tl-count">${items.length}</span>`}
       </button>`;
@@ -2185,12 +2182,25 @@ function renderCompetitionsPage() {
     const _tip = seasonWrap.querySelector('.comp-tl-tip');
     if (_tl && _tip) {
       const _show = (b) => {
-        _tip.innerHTML = b.dataset.tlTip;
+        let items = [];
+        try { items = JSON.parse(decodeURIComponent(b.dataset.tlItems || '[]')); } catch (_) {}
+        _tip.innerHTML = items.map(it => `<button type="button" class="tl-tip-line" data-comp="${it.id}">${it.lab}</button>`).join('');
         _tip.style.color = b.dataset.tlColor;
         _tip.style.left = Math.max(10, Math.min(90, parseFloat(b.style.left))) + '%';
         _tip.hidden = false;
         _tip.dataset.for = b.dataset.tlComp || 'cluster-' + b.style.left;
       };
+      _tip.addEventListener('click', (e) => {
+        const ln = e.target.closest('.tl-tip-line');
+        if (!ln) return;
+        e.stopPropagation();
+        const comp = loadCompetitions().find(c2 => c2.id === ln.dataset.comp);
+        if (comp && comp.date && typeof openSessionModal === 'function') {
+          _tip.hidden = true;
+          const isPast3 = new Date(comp.date + 'T12:00:00') < today;
+          openSessionModal(comp.date, isPast3 ? 'realise' : 'prevu');
+        }
+      });
       _tl.addEventListener('mouseover', (e) => { const b = e.target.closest('.comp-tl-marker'); if (b) _show(b); });
       _tl.addEventListener('mouseleave', () => { _tip.hidden = true; _tip.dataset.for = ''; });
       _tl.addEventListener('click', (e) => {
