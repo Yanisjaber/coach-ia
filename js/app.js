@@ -2134,8 +2134,9 @@ function renderCompetitionsPage() {
     const _leftovers = new Map(); // iso -> [od results sans activite]
     window.__odAssignedByComp = {};
     const _odOv = _odOverridesLoad();
+    const _odHid = _odHiddenLoad();
     for (const [iso, its] of _byIso) {
-      const odAll = ((window.__odByDate && window.__odByDate[iso]) || []).slice();
+      const odAll = ((window.__odByDate && window.__odByDate[iso]) || []).filter(r => !_odHid.has(String(r.id)));
       if (!odAll.length) continue;
       // 1) Overrides MANUELS (menu "Associer a une epreuve...") : prioritaires.
       //    null = dissocie de tout resultat ; un id = ce resultat precis.
@@ -2250,6 +2251,8 @@ function renderCompetitionsPage() {
             <div class="comp-res-top">
               <span class="comp-res-name"><span style="color:${_pi.color};">${r.competitionName || 'Résultat officiel'}</span></span>
               <span class="comp-res-date">${_fmtIsoDate(g.iso)}</span>
+              <button class="comp-more od-more" data-od-id="${r.id}" data-iso="${g.iso}" title="Actions">⋯</button>
+              <button class="comp-del od-del" data-od-id="${r.id}" title="Masquer ce résultat">×</button>
             </div>
             <div class="comp-res-metrics comp-res-nodata">Résultat officiel (pas d'activité liée)</div>
           </div>
@@ -2356,6 +2359,15 @@ function _odOverridesLoad() {
 function _odOverridesSave(m) {
   localStorage.setItem('coach_ia_od_overrides_v1', JSON.stringify(m || {}));
 }
+// Resultats OD masques par l'utilisateur (cartes 'resultat officiel' supprimees)
+function _odHiddenLoad() {
+  try { return new Set(JSON.parse(localStorage.getItem('coach_ia_od_hidden_v1') || '[]').map(String)); } catch { return new Set(); }
+}
+function _odHiddenAdd(id) {
+  const a = [..._odHiddenLoad()];
+  if (!a.includes(String(id))) a.push(String(id));
+  localStorage.setItem('coach_ia_od_hidden_v1', JSON.stringify(a));
+}
 
 // Menu d'actions (⋯) d'une carte compet : Modifier / Transformer / Supprimer.
 function _closeCompActionsMenu() {
@@ -2443,8 +2455,54 @@ function _openCompActionsMenu(btn, id) {
   setTimeout(() => document.addEventListener('click', _closeCompActionsMenu, true), 0);
 }
 
+// Menu d'actions d'une carte 'resultat officiel' OD sans activite :
+// associer a une activite/compet du jour, ou masquer le resultat.
+function _openOdOnlyMenu(btn, odId, iso) {
+  _closeCompActionsMenu();
+  const menu = document.createElement('div');
+  menu.className = 'comp-actions-menu';
+  const dayComps = loadCompetitions().filter(c => c.date === iso && (c.realised === true || c._table === 'activity' || c._table === 'competition'));
+  const addOpt = (label, fn, danger) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    if (danger) b.classList.add('danger');
+    b.addEventListener('click', (ev) => { ev.stopPropagation(); _closeCompActionsMenu(); fn(); });
+    menu.appendChild(b);
+  };
+  for (const c of dayComps) {
+    addOpt('Associer à « ' + (c.name || 'Activité') + ' »', () => {
+      const m = _odOverridesLoad();
+      m[String(c.id)] = odId;
+      _odOverridesSave(m);
+      renderCompetitionsPage();
+    });
+  }
+  addOpt('Masquer ce résultat', () => { _odHiddenAdd(odId); renderCompetitionsPage(); }, true);
+  document.body.appendChild(menu);
+  window._compMenuEl = menu;
+  const r = btn.getBoundingClientRect();
+  const mw = menu.offsetWidth || 220;
+  menu.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, r.right - mw)) + 'px';
+  menu.style.top = Math.min(window.innerHeight - menu.offsetHeight - 8, r.bottom + 6) + 'px';
+  setTimeout(() => document.addEventListener('click', _closeCompActionsMenu, true), 0);
+}
+
 // Handler de clic partagé entre la carte du calendrier (#comp-list) et la page Compétitions.
 function _handleCompClick(e) {
+  // Cartes 'resultat officiel' OD (sans activite)
+  if (e.target.classList.contains('od-more')) {
+    e.stopPropagation();
+    e.preventDefault();
+    _openOdOnlyMenu(e.target, e.target.dataset.odId, e.target.dataset.iso);
+    return;
+  }
+  if (e.target.classList.contains('od-del')) {
+    e.stopPropagation();
+    _odHiddenAdd(e.target.dataset.odId);
+    renderCompetitionsPage();
+    return;
+  }
   // Menu d'actions
   if (e.target.classList.contains('comp-more')) {
     e.stopPropagation();
