@@ -229,6 +229,18 @@ body.lib-placing-mode .day-card[data-iso]:active {
 }
 .lib-item:hover .lib-item-edit { opacity: 1; }
 .lib-item-edit:hover { color: var(--accent); background: var(--bg-elev2); }
+/* Œil aperçu : même look que le crayon */
+.lib-item-eye {
+  background: none; border: none; color: var(--text-mute);
+  cursor: pointer; padding: 4px 6px; flex: none; display: flex; align-items: center;
+  border-radius: 6px; opacity: 0.5; transition: opacity 0.12s, color 0.12s, background 0.12s;
+}
+.lib-item:hover .lib-item-eye { opacity: 1; }
+.lib-item-eye:hover { color: var(--accent); background: var(--bg-elev2); }
+/* Modal aperçu (œil) */
+.lib-preview-meta { font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
+.lib-preview-profile { margin: 4px 0 10px; }
+.lib-preview-desc { font-size: 13px; color: var(--text); white-space: pre-wrap; line-height: 1.5; }
 
 .lib-empty, .lib-noresult {
   text-align: center; color: var(--text-mute); font-size: 12px;

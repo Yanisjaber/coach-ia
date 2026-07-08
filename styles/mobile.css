@@ -184,11 +184,14 @@
      defaut sur mobile -> compactage fort des paddings, polices et hauteurs. */
   #calendar-subtabs.subtabs { margin: 0 auto 6px; padding: 2px; border-radius: 6px; gap: 2px; }
   #calendar-subtabs .subtab { padding: 4px 12px !important; font-size: 11px !important; min-height: 0 !important; font-weight: 600; }
-  .month-filter { gap: 5px; margin-bottom: 8px; font-size: 11px; flex-wrap: wrap; justify-content: center; }
-  .month-filter input[type="month"] { padding: 3px 7px !important; font-size: 11px !important; min-height: 0 !important; }
-  .month-filter button { padding: 3px 8px !important; font-size: 11px !important; min-height: 26px !important; }
+  /* Une seule ligne quel que soit le mode (le libellé « 4 sem. à venir » faisait
+     passer le bouton reset à la ligne en Prévu) : le champ mois rétrécit, le reste non. */
+  .month-filter { gap: 5px; margin-bottom: 8px; font-size: 11px; flex-wrap: nowrap; justify-content: center; }
+  .month-filter .month-input-wrap { flex: 0 1 auto; min-width: 0; }
+  .month-filter input[type="month"] { padding: 3px 7px !important; font-size: 11px !important; min-height: 0 !important; width: 100%; min-width: 0; max-width: 130px; }
+  .month-filter button { padding: 3px 8px !important; font-size: 11px !important; min-height: 26px !important; flex: none; }
   .month-input-overlay { font-size: 11px; left: 8px; }
-  .month-filter .reset { padding: 3px 9px !important; }
+  .month-filter .reset { padding: 3px 9px !important; white-space: nowrap; }
   /* Bouton bibliotheque (absolu haut-droite) : un peu plus petit/haut, et on
      reserve l'espace a droite du selecteur de periode pour eviter le chevauchement. */
   .lib-fab { width: 28px !important; height: 28px !important; top: 10px !important; right: 10px !important; }
