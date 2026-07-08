@@ -246,10 +246,62 @@
     autre: { dist: 'km', dplus: true, gpx: true, laps: 'Nombre de tours' },
   };
 
+  // ============================================================
+  // TIMELINE du plan de course d'une compétition TRIATHLON PRÉVUE :
+  // déroulé Natation -> T1 -> Vélo -> T2 -> CAP avec temps CUMULÉ.
+  // ============================================================
+  function renderTriPlanHTML(comp) {
+    var t = comp && comp.tri;
+    if (!t) return '';
+    var sw = t.swim || {}, bk = t.bike || {}, rn = t.run || {};
+    var swDist = sw.dist_m != null ? sw.dist_m : t.swim_m;
+    var bkDist = bk.dist_km != null ? bk.dist_km : t.bike_km;
+    var rnDist = rn.dist_km != null ? rn.dist_km : t.run_km;
+    if (!(sw.min || swDist || bk.min || bkDist || rn.min || rnDist)) return '';
+    var cum = 0, cumOk = true;
+    var rows = [];
+    function seg(color, glyph, label, parts, min) {
+      if (min) cum += min; else cumOk = false;
+      rows.push('<div class="tp-row">'
+        + '<span class="tp-dot" style="background:' + color + '"></span>'
+        + '<span class="tp-ico" style="color:' + color + '">' + glyph + '</span>'
+        + '<span class="tp-lab">' + label + '</span>'
+        + '<span class="tp-parts">' + parts.filter(Boolean).join(' · ') + '</span>'
+        + '<span class="tp-cum">' + (min && cumOk ? '→ ' + fmtSegTime2(cum) : '') + '</span>'
+        + '</div>');
+    }
+    function trans(label, min) {
+      if (min) cum += min; else cumOk = false;
+      rows.push('<div class="tp-row tp-trans">'
+        + '<span class="tp-dot tp-dot-mini"></span><span class="tp-ico"></span>'
+        + '<span class="tp-lab">' + label + '</span>'
+        + '<span class="tp-parts">' + (min ? fmtSegTime2(min) : '—') + '</span>'
+        + '<span class="tp-cum">' + (min && cumOk ? '→ ' + fmtSegTime2(cum) : '') + '</span>'
+        + '</div>');
+    }
+    function fmtSegTime2(min) {
+      if (min >= 60) { var h2 = Math.floor(min / 60), m2 = Math.round(min % 60); return h2 + 'h' + String(m2).padStart(2, '0'); }
+      var mm2 = Math.floor(min), ss2 = Math.round((min - mm2) * 60);
+      return mm2 + ':' + String(ss2).padStart(2, '0');
+    }
+    seg(MS_COLOR.natation, SVG.waves, 'Natation',
+      [swDist ? Math.round(swDist) + ' m' : null, sw.pace ? sw.pace + '/100m' : null, sw.min ? fmtSegTime2(sw.min) : null], sw.min);
+    trans('T1', t.t1_min);
+    seg(MS_COLOR.cyclisme, SVG.bike, 'Vélo',
+      [bkDist ? bkDist + ' km' : null, bk.speed ? bk.speed + ' km/h' : null, bk.dplus ? 'D+ ' + Math.round(bk.dplus) + ' m' : null, bk.min ? fmtSegTime2(bk.min) : null], bk.min);
+    trans('T2', t.t2_min);
+    seg(MS_COLOR.course, SVG.run, 'CAP',
+      [rnDist ? rnDist + ' km' : null, rn.pace ? rn.pace + '/km' : null, rn.min ? fmtSegTime2(rn.min) : null], rn.min);
+    var header = '<div class="tp-head"><span class="tp-kind">Déroulé de course</span>'
+      + '<span class="tp-total">' + (comp.target ? 'Objectif · ' + fmtMinToTime(comp.target) : (cumOk && cum ? 'Total · ' + fmtSegTime2(cum) : '')) + '</span></div>';
+    return '<div class="modal-section tri-plan">' + header + '<div class="tp-rows">' + rows.join('') + '</div></div>';
+  }
+
   window.SportProfiles = {
     categoryOf: catOf,
     detectMultisport: detectMultisport,
     renderMultisportHTML: renderMultisportHTML,
+    renderTriPlanHTML: renderTriPlanHTML,
     formConfig: function (sportVal) {
       var cat = (typeof window.getSportCategory === 'function') ? window.getSportCategory(sportVal || '') : 'autre';
       return FORM[cat] || FORM.autre;

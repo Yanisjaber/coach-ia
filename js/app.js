@@ -10161,12 +10161,15 @@ function openSessionModal(iso, source) {
       const typeTitle = c.type
         ? `<div class="modal-section-title" style="margin-bottom:12px;font-size:18px;color:var(--text);text-transform:none;letter-spacing:0;">${c.type}</div>`
         : '';
+      // Triathlon avec segments : timeline du déroulé de course à la place des tuiles génériques
+      const triPlanHTML = (typeof getSportCategory === 'function' && getSportCategory(c.sport) === 'triathlon'
+        && window.SportProfiles && window.SportProfiles.renderTriPlanHTML) ? window.SportProfiles.renderTriPlanHTML(c) : '';
       bodyEl.innerHTML = `
         ${switchHTML}
         ${typeTitle}
-        <div class="modal-metrics">
+        ${triPlanHTML || `<div class="modal-metrics">
           ${cards.map(card => `<div class="modal-metric${card.accent ? ' accent' : ''}"><div class="m-label">${card.label}</div><div class="m-value" style="${card.isText ? 'font-size:16px;' : ''}">${card.value}${card.unit ? `<span style="font-size:13px;font-weight:500;margin-left:2px;">${card.unit}</span>` : ''}</div></div>`).join('')}
-        </div>
+        </div>`}
         ${sections.join('')}
       `;
       wireSwitchButtons();
