@@ -3230,9 +3230,68 @@ const LEVEL_PLACEHOLDER_BY_FED = {
   FFC: 'ex : Open 1-3, Access 3-4',
   UFOLEP: 'ex : 2e-3e cat',
   FSGT: 'ex : 3e-4e cat',
-  FFA: 'ex : label régional',
   FFTri: 'ex : D3, Open',
 };
+// Catalogues de categories fermees par federation (le champ devient un select).
+// FFA : categories d'age officielles (reforme 2020), determinees par l'annee
+// de naissance ; saison du 1er novembre au 31 octobre.
+const LEVEL_OPTIONS_BY_FED = {
+  FFA: [
+    ['EA', 'EA · Éveil athlétique (U10)'],
+    ['PO', 'PO · Poussin (U12)'],
+    ['BE', 'BE · Benjamin (U14)'],
+    ['MI', 'MI · Minime (U16)'],
+    ['CA', 'CA · Cadet (U18)'],
+    ['JU', 'JU · Junior (U20)'],
+    ['ES', 'ES · Espoir (U23)'],
+    ['SE', 'SE · Senior (23-34)'],
+    ['M0', 'M0 · Master 35-39'], ['M1', 'M1 · Master 40-44'], ['M2', 'M2 · Master 45-49'],
+    ['M3', 'M3 · Master 50-54'], ['M4', 'M4 · Master 55-59'], ['M5', 'M5 · Master 60-64'],
+    ['M6', 'M6 · Master 65-69'], ['M7', 'M7 · Master 70-74'], ['M8', 'M8 · Master 75-79'],
+    ['M9', 'M9 · Master 80-84'], ['M10', 'M10 · Master 85+'],
+  ],
+};
+// Niveau : select si la fede a un catalogue ferme, saisie libre sinon
+function updateLevelFieldForFed(fed, keepValue) {
+  const inp = document.getElementById('comp-modal-level');
+  const sel = document.getElementById('comp-modal-level-select');
+  if (!inp || !sel) return;
+  const opts = LEVEL_OPTIONS_BY_FED[fed];
+  const selWrap = (sel.parentElement && sel.parentElement.classList.contains('custom-select')) ? sel.parentElement : sel;
+  if (opts) {
+    const prev = keepValue != null ? keepValue : (sel.value || inp.value);
+    sel.innerHTML = '';
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = 'Non précisée';
+    sel.appendChild(empty);
+    opts.forEach(([v, lab]) => {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = lab;
+      sel.appendChild(o);
+    });
+    // valeur legacy hors catalogue : on la garde comme option supplementaire
+    if (prev && !opts.some(([v]) => v === prev)) {
+      const o = document.createElement('option');
+      o.value = prev;
+      o.textContent = prev;
+      sel.appendChild(o);
+    }
+    sel.value = prev || '';
+    sel.hidden = false;
+    inp.style.display = 'none';
+    if (typeof enhanceSelect === 'function') enhanceSelect('comp-modal-level-select');
+    if (sel._customUpdate) sel._customUpdate();
+    if (selWrap !== sel) selWrap.style.display = '';
+  } else {
+    if (selWrap !== sel) selWrap.style.display = 'none';
+    sel.hidden = true;
+    inp.style.display = '';
+    inp.placeholder = LEVEL_PLACEHOLDER_BY_FED[fed] || 'ex : Open 1-3';
+    if (keepValue != null) inp.value = keepValue;
+  }
+}
 function populateFedSelectForSport(rawType) {
   const sel = document.getElementById('comp-modal-federation');
   if (!sel) return;
@@ -3254,9 +3313,8 @@ function populateFedSelectForSport(rawType) {
   else sel.value = '';
   if (typeof enhanceSelect === 'function') enhanceSelect('comp-modal-federation');
   if (sel._customUpdate) sel._customUpdate();
-  // Placeholder du niveau adapte a la fede choisie
-  const lvl = document.getElementById('comp-modal-level');
-  if (lvl) lvl.placeholder = LEVEL_PLACEHOLDER_BY_FED[sel.value] || 'ex : Open 1-3';
+  // Niveau : select FFA / saisie libre selon la fede
+  updateLevelFieldForFed(sel.value);
   // Format : uniquement pour le triathlon
   const tfWrap = document.getElementById('comp-modal-triformat-wrap');
   if (tfWrap) {
@@ -3266,9 +3324,8 @@ function populateFedSelectForSport(rawType) {
   if (typeof reflowSecGrids === 'function') reflowSecGrids();
 }
 document.getElementById('comp-modal-federation')?.addEventListener('change', () => {
-  const lvl = document.getElementById('comp-modal-level');
   const sel = document.getElementById('comp-modal-federation');
-  if (lvl && sel) lvl.placeholder = LEVEL_PLACEHOLDER_BY_FED[sel.value] || 'ex : Open 1-3';
+  if (sel) updateLevelFieldForFed(sel.value);
 });
 
 // « Nombre de tours » : uniquement pour une épreuve en Circuit
@@ -4074,7 +4131,8 @@ async function saveCompFromModal() {
   const laps = parseInt(document.getElementById('comp-modal-laps').value, 10) || null;
   const notes = document.getElementById('comp-modal-notes').value.trim();
   const federation = (document.getElementById('comp-modal-federation') || {}).value || null;
-  const raceLevel = ((document.getElementById('comp-modal-level') || {}).value || '').trim() || null;
+  const _lvlSel = document.getElementById('comp-modal-level-select');
+  const raceLevel = ((_lvlSel && !_lvlSel.hidden) ? _lvlSel.value : ((document.getElementById('comp-modal-level') || {}).value || '')).trim() || null;
   const triFormat = (document.getElementById('comp-modal-triformat') || {}).value || null;
   const compTss = parseInt((document.getElementById('comp-modal-tss') || {}).value, 10) || null;
   const compRpe = parseFloat(String((document.getElementById('comp-modal-rpe') || {}).value || '').replace(',', '.')) || null;
@@ -11612,8 +11670,7 @@ function openCompModalForEdit(comp) {
     if (typeof populateFedSelectForSport === 'function') populateFedSelectForSport(comp.sport || 'Ride');
     const f = document.getElementById('comp-modal-federation');
     if (f && comp.federation) { f.value = comp.federation; if (f._customUpdate) f._customUpdate(); }
-    const l = document.getElementById('comp-modal-level');
-    if (l) l.value = comp.raceLevel || '';
+    updateLevelFieldForFed((f && f.value) || comp.federation || '', comp.raceLevel || '');
     const tf = document.getElementById('comp-modal-triformat');
     if (tf) { tf.value = comp.triFormat || ''; if (tf._customUpdate) tf._customUpdate(); }
   }
