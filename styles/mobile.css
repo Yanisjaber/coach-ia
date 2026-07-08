@@ -373,6 +373,23 @@
   /* ===== Frise de saison : largeur fixe + scroll horizontal de la carte ===== */
   .grid-1.card:has(> .comp-timeline) { overflow-x: auto; }
   .comp-timeline { width: 560px; }
+  /* Page Competitions : tailles reduites en fluide (palmares + hero) */
+  .od-ring, .od-ring svg { width: clamp(64px, 56px + 2.5vw, 84px); height: clamp(64px, 56px + 2.5vw, 84px); }
+  .od-ring-pct { font-size: clamp(16px, 14px + 0.75vw, 20px); }
+  .od-ring-k { font-size: clamp(8px, 7.4px + 0.2vw, 9px); }
+  .od-tally { gap: clamp(4px, 3px + 0.3vw, 7px) clamp(10px, 8px + 0.6vw, 16px); }
+  .od-tally-row { font-size: clamp(11px, 10px + 0.3vw, 12.5px); gap: 6px; }
+  .od-tally-row b { font-size: clamp(14px, 12.8px + 0.4vw, 16px); }
+  .od-best-rank { font-size: clamp(20px, 18px + 0.6vw, 24px) !important; }
+  .od-best-lbl, .od-best-race { font-size: clamp(9.5px, 8.9px + 0.2vw, 10.5px) !important; }
+  .od-recap-card, #comp-hero .comp-hero { padding: clamp(11px, 9px + 0.6vw, 15px) !important; }
+  .comp-hero-ring, .comp-hero-ring svg { width: clamp(72px, 62px + 3.1vw, 96px); height: clamp(72px, 62px + 3.1vw, 96px); }
+  .comp-hero-jx { font-size: clamp(19px, 16.9px + 0.66vw, 24px); }
+  .comp-hero-jdate { font-size: clamp(9px, 8.4px + 0.2vw, 10px); }
+  .comp-hero-name { font-size: clamp(15px, 13.7px + 0.4vw, 18px); }
+  .comp-hero-lbl { font-size: clamp(9px, 8.4px + 0.2vw, 10px); }
+  .comp-prep-val { font-size: clamp(15px, 13.7px + 0.4vw, 18px) !important; }
+
   .comp-timeline.v2 { width: auto; height: clamp(64px, 60px + 1.25vw, 72px) !important; margin: 20px 2px 0; }
   .comp-timeline.v2 .comp-tl-month { top: 50px; }
   .comp-timeline.v2 .comp-tl-tick { top: 21px; height: 8px; opacity: 0.4; }
