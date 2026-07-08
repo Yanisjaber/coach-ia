@@ -773,22 +773,16 @@
   .act-tile { padding: clamp(6px, 4.55px + 0.455vw, 8px) clamp(7px, 5.55px + 0.455vw, 9px); }
 }
 
-/* ============ Compets a venir : pliees au-dela de 2 sur mobile ============ */
-.comp-more-btn { display: none; }
+/* ============ Compets a venir : scroll plafonne a ~2 cartes sur mobile ============ */
 @media (max-width: 860px) {
-  #comp-list:not(.comp-expanded) .comp-item.comp-extra { display: none; }
-  #comp-list .comp-more-btn {
-    display: block;
-    width: 100%;
-    margin-top: clamp(6px, 4.5px + 0.44vw, 9px);
-    padding: clamp(7px, 5.5px + 0.44vw, 10px) 0;
-    background: var(--bg-elev2, #141a26);
-    border: 1px solid var(--border, #26304a);
-    border-radius: 9px;
-    color: var(--text-dim, #8b93a7);
-    font-size: clamp(11px, 10.1px + 0.29vw, 13px);
-    font-weight: 600;
-    cursor: pointer;
+  #comp-list {
+    /* 2 cartes pleines + un lisere de la 3e (invite au scroll) */
+    max-height: clamp(284px, 258px + 7vw, 312px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+    padding-right: 4px;
   }
-  #comp-list .comp-more-btn:active { background: var(--bg-elev, #10151f); }
+  /* conteneur flex : sans ca les cartes se COMPRESSENT au lieu de deborder */
+  #comp-list .comp-item { flex-shrink: 0; }
 }
