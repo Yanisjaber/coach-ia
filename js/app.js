@@ -9116,6 +9116,9 @@ function openSessionModal(iso, source) {
       bodyEl.innerHTML = '<div class="modal-placeholder">Aucune activité enregistrée ce jour-là.</div>';
     } else {
       let currentIdx = 0;
+      // Groupe multisport (triathlon, brick...) : détecté une fois pour le jour
+      const _msGroup = (acts.length > 1 && window.SportProfiles && window.SportProfiles.detectMultisport)
+        ? window.SportProfiles.detectMultisport(acts) : null;
       function renderModalActivity(idx) {
         currentIdx = idx;
         window.__modalActIdx = idx;
@@ -9191,7 +9194,11 @@ function openSessionModal(iso, source) {
         if (startTime) textParts.push(startTime);
         metaEl.innerHTML = textParts.join(' · ') + sportPill;
 
-        const switchHTML = acts.length > 1 ? `
+        // Enchaînement multisport détecté : bandeau groupé (segments cliquables)
+        // à la place du switch générique ; sinon switch classique.
+        const groupHTML = _msGroup ? window.SportProfiles.renderMultisportHTML(_msGroup, idx) : '';
+        const _inGroup = _msGroup ? _msGroup.legs.some(l => l.idx === idx) : false;
+        const switchHTML = (acts.length > 1 && !(groupHTML && _inGroup && acts.length === _msGroup.legs.length)) ? `
           <div class="modal-activity-switch">
             ${acts.map((a, i) => `<button class="${i === idx ? 'active' : ''}" data-i="${i}">${a.name || 'Séance'} (${a.tss || 0} TSS)</button>`).join('')}
           </div>` : '';
@@ -9356,6 +9363,7 @@ function openSessionModal(iso, source) {
         const graphHTML = _hasStrava ? `<div class="modal-section"><div id="streams-section"></div></div>` : '';
         const lienHTML = '';
         bodyEl.innerHTML = `
+          ${groupHTML}
           ${switchHTML}
           ${statsHTML}
           ${comparHTML}
@@ -9369,6 +9377,10 @@ function openSessionModal(iso, source) {
         // Wire switch buttons (avant le chargement async des streams)
         bodyEl.querySelectorAll('.modal-activity-switch button').forEach(btn => {
           btn.addEventListener('click', () => renderModalActivity(+btn.dataset.i));
+        });
+        // Segments du bandeau multisport -> bascule sur l'activité du segment
+        bodyEl.querySelectorAll('.msg-seg').forEach(btn => {
+          btn.addEventListener('click', () => renderModalActivity(+btn.dataset.legIdx));
         });
 
         // Camemberts des zones FC / Puissance — defer pour laisser le layout se calculer

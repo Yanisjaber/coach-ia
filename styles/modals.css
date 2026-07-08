@@ -1223,3 +1223,76 @@
   /* 3e champ (RPE / sport) en pleine largeur sous les deux premiers */
   .add-sec-grid.g3 > .form-field:nth-child(3) { grid-column: 1 / -1; }
 }
+
+/* ============================================================
+   Bandeau MULTISPORT (triathlon, brick, duathlon...) dans la modale jour :
+   segments par discipline (cliquables) + transitions T1/T2.
+   ============================================================ */
+.msg-group {
+  background: var(--bg-elev2, #1b2230);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: clamp(10px, 7.1px + 0.91vw, 14px);
+}
+.msg-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+}
+.msg-kind {
+  font-size: clamp(12px, 10.55px + 0.455vw, 14px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--accent);
+}
+.msg-totals {
+  font-size: clamp(11px, 9.9px + 0.34vw, 12.5px);
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.msg-segs { display: flex; flex-direction: column; gap: 4px; }
+.msg-seg {
+  display: flex;
+  align-items: center;
+  gap: clamp(7px, 4.8px + 0.68vw, 10px);
+  width: 100%;
+  background: var(--bg-elev, #141a23);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--seg-c, var(--border));
+  border-radius: 9px;
+  padding: clamp(7px, 5.55px + 0.455vw, 9px) clamp(8px, 5.1px + 0.91vw, 12px);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+  min-width: 0;
+}
+.msg-seg:hover { background: var(--bg-elev2); }
+.msg-seg.active { border-color: var(--seg-c, var(--accent)); background: color-mix(in srgb, var(--seg-c, #4ade80) 10%, var(--bg-elev, #141a23)); }
+.msg-seg-ico { flex: none; line-height: 0; color: var(--seg-c, var(--text-dim)); }
+.msg-seg-ico svg { width: clamp(16px, 13.1px + 0.91vw, 20px); height: clamp(16px, 13.1px + 0.91vw, 20px); }
+.msg-seg-name {
+  flex: none;
+  font-size: clamp(11.5px, 10.4px + 0.34vw, 13px);
+  font-weight: 700;
+}
+.msg-seg-meta {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: clamp(10.5px, 9.4px + 0.34vw, 12px);
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.msg-trans {
+  font-size: clamp(9.5px, 8.4px + 0.34vw, 11px);
+  color: var(--text-mute);
+  padding: 1px 0 1px clamp(26px, 18px + 2.5vw, 38px);
+}

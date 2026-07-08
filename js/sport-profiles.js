@@ -25,6 +25,8 @@
     zap: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
     dumbbell: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9v6M4 8v8M18 9v6M20 8v8M6 12h12"/></svg>',
     waves: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 17c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/></svg>',
+    bike: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l5-9h3l-2 9"/><path d="M11 8h4l2 5"/></svg>',
+    run: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="5" r="1.6"/><path d="M6 21l3-5 2-3 2 2 1 4"/><path d="M11 13l-2-3 4-2 2 3 3 1"/></svg>',
   };
 
   var C = { blue: '#60a5fa', cyan: '#22d3ee', green: '#34d399', lime: '#84cc16', amber: '#f59e0b', yellow: '#fbbf24', red: '#f87171', purple: '#a78bfa', violet: '#c084fc', grey: '#9ca3af' };
@@ -139,8 +141,94 @@
     return out;
   }
 
+  // ============================================================
+  // MULTISPORT : détecte un enchaînement type triathlon dans les
+  // activités d'un jour (catégories différentes, chronologiquement
+  // consécutives, transitions <= 45 min). Renvoie null sinon.
+  // ============================================================
+  var MS_CATS = { natation: 1, cyclisme: 1, course: 1 };
+  var MS_GLYPH = { natation: SVG.waves, cyclisme: SVG.bike, course: SVG.run };
+  var MS_COLOR = { natation: '#06b6d4', cyclisme: '#3b82f6', course: '#fc4c02' };
+
+  function startMinOf(act) {
+    var m = act && act.start_date_local && String(act.start_date_local).match(/T(\d{2}):(\d{2})/);
+    return m ? (+m[1]) * 60 + (+m[2]) : null;
+  }
+
+  function detectMultisport(acts) {
+    if (!Array.isArray(acts) || acts.length < 2) return null;
+    var legs = acts
+      .map(function (a, i) { return { act: a, idx: i, cat: catOf(a), start: startMinOf(a), dur: +a.duration || 0 }; })
+      .filter(function (l) { return MS_CATS[l.cat] && l.start != null && l.dur > 0; });
+    if (legs.length < 2) return null;
+    legs.sort(function (a, b) { return a.start - b.start; });
+    // Chaîne consécutive : catégorie différente de la précédente, transition <= 45 min
+    var chain = [legs[0]];
+    for (var i = 1; i < legs.length; i++) {
+      var prev = chain[chain.length - 1];
+      var gap = legs[i].start - (prev.start + prev.dur);
+      if (legs[i].cat !== prev.cat && gap >= -5 && gap <= 45) chain.push(legs[i]);
+    }
+    if (chain.length < 2) return null;
+    var cats = chain.map(function (l) { return l.cat; });
+    var uniq = {}; cats.forEach(function (c) { uniq[c] = 1; });
+    var nCats = Object.keys(uniq).length;
+    var kind = 'Multisport';
+    var seq = cats.join('>');
+    if (nCats === 3) kind = 'Triathlon';
+    else if (seq === 'course>cyclisme>course') kind = 'Duathlon';
+    else if (seq === 'natation>course') kind = 'Aquathlon';
+    else if (seq === 'natation>cyclisme') kind = 'Aquabike';
+    else if (seq === 'cyclisme>course') kind = 'Brick vélo-course';
+    var transitions = [];
+    for (var t = 1; t < chain.length; t++) {
+      transitions.push(Math.max(0, Math.round((chain[t].start - (chain[t - 1].start + chain[t - 1].dur)) * 60))); // secondes
+    }
+    var totals = {
+      durMin: chain.reduce(function (x, l) { return x + l.dur; }, 0),
+      tss: chain.reduce(function (x, l) { return x + (+l.act.tss || 0); }, 0),
+      kcal: chain.reduce(function (x, l) { return x + (+l.act.calories || 0); }, 0),
+    };
+    return { kind: kind, legs: chain, transitions: transitions, totals: totals };
+  }
+
+  function fmtDurShort(min) {
+    var hh = Math.floor(min / 60), mm = Math.round(min % 60);
+    return hh > 0 ? hh + 'h' + String(mm).padStart(2, '0') : mm + ' min';
+  }
+  function fmtSec(sec) {
+    var m = Math.floor(sec / 60), s2 = sec % 60;
+    return m + ':' + String(s2).padStart(2, '0');
+  }
+
+  // HTML du bandeau groupé (segments cliquables -> data-leg-idx = index activité)
+  function renderMultisportHTML(group, activeIdx) {
+    var head = '<div class="msg-head">'
+      + '<span class="msg-kind">' + group.kind + '</span>'
+      + '<span class="msg-totals">' + fmtDurShort(group.totals.durMin)
+      + (group.totals.tss ? ' · ' + Math.round(group.totals.tss) + ' TSS' : '')
+      + (group.totals.kcal ? ' · ' + Math.round(group.totals.kcal) + ' kcal' : '') + '</span>'
+      + '</div>';
+    var rows = [];
+    for (var i = 0; i < group.legs.length; i++) {
+      var l = group.legs[i];
+      var meta = (window.SportProfiles ? window.SportProfiles.shortMeta(l.act) : []).join(' · ');
+      rows.push('<button type="button" class="msg-seg' + (l.idx === activeIdx ? ' active' : '') + '" data-leg-idx="' + l.idx + '" style="--seg-c:' + (MS_COLOR[l.cat] || '#9ca3af') + '">'
+        + '<span class="msg-seg-ico">' + (MS_GLYPH[l.cat] || '') + '</span>'
+        + '<span class="msg-seg-name">' + (l.cat.charAt(0).toUpperCase() + l.cat.slice(1)) + '</span>'
+        + '<span class="msg-seg-meta">' + meta + '</span>'
+        + '</button>');
+      if (i < group.legs.length - 1) {
+        rows.push('<div class="msg-trans">T' + (i + 1) + ' · ' + fmtSec(group.transitions[i]) + '</div>');
+      }
+    }
+    return '<div class="modal-section msg-group">' + head + '<div class="msg-segs">' + rows.join('') + '</div></div>';
+  }
+
   window.SportProfiles = {
     categoryOf: catOf,
+    detectMultisport: detectMultisport,
+    renderMultisportHTML: renderMultisportHTML,
     profiles: PROFILES,   // extensible : SportProfiles.profiles.escalade = {...}
     bricks: { heroes: H, tiles: T, svg: SVG, colors: C },
     heroes: function (act, ctx) { return build(profileFor(act).heroes, act, ctx); },
