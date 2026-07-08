@@ -163,7 +163,7 @@
   }
   .comp-row {
     display: grid;
-    grid-template-columns: 1fr auto auto 28px;
+    grid-template-columns: 1fr auto auto 28px 28px; /* nom · date · J-x · ⋯ · × */
     gap: 14px;
     align-items: center;
   }

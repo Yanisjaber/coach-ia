@@ -367,7 +367,7 @@
   .day-card.today .day-card-date { font-weight: 800; }
 
   /* ===== Compétitions : nom sur sa propre ligne ===== */
-  .comp-row { grid-template-columns: 1fr auto 28px; gap: 6px 10px; }
+  .comp-row { grid-template-columns: 1fr auto 28px 28px; gap: 6px 10px; }
   .comp-row .comp-name { grid-column: 1 / -1; }
 
   /* ===== Frise de saison : largeur fixe + scroll horizontal de la carte ===== */
