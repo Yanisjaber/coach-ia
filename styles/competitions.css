@@ -527,3 +527,14 @@
   background: rgba(244, 63, 94, 0.10);
 }
 .tri-tab.filled:not(.active) { color: var(--text); border-color: var(--text-mute); }
+
+/* Icone sport coloree a cote du nom d'epreuve */
+.comp-name .sport-ico {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 7px;
+  flex: 0 0 auto;
+}
+.comp-name .sport-ico span { display: inline-flex; }
+.comp-name .sport-ico svg { display: block; }

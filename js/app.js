@@ -1897,7 +1897,7 @@ function renderCompList() {
     fillPct = Math.max(0, Math.min(100, fillPct));
     return `<div class="comp-item" data-prio="${_pi.key}" data-comp-id="${c.id}" title="Voir le détail de la compétition">
       <div class="comp-row">
-        <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span></span>
+        <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span>${(window.SportProfiles && window.SportProfiles.sportIconHTML) ? window.SportProfiles.sportIconHTML(c.sport) : ''}</span>
         <span class="comp-date">${dateStr}</span>
         <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'J‑' + daysUntil}</span>
         <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>
@@ -2089,7 +2089,7 @@ function renderCompetitionsPage() {
       fillPct = Math.max(0, Math.min(100, fillPct));
       return `<div class="comp-item" data-prio="${_pi.key}" data-comp-id="${c.id}" title="Voir le détail">
         <div class="comp-row">
-          <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span></span>
+          <span class="comp-name">${trophySvg(_pi.color)}<span class="comp-name-text">${c.name}</span>${(window.SportProfiles && window.SportProfiles.sportIconHTML) ? window.SportProfiles.sportIconHTML(c.sport) : ''}</span>
           <span class="comp-date">${dateLabel(c)}</span>
           <span class="comp-countdown">${daysUntil <= 0 ? 'en cours' : 'J‑' + daysUntil}</span>
           <button class="comp-del" data-id="${c.id}" title="Supprimer">×</button>

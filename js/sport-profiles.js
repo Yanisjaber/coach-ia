@@ -297,7 +297,29 @@
     return '<div class="modal-section tri-plan">' + header + '<div class="tp-rows">' + rows.join('') + '</div></div>';
   }
 
+  // Icone SVG du sport, teintee a la couleur du sport (les emojis ne se
+  // colorent pas en CSS). Triathlon = les 3 mini-icones aux couleurs des
+  // disciplines (meme langage visuel que la timeline / le bandeau multisport).
+  var CAT_COLOR = { triathlon: '#f43f5e', cyclisme: '#3b82f6', course: '#fc4c02', natation: '#06b6d4', musculation: '#ef4444', autre: '#9ca3af' };
+  var CAT_ICON = { cyclisme: 'bike', course: 'run', natation: 'waves', musculation: 'dumbbell' };
+  function _sized(svg, px) { return svg.replace('width="22" height="22"', 'width="' + px + '" height="' + px + '"'); }
+  function sportIconHTML(rawSport, px) {
+    px = px || 13;
+    var cat = (typeof window.getSportCategory === 'function') ? window.getSportCategory(rawSport || '') : 'autre';
+    if (cat === 'triathlon') {
+      return '<span class="sport-ico" aria-hidden="true">'
+        + '<span style="color:' + MS_COLOR.natation + '">' + _sized(SVG.waves, px) + '</span>'
+        + '<span style="color:' + MS_COLOR.cyclisme + '">' + _sized(SVG.bike, px) + '</span>'
+        + '<span style="color:' + MS_COLOR.course + '">' + _sized(SVG.run, px) + '</span>'
+        + '</span>';
+    }
+    var ic = SVG[CAT_ICON[cat]];
+    if (!ic) return '';
+    return '<span class="sport-ico" aria-hidden="true" style="color:' + (CAT_COLOR[cat] || CAT_COLOR.autre) + '">' + _sized(ic, px) + '</span>';
+  }
+
   window.SportProfiles = {
+    sportIconHTML: sportIconHTML,
     categoryOf: catOf,
     detectMultisport: detectMultisport,
     renderMultisportHTML: renderMultisportHTML,
