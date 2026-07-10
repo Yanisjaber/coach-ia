@@ -2360,7 +2360,7 @@ function renderCompetitionsPage() {
         if (it.od) continue;
         const r = (it.c.result && it.c.result.place != null) ? it.c.result : _mr[String(it.c.id)];
         if (r && r.place != null) {
-          it.od = { rankingScratch: r.place, rankingInCategory: r.place, totalInCategory: r.total || null, catev: r.catev || null, _manual: true };
+          it.od = { rankingScratch: r.place, rankingInCategory: r.place, totalInCategory: r.total || null, catev: r.catev || null, url: r.url || null, _manual: true };
         }
       }
     }
@@ -2410,9 +2410,15 @@ function renderCompetitionsPage() {
       if (elev) metrics.push(Math.round(elev) + ' m D+');
       if (tssV) metrics.push(Math.round(tssV) + ' TSS');
       if (hrN) metrics.push(Math.round(hrSum / hrN) + ' bpm');
-      const metricsHtml = metrics.length
+      let metricsHtml = metrics.length
         ? `<div class="comp-res-metrics">${metrics.map(m => `<span class="comp-res-m">${m}</span>`).join('<span class="comp-res-sep">·</span>')}</div>`
         : '<div class="comp-res-metrics comp-res-nodata">Pas de données d\'activité</div>';
+      // Lien vers la page des resultats officiels (saisi avec le resultat manuel)
+      if (g.od && g.od._manual && g.od.url) {
+        const _u = String(g.od.url).replace(/"/g, '&quot;');
+        metricsHtml = metricsHtml.replace('</div>',
+          `${metrics.length ? '<span class="comp-res-sep">·</span>' : ''}<a class="comp-res-link" href="${_u}" target="_blank" rel="noopener" title="${_u}">Résultats ↗</a></div>`);
+      }
       const _dispName = g.disp || c.name;
       const _tooltipNames = g.all.map(cc => cc.name).filter(Boolean).join(' + ');
       let html = `<div class="comp-result-card" data-prio="${_pi.key}" data-comp-id="${c.id}" style="--pc:${_pi.color};" title="Voir le détail">
@@ -2547,8 +2553,9 @@ function _odOverridesSave(m) {
   _odPrefsPush();
 }
 // Resultats saisis MANUELLEMENT (compets sans resultat Open Dossard)
-// { [compId]: { place, total, catev } } — cache local ; la VERITE est en base
-// (colonnes result_place/result_total/result_catev de activities).
+// { [compId]: { place, total, catev, url } } — cache local ; la VERITE est en base
+// (colonnes result_place/result_total/result_catev/result_url de activities ;
+// la federation est poussee sur la colonne federation de la compet elle-meme).
 function _manualResLoad() {
   try { return JSON.parse(localStorage.getItem('coach_ia_manual_results_v1') || '{}'); } catch { return {}; }
 }
@@ -2556,16 +2563,41 @@ function _manualResSave(m) {
   localStorage.setItem('coach_ia_manual_results_v1', JSON.stringify(m || {}));
 }
 // Pousse le resultat manuel sur la ligne activities (fire-and-forget)
-async function _manualResPush(comp, r) {
+async function _manualResPush(comp, r, fede) {
   if (!window.sb || !comp || !comp._sbId) return;
   try {
-    await window.sb.from('activities').update({
+    const upd = {
       result_place: r ? r.place : null,
       result_total: r ? (r.total || null) : null,
       result_catev: r ? (r.catev || null) : null,
-    }).eq('id', comp._sbId);
+      result_url: r ? (r.url || null) : null,
+    };
+    // Federation saisie dans le formulaire resultat -> colonne federation de la compet
+    if (fede !== undefined) upd.federation = fede || null;
+    await window.sb.from('activities').update(upd).eq('id', comp._sbId);
   } catch (e) { console.warn('[result push]', e.message || e); }
 }
+// Resultats de course saisis manuellement, a plat, pour le palmares agrege
+// (opendossard.js). Exclut les compets deja couvertes par un resultat OD associe
+// pour ne pas compter deux fois la meme course.
+window.getManualRaceResults = function () {
+  try {
+    const out = [];
+    const mr = _manualResLoad();
+    const assigned = window.__odAssignedByComp || {};
+    for (const c of loadCompetitions()) {
+      if (typeof compIsRealised === 'function' && !compIsRealised(c)) continue;
+      const r = (c.result && c.result.place != null) ? c.result : mr[String(c.id)];
+      if (!r || r.place == null) continue;
+      if (assigned[String(c.id)] != null) continue;
+      out.push({
+        date: c.date, place: +r.place, total: r.total || null, catev: r.catev || null,
+        name: c.name || '', federation: c.federation || null, sport: c.sport || null,
+      });
+    }
+    return out;
+  } catch (e) { return []; }
+};
 // Pousse les prefs Open Dossard (associations + masques) — 1 ligne par user
 async function _odPrefsPush() {
   if (!window.sb) return;
@@ -2592,16 +2624,32 @@ function _odHiddenAdd(id) {
 }
 
 // Mini-formulaire flottant : saisir/modifier un resultat manuel
+// (place, partants, federation, categorie, lien vers les resultats officiels)
 function _openManualResultForm(btn, comp) {
   _closeCompActionsMenu();
   const cur = (comp.result && comp.result.place != null) ? comp.result : (_manualResLoad()[String(comp.id)] || {});
+  const _esc = v => String(v == null ? '' : v).replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  // Federations proposees selon le sport de la compet (memes listes que le modal compet)
+  const _cat = (typeof getSportCategory === 'function') ? getSportCategory(comp.sport) : null;
+  const _feds = ((typeof FEDERATIONS_BY_CAT !== 'undefined' && FEDERATIONS_BY_CAT[_cat]) || []).concat('Autre');
+  const _curFed = comp.federation || '';
   const menu = document.createElement('div');
   menu.className = 'comp-actions-menu comp-res-form';
   menu.innerHTML = `
-    <div class="crf-title">Résultat — ${(comp.name || '').replace(/</g, '&lt;')}</div>
-    <label>Place<input type="number" id="crf-place" min="1" step="1" value="${cur.place != null ? cur.place : ''}" placeholder="ex : 7"></label>
-    <label>Partants<input type="number" id="crf-total" min="1" step="1" value="${cur.total != null ? cur.total : ''}" placeholder="ex : 62"></label>
-    <label>Catégorie<input type="text" id="crf-catev" value="${cur.catev ? String(cur.catev).replace(/"/g, '&quot;') : ''}" placeholder="ex : 3 / Open 2"></label>
+    <div class="crf-title">Résultat — ${_esc(comp.name)}</div>
+    <div class="crf-row2">
+      <label>Place<input type="number" id="crf-place" min="1" step="1" value="${cur.place != null ? cur.place : ''}" placeholder="ex : 7"></label>
+      <label>Partants<input type="number" id="crf-total" min="1" step="1" value="${cur.total != null ? cur.total : ''}" placeholder="ex : 62"></label>
+    </div>
+    <div class="crf-row2">
+      <label>Fédération<select id="crf-fede">
+        <option value=""${!_curFed ? ' selected' : ''}>—</option>
+        ${_feds.map(f => `<option value="${_esc(f)}"${_curFed === f ? ' selected' : ''}>${_esc(f)}</option>`).join('')}
+        ${_curFed && !_feds.includes(_curFed) ? `<option value="${_esc(_curFed)}" selected>${_esc(_curFed)}</option>` : ''}
+      </select></label>
+      <label>Catégorie<input type="text" id="crf-catev" value="${_esc(cur.catev)}" placeholder="ex : 3 / Open 2"></label>
+    </div>
+    <label>Lien résultats<input type="url" id="crf-url" value="${_esc(cur.url)}" placeholder="https://…"></label>
     <div class="crf-btns">
       <button type="button" id="crf-cancel">Annuler</button>
       <button type="button" id="crf-save">Enregistrer</button>
@@ -2617,11 +2665,22 @@ function _openManualResultForm(btn, comp) {
     const place = parseInt(menu.querySelector('#crf-place').value, 10) || null;
     const total = parseInt(menu.querySelector('#crf-total').value, 10) || null;
     const catev = menu.querySelector('#crf-catev').value.trim() || null;
+    let url = menu.querySelector('#crf-url').value.trim() || null;
+    if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const fede = menu.querySelector('#crf-fede').value || null;
     const m = _manualResLoad();
-    if (place) m[String(comp.id)] = { place, total, catev };
+    if (place) m[String(comp.id)] = { place, total, catev, url };
     else delete m[String(comp.id)];
     _manualResSave(m);
-    _manualResPush(comp, place ? { place, total, catev } : null);
+    _manualResPush(comp, place ? { place, total, catev, url } : null, fede);
+    // Reflete la federation en local sans attendre la re-synchro
+    if (fede !== (comp.federation || null)) {
+      try {
+        const all = loadCompetitions();
+        const i = all.findIndex(x => x.id === comp.id);
+        if (i >= 0) { all[i].federation = fede; localStorage.setItem(COMP_KEY, JSON.stringify(all)); }
+      } catch (e) { /* ignore */ }
+    }
     _closeCompActionsMenu();
     renderCompetitionsPage();
   });
@@ -2803,6 +2862,8 @@ function _handleCompClick(e) {
     renderCalendar();
     return;
   }
+  // Lien « Résultats » : navigation normale, ne pas ouvrir le détail
+  if (e.target.closest && e.target.closest('.comp-res-link')) { e.stopPropagation(); return; }
   // Clic sur une carte de compé (ligne, hero, carte résultat) → ouvre le détail
   const item = e.target.closest('[data-comp-id]');
   if (!item) return;
@@ -10196,7 +10257,6 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
     return window.__collapsible('pvr', 'Prévu vs Réalisé', bars + structHTML);
   } catch (e) { console.warn('[prevu vs realise]', e && e.message); return ''; }
 };
-
 
 // Bouton/selecteur de lien dans le HEADER de la modale (a cote des "...").
 window.__setupModalLinkSelect = function (act, iso) {

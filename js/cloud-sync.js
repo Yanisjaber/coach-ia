@@ -201,9 +201,15 @@ async function pullAllFromCloud() {
     // Compet REALISEES = activities (category='competition'). La table `competitions` n'existe plus.
     {
       const _seen = new Set();
-      const { data: ra } = await sb.from('activities')
-        .select('id, client_id, name, sport, start_date_local, priority, distance_km, course_dplus, target, laps, user_notes, gpx_name, stages, event, type, tss, rpe, moving_time, total_elevation_gain, tri, result_place, result_total, result_catev, federation, race_level, tri_format')
+      const _COMP_COLS = 'id, client_id, name, sport, start_date_local, priority, distance_km, course_dplus, target, laps, user_notes, gpx_name, stages, event, type, tss, rpe, moving_time, total_elevation_gain, tri, result_place, result_total, result_catev, federation, race_level, tri_format';
+      // result_url : colonne recente (migration 2026-07-10) -> repli sans elle si absente
+      let { data: ra, error: raErr } = await sb.from('activities')
+        .select(_COMP_COLS + ', result_url')
         .eq('user_id', userId).eq('category', 'competition');
+      if (raErr) {
+        console.warn('[cloud-sync] result_url indisponible (migration non appliquée ?) — repli :', raErr.message);
+        ({ data: ra } = await sb.from('activities').select(_COMP_COLS).eq('user_id', userId).eq('category', 'competition'));
+      }
       for (const r of (ra || [])) {
         const cid = String(r.client_id || r.id);
         if (_seen.has(cid)) continue;
@@ -222,7 +228,7 @@ async function pullAllFromCloud() {
           laps: r.laps ?? null, notes: r.user_notes ?? null,
           tss: r.tss ?? null, rpe: r.rpe ?? null,
           tri: r.tri ?? null,
-          result: (r.result_place != null) ? { place: r.result_place, total: r.result_total ?? null, catev: r.result_catev ?? null } : null,
+          result: (r.result_place != null) ? { place: r.result_place, total: r.result_total ?? null, catev: r.result_catev ?? null, url: r.result_url ?? null } : null,
           federation: r.federation ?? null, raceLevel: r.race_level ?? null, triFormat: r.tri_format ?? null,
           gpxName: r.gpx_name ?? null,
           stages: Array.isArray(r.stages) && r.stages.length > 0,

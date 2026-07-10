@@ -184,10 +184,32 @@ function odComputeStats(results, year) {
   }
   return { races, wins, podiums, top10, best, bestR, buckets };
 }
+// Palmares AGREGE : resultats Open Dossard + resultats saisis manuellement
+// (window.getManualRaceResults, deja dedoublonnes cote app.js). Chaque entree
+// est normalisee au format OD : { date, rankingScratch, competitionName, _fede, _cat }.
+function odMergedResults() {
+  const out = [];
+  for (const r of (_odResults || [])) {
+    const f = window.odFedeForCompetition ? window.odFedeForCompetition(r.competitionId) : null;
+    out.push(Object.assign({}, r, { _fede: (f === 'FFVELO' ? 'FFVélo' : f), _cat: 'cyclisme', _src: 'od' }));
+  }
+  const manual = (typeof window.getManualRaceResults === 'function') ? window.getManualRaceResults() : [];
+  for (const m of manual) {
+    out.push({
+      date: m.date, rankingScratch: m.place,
+      rankingInCategory: m.place, totalInCategory: m.total || null, catev: m.catev || null,
+      competitionName: m.name,
+      _fede: m.federation || null,
+      _cat: (typeof window.getSportCategory === 'function') ? window.getSportCategory(m.sport || '') : null,
+      _src: 'manual',
+    });
+  }
+  return out;
+}
 function renderOdRecap() {
   const wrap = document.getElementById('od-recap');
   if (!wrap) return;
-  if (!_odResults || !_odResults.length) { wrap.innerHTML = ''; return; }
+  if (!odMergedResults().length) { wrap.innerHTML = ''; return; }
   // Plus de selecteur d'annee propre : le palmares suit le filtre GLOBAL
   // (barre de la page Competitions : annee + sport + fede).
   wrap.innerHTML = `
@@ -203,16 +225,11 @@ function renderOdRecapStats() {
   const el = document.getElementById('od-recap-stats');
   if (!el) return;
   // Filtre global de la page Competitions (sport + fede) : le palmares suit.
-  // Les resultats OD sont des courses velo -> un filtre CAP/Tri vide le recap.
+  // Source = resultats agreges (Open Dossard + saisis manuellement).
   const flt = window._compPageFilter || { cat: 'tout', fed: 'tout' };
-  let rs = _odResults;
-  if (flt.cat !== 'tout' && flt.cat !== 'cyclisme') rs = [];
-  if (rs.length && flt.fed !== 'tout') {
-    rs = rs.filter(r => {
-      const f = window.odFedeForCompetition ? window.odFedeForCompetition(r.competitionId) : null;
-      return (f === 'FFVELO' ? 'FFVélo' : f) === flt.fed;
-    });
-  }
+  let rs = odMergedResults();
+  if (flt.cat !== 'tout') rs = rs.filter(r => !r._cat || r._cat === flt.cat);
+  if (flt.fed !== 'tout') rs = rs.filter(r => (r._fede || null) === flt.fed);
   const _gYear = (flt.year !== undefined && String(flt.year) !== 'tout') ? String(flt.year) : 'all';
   const s = odComputeStats(rs, _gYear);
   const fmtD = (d) => { try { return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return d || ''; } };
@@ -251,11 +268,56 @@ function renderOdRecapStats() {
         <span><i class="od-dot t10"></i>Top 10</span>
         <span><i class="od-dot rest"></i>Au-delà</span>
       </div>
-    </div>` : ''}`;
+    </div>` : ''}
+    ${_odSeasonsHTML(rs, _gYear)}
+    ${_odFedesHTML(rs, flt)}`;
+}
+// Evolution saison par saison (uniquement quand aucune annee n'est filtree
+// et qu'il y a au moins 2 saisons de resultats).
+function _odSeasonsHTML(rs, gYear) {
+  if (gYear !== 'all') return '';
+  const years = odYears(rs);
+  if (years.length < 2) return '';
+  const rows = years.map(y => {
+    const st = odComputeStats(rs, y);
+    return `<div class="od-season-row">
+      <span class="od-season-y">${y}</span>
+      <span class="od-season-v"><b>${st.races}</b> course${st.races > 1 ? 's' : ''}</span>
+      <span class="od-season-v"><b>${st.wins}</b> V</span>
+      <span class="od-season-v"><b>${st.podiums}</b> podium${st.podiums > 1 ? 's' : ''}</span>
+      <span class="od-season-v"><b>${st.top10}</b> top 10</span>
+      <span class="od-season-v od-season-best">${st.best != null ? 'best ' + st.best + (st.best === 1 ? '<sup>er</sup>' : '<sup>e</sup>') : ''}</span>
+    </div>`;
+  }).join('');
+  return `<div class="od-seasons"><div class="od-agg-title">Par saison</div>${rows}</div>`;
+}
+// Repartition par federation (uniquement quand aucune fede n'est filtree
+// et qu'il y a au moins 2 federations representees).
+function _odFedesHTML(rs, flt) {
+  if (flt.fed !== 'tout') return '';
+  const byFed = new Map();
+  for (const r of rs) {
+    const f = r._fede || 'Autre';
+    const cur = byFed.get(f) || { races: 0, pod: 0 };
+    cur.races++;
+    if (r.rankingScratch != null && r.rankingScratch <= 3) cur.pod++;
+    byFed.set(f, cur);
+  }
+  if (byFed.size < 2) return '';
+  const chips = [...byFed.entries()].sort((a, b) => b[1].races - a[1].races).map(([f, v]) =>
+    `<span class="od-fed-chip"><b>${odEsc(f)}</b> ${v.races} course${v.races > 1 ? 's' : ''}${v.pod ? ' · ' + v.pod + ' podium' + (v.pod > 1 ? 's' : '') : ''}</span>`
+  ).join('');
+  return `<div class="od-fedes"><div class="od-agg-title">Par fédération</div><div class="od-fed-chips">${chips}</div></div>`;
 }
 
 // ============ Liaison de la licence (appelée depuis la modale Connexions) ============
-window.odRecapRefresh = renderOdRecapStats;
+// Recree la carte entiere si elle n'existe pas encore (cas : aucun resultat OD
+// mais des resultats manuels -> la carte doit quand meme apparaitre/disparaitre).
+window.odRecapRefresh = function () {
+  if (!document.getElementById('od-recap-stats')) renderOdRecap();
+  else if (!odMergedResults().length) renderOdRecap();
+  else renderOdRecapStats();
+};
 
 window.odUnlinkLicence = function () {
   odSaveLicence(null);
