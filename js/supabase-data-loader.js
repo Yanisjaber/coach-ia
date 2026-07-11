@@ -115,7 +115,7 @@ const ACTIVITY_LIGHT_COLS = [
   'moving_time', 'elapsed_time', 'start_date_local',
   'distance_km', 'total_elevation_gain', 'total_elevation_loss',
   'avg_speed_kmh', 'max_speed_kmh', 'max_speed_smooth_kmh',
-  'np', 'avg_watts', 'max_watts', 'avg_heartrate', 'max_heartrate',
+  'np', 'avg_watts', 'max_watts', 'device_watts', 'avg_heartrate', 'max_heartrate',
   'avg_cadence', 'max_cadence', 'kj', 'calories',
   'intensity', 'variability_index', 'zones_hr', 'zones_power',
   // Modèle unifié : catégorie + source + champs manuels/compétition
@@ -171,7 +171,12 @@ async function loadFromSupabase() {
       { data: powerProfileSport },
     ] = await Promise.all([
       sb.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
-      fetchAllPaged('activities', userId, 'start_date_local', ACTIVITY_LIGHT_COLS),
+      // tri + merged_into : colonnes récentes (fusion multisport) -> repli sans elles
+      fetchAllPaged('activities', userId, 'start_date_local', ACTIVITY_LIGHT_COLS + ', tri, merged_into')
+        .catch((e) => {
+          console.warn('[sb-data] colonnes tri/merged_into indisponibles (migration 2026-07-11 non appliquée ?) — repli :', e.message);
+          return fetchAllPaged('activities', userId, 'start_date_local', ACTIVITY_LIGHT_COLS);
+        }),
       fetchAllPaged('daily_metrics', userId, 'iso_date'),
       fetchAllPaged('power_profile', userId, 'duration_s'),
       fetchAllPaged('whoop_data', userId, 'iso_date'),
@@ -335,12 +340,15 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
   };
 
   // 2) Index activités par iso_date
-  const actsByDate = {};
-  for (const a of activities || []) {
-    const iso = a.start_date_local ? String(a.start_date_local).slice(0, 10) : null;
-    if (!iso) continue;
-    if (!actsByDate[iso]) actsByDate[iso] = [];
-    actsByDate[iso].push({
+  // Mapping ligne DB -> objet activité de l'app (utilisé aussi pour les étapes
+  // fusionnées d'un multisport, rattachées à leur parent via _msLegs).
+  function _mapActivityRow(a) {
+    // Puissance ESTIMÉE par Strava (device_watts === false = pas de capteur) :
+    // on n'affiche RIEN côté watts (moy/max/NP/VI/kJ/zones) — une estimation
+    // n'a pas sa place dans les stats. TSS/charge conservés.
+    const _estPow = (a.device_watts === false && (a.avg_watts || a.np));
+    return {
+      _estPower: !!_estPow,
       id: a.strava_id != null ? String(a.strava_id) : String(a.id),
       _sbId: a.id,                          // uuid (pour update/delete des manuelles)
       planned_id: a.planned_id || null,    // lien vers la seance prevue rapprochee ('none' = delie)
@@ -377,22 +385,43 @@ function reconstituteData({ profile, activities, dailyMetrics, powerProfile, who
       avg_speed_kmh: a.avg_speed_kmh,
       max_speed_kmh: a.max_speed_kmh,
       max_speed_smooth_kmh: a.max_speed_smooth_kmh,
-      np: a.np || 0,
-      avg_watts: a.avg_watts,
-      max_watts: a.max_watts,
+      np: _estPow ? 0 : (a.np || 0),
+      avg_watts: _estPow ? null : a.avg_watts,
+      max_watts: _estPow ? null : a.max_watts,
       hr: a.avg_heartrate || 0,
       max_hr: a.max_heartrate,
       cadence: a.avg_cadence,
       max_cadence: a.max_cadence,
-      kj: a.kj,
+      kj: _estPow ? null : a.kj,
       calories: a.calories,
-      ftpPct: a.intensity ? Math.round(a.intensity * 100) : 0,
-      intensity: a.intensity || 0,
-      variability_index: a.variability_index,
+      ftpPct: (!_estPow && a.intensity) ? Math.round(a.intensity * 100) : 0,
+      intensity: _estPow ? 0 : (a.intensity || 0),
+      variability_index: _estPow ? null : a.variability_index,
       training_load: a.tss,
       zones_hr: a.zones_hr,
-      zones_power: a.zones_power,
-    });
+      zones_power: _estPow ? null : a.zones_power,
+      tri: a.tri || null,
+      merged_into: a.merged_into || null,
+    };
+  }
+  // Étapes fusionnées (tri) : indexées par parent, PAS dans le calendrier/les stats
+  const _mergedKids = {};
+  for (const a of activities || []) {
+    if (a.merged_into) (_mergedKids[String(a.merged_into)] = _mergedKids[String(a.merged_into)] || []).push(a);
+  }
+  const actsByDate = {};
+  for (const a of activities || []) {
+    if (a.merged_into) continue; // rattachée à son parent ci-dessous
+    const iso = a.start_date_local ? String(a.start_date_local).slice(0, 10) : null;
+    if (!iso) continue;
+    if (!actsByDate[iso]) actsByDate[iso] = [];
+    const obj = _mapActivityRow(a);
+    const kids = _mergedKids[String(a.id)];
+    if (kids && kids.length) {
+      obj._msLegs = kids.map(_mapActivityRow)
+        .sort((x, y) => String(x.start_date_local || '').localeCompare(String(y.start_date_local || '')));
+    }
+    actsByDate[iso].push(obj);
   }
   // Tri par TSS desc dans chaque jour (cohérent avec build_day_index Python)
   for (const iso in actsByDate) {

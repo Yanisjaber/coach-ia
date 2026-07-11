@@ -1282,6 +1282,69 @@
   border-radius: 12px;
   padding: clamp(10px, 7.1px + 0.91vw, 14px);
 }
+/* ===== Modale TRIATHLON (vue d'ensemble) : chrono segmenté + cartes ===== */
+.tri-ov-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.tri-ov-chrono { font-size: 26px; font-weight: 800; color: var(--text); line-height: 1; }
+.tri-ov-sub { font-size: 12px; color: var(--text-dim); }
+.tri-ov-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin-bottom: 4px; }
+.tri-ov-pcts { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-mute); margin-bottom: 12px; }
+.tri-ov-target { font-size: 12px; color: var(--text-dim); margin: 2px 0 10px; }
+.tri-ov-cards { display: flex; gap: 8px; align-items: stretch; }
+.tri-ov-cards .tri-ov-card { flex: 1; min-width: 0; }
+/* Transition calée ENTRE deux cartes : petite colonne T1/T2 + temps */
+.tri-ov-t {
+  flex: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; padding: 0 3px; min-width: 34px;
+}
+.tri-ov-t span { font-size: 9px; letter-spacing: 0.6px; color: var(--text-mute); }
+.tri-ov-t b { font-size: 11px; font-weight: 600; color: var(--text-dim); }
+@media (max-width: 860px) {
+  /* Mobile : empilement vertical, la transition devient une fine ligne entre cartes */
+  .tri-ov-cards { flex-direction: column; }
+  .tri-ov-t { flex-direction: row; gap: 6px; padding: 1px 0; min-width: 0; }
+}
+.tri-ov-card {
+  background: var(--bg-elev2, #1b2230);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: 0 0 8px 8px;
+  padding: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.12s;
+}
+.tri-ov-card:hover { border-color: var(--text-mute); border-top-color: inherit; transform: translateY(-1px); }
+.tri-ov-card.active {
+  background: var(--bg-elev, #222b3d);
+  border-color: var(--text-mute);
+  box-shadow: 0 0 0 1px var(--border2, #374256);
+}
+.tri-ov-card-lab { font-size: 11px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.4px; }
+.tri-ov-card-time { font-size: 17px; font-weight: 700; color: var(--text); margin-top: 2px; }
+.tri-ov-card-meta { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
+.tri-ov-chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.tri-ov-chip {
+  font-size: 11px; color: var(--text-dim);
+  background: var(--bg-elev2, #1b2230);
+  border: 1px solid var(--border);
+  border-radius: 20px; padding: 3px 10px;
+}
+
+/* Bouton Fusionner / Défusionner (vue d'ensemble multisport) */
+.ms-fuse-btn {
+  background: rgba(244, 63, 94, 0.1);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: #f43f5e;
+  border-radius: 9px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ms-fuse-btn:hover { background: rgba(244, 63, 94, 0.18); border-color: rgba(244, 63, 94, 0.55); }
+.ms-fuse-btn:disabled { opacity: 0.6; cursor: default; }
 .msg-head {
   display: flex;
   align-items: baseline;

@@ -340,6 +340,7 @@ async function fetchAllActivities(sb: any, userId: string, fromIso: string) {
       .from("activities")
       .select("strava_id, start_date_local, tss, moving_time, elapsed_time")
       .eq("user_id", userId)
+      .is("merged_into", null) // étapes fusionnées (tri) : déjà comptées via leur parent
       .gte("start_date_local", fromIso)
       .order("start_date_local", { ascending: true })
       .range(from, from + PAGE - 1);

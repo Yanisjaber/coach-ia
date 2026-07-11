@@ -296,6 +296,7 @@ Deno.serve(async (req) => {
           .from("activities")
           .select("start_date_local, tss, moving_time, elapsed_time")
           .eq("user_id", user.id)
+          .is("merged_into", null) // étapes fusionnées (tri) : déjà comptées via leur parent
           .order("start_date_local", { ascending: true })
           .range(offset, offset + READ_PAGE - 1);
         if (readErr) { console.error("read activities for metrics:", readErr.message); break; }

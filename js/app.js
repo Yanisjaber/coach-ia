@@ -107,6 +107,8 @@ window.trophySvg = trophySvg;
 
 // Petit canapé dessiné pour les jours de repos.
 const REST_COUCH_SVG = `<svg class="rest-couch" viewBox="0 0 64 44" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round" stroke-linecap="round"><path d="M14 24 V12 C14 9.2 15.6 8 18 8 H30.5 C31.5 8 32 8.6 32 9.6 V24"/><path d="M50 24 V12 C50 9.2 48.4 8 46 8 H33.5 C32.5 8 32 8.6 32 9.6 V24"/><path d="M13 24 H31 C31.6 24 32 24.5 32 25.2 V31 H10 V27 C10 25.3 11.3 24 13 24 Z"/><path d="M51 24 H33 C32.4 24 32 24.5 32 25.2 V31 H54 V27 C54 25.3 52.7 24 51 24 Z"/><path d="M9 31 H55 V35 H9 Z"/><path d="M13 35 V40"/><path d="M51 35 V40"/></svg>`;
+// Jour de repos (calendrier) : lune + étoiles, liseré violet — même langage que les séances
+const REST_MOON_SVG = `<svg class="rest-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"/><path d="M17 4a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2"/><path d="M19 11h2m-1 -1v2"/></svg>`;
 
 // ========= CALQUE D'OVERRIDES D'ACTIVITÉ =========
 // Les activités viennent de Strava (réécrites à chaque synchro). On stocke ici
@@ -4077,6 +4079,9 @@ wireCompTrios();
     if (!btn) return;
     tabs.querySelectorAll('.tri-tab').forEach(b => b.classList.toggle('active', b === btn));
     document.querySelectorAll('#comp-parcours-tri .tri-pane').forEach(pn => { pn.hidden = pn.dataset.pane !== btn.dataset.pane; });
+    // Pas de charge estimée pour une transition (T1/T2) : la section est masquée
+    const _chg = document.getElementById('comp-charge-sec');
+    if (_chg) _chg.hidden = (btn.dataset.pane === 't1' || btn.dataset.pane === 't2');
   });
   // marque les onglets qui contiennent des valeurs
   document.querySelectorAll('#comp-parcours-tri input').forEach(inp => {
@@ -4088,11 +4093,34 @@ wireCompTrios();
       });
     });
   });
+  // TSS par discipline -> le TSS global (Charge estimée) devient la somme (auto).
+  // Une saisie manuelle du global reprend la main (perte du statut auto).
+  const _segTssIds = ['comp-tri-nat-tss', 'comp-tri-bike-tss', 'comp-tri-run-tss'];
+  const _globalTss = document.getElementById('comp-modal-tss');
+  if (_globalTss && !_globalTss._triSumWired) {
+    _globalTss._triSumWired = true;
+    _globalTss.addEventListener('input', () => { delete _globalTss.dataset.auto; });
+    const _sumSegTss = () => {
+      const vals = _segTssIds.map(id => parseInt((document.getElementById(id) || {}).value, 10) || 0);
+      const sum = vals.reduce((a2, b2) => a2 + b2, 0);
+      if (!sum) return;
+      if (!_globalTss.value || _globalTss.dataset.auto === '1') {
+        _globalTss.value = sum;
+        _globalTss.dataset.auto = '1';
+      }
+    };
+    _segTssIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', () => { if (_globalTss.dataset.auto === '1') _globalTss.value = ''; _sumSegTss(); });
+    });
+  }
 })();
 function resetTriPanes() {
   document.querySelectorAll('#comp-parcours-tri input').forEach(i => { if (i.type !== 'file') { i.value = ''; delete i.dataset.auto; } });
   const g = document.getElementById('comp-tri-gpx'); if (g) g.value = '';
   document.querySelectorAll('#comp-tri-tabs .tri-tab').forEach((b, i2) => { b.classList.toggle('active', i2 === 0); b.classList.remove('filled'); });
+  // Retour sur l'onglet Natation -> la section Charge estimée redevient visible
+  const _chg = document.getElementById('comp-charge-sec'); if (_chg) _chg.hidden = false;
   document.querySelectorAll('#comp-parcours-tri .tri-pane').forEach((pn) => { pn.hidden = pn.dataset.pane !== 'nat'; });
 }
 
@@ -4256,7 +4284,11 @@ function upsertCompInDashboard(comp) {
     (comp._sbId && String(x._sbId) === String(comp._sbId)) ||
     (String(x.client_id) === String(comp.id))
   );
-  if (existing && existing.source !== 'manual') {
+  // Vraie activité (Strava/import) OU parent multisport fusionné (_msLegs) :
+  // mise à jour des champs compet uniquement — ne JAMAIS remplacer par le stub
+  // (sinon durée/TSS/streams — ou les étapes du triathlon — disparaissent
+  // jusqu'au rechargement).
+  if (existing && (existing.source !== 'manual' || existing._msLegs)) {
     existing.name = comp.name;
     existing.category = 'competition';
     existing.priority = comp.priority || null;
@@ -4264,6 +4296,7 @@ function upsertCompInDashboard(comp) {
     existing.laps = comp.laps || null;
     existing.course_dplus = comp.dplus || null;
     if (comp.notes) existing.notes = comp.notes;
+    if (comp.tri) existing.tri = comp.tri;
     return;
   }
   day.activities = day.activities.filter(x => !(
@@ -4297,9 +4330,9 @@ async function saveCompFromModal() {
     if (triWrap && !triWrap.hidden) {
       const num = (id) => { const v = parseFloat(String((document.getElementById(id) || {}).value || '').replace(',', '.')); return isNaN(v) || v <= 0 ? null : v; };
       const seg = (tId) => parseSegTime((document.getElementById(tId) || {}).value);
-      const swim = { min: seg('comp-tri-nat-time'), dist_m: num('comp-tri-nat-dist'), pace: (document.getElementById('comp-tri-nat-pace') || {}).value || null };
-      const bike = { min: seg('comp-tri-bike-time'), dist_km: num('comp-tri-bike-dist'), speed: num('comp-tri-bike-speed'), dplus: num('comp-tri-bike-dplus') };
-      const run = { min: seg('comp-tri-run-time'), dist_km: num('comp-tri-run-dist'), pace: (document.getElementById('comp-tri-run-pace') || {}).value || null };
+      const swim = { min: seg('comp-tri-nat-time'), dist_m: num('comp-tri-nat-dist'), pace: (document.getElementById('comp-tri-nat-pace') || {}).value || null, tss: num('comp-tri-nat-tss') };
+      const bike = { min: seg('comp-tri-bike-time'), dist_km: num('comp-tri-bike-dist'), speed: num('comp-tri-bike-speed'), dplus: num('comp-tri-bike-dplus'), tss: num('comp-tri-bike-tss') };
+      const run = { min: seg('comp-tri-run-time'), dist_km: num('comp-tri-run-dist'), pace: (document.getElementById('comp-tri-run-pace') || {}).value || null, tss: num('comp-tri-run-tss') };
       const t1 = seg('comp-tri-t1-time'), t2 = seg('comp-tri-t2-time');
       const any = swim.min || swim.dist_m || bike.min || bike.dist_km || run.min || run.dist_km || t1 || t2;
       if (any) {
@@ -5274,6 +5307,8 @@ function renderWeekPlan() {
             name: raceName,
             stageInfo,
             isRace: true,
+            _id: c.id,
+            _isStage: c.stageIdx !== undefined,
             dur: raceDur,
             tss: raceTss,
             sport: c.sport || 'Ride',
@@ -5300,6 +5335,7 @@ function renderWeekPlan() {
             dplus: m.dplus || null,
             rpe: (m.rpe != null ? m.rpe : null),
             _manual: true,
+            _id: m.id,
           });
         }
 
@@ -5341,14 +5377,17 @@ function renderWeekPlan() {
       const isRest = proposal.type === 'rest';
       const todayClass = isToday ? ' today' : '';
       const pastClass = isPast ? ' prevu-past' : '';
-      // On comptabilise dans les totaux uniquement aujourd'hui + futur (pas le passé)
-      if (!isPast && proposal.tss) {
-        weekTotalDur += proposal.dur || 0;
-        weekTotalTss += proposal.tss || 0;
-        weekTotalSessions += 1;
+      // Totaux : TOUTES les séances du jour (pas seulement celle affichée quand
+      // il y en a plusieurs), aujourd'hui + futur uniquement, hors repos.
+      if (!isPast) {
+        for (const it of items) {
+          if (it.type === 'rest') continue;
+          weekTotalDur += it.dur || 0;
+          weekTotalTss += it.tss || 0;
+          weekTotalSessions += 1;
+          weekTotalKm += it.km || 0;
+        }
       }
-      // Km prévus (compés + séances manuelles avec distance renseignée)
-      if (!isPast) weekTotalKm += proposal.km || 0;
       // L'item actuellement affiché peut être une compé ou un entraînement manuel
       const isRace = !!proposal.isRace;
       const raceClass = isRace ? ' race' : '';
@@ -5412,7 +5451,7 @@ function renderWeekPlan() {
         <div class="day-card rest${todayClass}${pastClass}" data-iso="${iso}" data-source="prevu">
           ${_dow}
           ${_date}
-          ${REST_COUCH_SVG}
+          <div class="rest-b">${REST_MOON_SVG}<span>Récupération</span></div>
         </div>`;
       } else {
         const _hex = isRace ? compPrio(proposal.priority).color : (window.sportColor ? window.sportColor(proposal.sport) : '#9ca3af');
@@ -5421,8 +5460,12 @@ function renderWeekPlan() {
           ? `<div class="dst-profile">${window.renderWorkoutProfileHTML(proposal.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>`
           : '';
         const _nm = proposal.name || 'Séance';
+        // Déplaçable par glisser-déposer : entraînement manuel ou compétition
+        // simple (pas les étapes d'une course à étapes, liées entre elles).
+        const _movable = proposal._id && (proposal._manual || (proposal.isRace && !proposal._isStage));
+        const _moveAttr = _movable ? ` data-move-kind="${proposal._manual ? 'training' : 'comp'}" data-move-id="${String(proposal._id).replace(/"/g, '&quot;')}"` : '';
         cardHTML = `
-        <div class="day-card${todayClass}${pastClass}${raceClass} day-card--single" data-iso="${iso}" data-source="prevu"${raceAttr}>
+        <div class="day-card${todayClass}${pastClass}${raceClass} day-card--single" data-iso="${iso}" data-source="prevu"${raceAttr}${_moveAttr}>
           ${_dow}
           ${_date}
           <div class="day-single-tile" style="background:${_hex}1a" title="${String(_nm).replace(/\"/g, '&quot;')}">
@@ -5908,12 +5951,14 @@ function renderRealiseCalendar() {
           }
           cardHTML = renderRealisedDayCard(d, dow, realDay, isToday);
         } else {
+          // Lune « Récupération » UNIQUEMENT si le repos a été activé pour ce jour
+          // (override utilisateur) ; sinon case basique vide.
+          const _isForcedRest = (typeof isRestDayForMode === 'function') && isRestDayForMode(iso);
           cardHTML = `
-            <div class="day-card empty-past rest-clickable${isToday ? ' today' : ''}" data-iso="${iso}" data-source="realise">
+            <div class="day-card empty-past${_isForcedRest ? ' rest' : ''} rest-clickable${isToday ? ' today' : ''}" data-iso="${iso}" data-source="realise">
               <div class="day-card-dow">${dowFr[dow]}${isToday ? '<span class="dow-suffix"> · auj.</span>' : ''}</div>
               <div class="day-card-date">${d.getDate()}</div>
-              <div class="day-card-name" style="color:var(--text-mute);font-weight:500;">Repos</div>
-              ${REST_COUCH_SVG}
+              ${_isForcedRest ? `<div class="rest-b">${REST_MOON_SVG}<span>Récupération</span></div>` : ''}
             </div>
           `;
         }
@@ -5999,8 +6044,91 @@ if (window.ResizeObserver) {
   if (_wtCal) _wtRo.observe(_wtCal);
 }
 
+// ============================================================
+// GLISSER-DÉPOSER des séances prévues entre les jours du calendrier.
+// Même mécanique pointer-events que la bibliothèque : seuil 6px, ghost,
+// dépôt sur une case prévu -> la séance/compét change de date (+ sync cloud).
+// ============================================================
+function movePlannedItem(kind, id, newIso) {
+  if (kind === 'training') {
+    const arr = loadTrainings();
+    const t = arr.find(x => String(x.id) === String(id));
+    if (!t || t.date === newIso) return false;
+    t.date = newIso;
+    saveTrainings(arr);
+  } else {
+    const comps = loadCompetitions();
+    const c = comps.find(x => String(x.id) === String(id));
+    if (!c || c.stages || c.date === newIso) return false;
+    c.date = newIso;
+    saveCompetitions(comps);
+    if (typeof renderCompList === 'function') renderCompList();
+    if (typeof renderCompetitionsPage === 'function') renderCompetitionsPage();
+  }
+  renderCalendar();
+  return true;
+}
+let _dayPtr = null, _dayJustDragged = false;
+(function wireDayMoveDrag() {
+  const cal = document.getElementById('week-calendar');
+  if (!cal || window.__dayMoveWired) return;
+  window.__dayMoveWired = true;
+  const clearHover = () => document.querySelectorAll('.day-card.day-move-hover').forEach(c => c.classList.remove('day-move-hover'));
+  cal.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') return;                 // tactile : scroll prioritaire
+    if (e.button != null && e.button > 0) return;
+    if (e.target.closest && e.target.closest('button')) return; // flèches, +, etc.
+    const card = e.target.closest ? e.target.closest('.day-card[data-move-id]') : null;
+    if (!card) return;
+    _dayPtr = { card, kind: card.dataset.moveKind, id: card.dataset.moveId, from: card.dataset.iso, x: e.clientX, y: e.clientY, started: false, ghost: null };
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (!_dayPtr) return;
+    if (!_dayPtr.started) {
+      if (Math.abs(e.clientX - _dayPtr.x) + Math.abs(e.clientY - _dayPtr.y) < 6) return;
+      _dayPtr.started = true;
+      document.body.classList.add('day-move-dragging');
+      const g = _dayPtr.card.cloneNode(true);
+      g.id = 'day-drag-ghost';
+      g.style.width = _dayPtr.card.offsetWidth + 'px';
+      g.style.height = _dayPtr.card.offsetHeight + 'px';
+      document.body.appendChild(g);
+      _dayPtr.ghost = g;
+      _dayPtr.card.classList.add('day-move-source');
+    }
+    if (_dayPtr.ghost) { _dayPtr.ghost.style.left = e.clientX + 'px'; _dayPtr.ghost.style.top = e.clientY + 'px'; }
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const target = el && el.closest ? el.closest('.day-card[data-iso][data-source="prevu"]') : null;
+    clearHover();
+    if (target && target !== _dayPtr.card) target.classList.add('day-move-hover');
+  });
+  document.addEventListener('pointerup', (e) => {
+    if (!_dayPtr) return;
+    const st = _dayPtr; _dayPtr = null;
+    if (st.ghost) st.ghost.remove();
+    document.body.classList.remove('day-move-dragging');
+    if (st.card) st.card.classList.remove('day-move-source');
+    clearHover();
+    if (!st.started) return;                               // simple clic -> modale du jour
+    _dayJustDragged = true; setTimeout(() => { _dayJustDragged = false; }, 250);
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const target = el && el.closest ? el.closest('.day-card[data-iso][data-source="prevu"]') : null;
+    const iso = target && target.dataset.iso;
+    if (iso && iso !== st.from) movePlannedItem(st.kind, st.id, iso);
+  });
+  document.addEventListener('pointercancel', () => {
+    if (_dayPtr && _dayPtr.ghost) _dayPtr.ghost.remove();
+    if (_dayPtr && _dayPtr.card) _dayPtr.card.classList.remove('day-move-source');
+    _dayPtr = null;
+    document.body.classList.remove('day-move-dragging');
+    clearHover();
+  });
+})();
+
 // Handler flèches + clic carte (event delegation sur le calendrier)
 document.getElementById('week-calendar').addEventListener('click', (e) => {
+  // Fin de drag : ne pas ouvrir la modale du jour
+  if (_dayJustDragged) { e.stopPropagation(); return; }
   // Flèches de switch de vue sur les cartes totaux (Volume ↔ Charge)
   const isWtArrow = e.target.classList.contains('wt-arrow');
   if (isWtArrow) {
@@ -7100,9 +7228,9 @@ async function renderStreamsSection(container, activityId) {
       + window.renderWorkoutProfileHTML(_detected, { minFlex: 0.004, labels: false, readout: true })
       + '</div>'
     : '';
-  const _toggleHTML = _profHTML
-    ? '<button id="toggle-detailed" type="button" style="width:100%;background:var(--bg-elev2);border:1px solid var(--border);color:var(--text-dim);border-radius:9px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin:6px 0 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;">Voir l\'analyse détaillée</button>'
-    : '';
+  // Bouton TOUJOURS présent dès qu'il y a des streams (avant : seulement si un
+  // profil de puissance existait -> natation/course n'avaient AUCUN accès à l'analyse).
+  const _toggleHTML = '<button id="toggle-detailed" type="button" style="width:100%;background:var(--bg-elev2);border:1px solid var(--border);color:var(--text-dim);border-radius:9px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin:6px 0 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;">Voir l\'analyse détaillée</button>';
   try { var _stray = document.getElementById('detailed-charts'); if (_stray) _stray.remove(); } catch (e) { }
   container.innerHTML = _profHTML + _toggleHTML + '<div id="detailed-charts">' + `
     <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;margin-bottom:14px;font-size:12px;color:var(--text-dim);">
@@ -7195,8 +7323,12 @@ async function renderStreamsSection(container, activityId) {
     }
     if (firstIdx === -1 || lastIdx < firstIdx) return null;
 
-    // Temps écoulé = durée entre les deux indices (1 sample/s en général)
-    const timeElapsed = lastIdx - firstIdx;
+    // Temps écoulé : vrai flux time si dispo (les streams ne sont PAS toujours
+    // échantillonnés à 1 Hz — smart recording Garmin, résolution réduite Strava…),
+    // sinon repli 1 sample = 1 s.
+    const timeElapsed = (time && time.length > lastIdx && time[lastIdx] != null && time[firstIdx] != null)
+      ? (time[lastIdx] - time[firstIdx])
+      : (lastIdx - firstIdx);
 
     // Distance parcourue
     let distCov = null;
@@ -10449,7 +10581,12 @@ function openSessionModal(iso, source) {
       return;
     }
     // Activités RÉELLES de ce jour
-    const acts = day.activities && day.activities.length ? day.activities : (day.sessionType ? [day] : []);
+    let acts = day.activities && day.activities.length ? day.activities : (day.sessionType ? [day] : []);
+    // Activité FUSIONNÉE (triathlon = 1 ligne en base + étapes rattachées) :
+    // on déplie les étapes dans la liste interne de la modale (streams/zones
+    // consultables), la vue d'ensemble reste l'entrée et porte les infos du parent.
+    const _mergedParent = acts.find(a => a._msLegs && a._msLegs.length) || null;
+    if (_mergedParent) acts = acts.filter(a => a !== _mergedParent).concat(_mergedParent._msLegs);
     if (acts.length === 0) {
       titleEl.innerHTML = 'Pas de séance';
       metaEl.textContent = dateStr;
@@ -10457,9 +10594,272 @@ function openSessionModal(iso, source) {
     } else {
       let currentIdx = 0;
       // Groupe multisport (triathlon, brick...) : détecté une fois pour le jour
-      const _msGroup = (acts.length > 1 && window.SportProfiles && window.SportProfiles.detectMultisport)
+      let _msGroup = (acts.length > 1 && window.SportProfiles && window.SportProfiles.detectMultisport)
         ? window.SportProfiles.detectMultisport(acts) : null;
+      // Parent fusionné : la vue d'ensemble doit exister même si la détection
+      // échoue (transition hors norme…) -> groupe reconstruit depuis les étapes.
+      if (_mergedParent && (!_msGroup || _msGroup.legs.length !== acts.length)) {
+        const _legs2 = acts.map((a, i) => ({
+          act: a, idx: i,
+          cat: (typeof getSportCategory === 'function') ? getSportCategory(a.raw_type || a.sport) : 'autre',
+          start: 0, dur: +a.duration || 0,
+        }));
+        _msGroup = {
+          kind: (typeof getSportCategory === 'function' && getSportCategory(_mergedParent.raw_type || _mergedParent.sport) === 'triathlon') ? 'Triathlon' : 'Multisport',
+          legs: _legs2, transitions: [],
+          totals: {
+            durMin: _mergedParent.duration || _legs2.reduce((s2, l2) => s2 + l2.dur, 0),
+            tss: _mergedParent.tss || 0,
+            kcal: _mergedParent.calories || 0,
+          },
+        };
+      }
+      // ===== VUE D'ENSEMBLE multisport : le triathlon est UNE activité =====
+      // Même présentation que la fiche prévu : trophée + nom, totaux (durée/TSS/kcal),
+      // une tuile par discipline, bandeau segments pour plonger dans chaque étape.
+      function renderMsOverview() {
+        currentIdx = -1;
+        window.__modalActIdx = -1;
+        const _triComp = window.__triCompForDate ? window.__triCompForDate(iso) : null;
+        const _compAct = _mergedParent && _mergedParent.category === 'competition'
+          ? _mergedParent
+          : (acts.find(a => a.category === 'competition') || null);
+        const isComp = !!_triComp || !!_compAct;
+        const _pi = compPrio((_mergedParent && _mergedParent.priority) || (_triComp && _triComp.priority) || (_compAct && _compAct.priority));
+        // Nom : activité fusionnée > compét liée > préfixe commun des étapes
+        // (« Triathlon de Toulouse : Vélo » -> « Triathlon de Toulouse ») > type générique.
+        let name = (_mergedParent && _mergedParent.name) || (_triComp && _triComp.name) || null;
+        if (!name) {
+          const _prefixes = _msGroup.legs.map(l => {
+            const n2 = String(l.act.name || '');
+            const cut = n2.search(/\s*[:\-–]\s+/);
+            return cut > 0 ? n2.slice(0, cut).trim() : null;
+          });
+          if (_prefixes[0] && _prefixes.every(p => p === _prefixes[0])) name = _prefixes[0];
+        }
+        if (!name) name = _msGroup.kind;
+        titleEl.innerHTML = isComp ? `${trophySvg(_pi.color, 18)} ${name}` : name;
+        const sportPill = `<span class="sport-pill" data-sport-cat="triathlon" style="margin-left:8px;vertical-align:middle;">${_msGroup.kind}</span>`;
+        let startTime = '';
+        const _st0 = _msGroup.legs[0].act.start_date_local;
+        if (_st0) { const _m0 = String(_st0).match(/T(\d{2}):(\d{2})/); if (_m0) startTime = `${_m0[1]}h${_m0[2]}`; }
+        metaEl.innerHTML = [dateStr, startTime].filter(Boolean).join(' · ') + sportPill;
+        // Édition : la compétition liée s'édite via la modale compét ; sinon rien
+        const _e = document.getElementById('modal-edit-btn');
+        const _d = document.getElementById('modal-delete-btn');
+        const _compId = (_mergedParent && _mergedParent.category === 'competition')
+          ? String(_mergedParent.client_id || _mergedParent._sbId || '')
+          : (_triComp ? String(_triComp.id) : (_compAct ? String(_compAct.client_id || _compAct._sbId || _compAct.id || '') : ''));
+        if (isComp && _compId) {
+          if (_e) { _e.hidden = false; _e.dataset.kind = 'comp'; _e.dataset.compId = _compId; }
+          if (_d) { _d.hidden = false; _d.dataset.kind = 'comp'; _d.dataset.compId = _compId; }
+        } else {
+          if (_e) _e.hidden = true;
+          if (_d) _d.hidden = true;
+        }
+        // ===== Proto A : chrono segmenté + cartes discipline =====
+        const _COL = { natation: '#06b6d4', cyclisme: '#3b82f6', course: '#fc4c02' };
+        const _LAB = { natation: 'Natation', cyclisme: 'Vélo', course: 'Course' };
+        const _legSec = (a2) => Math.round(a2.moving_time || (a2.duration || 0) * 60);
+        const _fmtChr = (sec) => {
+          sec = Math.max(0, Math.round(sec));
+          const h2 = Math.floor(sec / 3600), m2 = Math.floor((sec % 3600) / 60), s3 = sec % 60;
+          return h2 > 0 ? `${h2}:${String(m2).padStart(2, '0')}:${String(s3).padStart(2, '0')}` : `${m2}:${String(s3).padStart(2, '0')}`;
+        };
+        const _trans = _msGroup.transitions || [];
+        const _transSec = _trans.reduce((s2, t2) => s2 + t2, 0);
+        const _legsSec = _msGroup.legs.reduce((s2, l2) => s2 + _legSec(l2.act), 0);
+        const _totSec = (_mergedParent && _mergedParent.elapsed_time) ? _mergedParent.elapsed_time : (_legsSec + _transSec);
+        const _distTot = +(_msGroup.legs.reduce((s2, l2) => s2 + (+l2.act.distance_km || 0), 0)).toFixed(1);
+        // Sous-titre : transitions + distance + TSS + kcal
+        const _subParts = [];
+        if (_transSec > 0) _subParts.push(`dont ${_fmtChr(_transSec)} de transitions`);
+        if (_distTot) _subParts.push(`${_distTot} km`);
+        if (_msGroup.totals.tss) _subParts.push(`${Math.round(_msGroup.totals.tss)} TSS`);
+        if (_msGroup.totals.kcal) _subParts.push(`${Math.round(_msGroup.totals.kcal)} kcal`);
+        // Barre proportionnelle temps : étape / transition / étape...
+        let _barSegs = '', _pctRow = '';
+        _msGroup.legs.forEach((l2, i2) => {
+          const sec = _legSec(l2.act);
+          _barSegs += `<span style="flex:${Math.max(sec, 1)};background:${_COL[l2.cat] || '#9ca3af'}"></span>`;
+          const pct = _totSec > 0 ? Math.round(sec / _totSec * 100) : 0;
+          _pctRow += `<span>${_LAB[l2.cat] || (l2.cat.charAt(0).toUpperCase() + l2.cat.slice(1))} ${pct}%</span>`;
+          if (i2 < _msGroup.legs.length - 1 && _trans[i2] != null) {
+            _barSegs += `<span style="flex:${Math.max(_trans[i2], 1)};background:var(--border)"></span>`;
+          }
+        });
+        // Métriques par discipline (sans la durée, affichée en gros sur la carte)
+        const _legMeta = (l2) => {
+          const a2 = l2.act, out = [];
+          const durMin2 = (a2.duration || 0);
+          if (l2.cat === 'natation') {
+            if (a2.distance_km) out.push(Math.round(a2.distance_km * 1000) + ' m');
+            if (a2.distance_km && durMin2) { const s2 = (durMin2 * 60) / (a2.distance_km * 10); out.push(`${Math.floor(s2 / 60)}:${String(Math.round(s2 % 60)).padStart(2, '0')} /100m`); }
+          } else if (l2.cat === 'cyclisme') {
+            if (a2.distance_km) out.push((Math.round(a2.distance_km * 10) / 10) + ' km');
+            if (a2.avg_speed_kmh) out.push((Math.round(a2.avg_speed_kmh * 10) / 10) + ' km/h');
+            if (a2.avg_watts) out.push(Math.round(a2.avg_watts) + ' W');
+          } else {
+            if (a2.distance_km) out.push((Math.round(a2.distance_km * 10) / 10) + ' km');
+            if (a2.distance_km && durMin2) { const s2 = (durMin2 * 60) / a2.distance_km; out.push(`${Math.floor(s2 / 60)}:${String(Math.round(s2 % 60)).padStart(2, '0')} /km`); }
+            if (a2.hr) out.push(Math.round(a2.hr) + ' bpm');
+          }
+          return out.join(' · ');
+        };
+        // Cartes disciplines avec les transitions CALÉES entre elles :
+        // [Natation] ·T1· [Vélo] ·T2· [Course] — comme le déroulé réel.
+        const _rowParts = [];
+        _msGroup.legs.forEach((l2, i2) => {
+          _rowParts.push(`
+          <div class="tri-ov-card" data-leg-pos="${i2}" style="border-top-color:${_COL[l2.cat] || '#9ca3af'}" title="Voir l'analyse de cette discipline">
+            <div class="tri-ov-card-lab">${_LAB[l2.cat] || l2.cat}</div>
+            <div class="tri-ov-card-time">${_fmtChr(_legSec(l2.act))}</div>
+            <div class="tri-ov-card-meta">${_legMeta(l2) || '&nbsp;'}</div>
+          </div>`);
+          if (i2 < _msGroup.legs.length - 1 && _trans[i2] != null) {
+            _rowParts.push(`<div class="tri-ov-t" title="Transition ${i2 + 1}"><span>T${i2 + 1}</span><b>${_fmtChr(_trans[i2])}</b></div>`);
+          }
+        });
+        const _cards = _rowParts.join('');
+        // Comparaison au temps cible : UNIQUEMENT si une compét/séance PRÉVUE
+        // portait un temps estimé (le target d'une compét réalisée est recalculé
+        // depuis les temps réels -> objectif circulaire « −0 min », sans intérêt).
+        const _plannedTri = (_triComp && !(typeof compIsRealised === 'function' && compIsRealised(_triComp))) ? _triComp : null;
+        const _msComp2 = _plannedTri && _plannedTri.target ? { target: (typeof parseTimeToMin === 'function' ? parseTimeToMin(_plannedTri.target) : null) } : null;
+        let _targetHTML = '';
+        if (_msComp2 && _msComp2.target > 0) {
+          const _dlt = Math.round(_totSec / 60) - _msComp2.target;
+          const _ok = _dlt <= _msComp2.target * 0.02;
+          const _c2 = _ok ? 'var(--accent)' : (_dlt <= _msComp2.target * 0.08 ? 'var(--warn)' : 'var(--danger)');
+          _targetHTML = `<div class="tri-ov-target">Objectif ${fmtMinToTime(_msComp2.target)} → <b style="color:${_c2}">${_dlt > 0 ? '+' : '−'}${fmtMinToTime(Math.abs(_dlt)) || Math.abs(_dlt) + ' min'}</b></div>`;
+        }
+        const statsHTML = `<div class="modal-section tri-ov">
+          <div class="tri-ov-head"><span class="tri-ov-chrono">${_fmtChr(_totSec)}</span><span class="tri-ov-sub">${_subParts.join(' · ')}</span></div>
+          <div class="tri-ov-bar">${_barSegs}</div>
+          <div class="tri-ov-pcts">${_pctRow}</div>
+          ${_targetHTML}
+          <div class="tri-ov-cards">${_cards}</div>
+        </div>`;
+        const groupHTML = '';
+        // Fusion en base : proposer la fusion (jour multisport non fusionné) ou la
+        // défusion (activité fusionnée -> suppression du parent, les étapes reviennent).
+        const _canFuse = !_mergedParent && _msGroup.legs.length === acts.length
+          && _msGroup.legs.every(l => l.act._sbId) && window.sb;
+        const fuseHTML = _mergedParent
+          ? `<div class="modal-section" style="display:flex;justify-content:flex-end;"><button type="button" class="ms-fuse-btn" id="ms-unfuse">Défusionner (retrouver les ${acts.length} activités)</button></div>`
+          : (_canFuse ? `<div class="modal-section" style="display:flex;justify-content:flex-end;"><button type="button" class="ms-fuse-btn" id="ms-fuse">Fusionner en une seule activité</button></div>` : '');
+        // Analyse détaillée intégrée : les cartes discipline servent d'onglets,
+        // le graphique de streams de l'étape choisie s'affiche SOUS la fiche tri
+        // (plus de navigation vers des sous-vues).
+        const anaHTML = `<div class="modal-section"><div id="ms-ana-streams"></div></div>`;
+        bodyEl.innerHTML = `${statsHTML}${groupHTML}${anaHTML}${fuseHTML}`;
+        const _legStravaId = (a2) => {
+          const raw = String(a2.id || a2.activityId || '').replace(/^s/, '').replace(/^i/, '');
+          return /^\d+$/.test(raw) ? raw : null;
+        };
+        const _selectLeg = (li) => {
+          const l2 = _msGroup.legs[li];
+          if (!l2) return;
+          bodyEl.querySelectorAll('.tri-ov-card').forEach(c2 => c2.classList.toggle('active', +c2.dataset.legPos === li));
+          const labEl = bodyEl.querySelector('#ms-ana-lab');
+          if (labEl) labEl.textContent = _LAB[l2.cat] || l2.cat;
+          const wrap2 = bodyEl.querySelector('#ms-ana-streams');
+          if (!wrap2) return;
+          const sid = _legStravaId(l2.act);
+          if (!sid) { wrap2.innerHTML = '<div class="modal-placeholder">Pas de données haute résolution pour cette étape.</div>'; return; }
+          // Contexte global utilisé par la section streams (sport, activité, date)
+          window.__lastActSbId = l2.act._sbId || null;
+          window.__lastActDate = iso;
+          window.__lastActSport = (typeof getSportCategory === 'function') ? getSportCategory(l2.act.raw_type || l2.act.sport) : null;
+          window.__lastAct = l2.act;
+          renderStreamsSection(wrap2, sid);
+        };
+        bodyEl.querySelectorAll('.tri-ov-card').forEach(c2 => {
+          c2.addEventListener('click', () => _selectLeg(+c2.dataset.legPos));
+        });
+        // Par défaut : le vélo (watts) si présent, sinon la première étape
+        let _defLeg = _msGroup.legs.findIndex(l2 => l2.cat === 'cyclisme');
+        if (_defLeg < 0) _defLeg = 0;
+        _selectLeg(_defLeg);
+        const _fuseBtn = bodyEl.querySelector('#ms-fuse');
+        if (_fuseBtn) _fuseBtn.addEventListener('click', async () => {
+          _fuseBtn.disabled = true; _fuseBtn.textContent = 'Fusion…';
+          try { await _doMergeMultisport({ name, isComp, _pi, _triComp }); }
+          catch (err) { console.error('[fusion]', err); _fuseBtn.disabled = false; _fuseBtn.textContent = 'Réessayer la fusion'; }
+        });
+        const _unfuseBtn = bodyEl.querySelector('#ms-unfuse');
+        if (_unfuseBtn) _unfuseBtn.addEventListener('click', async () => {
+          const ok = await (window.appConfirm
+            ? window.appConfirm({ title: 'Défusionner', message: `Supprimer « ${name} » et retrouver les activités séparées ?`, confirmLabel: 'Défusionner', danger: true })
+            : Promise.resolve(window.confirm('Défusionner ?')));
+          if (!ok) return;
+          const { error } = await window.sb.from('activities').delete().eq('id', _mergedParent._sbId);
+          if (error) { console.error('[défusion]', error); return; }
+          location.reload();
+        });
+      }
+      // Construit la ligne fusionnée en base + rattache les étapes (merged_into).
+      async function _doMergeMultisport(ctx2) {
+        const sb = window.sb;
+        const legs = _msGroup.legs.map(l => l.act);
+        // Pré-vol : la colonne merged_into doit exister (migration 2026-07-11),
+        // sinon on créerait un doublon sans pouvoir rattacher les étapes.
+        {
+          const probe = await sb.from('activities').select('merged_into').limit(1);
+          if (probe.error) {
+            const msg = 'Fusion impossible : la migration « 2026-07-11_tri_fusion.sql » n\'est pas appliquée en base (colonne merged_into manquante). Colle son contenu dans le SQL Editor de Supabase puis réessaie.';
+            if (window.appAlert) window.appAlert({ title: 'Migration requise', message: msg }); else alert(msg);
+            throw new Error('colonne merged_into absente');
+          }
+        }
+        const { data: { user } } = await sb.auth.getUser();
+        if (!user) throw new Error('non connecté');
+        const byCat = {};
+        _msGroup.legs.forEach(l => { byCat[l.cat] = l.act; });
+        const sw = byCat.natation || null, bk = byCat.cyclisme || null, rn = byCat.course || null;
+        const _paceMinKm = (a) => { if (!a || !a.distance_km || !a.duration) return null; const s = (a.duration * 60) / a.distance_km; return Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0'); };
+        const _pace100m = (a) => { if (!a || !a.distance_km || !a.duration) return null; const s = (a.duration * 60) / (a.distance_km * 10); return Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0'); };
+        const tri = {};
+        if (sw) { tri.swim = { min: +(sw.duration || 0), dist_m: sw.distance_km ? Math.round(sw.distance_km * 1000) : null, pace: _pace100m(sw) }; tri.swim_m = sw.distance_km ? Math.round(sw.distance_km * 1000) : null; }
+        if (bk) { tri.bike = { min: +(bk.duration || 0), dist_km: bk.distance_km || null, speed: bk.avg_speed_kmh || null, dplus: bk.elevation_gain || null }; tri.bike_km = bk.distance_km || null; }
+        if (rn) { tri.run = { min: +(rn.duration || 0), dist_km: rn.distance_km || null, pace: _paceMinKm(rn) }; tri.run_km = rn.distance_km || null; }
+        if (_msGroup.transitions[0] != null) tri.t1_min = Math.round(_msGroup.transitions[0] / 6) / 10;
+        if (_msGroup.transitions[1] != null) tri.t2_min = Math.round(_msGroup.transitions[1] / 6) / 10;
+        const first = _msGroup.legs[0].act, lastL = _msGroup.legs[_msGroup.legs.length - 1].act;
+        const movingSec = Math.round(legs.reduce((s2, a2) => s2 + (a2.moving_time || (a2.duration || 0) * 60), 0));
+        const _t0 = new Date(String(first.start_date_local)).getTime();
+        const _t1 = new Date(String(lastL.start_date_local)).getTime() + (lastL.moving_time || (lastL.duration || 0) * 60) * 1000;
+        const _hrLegs = legs.filter(a2 => a2.hr && a2.duration);
+        const row = {
+          user_id: user.id,
+          source: 'manual',
+          client_id: 'msfusion-' + Date.now().toString(36),
+          category: ctx2.isComp ? 'competition' : 'entrainement',
+          priority: (ctx2._triComp && ctx2._triComp.priority) || null,
+          name: ctx2.name,
+          sport: 'Triathlon',
+          start_date_local: first.start_date_local,
+          moving_time: movingSec,
+          elapsed_time: (isFinite(_t0) && isFinite(_t1) && _t1 > _t0) ? Math.round((_t1 - _t0) / 1000) : movingSec,
+          distance_km: +(legs.reduce((s2, a2) => s2 + (+a2.distance_km || 0), 0).toFixed(2)) || null,
+          total_elevation_gain: Math.round(legs.reduce((s2, a2) => s2 + (+a2.elevation_gain || 0), 0)) || null,
+          tss: Math.round(_msGroup.totals.tss) || null,
+          calories: Math.round(_msGroup.totals.kcal) || null,
+          avg_heartrate: _hrLegs.length ? Math.round(_hrLegs.reduce((s2, a2) => s2 + a2.hr * a2.duration, 0) / _hrLegs.reduce((s2, a2) => s2 + a2.duration, 0)) : null,
+          tri,
+        };
+        const { data: ins, error: insErr } = await sb.from('activities').insert(row).select('id').single();
+        if (insErr) throw insErr;
+        const { error: updErr } = await sb.from('activities').update({ merged_into: ins.id }).in('id', legs.map(a2 => a2._sbId));
+        if (updErr) {
+          // Rollback : ne JAMAIS laisser un parent sans étapes rattachées (doublon)
+          try { await sb.from('activities').delete().eq('id', ins.id); } catch (e2) { /* ignore */ }
+          throw updErr;
+        }
+        location.reload();
+      }
       function renderModalActivity(idx) {
+        if (idx === -1 && _msGroup) { renderMsOverview(); return; }
         currentIdx = idx;
         window.__modalActIdx = idx;
         const act = acts[idx];
@@ -10878,7 +11278,11 @@ function openSessionModal(iso, source) {
           else _streamsEl.innerHTML = '<div class="modal-placeholder">Pas d\'ID activité disponible pour cette séance.</div>';
         }
       }
-      const _startIdx = (window.__openActIdx != null && window.__openActIdx < acts.length) ? window.__openActIdx : 0;
+      // Enchaînement multisport complet (triathlon…) : on ouvre sur la vue
+      // d'ensemble (le tri est UNE activité), sauf si une étape précise est demandée.
+      const _startIdx = (window.__openActIdx != null && window.__openActIdx < acts.length)
+        ? window.__openActIdx
+        : ((_mergedParent || (_msGroup && _msGroup.legs.length === acts.length)) ? -1 : 0);
       window.__openActIdx = null;
       renderModalActivity(_startIdx);
       // Sélecteur d'étapes si l'activité fait partie d'une course à étapes
@@ -11950,6 +12354,9 @@ function openCompModalForEdit(comp) {
     setV('comp-tri-nat-time', sw.min ? fmtSegTime(sw.min) : null);
     setV('comp-tri-nat-dist', sw.dist_m != null ? sw.dist_m : t.swim_m);
     setV('comp-tri-nat-pace', sw.pace);
+    setV('comp-tri-nat-tss', sw.tss);
+    setV('comp-tri-bike-tss', bk.tss);
+    setV('comp-tri-run-tss', rn.tss);
     setV('comp-tri-t1-time', t.t1_min ? fmtSegTime(t.t1_min) : null);
     setV('comp-tri-bike-time', bk.min ? fmtSegTime(bk.min) : null);
     setV('comp-tri-bike-dist', bk.dist_km != null ? bk.dist_km : t.bike_km);

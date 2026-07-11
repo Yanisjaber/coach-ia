@@ -271,6 +271,9 @@
   .day-card .rest-couch,
   .day-card .day-card-counter,
   .day-card .day-card-sport { display: none; }
+  /* Repos mobile : lune seule, plus petite (pas la place pour le libellé) */
+  .day-card.rest .rest-b span { display: none; }
+  .day-card.rest .rest-b .rest-moon { width: 20px; height: 20px; }
 
   /* Vignette séance : durée · distance sur fond couleur du sport */
   .day-card .day-card-meta {

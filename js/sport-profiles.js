@@ -222,6 +222,12 @@
         + ' <b style="color:' + col + '">(' + (delta > 0 ? '+' : '−') + fmtDurShort(Math.abs(delta)) + ')</b></div>';
     }
     var rows = [];
+    // Segment « Ensemble » (vue globale de l'enchaînement) : actif quand activeIdx = -1
+    rows.push('<button type="button" class="msg-seg msg-seg-all' + (activeIdx === -1 ? ' active' : '') + '" data-leg-idx="-1" style="--seg-c:#f43f5e">'
+      + '<span class="msg-seg-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>'
+      + '<span class="msg-seg-name">Ensemble</span>'
+      + '<span class="msg-seg-meta">' + fmtDurShort(group.totals.durMin) + '</span>'
+      + '</button>');
     for (var i = 0; i < group.legs.length; i++) {
       var l = group.legs[i];
       var meta = (window.SportProfiles ? window.SportProfiles.shortMeta(l.act) : []).join(' · ');

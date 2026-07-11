@@ -351,7 +351,40 @@
     border-radius: 3px;
     font-weight: 600;
   }
-  .day-card.rest { background: var(--bg); border-style: dashed; }
+  /* === Glisser-déposer des séances prévues entre jours === */
+  .day-card[data-move-id] { cursor: grab; }
+  body.day-move-dragging { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+  body.day-move-dragging .day-card[data-move-id] { cursor: grabbing; }
+  .day-card.day-move-source { opacity: 0.35; }
+  .day-card.day-move-hover {
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
+    background: rgba(74, 222, 128, 0.06);
+  }
+  #day-drag-ghost {
+    position: fixed;
+    z-index: 3000;
+    pointer-events: none;
+    transform: translate(-50%, -55%) rotate(2deg) scale(0.92);
+    opacity: 0.9;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+    border-radius: 13px;
+    overflow: hidden;
+  }
+
+  /* Jour de repos : lune violette + liseré, même langage que les séances */
+  .day-card.rest { background: var(--bg-elev2); border-style: solid; }
+  .day-card.rest::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: #7c6ff0; opacity: 0.7;
+  }
+  .day-card.rest .rest-b {
+    margin: auto;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding-bottom: 8px;
+  }
+  .day-card.rest .rest-b .rest-moon { width: 28px; height: 28px; color: #7c6ff0; }
+  .day-card.rest .rest-b span { font-size: 11px; color: var(--text-dim); }
   .day-card .rest-couch {
     width: 34px;
     height: auto;
