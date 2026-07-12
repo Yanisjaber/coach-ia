@@ -113,9 +113,11 @@
 
 /* ---- Colonne droite : déroulé ---- */
 #p-structure .se-right { position: sticky; top: 12px; }
-#p-structure .se-right .se-flowwrap { margin-top: 0; }
-#p-structure .se-right #se-flow { flex-direction: column; gap: 6px; }
-#p-structure .se-right .se-flow-it { text-align: left; }
+#p-structure .se-right .se-flowwrap { margin-top: 0; display: flex; flex-direction: column; }
+/* le déroulé ne dépasse jamais la hauteur de la colonne de gauche :
+   au-delà, il scrolle en interne (l'inspecteur reste visible sans descendre) */
+#p-structure .se-right #se-flow { flex-direction: column; flex-wrap: nowrap; gap: 6px; overflow-y: auto; min-height: 0; }
+#p-structure .se-right .se-flow-it { text-align: left; flex: none; }
 
 /* ---- Inspecteur (pleine largeur sous le graphe) ---- */
 #p-structure .se-inspwrap { margin-top: 14px; }

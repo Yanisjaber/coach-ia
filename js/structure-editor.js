@@ -368,6 +368,9 @@
   }
 
   function renderFlow() {
+    // cap : le déroulé ne dépasse jamais la colonne de gauche (scroll interne)
+    const left = root.querySelector('.se-left'), fw = root.querySelector('.se-flowwrap');
+    if (left && fw) fw.style.maxHeight = window.matchMedia('(min-width: 981px)').matches ? left.offsetHeight + 'px' : '';
     const f = root.querySelector('#se-flow');
     if (!blocks.length) { f.innerHTML = '<span class="se-hint">Le déroulé de la séance apparaîtra ici.</span>'; return; }
     f.innerHTML = blocks.map((b, bi) => {
