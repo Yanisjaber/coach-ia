@@ -686,6 +686,17 @@
     if (typeof window.setWorkoutStructure === 'function') window.setWorkoutStructure(blocks.length ? clean : []);
     const tg = document.getElementById('sb-toggle');
     if (tg) { tg.checked = blocks.length > 0; }
+    // allure moyenne de la structure -> champ allure de la modal ; la distance
+    // se recalcule ensuite via le trio temps/allure/distance
+    try {
+      const pa = avgStats().find(a => a.label === 'ALLURE MOY');
+      const sp = document.getElementById('train-modal-speed');
+      const mode = window._trainSpeedMode || 'speed';
+      if (pa && sp && (mode === 'pace_km' || mode === 'pace_100m')) {
+        sp.value = pa.val;
+        sp.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    } catch (e) { /* champ absent : rien à faire */ }
     if (root) root.classList.remove('active');
     if (typeof window.activatePanel === 'function') window.activatePanel(prevPanelId || 'p2', false);
     else { const pv = document.getElementById(prevPanelId || 'p2'); if (pv) pv.classList.add('active'); }
