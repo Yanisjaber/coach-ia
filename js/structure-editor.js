@@ -65,6 +65,22 @@
   const fmtPace = (i) => { const s = Math.round(paceBase() * 100 / Math.max(1, i)); return Math.floor(s / 60) + ':' + pad2(s % 60); };
   const fmtMin = (min) => { const t = Math.round((+min || 0) * 60), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60; if (h) return h + 'h' + pad2(m); if (s && m) return m + ':' + pad2(s); if (!m) return s + 's'; return m + ':00'; };
   const fmtDur = (min) => { const h = Math.floor(min / 60), m = Math.round(min % 60); return h ? h + 'h' + pad2(m) : m + ' min'; };
+  // Durée en texte libre -> minutes. Accepte : 15 · 15m · 15min · 15mn · 15' ·
+  // 15s · 15sec · 15" · 1h · 1h15 · 1h15m30s · 4:30 (m:ss) · 1:15:30 (h:mm:ss) · 1,5
+  function parseDurTxt(v) {
+    v = String(v == null ? '' : v).trim().toLowerCase().replace(',', '.').replace(/\s+/g, '');
+    if (!v) return null;
+    let m = v.match(/^(\d+):(\d{1,2}):(\d{1,2})$/);
+    if (m) return +m[1] * 60 + +m[2] + +m[3] / 60;
+    m = v.match(/^(\d+):(\d{1,2})$/);
+    if (m) return +m[1] + +m[2] / 60;
+    m = v.match(/^(\d+)h(\d{1,2})$/); // 1h15 = minutes collées après h
+    if (m) return +m[1] * 60 + +m[2];
+    m = v.match(/^(?:(\d+(?:\.\d+)?)h)?(?:(\d+(?:\.\d+)?)(?:min|mn|m|'))?(?:(\d+(?:\.\d+)?)(?:sec|s|"))?$/);
+    if (m && (m[1] || m[2] || m[3])) return (+m[1] || 0) * 60 + (+m[2] || 0) + (+m[3] || 0) / 60;
+    const f = parseFloat(v);
+    return isNaN(f) ? null : f;
+  }
 
   function segTargetLabel(seg, metric) {
     const lo = +seg.int || 0, hi = (seg.intHi != null && +seg.intHi > 0) ? +seg.intHi : null;
@@ -324,12 +340,13 @@
       return '<div class="se-segcard" data-card="' + which + '" style="border-left-color:' + c + '">'
         + '<div class="se-lab" style="color:' + c + '">' + title + '</div>'
         + '<div class="se-durrow"><button type="button" class="se-ib" data-dmin="-1" data-w="' + which + '">−</button>'
-        + '<input class="se-w-min" data-w="' + which + '" type="number" min="0" step="0.5" value="' + (+seg.min || 0) + '"><span class="se-unit">min</span>'
+        + '<input class="se-w-min" data-w="' + which + '" type="text" value="' + fmtMin(+seg.min || 0) + '" title="15 · 15min · 30s · 1h15 · 4:30…">'
         + '<button type="button" class="se-ib" data-dmin="1" data-w="' + which + '">+</button>'
         + '<span class="se-unit" style="margin:0 3px">·</span>'
         + '<input class="se-w-lo" data-w="' + which + '" ' + (paceTxt ? 'type="text" placeholder="m:ss"' : 'type="number"') + ' value="' + loHi[0] + '">'
-        + '<span class="se-unit">' + (b.unit === 'pct' ? '%' : mt === 'power' ? 'W' : mt === 'hr' ? 'bpm' : paceUnit()) + '</span>'
-        + '<input class="se-w-hi" data-w="' + which + '" ' + (paceTxt ? 'type="text" placeholder="max"' : 'type="number" placeholder="max"') + ' value="' + loHi[1] + '"></div>'
+        + '<span class="se-unit">–</span>'
+        + '<input class="se-w-hi" data-w="' + which + '" ' + (paceTxt ? 'type="text" placeholder="max"' : 'type="number" placeholder="max"') + ' value="' + loHi[1] + '">'
+        + '<span class="se-unit">' + (b.unit === 'pct' ? '%' : mt === 'power' ? 'W' : mt === 'hr' ? 'bpm' : paceUnit()) + '</span></div>'
         + '<div class="se-zbar" data-w="' + which + '">' + Z.labels.map((l, zi) => '<span title="' + l + '" data-z="' + zi + '" style="background:' + ZHEX[Math.min(zi, 6)] + '" class="' + (zi === zIdx(midOf(seg), mt) ? 'on' : '') + '"></span>').join('') + '</div>'
         + '<div class="se-hint" style="margin-top:5px">' + segTargetLabel(seg, mt) + '</div>'
         + '</div>';
@@ -405,7 +422,9 @@
     };
     // Durée / cible / zones : PAR SEGMENT (les deux cartes sont éditables en même temps)
     box.querySelectorAll('.se-w-min').forEach(inp => inp.addEventListener('change', () => {
-      snap(); b[inp.dataset.w].min = Math.max(0, +inp.value || 0); rerender();
+      const v = parseDurTxt(inp.value);
+      if (v == null) { inp.value = fmtMin(+b[inp.dataset.w].min || 0); return; } // saisie illisible : on restaure
+      snap(); b[inp.dataset.w].min = Math.max(0, Math.round(v * 60) / 60); rerender();
     }));
     box.querySelectorAll('[data-dmin]').forEach(x => x.addEventListener('click', () => {
       snap(); const seg = b[x.dataset.w];
@@ -525,7 +544,7 @@
       }
       renderGraph(); renderTop(); renderFlow();
       const mi = root.querySelector('.se-segcard[data-card="' + sel.which + '"] .se-w-min');
-      if (mi && isDur) mi.value = seg.min;
+      if (mi && isDur) mi.value = fmtMin(seg.min);
       if (!isDur) renderInspector();
     };
     const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); render(); };
