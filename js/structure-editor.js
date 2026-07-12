@@ -603,6 +603,12 @@
       + '<div class="se-inspwrap"><div id="se-insp"></div></div>';
     root = page;
     // wiring global
+    // clic n'importe où dans la page hors d'un bloc / d'un contrôle -> désélection
+    page.addEventListener('pointerdown', (e) => {
+      if (!sel) return;
+      if (e.target.closest('.se-seg, .se-inspwrap, .se-flowwrap, button, input')) return;
+      sel = null; render();
+    });
     page.querySelector('#se-back').addEventListener('click', close);
     page.querySelector('#se-undo').addEventListener('click', undo);
     page.querySelector('#se-redo').addEventListener('click', redo);
