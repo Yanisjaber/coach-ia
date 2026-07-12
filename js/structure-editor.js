@@ -428,7 +428,10 @@
     }));
     box.querySelectorAll('[data-dmin]').forEach(x => x.addEventListener('click', () => {
       snap(); const seg = b[x.dataset.w];
-      seg.min = Math.max(0.5, (+seg.min || 0) + (+x.dataset.dmin)); rerender();
+      const cur = +seg.min || 0, d = +x.dataset.dmin;
+      // sous la minute (affichage en secondes), le pas devient la seconde
+      const step = (cur < 1 || (cur === 1 && d < 0)) ? 1 / 60 : 1;
+      seg.min = Math.max(1 / 60, Math.round((cur + d * step) * 60) / 60); rerender();
     }));
     const applyLoHi = (which) => {
       snap(); const seg = b[which];
