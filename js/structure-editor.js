@@ -197,8 +197,7 @@
     const t = totals();
     const nameInp = document.getElementById('train-modal-name');
     const q = (id) => root.querySelector(id);
-    q('#se-name').value = nameInp ? nameInp.value : '';
-    q('#se-sport').textContent = grp().charAt(0).toUpperCase() + grp().slice(1) + ' · cibles ' + (curMetric() === 'power' ? 'watts (FTP ' + FTP() + ')' : curMetric() === 'pace' ? 'allure' : 'FC (max ' + HRMAX() + ')');
+    q('#se-name').textContent = (nameInp && nameInp.value) || 'Séance';
     q('#se-dur').textContent = t.dur ? fmtDur(t.dur) : '0 min';
     q('#se-tss').textContent = t.tss;
     q('#se-if').textContent = t.dur ? t.ifr.toFixed(2) : '—';
@@ -578,7 +577,7 @@
     page.innerHTML = ''
       + '<div class="se-top">'
       +   '<button type="button" class="se-back" id="se-back"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Retour</button>'
-      +   '<div class="se-title"><input id="se-name" placeholder="Nom de la séance"><div class="se-sub" id="se-sport"></div></div>'
+      +   '<div class="se-title"><div id="se-name"></div></div>'
       +   '<div class="se-stats">'
       +     '<span class="se-stat"><b id="se-dur" style="color:#60a5fa">0</b><i>durée</i></span>'
       +     '<span class="se-stat"><b id="se-tss" style="color:#fbbf24">0</b><i>TSS</i></span>'
@@ -591,7 +590,6 @@
       + '<div class="se-main">'
       +   '<div class="se-left">'
       +     '<div class="se-graphwrap"><div id="se-graph"></div></div>'
-      +     '<div class="se-hint" style="margin:7px 2px 0">glisser un bloc = réordonner · poignées du bloc sélectionné = durée / intensité · double-clic = dupliquer</div>'
       +     '<div class="se-addbar">'
       +       '<button type="button" class="se-add" data-add="warmup" style="--c:#60a5fa">+ Échauffement</button>'
       +       '<button type="button" class="se-add" data-add="interval" style="--c:#ef4444">+ Intervalles ×N</button>'
@@ -609,7 +607,6 @@
     page.querySelector('#se-undo').addEventListener('click', undo);
     page.querySelector('#se-redo').addEventListener('click', redo);
     page.querySelectorAll('[data-add]').forEach(x => x.addEventListener('click', () => addBlock(x.dataset.add)));
-    page.querySelector('#se-name').addEventListener('input', (e) => { const n = document.getElementById('train-modal-name'); if (n) n.value = e.target.value; });
     // clic sur un item du déroulé -> sélectionne le bloc
     page.querySelector('#se-flow').addEventListener('click', (e) => {
       const it = e.target.closest('.se-flow-it');
