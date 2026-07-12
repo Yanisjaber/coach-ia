@@ -289,6 +289,17 @@ window.libraryDeleteTemplate = function (id) {
   saveTemplates(loadTemplates().filter(t => t.id !== id));
   renderLibrary();
 };
+// Ajout direct d'un modele (utilise par l'editeur de structure pleine page)
+window.libraryAddTemplate = function (tpl) {
+  const arr = loadTemplates();
+  arr.push(Object.assign({
+    id: Date.now().toString() + Math.random().toString(36).slice(2, 5),
+    sort_order: arr.length,
+    sport: (typeof rawToLibKey === 'function' && tpl.sport_raw) ? rawToLibKey(tpl.sport_raw) : (tpl.sport || 'cyclisme'),
+  }, tpl));
+  saveTemplates(arr);
+  renderLibrary();
+};
 
 // ---- Aperçu lecture seule (œil) ----
 function openTemplatePreview(id) {
@@ -323,9 +334,9 @@ function openTemplatePreview(id) {
         <button class="day-modal-close" type="button" title="Fermer">×</button>
       </div>
       <div class="day-modal-body">
+        ${meta ? `<div class="lib-preview-meta">${esc(meta)}</div>` : ''}
         ${profile}
         ${detail}
-        ${meta ? `<div class="lib-preview-meta">${esc(meta)}</div>` : ''}
         ${t.description ? `<div class="lib-preview-desc">${esc(t.description)}</div>` : ''}
         ${(!meta && !profile && !t.description) ? '<div class="lib-noresult">Aucun détail pour cette séance.</div>' : ''}
       </div>

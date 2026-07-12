@@ -43,6 +43,7 @@ import './workout-builder.js';
 // Editeur de seance structuree (style Nolio) pour la modale prevu. Doit etre importe
 // APRES workout-builder pour surcharger les 3 fonctions pivot.
 import './session-builder.js';
+import './structure-editor.js';
 import './gpx-field.js';
 
 // ========= POWER PROFILE (Mean Maximal Power) =========
@@ -8289,6 +8290,102 @@ window.closeFullAnalysis = function (reopen) {
     try { openSessionModal(window.__currentModalIso, window.__currentModalSource || 'realise'); } catch (e) {}
   }
 };
+// ============================================================
+// ÉDITEUR DE STRUCTURE EN PLEINE PAGE : la section #sb-section (builder
+// d'intervalles) est DÉPLACÉE de la modale entraînement vers une page dédiée
+// (plus de place pour construire), puis remise à sa place au retour.
+// L'état du builder et des champs de la modale est conservé (même DOM).
+// ============================================================
+window.openStructureEditor = function () {
+  // Éditeur v2 (structure-editor.js) : page dédiée complète — prioritaire
+  if (window.StructEd && typeof window.StructEd.open === 'function') { window.StructEd.open(); return; }
+  var sec = document.getElementById('sb-section');
+  if (!sec) return;
+  // Ancre pour remettre la section exactement à sa place au retour
+  if (!document.getElementById('sb-home-anchor')) {
+    var ph = document.createElement('div');
+    ph.id = 'sb-home-anchor';
+    ph.hidden = true;
+    sec.parentNode.insertBefore(ph, sec);
+  }
+  var modal = document.getElementById('train-modal');
+  window.__sbModalWasOpen = !!(modal && modal.classList.contains('active'));
+  if (modal) modal.classList.remove('active');
+  var container = document.querySelector('.main .container') || document.querySelector('.container');
+  if (!container) return;
+  var page = document.getElementById('p-structure');
+  if (!page) { page = document.createElement('section'); page.className = 'panel'; page.id = 'p-structure'; container.appendChild(page); }
+  var nm = (document.getElementById('train-modal-name') || {}).value || '';
+  page.innerHTML = '<div class="sbp-head">'
+    + '<button type="button" class="af-back" id="sbp-back">← Retour à la séance</button>'
+    + '<h2 class="sbp-title">Structure' + (nm ? ' — ' + nm.replace(/[<>]/g, '') : '') + '</h2>'
+    + '<button type="button" class="btn-primary" id="sbp-done" style="margin-left:auto;">Valider la structure</button>'
+    + '</div><div id="sbp-slot"></div>';
+  page.querySelector('#sbp-back').addEventListener('click', function () { window.closeStructureEditor(); });
+  page.querySelector('#sbp-done').addEventListener('click', function () { window.closeStructureEditor(); });
+  page.querySelector('#sbp-slot').appendChild(sec);
+  sec.classList.add('sb-fullpage');
+  var cur = document.querySelector('.panel.active');
+  window.__sbPrevPanelId = (cur && cur.id && cur.id !== 'p-structure') ? cur.id : (window.__sbPrevPanelId || 'p2');
+  document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
+  page.classList.add('active');
+  window.scrollTo(0, 0);
+};
+window.closeStructureEditor = function () {
+  var sec = document.getElementById('sb-section');
+  var anchor = document.getElementById('sb-home-anchor');
+  if (sec && anchor && anchor.parentNode) anchor.parentNode.insertBefore(sec, anchor.nextSibling);
+  if (sec) sec.classList.remove('sb-fullpage');
+  var page = document.getElementById('p-structure');
+  if (page) page.classList.remove('active');
+  if (typeof activatePanel === 'function') activatePanel(window.__sbPrevPanelId || 'p2', false);
+  if (window.__sbModalWasOpen) {
+    var m = document.getElementById('train-modal');
+    if (m) m.classList.add('active');
+  }
+  if (window.__updateSbMini) window.__updateSbMini();
+};
+document.addEventListener('click', function (e) {
+  var b = e.target.closest ? e.target.closest('#sb-expand') : null;
+  if (!b) return;
+  e.preventDefault();
+  window.openStructureEditor();
+});
+// ===== Résumé de structure dans la MODALE (l'éditeur ne vit QUE dans la page) =====
+// - mini-profil en lecture seule + bouton « Ouvrir l'éditeur »
+// - activer le toggle depuis la modale ouvre directement la page de création
+window.__updateSbMini = function () {
+  var mini = document.getElementById('sb-mini');
+  var btn = document.getElementById('sb-expand');
+  if (!mini || !btn) return;
+  var inPage = !!document.querySelector('#p-structure #sb-section');
+  var tg = document.getElementById('sb-toggle');
+  var on = !!(tg && tg.checked);
+  if (inPage || !on) { mini.hidden = true; btn.hidden = true; mini.innerHTML = ''; return; }
+  var blocks = (typeof window.getCurrentWorkoutStructure === 'function') ? window.getCurrentWorkoutStructure() : null;
+  mini.hidden = false;
+  btn.hidden = false;
+  mini.innerHTML = (blocks && blocks.length && window.renderWorkoutProfileHTML)
+    ? window.renderWorkoutProfileHTML(blocks, { height: 46, labels: false })
+    : '<div class="sb-mini-empty">Aucun bloc pour l\'instant — ouvre l\'éditeur pour construire la séance.</div>';
+};
+// Toggle « Activer » : affiche simplement le résumé + le bouton d'ouverture
+// (l'utilisateur ouvre la page de création quand IL le décide).
+document.addEventListener('change', function (e) {
+  if (!e.target || e.target.id !== 'sb-toggle') return;
+  if (window.__updateSbMini) window.__updateSbMini();
+});
+// Le builder re-rend son DOM à chaque changement (setBlocks au pré-remplissage,
+// édition dans la page...) : on suit ces mutations pour rafraîchir le résumé.
+(function wireSbMiniObserver() {
+  var root = document.getElementById('sb-root'); // le builder uniquement (PAS #sb-mini, sinon boucle)
+  if (!root || window.__sbMiniObs) return;
+  window.__sbMiniObs = new MutationObserver(function () {
+    clearTimeout(window.__sbMiniT);
+    window.__sbMiniT = setTimeout(function () { if (window.__updateSbMini) window.__updateSbMini(); }, 120);
+  });
+  window.__sbMiniObs.observe(root, { childList: true, subtree: true });
+})();
 // Clic sur "Voir l'analyse detaillee" (delegation -> robuste quel que soit le moment de rendu)
 document.addEventListener('click', function (e) {
   var b = e.target.closest ? e.target.closest('#toggle-detailed') : null;
