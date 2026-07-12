@@ -98,7 +98,10 @@
     let zi = 0;
     for (let i = Z.lo.length - 1; i >= 0; i--) { if (mid >= Z.lo[i]) { zi = i; break; } }
     const span = Math.max(1, (Z.hi[zi] - Z.lo[zi]));
-    const frac = Math.max(0, Math.min(1, (mid - Z.lo[zi]) / span));
+    // dernière zone : frac NON plafonné -> un sprint à 1000 W monte au-delà de
+    // Z7 au lieu d'être écrasé au plafond comme un bloc à 400 W
+    const raw = (mid - Z.lo[zi]) / span;
+    const frac = zi === Z.lo.length - 1 ? Math.max(0, raw) : Math.max(0, Math.min(1, raw));
     return { zi, frac, n: Z.lo.length };
   }
   // Hauteur (%) d'un segment : plancher 8 %, puis (zi + frac) marches sur n partagé
@@ -200,6 +203,15 @@
     const usedMts = [...new Set(blocks.map(b => b.metric || mt))];
     if (!usedMts.length) usedMts.push(mt);
     stairMax = Math.max(...usedMts.map(m => zonesOf(m).lo.length));
+    // si un segment dépasse la dernière zone (sprint hors échelle), on étend
+    // l'échelle vers le haut : le reste du graphe se tasse en proportion
+    blocks.forEach(b => {
+      const m2 = b.metric || mt;
+      blockSegs(b).forEach(({ seg }) => {
+        const p = zonePos(midOf(seg), m2);
+        stairMax = Math.max(stairMax, p.zi + p.frac);
+      });
+    });
     g.style.setProperty('--se-gutter', '74px');
     const bands = el('<div class="se-bands"></div>');
     const lines = {}; // fusion des échelles qui coïncident (FC et allure : 5 étages)
@@ -488,7 +500,9 @@
         const n = stairCount(mt0); // même échelle partagée que l'affichage
         const level = Math.max(0, Math.min(n - 0.001, (hPct - 8) / 90 * n));
         let zi = Math.floor(level), frac = level - zi;
-        if (zi > Z.lo.length - 1) { zi = Z.lo.length - 1; frac = 1; } // au-delà des marches de cette métrique : plafond
+        // au-delà des marches de cette métrique : on continue dans la zone
+        // étendue (frac > 1) au lieu de plafonner
+        if (zi > Z.lo.length - 1) { frac = level - (Z.lo.length - 1); zi = Z.lo.length - 1; }
         const mid = Z.lo[zi] + frac * Math.max(1, Z.hi[zi] - Z.lo[zi]);
         if (startSpread != null) {
           seg.int = Math.max(10, Math.round(mid - startSpread / 2));
