@@ -139,6 +139,24 @@
     const ifr = dur > 0 ? Math.sqrt(tss / (dur / 60) / 100) : 0;
     return { dur, tss: Math.round(tss), ifr, kj: Math.round(kj) };
   }
+  // Moyenne pondérée par la durée, PAR MÉTRIQUE utilisée -> [{label, val}]
+  function avgStats() {
+    const acc = {}; // metric -> { s: somme %·min, w: minutes }
+    blocks.forEach(b => {
+      const m = b.metric || curMetric();
+      blockSegs(b).forEach(({ seg }) => {
+        const w = +seg.min || 0; if (!w) return;
+        (acc[m] = acc[m] || { s: 0, w: 0 });
+        acc[m].s += midOf(seg) * w; acc[m].w += w;
+      });
+    });
+    return Object.entries(acc).map(([m, a]) => {
+      const pct = a.s / a.w;
+      if (m === 'power') return { label: 'W MOY', val: String(Math.round(FTP() * pct / 100)) };
+      if (m === 'hr') return { label: 'BPM MOY', val: String(Math.round(HRMAX() * pct / 100)) };
+      return { label: 'ALLURE MOY', val: fmtPace(pct) };
+    });
+  }
 
   // ---------- Undo / redo ----------
   const snap = () => { undoStack.push(JSON.stringify(blocks)); if (undoStack.length > 60) undoStack.shift(); redoStack = []; };
@@ -204,6 +222,8 @@
     const kjEl = q('#se-kj');
     if (curMetric() === 'power') { kjEl.parentElement.style.display = ''; kjEl.textContent = t.kj; }
     else kjEl.parentElement.style.display = 'none';
+    q('#se-avgs').innerHTML = avgStats().map(a =>
+      '<span class="se-stat"><b style="color:#a5b4fc">' + a.val + '</b><i>' + a.label.toLowerCase() + '</i></span>').join('');
     q('#se-undo').disabled = !undoStack.length;
     q('#se-redo').disabled = !redoStack.length;
   }
@@ -586,6 +606,7 @@
       +     '<span class="se-stat"><b id="se-tss" style="color:#fbbf24">0</b><i>TSS</i></span>'
       +     '<span class="se-stat"><b id="se-if" style="color:#f97316">—</b><i>IF</i></span>'
       +     '<span class="se-stat"><b id="se-kj" style="color:#9ca3af">0</b><i>kJ</i></span>'
+      +     '<span id="se-avgs" style="display:contents"></span>'
       +     '<button type="button" class="se-ib" id="se-undo" title="Annuler (Ctrl+Z)">↩</button>'
       +     '<button type="button" class="se-ib" id="se-redo" title="Rétablir">↪</button>'
       +   '</div>'
