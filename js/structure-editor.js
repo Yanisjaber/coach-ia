@@ -476,7 +476,11 @@
       const h = e.target.closest('.se-h-dur, .se-h-int');
       if (h) return startHandleDrag(e, h);
       const s = e.target.closest('.se-seg');
-      if (!s) return;
+      if (!s) {
+        // clic dans le vide du cadre (y compris au-dessus d'un bloc) -> désélection
+        if (sel) { sel = null; render(); }
+        return;
+      }
       sel = { bi: +s.dataset.bi, which: s.dataset.which };
       render();
     });
