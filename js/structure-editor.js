@@ -282,6 +282,17 @@
     const axis = el('<div class="se-axis"></div>');
     for (let i = 0; i <= 4; i++) axis.appendChild(el('<span>' + fmtDur(totMin * i / 4) + '</span>'));
     g.appendChild(axis);
+    // Cale le calque des lignes de zones EXACTEMENT sur la boîte des barres
+    // (.se-bars = rangée moins l'étiquette de nom) : sinon les % des lignes et
+    // des barres ne parlent pas du même repère et tout paraît décalé.
+    const bars0 = row.querySelector('.se-bars');
+    if (bars0) {
+      const gr = g.getBoundingClientRect(), br = bars0.getBoundingClientRect();
+      bands.style.inset = 'auto';
+      bands.style.left = '0'; bands.style.right = '0';
+      bands.style.top = (br.top - gr.top) + 'px';
+      bands.style.height = br.height + 'px';
+    }
   }
   function nestInGroup(grpEl, sEl) { let inner = grpEl.querySelector('.se-bars'); if (!inner) { inner = el('<div class="se-bars"></div>'); grpEl.appendChild(inner); } inner.appendChild(sEl); return grpEl; }
   function firstSelIdx(b, which) { const segs = blockSegs(b); for (let i = 0; i < segs.length; i++) if (segs[i].which === which) return i; return 0; }
@@ -494,7 +505,8 @@
         const r = selEl.getBoundingClientRect(); void r;
         // hauteur visée = position de la souris dans le graphe -> inversion de
         // l'échelle « en étages de zones » pour retrouver l'intensité exacte
-        const rowRect = g.querySelector('.se-row').getBoundingClientRect();
+        // repère = la boîte des barres (.se-bars), le même que les hauteurs %
+        const rowRect = g.querySelector('.se-bars').getBoundingClientRect();
         const hPct = Math.max(2, Math.min(100, (rowRect.bottom - ev.clientY) / rowRect.height * 100));
         const Z = zonesOf(mt0);
         const n = stairCount(mt0); // même échelle partagée que l'affichage
