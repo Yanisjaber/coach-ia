@@ -525,6 +525,8 @@
       const hi = readTarget(card.querySelector('.se-w-hi').value);
       if (lo != null) seg.int = lo;
       seg.intHi = hi;
+      // saisie manuelle d'une cible : on quitte le mode « Zones » pour « Valeurs »
+      if (b.unit === 'zone') b.unit = 'raw';
       rerender();
     };
     box.querySelectorAll('.se-w-lo, .se-w-hi').forEach(inp => inp.addEventListener('change', () => applyLoHi(inp.dataset.w)));
