@@ -426,10 +426,10 @@
         + '<button type="button" class="se-ib" data-dmin="1" data-w="' + which + '">+</button>'
         + '<span class="se-unit" style="margin:0 3px">·</span>'
         + '<input class="se-w-lo" data-w="' + which + '" ' + (paceTxt ? 'type="text" placeholder="m:ss"' : 'type="number"') + ' value="' + loHi[0] + '">'
-        + (paceTxt ? '<span class="se-pspin"><button type="button" class="se-ps" data-pw="' + which + '" data-pf="lo" data-pd="1">▴</button><button type="button" class="se-ps" data-pw="' + which + '" data-pf="lo" data-pd="-1">▾</button></span>' : '')
+        + '<span class="se-pspin"><button type="button" class="se-ps" data-pw="' + which + '" data-pf="lo" data-pd="1">▴</button><button type="button" class="se-ps" data-pw="' + which + '" data-pf="lo" data-pd="-1">▾</button></span>'
         + '<span class="se-unit">–</span>'
         + '<input class="se-w-hi" data-w="' + which + '" ' + (paceTxt ? 'type="text" placeholder="max"' : 'type="number" placeholder="max"') + ' value="' + loHi[1] + '">'
-        + (paceTxt ? '<span class="se-pspin"><button type="button" class="se-ps" data-pw="' + which + '" data-pf="hi" data-pd="1">▴</button><button type="button" class="se-ps" data-pw="' + which + '" data-pf="hi" data-pd="-1">▾</button></span>' : '')
+        + '<span class="se-pspin"><button type="button" class="se-ps" data-pw="' + which + '" data-pf="hi" data-pd="1">▴</button><button type="button" class="se-ps" data-pw="' + which + '" data-pf="hi" data-pd="-1">▾</button></span>'
         + '<span class="se-unit">' + (b.unit === 'pct' ? '%' : mt === 'power' ? 'W' : mt === 'hr' ? 'bpm' : paceUnit()) + '</span></div>'
         + '<div class="se-zbar" data-w="' + which + '">' + Z.labels.map((l, zi) => '<span title="' + l + '" data-z="' + zi + '" style="background:' + ZHEX[Math.min(zi, 6)] + '" class="' + (zi === zIdx(midOf(seg), mt) ? 'on' : '') + '"></span>').join('') + '</div>'
         + '<div class="se-hint" style="margin-top:5px">' + segTargetLabel(seg, mt) + '</div>'
@@ -532,15 +532,21 @@
       rerender();
     };
     box.querySelectorAll('.se-w-lo, .se-w-hi').forEach(inp => inp.addEventListener('change', () => applyLoHi(inp.dataset.w)));
-    // mini-flèches allure : ±1 s sur le champ visé (▴ = plus lent, ▾ = plus rapide)
+    // mini-flèches cibles : allure ±1 s, watts/bpm/% ±1
     box.querySelectorAll('.se-ps').forEach(x => x.addEventListener('click', () => {
       const card = box.querySelector('.se-segcard[data-card="' + x.dataset.pw + '"]');
       const inp = card.querySelector(x.dataset.pf === 'lo' ? '.se-w-lo' : '.se-w-hi');
       const src = String(inp.value || card.querySelector('.se-w-lo').value || '').trim();
+      const d = +x.dataset.pd;
       const m = src.match(/^(\d{1,2}):(\d{2})$/);
-      if (!m) return;
-      const sec = Math.max(1, (+m[1]) * 60 + (+m[2]) + (+x.dataset.pd));
-      inp.value = Math.floor(sec / 60) + ':' + pad2(sec % 60);
+      if (m) {
+        const sec = Math.max(1, (+m[1]) * 60 + (+m[2]) + d);
+        inp.value = Math.floor(sec / 60) + ':' + pad2(sec % 60);
+      } else {
+        const n = parseFloat(src.replace(',', '.'));
+        if (isNaN(n)) return;
+        inp.value = Math.max(1, Math.round(n + d));
+      }
       inp.dispatchEvent(new Event('change', { bubbles: true }));
     }));
     box.querySelectorAll('.se-zbar').forEach(zb => zb.querySelectorAll('[data-z]').forEach(x => x.addEventListener('click', () => {
