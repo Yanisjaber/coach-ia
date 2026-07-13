@@ -10663,6 +10663,7 @@ window.renderStatsBlockHTML = function (heroes, tiles) {
   return (heroRow || grid) ? '<div class="modal-section">' + heroRow + grid + '</div>' : '';
 };
 
+window.openSessionModal = openSessionModal; // accessible hors module (hoisting)
 function openSessionModal(iso, source) {
   window.__currentModalIso = iso; window.__currentModalSource = source;
   { const _lw = document.getElementById('modal-link-wrap'); if (_lw) _lw.hidden = true; }
@@ -11969,6 +11970,16 @@ function openSessionModal(iso, source) {
       if (t.rpe != null && t.rpe !== '') _tiles.push({ lab: 'RPE estimé', val: t.rpe + '/10', color: '#f59e0b' });
       var _pKj = (Array.isArray(t.structure) && t.structure.length && window.__estKjFromStructure) ? window.__estKjFromStructure(t.structure) : null;
       if (_pKj != null) _tiles.push({ lab: 'Énergie estimée', val: Math.round(_pKj) + ' kJ', color: '#9ca3af' });
+      // moyennes estimées de la structure (W / bpm / allure)
+      if (Array.isArray(t.structure) && t.structure.length && window.StructEd && window.StructEd.avgStats) {
+        try {
+          const _pretty = { 'W MOY': ['Watts moy estimés', ' W'], 'BPM MOY': ['FC moy estimée', ' bpm'], 'ALLURE MOY': ['Allure moy estimée', ''] };
+          window.StructEd.avgStats(t.structure, t.sport || 'Ride').forEach(function (a) {
+            const p = _pretty[a.label] || [a.label, ''];
+            _tiles.push({ lab: p[0], val: a.val + p[1], color: '#a5b4fc' });
+          });
+        } catch (e) { /* éditeur non chargé */ }
+      }
       const statsHTML = window.renderStatsBlockHTML(_heroes, _tiles);
 
       const sections = [];

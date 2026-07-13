@@ -141,11 +141,13 @@
     return { dur, tss: Math.round(tss), ifr, kj: Math.round(kj) };
   }
   // Moyenne pondérée par la durée, PAR MÉTRIQUE utilisée -> [{label, val}]
-  // (bl optionnel : permet au résumé de la modal de calculer sur ses blocs)
-  function avgStats(bl) {
+  // bl optionnel : blocs externes (résumé modal, aperçu) ; sport optionnel :
+  // sport Strava ('Run'…) pour caler la base d'allure hors contexte modal.
+  function avgStats(bl, sport) {
+    const g2 = sport ? (SPORT_GROUP[sport] || 'cyclisme') : grp();
     const acc = {}; // metric -> { s: somme %·min, w: minutes }
     (bl || blocks).forEach(b => {
-      const m = b.metric || curMetric();
+      const m = b.metric || METRICS[g2][0][0];
       blockSegs(b).forEach(({ seg }) => {
         const w = +seg.min || 0; if (!w) return;
         (acc[m] = acc[m] || { s: 0, w: 0 });
@@ -156,7 +158,9 @@
       const pct = a.s / a.w;
       if (m === 'power') return { label: 'W MOY', val: String(Math.round(FTP() * pct / 100)) };
       if (m === 'hr') return { label: 'BPM MOY', val: String(Math.round(HRMAX() * pct / 100)) };
-      return { label: 'ALLURE MOY', val: fmtPace(pct) };
+      const base = (PACE[g2] && PACE[g2].base) || 240;
+      const s = Math.round(base * 100 / Math.max(1, pct));
+      return { label: 'ALLURE MOY', val: Math.floor(s / 60) + ':' + pad2(s % 60) };
     });
   }
 
