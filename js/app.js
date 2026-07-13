@@ -4730,11 +4730,14 @@ function openTrainModalForEdit(training, mode) {
   }
   // Adapte le formulaire au sport (convertit l'affichage km->m si natation)
   if (typeof adaptTrainSportForm === 'function') adaptTrainSportForm();
-  // Vitesse/allure recalculee depuis duree + distance (comme la modale compet)
+  // Vitesse/allure : la structure fait foi si elle existe (est.pace stocké ou
+  // resynchronisé par fillFields) ; sinon recalcul depuis durée + distance
   {
     const sp = document.getElementById('train-modal-speed');
-    const mins = +training.duration || 0, km2 = +training.km || 0;
-    if (sp) {
+    const _hasPaceStruct = Array.isArray(training.structure) && training.structure.length
+      && window._trainSpeedMode && window._trainSpeedMode !== 'speed';
+    if (sp && !_hasPaceStruct) {
+      const mins = +training.duration || 0, km2 = +training.km || 0;
       let v = '';
       if (mins > 0 && km2 > 0) {
         const m = window._trainSpeedMode || 'speed';
@@ -4744,6 +4747,8 @@ function openTrainModalForEdit(training, mode) {
       }
       sp.value = v;
       if (v) sp.dataset.auto = '1';
+    } else if (sp && _hasPaceStruct && training.est && training.est.pace) {
+      sp.value = training.est.pace;
     }
   }
   // Controles "activite" (mode realise edite) : exclusions records + transformer en compet
@@ -4896,9 +4901,22 @@ function saveTrainFromModal() {
   const _ac = document.getElementById('train-modal-act-controls');
   const _exclOn = (mm) => !!(_ac && !_ac.hidden && _ac.querySelector('.ae-metric-btn[data-m="' + mm + '"].active'));
   const exclPower = _exclOn('power'), exclHr = _exclOn('hr'), exclDistance = _exclOn('dist');
+  // Moyennes dérivées de la structure — stockées comme le reste (W / bpm / allure)
+  let est = null;
+  if (Array.isArray(structure) && structure.length && window.StructEd && window.StructEd.avgStats) {
+    try {
+      est = {};
+      window.StructEd.avgStats(structure, sport).forEach(a => {
+        if (a.label === 'W MOY') est.w = +a.val;
+        else if (a.label === 'BPM MOY') est.bpm = +a.val;
+        else est.pace = a.val;
+      });
+      if (!Object.keys(est).length) est = null;
+    } catch (e) { est = null; }
+  }
   const entry = {
     id: editingId || Date.now().toString(),
-    name, date, time, sport, type, duration, tss, notes,
+    name, date, time, sport, type, duration, tss, notes, est,
     rpe, km, dplus, laps, tri, gpxName: _gpx.name, gpxContent: _gpx.content,
     exclPower, exclHr, exclDistance,
     sportCategory: (typeof getSportCategory === 'function' ? getSportCategory(sport) : sport),

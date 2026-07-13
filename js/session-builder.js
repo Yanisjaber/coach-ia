@@ -129,6 +129,17 @@
     var t = totals();
     var d = R('train-modal-duration'); if (d) { d.value = window.__fmtDurField ? window.__fmtDurField(Math.round(t.dur)) : Math.round(t.dur); }
     var ts = R('train-modal-tss'); if (ts) { ts.value = t.tss; }
+    // sports en allure : allure + distance viennent aussi de la structure
+    var _cat2 = window.getSportCategory ? window.getSportCategory((R('train-modal-sport') || {}).value) : 'autre';
+    if (window.StructEd && (_cat2 === 'course' || _cat2 === 'natation')) {
+      try {
+        var pa = window.StructEd.avgStats(blocks).filter(function (a) { return a.label === 'ALLURE MOY'; })[0];
+        var sp = R('train-modal-speed'); if (pa && sp) sp.value = pa.val;
+        var dk = window.StructEd.paceDistanceKm(blocks);
+        var kmEl = R('train-modal-km');
+        if (dk > 0 && kmEl) kmEl.value = kmEl.dataset.distUnit === 'm' ? Math.round(dk * 100) * 10 : Math.round(dk * 100) / 100;
+      } catch (e) { /* éditeur non chargé */ }
+    }
   }
 
   function renderProfile() {
@@ -249,7 +260,7 @@
   function wire() {
     var rootEl = R('sb-root'); if (!rootEl) return;
     var tg = R('sb-toggle'); if (tg) tg.addEventListener('change', function () { setActive(tg.checked); });
-    var sp = document.getElementById('train-modal-sport'); if (sp) sp.addEventListener('change', function () { normalizeMetrics(); renderAll(); });
+    var sp = document.getElementById('train-modal-sport'); if (sp) sp.addEventListener('change', function () { normalizeMetrics(); renderAll(); setRO(isOn()); });
     var bl = R('sb-blocks');
     bl.addEventListener('input', onEdit);
     bl.addEventListener('change', function (e) { var f = e.target.dataset.f; if (f === 'metric' || f === 'unit' || e.target.dataset.kind === 'zone') onEdit(e); });
@@ -279,9 +290,16 @@
   function reset() { blocks = defaults(); ensureMount(); var tg = R('sb-toggle'); if (tg) tg.checked = false; setActive(false); }
   function setRO(ro) {
     var ids = ['train-modal-duration', 'train-modal-tss'];
-    // sports en allure : l'allure est pilotée par la structure -> verrouillée aussi
-    if (window._trainSpeedMode && window._trainSpeedMode !== 'speed') ids.push('train-modal-speed');
-    else { var sp0 = R('train-modal-speed'); if (sp0 && sp0.readOnly) { sp0.readOnly = false; sp0.style.opacity = ''; } }
+    // sports en allure : allure ET distance sont pilotées par la structure
+    // (catégorie lue sur le select : _trainSpeedMode peut être en retard d'un event)
+    var _cat = window.getSportCategory ? window.getSportCategory((R('train-modal-sport') || {}).value) : 'autre';
+    var paceMode = _cat === 'course' || _cat === 'natation';
+    if (paceMode) { ids.push('train-modal-speed', 'train-modal-km'); }
+    else {
+      ['train-modal-speed', 'train-modal-km'].forEach(function (id) {
+        var e0 = R(id); if (e0 && e0.readOnly) { e0.readOnly = false; e0.style.opacity = ''; }
+      });
+    }
     ids.forEach(function (id) { var e = R(id); if (e) { e.readOnly = ro; e.style.opacity = ro ? '0.6' : ''; } });
   }
   function setActive(on) { ensureMount(); var body = R('sb-body'); if (body) body.hidden = !on; setRO(on); if (on) renderAll(); }

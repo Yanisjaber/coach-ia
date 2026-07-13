@@ -164,6 +164,21 @@
     });
   }
 
+  // Distance (km) déduite des segments en allure — 0 si structure watts/FC
+  function paceDistanceKm(bl, sport) {
+    const g2 = sport ? (SPORT_GROUP[sport] || 'cyclisme') : grp();
+    const base = (PACE[g2] && PACE[g2].base) || 240;
+    let units = 0; // km (course) ou x100m (natation)
+    (bl || blocks).forEach(b => {
+      if ((b.metric || METRICS[g2][0][0]) !== 'pace') return;
+      blockSegs(b).forEach(({ seg }) => {
+        const sec = base * 100 / Math.max(1, midOf(seg));
+        units += (+seg.min || 0) * 60 / sec;
+      });
+    });
+    return g2 === 'natation' ? units / 10 : units;
+  }
+
   // ---------- Undo / redo ----------
   const snap = () => { undoStack.push(JSON.stringify(blocks)); if (undoStack.length > 60) undoStack.shift(); redoStack = []; };
   const undo = () => { if (!undoStack.length) return; redoStack.push(JSON.stringify(blocks)); blocks = JSON.parse(undoStack.pop()); clampSel(); render(); };
@@ -231,17 +246,9 @@
     let avgsHtml = avgStats().map(a =>
       '<span class="se-stat"><b style="color:#a5b4fc">' + a.val + '</b><i>' + a.label.toLowerCase() + '</i></span>').join('');
     // segments en allure -> distance estimée (course en km, natation en m)
-    let paceUnits = 0; // km (course) ou x100m (natation)
-    blocks.forEach(b => {
-      if ((b.metric || curMetric()) !== 'pace') return;
-      blockSegs(b).forEach(({ seg }) => {
-        const sec = paceBase() * 100 / Math.max(1, midOf(seg));
-        paceUnits += (+seg.min || 0) * 60 / sec;
-      });
-    });
-    if (paceUnits > 0) {
-      const isSwim = grp() === 'natation';
-      const val = isSwim ? (Math.round(paceUnits * 10) * 10) + ' m' : (Math.round(paceUnits * 100) / 100) + ' km';
+    const dk = paceDistanceKm();
+    if (dk > 0) {
+      const val = grp() === 'natation' ? (Math.round(dk * 100) * 10) + ' m' : (Math.round(dk * 100) / 100) + ' km';
       avgsHtml += '<span class="se-stat"><b style="color:#22d3ee">' + val + '</b><i>distance</i></span>';
     }
     q('#se-avgs').innerHTML = avgsHtml;
@@ -707,17 +714,8 @@
     if (typeof window.setWorkoutStructure === 'function') window.setWorkoutStructure(blocks.length ? clean : []);
     const tg = document.getElementById('sb-toggle');
     if (tg) { tg.checked = blocks.length > 0; }
-    // allure moyenne de la structure -> champ allure de la modal ; la distance
-    // se recalcule ensuite via le trio temps/allure/distance
-    try {
-      const pa = avgStats().find(a => a.label === 'ALLURE MOY');
-      const sp = document.getElementById('train-modal-speed');
-      const mode = window._trainSpeedMode || 'speed';
-      if (pa && sp && (mode === 'pace_km' || mode === 'pace_100m')) {
-        sp.value = pa.val;
-        sp.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    } catch (e) { /* champ absent : rien à faire */ }
+    // (allure + distance de la modal : synchronisées par fillFields du builder
+    //  déclenché via setWorkoutStructure ci-dessus)
     if (root) root.classList.remove('active');
     if (typeof window.activatePanel === 'function') window.activatePanel(prevPanelId || 'p2', false);
     else { const pv = document.getElementById(prevPanelId || 'p2'); if (pv) pv.classList.add('active'); }
@@ -725,5 +723,5 @@
     if (window.__updateSbMini) setTimeout(window.__updateSbMini, 80);
   }
 
-  window.StructEd = { open, close, avgStats };
+  window.StructEd = { open, close, avgStats, paceDistanceKm };
 })();
