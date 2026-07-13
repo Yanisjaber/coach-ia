@@ -1084,7 +1084,6 @@
         <span>Notes</span>
         <textarea id="comp-modal-notes" rows="3" placeholder="Stratégie, observations, objectifs..."></textarea>
       </label>
-      <button type="button" class="ae-transform-btn form-col-2" id="comp-modal-to-training" style="margin-top:4px" hidden>Transformer en entraînement</button>
     </div>
     <div class="modal-footer">
       <button class="btn-trash" id="comp-modal-delete" title="Supprimer cette compétition" hidden>
@@ -1095,6 +1094,7 @@
           <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
         </svg>
       </button>
+      <button class="btn-secondary" id="comp-modal-to-training" type="button" title="Transformer cette compétition en entraînement" hidden>→ Entraînement</button>
       <div style="flex:1;"></div>
       <button class="btn-secondary" id="comp-modal-cancel">Annuler</button>
       <button class="btn-primary" id="comp-modal-save">Enregistrer</button>
@@ -1208,7 +1208,6 @@
           <button type="button" class="ae-metric-btn" data-m="hr">Cardio</button>
           <button type="button" class="ae-metric-btn" data-m="dist">Distance</button>
         </div>
-        <button type="button" class="ae-transform-btn" id="train-modal-transform" style="margin-top:12px">Transformer en compétition</button>
       </div>
     </div>
     <div class="modal-footer">
@@ -1222,6 +1221,7 @@
       </button>
       <button class="btn-secondary" id="train-modal-addlib" type="button" title="Enregistrer cette séance comme modèle dans la bibliothèque">+ Bibliothèque</button>
       <button class="btn-secondary" id="train-modal-tocomp" type="button" title="Transformer cette séance en compétition" hidden>→ Compétition</button>
+      <button class="btn-secondary" id="train-modal-transform" type="button" title="Transformer cette activité en compétition" hidden>→ Compétition</button>
       <div style="flex:1;"></div>
       <button class="btn-secondary" id="train-modal-cancel">Annuler</button>
       <button class="btn-primary" id="train-modal-save">Enregistrer</button>

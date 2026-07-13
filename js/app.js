@@ -4693,6 +4693,7 @@ function openTrainModal(mode) {
     if (el) el.value = '';
   });
   { const _c = document.getElementById('train-modal-act-controls'); if (_c) _c.hidden = true; }
+  { const _tb = document.getElementById('train-modal-transform'); if (_tb) _tb.hidden = true; }
   if (window.resetTrainGpx) window.resetTrainGpx();
   // Reset structure (mode création)
   if (typeof window.resetWorkoutStructure === 'function') window.resetWorkoutStructure();
@@ -4789,6 +4790,7 @@ function openTrainModalForEdit(training, mode) {
     if (_ctrls) {
       if (mode === 'realise' && training._sbId) {
         _ctrls.hidden = false;
+        { const _tb = document.getElementById('train-modal-transform'); if (_tb) _tb.hidden = false; }
         window._trainEditActId = String(training._sbId);
         window._trainEditIso = training.date;
         const _set = (m, on) => { const b = _ctrls.querySelector('.ae-metric-btn[data-m="' + m + '"]'); if (b) b.classList.toggle('active', !!on); };
@@ -10225,10 +10227,8 @@ function openActivityEditModal(activityId, iso) {
               <button type="button" class="ae-metric-btn${exclHr ? ' active' : ''}" data-m="hr">Cardio</button>
               <button type="button" class="ae-metric-btn${exclDist ? ' active' : ''}" data-m="dist">Distance</button>
             </div>
-            <button type="button" class="ae-transform-btn" id="_ae-transform" style="margin-top:12px">
-              ${act.category === 'competition'
-                ? 'Repasser en entraînement'
-                : `${trophySvg('#fbbf24', 15)} Transformer en compétition`}
+            <button type="button" class="btn-secondary" id="_ae-transform" style="margin-top:12px">
+              ${act.category === 'competition' ? '→ Entraînement' : '→ Compétition'}
             </button>
             <div id="_ae-event-wrap" style="${act.category === 'competition' ? 'margin-top:12px' : 'display:none;'}">
               <label class="note-field-label">Priorité</label>
