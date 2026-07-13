@@ -316,11 +316,11 @@ function openTemplatePreview(id) {
   ].filter(Boolean).join(' · ');
   const _hasStruct = Array.isArray(t.structure) && t.structure.length;
   const profile = (_hasStruct && window.renderWorkoutProfileHTML)
-    ? `<div class="lib-preview-profile">${window.renderWorkoutProfileHTML(t.structure, { height: 56, labels: false })}</div>`
+    ? `<div class="lib-preview-profile">${window.renderWorkoutProfileHTML(t.structure, { height: 56, labels: false, sport: t.sport })}</div>`
     : '';
   // Détail du profil (liste des blocs/intervalles) sous le graphique
   const detail = (_hasStruct && typeof window.renderWorkoutDetailHTML === 'function')
-    ? `<div class="lib-preview-detail">${window.renderWorkoutDetailHTML(t.structure)}</div>`
+    ? `<div class="lib-preview-detail">${window.renderWorkoutDetailHTML(t.structure, { sport: t.sport })}</div>`
     : '';
   const overlay = document.createElement('div');
   overlay.className = 'day-modal-overlay active';

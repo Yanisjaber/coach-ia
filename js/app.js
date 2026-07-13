@@ -5526,7 +5526,7 @@ function renderWeekPlan() {
         const _hex = isRace ? compPrio(proposal.priority).color : (window.sportColor ? window.sportColor(proposal.sport) : '#9ca3af');
         const _headGlyph = isRace ? trophySvg(_hex, 18) : (window.sportGlyph ? window.sportGlyph(proposal.sport, 20) : '');
         const _fullProfile = (proposal && Array.isArray(proposal.structure) && proposal.structure.length && window.renderWorkoutProfileHTML)
-          ? `<div class="dst-profile">${window.renderWorkoutProfileHTML(proposal.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>`
+          ? `<div class="dst-profile">${window.renderWorkoutProfileHTML(proposal.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0, sport: proposal.sport })}</div>`
           : '';
         const _nm = proposal.name || 'Séance';
         // Déplaçable par glisser-déposer : entraînement manuel ou compétition
@@ -5779,7 +5779,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
 
   // Mini-profil d'intervalles dans la carte (si la seance a une structure).
   const _miniProfile = (act && Array.isArray(act.structure) && act.structure.length && window.renderWorkoutProfileHTML)
-    ? `<div class="day-card-profile" style="margin-top:8px;">${window.renderWorkoutProfileHTML(act.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>`
+    ? `<div class="day-card-profile" style="margin-top:8px;">${window.renderWorkoutProfileHTML(act.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0, sport: act.raw_type || act.sport })}</div>`
     : '';
 
   // Mono-activite : meme look "tuile" que le multi, mais une seule tuile pleine largeur.
@@ -5791,7 +5791,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
     ? trophySvg(_hex, 18)
     : (window.sportGlyph ? window.sportGlyph(act.raw_type || act.sport, 20) : '');
   const _fullProfile = (act && Array.isArray(act.structure) && act.structure.length && window.renderWorkoutProfileHTML)
-    ? `<div class="dst-profile">${window.renderWorkoutProfileHTML(act.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0 })}</div>`
+    ? `<div class="dst-profile">${window.renderWorkoutProfileHTML(act.structure, { height: 30, labels: false, padding: 0, bg: 'transparent', border: 'none', radius: 0, sport: act.raw_type || act.sport })}</div>`
     : '';
   return `
     <div class="day-card past${isToday ? ' today' : ''}${raceClass}${manualClass} day-card--single" data-iso="${iso}" data-source="realise"${raceAttr}>
@@ -7294,7 +7294,7 @@ async function renderStreamsSection(container, activityId) {
   const _detected = (watts && watts.length && window.detectRideSequences) ? window.detectRideSequences(watts, _ftp) : [];
   const _profHTML = (_detected.length && window.renderWorkoutProfileHTML)
     ? '<div class="modal-section"><div class="modal-section-title">Profil de séance</div>'
-      + window.renderWorkoutProfileHTML(_detected, { minFlex: 0.004, labels: false, readout: true })
+      + window.renderWorkoutProfileHTML(_detected, { minFlex: 0.004, labels: false, readout: true, sport: window.__lastActSport })
       + '</div>'
     : '';
   // Bouton TOUJOURS présent dès qu'il y a des streams (avant : seulement si un
@@ -10564,7 +10564,7 @@ window.renderPrevuVsRealiseHTML = function (act, iso) {
     if (Array.isArray(p.structure) && p.structure.length && window.renderWorkoutProfileHTML) {
       structHTML = '<div style="margin-top:16px">'
         + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#6b7686);margin-bottom:7px">Structure prévue (objectif)</div>'
-        + window.renderWorkoutProfileHTML(p.structure, { height: 56, labels: false })
+        + window.renderWorkoutProfileHTML(p.structure, { height: 56, labels: false, sport: p.sport || act.raw_type || act.sport })
         // Adhérence par intervalle : rempli par fillAdherenceSlot() quand les streams arrivent
         + '<div id="pvr-adherence" data-structure="' + encodeURIComponent(JSON.stringify(p.structure)) + '"></div>'
         + '</div>';
@@ -11290,9 +11290,9 @@ function openSessionModal(iso, source) {
         const stravaId = aId ? String(aId).replace(/^s/, '').replace(/^i/, '') : '';
         const comparHTML = (typeof window.renderPrevuVsRealiseHTML === 'function') ? window.renderPrevuVsRealiseHTML(act, iso) : '';
         const _struct = act.structure;
-        const _structDet = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(_struct) : '';
+        const _structDet = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(_struct, { sport: act.raw_type || act.sport }) : '';
         const profileHTML = (Array.isArray(_struct) && _struct.length && typeof window.renderWorkoutProfileHTML === 'function')
-          ? `<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(_struct)}${_structDet}</div>`
+          ? `<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(_struct, { sport: act.raw_type || act.sport })}${_structDet}</div>`
           : '';
         const _escNote = (x) => String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
         const notesHTML = (act.notes && String(act.notes).trim())
@@ -12044,8 +12044,8 @@ function openSessionModal(iso, source) {
 
       const sections = [];
       if (Array.isArray(t.structure) && t.structure.length && typeof window.renderWorkoutProfileHTML === 'function') {
-        const _det = (typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(t.structure) : '';
-        sections.push(`<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(t.structure)}${_det}</div>`);
+        const _det = (typeof window.renderWorkoutDetailHTML === 'function') ? window.renderWorkoutDetailHTML(t.structure, { sport: t.sport }) : '';
+        sections.push(`<div class="modal-section"><div class="modal-section-title">Profil de séance</div>${window.renderWorkoutProfileHTML(t.structure, { sport: t.sport })}${_det}</div>`);
       }
       if (t.notes) {
         sections.push(`<div class="modal-section">

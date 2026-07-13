@@ -91,7 +91,18 @@
   };
   var SPORT_GROUP = { Ride: 'cyclisme', VirtualRide: 'cyclisme', MountainBikeRide: 'cyclisme', GravelRide: 'cyclisme', EBikeRide: 'cyclisme', EMountainBikeRide: 'cyclisme', cyclisme: 'cyclisme', Run: 'course', TrailRun: 'course', VirtualRun: 'course', course: 'course', Swim: 'natation', OpenWaterSwim: 'natation', natation: 'natation' };
   var METRICS = { cyclisme: [['power', 'Puissance'], ['hr', 'FC']], course: [['pace', 'Allure'], ['hr', 'FC']], natation: [['pace', 'Allure'], ['hr', 'FC']] };
-  function grp() { var s = document.getElementById('train-modal-sport'); return (s && SPORT_GROUP[s.value]) || 'cyclisme'; }
+  var _grpOverride = null; // sport forcé pour les rendus lecture seule (fiches aperçu)
+  function grp() {
+    if (_grpOverride) return _grpOverride;
+    var s = document.getElementById('train-modal-sport');
+    return (s && SPORT_GROUP[s.value]) || 'cyclisme';
+  }
+  function _grpOf(sport) { // 'Swim' | 'natation' | catégorie -> groupe, null si inconnu
+    if (!sport) return null;
+    if (SPORT_GROUP[sport]) return SPORT_GROUP[sport];
+    var cat = (window.getSportCategory ? window.getSportCategory(sport) : null);
+    return (cat && SPORT_GROUP[cat]) || null;
+  }
   function paceBase() { var g = grp(); return (PACE[g] && PACE[g].base) || 240; }
   function paceUnit() { var g = grp(); return (PACE[g] && PACE[g].unit) || '/km'; }
   function normalizeMetrics() { var gm = METRICS[grp()].map(function (a) { return a[0]; }); blocks.forEach(function (b) { if (!b.metric && b.work && b.work.metric) b.metric = b.work.metric; if (!b.unit && b.work && b.work.unit) b.unit = b.work.unit; if (!b.metric || gm.indexOf(b.metric) < 0) b.metric = gm[0]; if (!b.unit) b.unit = 'zone'; }); }
@@ -313,6 +324,12 @@
   window.renderWorkoutProfileHTML = function (blks, opts) {
     if (!Array.isArray(blks) || !blks.length) return '';
     opts = opts || {};
+    _grpOverride = _grpOf(opts.sport); // unités du sport de LA séance, pas du select
+    try {
+    return _renderWorkoutProfileHTML(blks, opts);
+    } finally { _grpOverride = null; }
+  };
+  function _renderWorkoutProfileHTML(blks, opts) {
     var H = opts.height || 140;
     var showLabels = opts.labels !== false;
     var pad = (opts.padding != null) ? opts.padding : 12;
@@ -352,11 +369,17 @@
       return '<div class="wp-wrap"><div class="wp-readout" style="min-height:18px;font-size:12px;color:var(--text-mute,#6b7686);margin-bottom:9px;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--text-mute,#6b7686)">' + HINT0 + '</span></div>' + html + '</div>';
     }
     return html;
-  };
+  }
   // Detail des intervalles : barres proportionnelles a la duree (largeur = duree),
   // colorees par zone, texte en surimpression (toujours lisible) ; series encadrees "xN".
-  window.renderWorkoutDetailHTML = function (blks) {
+  window.renderWorkoutDetailHTML = function (blks, opts) {
     if (!Array.isArray(blks) || !blks.length) return '';
+    _grpOverride = _grpOf(opts && opts.sport);
+    try {
+    return _renderWorkoutDetailHTML(blks);
+    } finally { _grpOverride = null; }
+  };
+  function _renderWorkoutDetailHTML(blks) {
     var ZHEX = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#ec4899'];
     var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
     function valStr(seg, m) {
@@ -399,7 +422,7 @@
       return bar(b.work || {}, m, nm);
     }).join('');
     return '<div style="margin-top:18px">' + out + '</div>';
-  };
+  }
   // Tooltip custom (Modele A) au survol des blocs de profil (.wp-block)
   (function () {
     if (window.__wpTipInit) return; window.__wpTipInit = true;
