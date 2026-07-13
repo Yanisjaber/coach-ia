@@ -4747,8 +4747,8 @@ function openTrainModalForEdit(training, mode) {
       }
       sp.value = v;
       if (v) sp.dataset.auto = '1';
-    } else if (sp && _hasPaceStruct && training.est && training.est.pace) {
-      sp.value = training.est.pace;
+    } else if (sp && _hasPaceStruct && training.estPace) {
+      sp.value = training.estPace;
     }
   }
   // Controles "activite" (mode realise edite) : exclusions records + transformer en compet
@@ -4901,23 +4901,24 @@ function saveTrainFromModal() {
   const _ac = document.getElementById('train-modal-act-controls');
   const _exclOn = (mm) => !!(_ac && !_ac.hidden && _ac.querySelector('.ae-metric-btn[data-m="' + mm + '"].active'));
   const exclPower = _exclOn('power'), exclHr = _exclOn('hr'), exclDistance = _exclOn('dist');
-  // Moyennes dérivées de la structure — stockées comme le reste (W / bpm / allure)
-  let est = null;
-  if (Array.isArray(structure) && structure.length && window.StructEd && window.StructEd.avgStats) {
-    try {
-      est = {};
-      window.StructEd.avgStats(structure, sport).forEach(a => {
-        if (a.label === 'W MOY') est.w = +a.val;
-        else if (a.label === 'BPM MOY') est.bpm = +a.val;
-        else est.pace = a.val;
-      });
-      if (!Object.keys(est).length) est = null;
-    } catch (e) { est = null; }
+  // Structure = source de vérité : TOUT ce qui en découle est dérivé ICI,
+  // au save, par StructEd.summary, puis stocké en base (une colonne chacun).
+  let sm = null;
+  if (Array.isArray(structure) && structure.length && window.StructEd && window.StructEd.summary) {
+    try { sm = window.StructEd.summary(structure, sport); } catch (e) { sm = null; }
   }
   const entry = {
     id: editingId || Date.now().toString(),
-    name, date, time, sport, type, duration, tss, notes, est,
-    rpe, km, dplus, laps, tri, gpxName: _gpx.name, gpxContent: _gpx.content,
+    name, date, time, sport, type, notes,
+    duration: sm ? sm.durMin : duration,
+    tss: sm ? sm.tss : tss,
+    estWatts: sm ? sm.w : null,
+    estBpm: sm ? sm.bpm : null,
+    estPace: sm ? sm.pace : null,
+    estKj: sm ? sm.kj : null,
+    estIf: sm ? sm.ifr : null,
+    rpe, km: (sm && sm.km != null) ? sm.km : km,
+    dplus, laps, tri, gpxName: _gpx.name, gpxContent: _gpx.content,
     exclPower, exclHr, exclDistance,
     sportCategory: (typeof getSportCategory === 'function' ? getSportCategory(sport) : sport),
     mode: trainModalMode,
@@ -12013,14 +12014,16 @@ function openSessionModal(iso, source) {
       const _heroes = [];
       if (dur) _heroes.push({ svg: _S.clock, val: (dur < 60 ? Math.round(dur) + '<span style="font-size:13px"> min</span>' : (Math.floor(dur / 60) + '<span style="font-size:13px">h</span>' + String(Math.round(dur % 60)).padStart(2, '0'))), unit: '', lab: 'Durée prévue', color: '#60a5fa' });
       if (t.km) { const _dp = window.fmtDist(t.km, t.sport).split(' '); _heroes.push({ svg: _S.route, val: _dp[0], unit: _dp[1], lab: 'Distance prévue', color: '#22d3ee' }); }
-      // Allure/vitesse prévue : la structure fait foi si elle existe, sinon km+durée
-      let _rp = null;
-      if (Array.isArray(t.structure) && t.structure.length && window.StructEd && window.StructEd.avgStats) {
-        try {
-          const _pa = window.StructEd.avgStats(t.structure, t.sport || 'Ride').find(a => a.label === 'ALLURE MOY');
-          if (_pa) _rp = _pa.val + (window.getSportCategory(t.sport) === 'natation' ? ' /100m' : ' /km');
-        } catch (e) { /* éditeur non chargé */ }
+      // TOUT vient des valeurs STOCKÉES (dérivées de la structure au save).
+      // Fallback unique pour les anciennes séances jamais re-sauvées : summary().
+      let _est = { w: t.estWatts, bpm: t.estBpm, pace: t.estPace, kj: t.estKj, ifr: t.estIf };
+      if (_est.w == null && _est.bpm == null && _est.pace == null && _est.kj == null
+          && Array.isArray(t.structure) && t.structure.length && window.StructEd && window.StructEd.summary) {
+        try { _est = window.StructEd.summary(t.structure, t.sport || 'Ride'); } catch (e) { /* ignore */ }
       }
+      // Allure/vitesse prévue : valeur stockée, sinon km+durée
+      let _rp = null;
+      if (_est.pace) _rp = _est.pace + (window.getSportCategory(t.sport) === 'natation' ? ' /100m' : ' /km');
       if (!_rp && t.km && dur) _rp = window.fmtRate(t.km, dur, t.sport);
       if (_rp) { const _ri = _rp.indexOf(' '); _heroes.push({ svg: _S.speed, val: _rp.slice(0, _ri), unit: _rp.slice(_ri + 1), lab: window.rateLabel(t.sport) + ' prévue', color: '#34d399' }); }
       if (t.dplus) _heroes.push({ svg: _S.mtn, val: Math.round(t.dplus), unit: 'm D+', lab: 'Dénivelé prévu', color: '#84cc16' });
@@ -12028,18 +12031,10 @@ function openSessionModal(iso, source) {
       const _tiles = [];
       if (t.tss && _heroes.every(function (h) { return h.lab !== 'TSS estimé'; })) _tiles.push({ lab: 'TSS estimé', val: '' + t.tss, color: '#fbbf24' });
       if (t.rpe != null && t.rpe !== '') _tiles.push({ lab: 'RPE estimé', val: t.rpe + '/10', color: '#f59e0b' });
-      var _pKj = (Array.isArray(t.structure) && t.structure.length && window.__estKjFromStructure) ? window.__estKjFromStructure(t.structure) : null;
-      if (_pKj != null) _tiles.push({ lab: 'Énergie estimée', val: Math.round(_pKj) + ' kJ', color: '#9ca3af' });
-      // moyennes estimées de la structure (W / bpm / allure)
-      if (Array.isArray(t.structure) && t.structure.length && window.StructEd && window.StructEd.avgStats) {
-        try {
-          const _pretty = { 'W MOY': ['Watts moy estimés', ' W'], 'BPM MOY': ['FC moy estimée', ' bpm'] };
-          window.StructEd.avgStats(t.structure, t.sport || 'Ride').forEach(function (a) {
-            const p = _pretty[a.label]; // l'allure vit déjà dans le héro « Allure prévue »
-            if (p) _tiles.push({ lab: p[0], val: a.val + p[1], color: '#a5b4fc' });
-          });
-        } catch (e) { /* éditeur non chargé */ }
-      }
+      if (_est.w != null) _tiles.push({ lab: 'Watts moy estimés', val: _est.w + ' W', color: '#a5b4fc' });
+      if (_est.bpm != null) _tiles.push({ lab: 'FC moy estimée', val: _est.bpm + ' bpm', color: '#a5b4fc' });
+      if (_est.kj != null) _tiles.push({ lab: 'Énergie estimée', val: Math.round(_est.kj) + ' kJ', color: '#9ca3af' });
+      if (_est.ifr != null && _est.ifr > 0) _tiles.push({ lab: 'IF estimé', val: (+_est.ifr).toFixed(2), color: '#f97316' });
       const statsHTML = window.renderStatsBlockHTML(_heroes, _tiles);
 
       const sections = [];

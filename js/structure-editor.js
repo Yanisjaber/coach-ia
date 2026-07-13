@@ -179,6 +179,34 @@
     return g2 === 'natation' ? units / 10 : units;
   }
 
+  // ---------- Résumé complet d'une structure (LA fonction de vérité) ----------
+  // Tout ce qui est dérivé d'une structure passe par ici : save, modal, aperçu.
+  // -> { durMin, tss, ifr, kj, w, bpm, pace, km } (null quand non applicable)
+  function summary(bl, sport) {
+    bl = bl || blocks;
+    const g2 = sport ? (SPORT_GROUP[sport] || 'cyclisme') : grp();
+    let dur = 0, tss = 0, kj = 0;
+    bl.forEach(b => {
+      const m2 = b.metric || METRICS[g2][0][0];
+      blockSegs(b).forEach(({ seg }) => {
+        const m = +seg.min || 0, f = midOf(seg) / 100;
+        dur += m; tss += (m / 60) * f * f * 100;
+        if (m2 === 'power') kj += m * 60 * (f * FTP()) / 1000;
+      });
+    });
+    const ifr = dur > 0 ? Math.sqrt(tss / (dur / 60) / 100) : 0;
+    const out = { durMin: Math.round(dur), tss: Math.round(tss), ifr: Math.round(ifr * 100) / 100,
+      kj: Math.round(kj) || null, w: null, bpm: null, pace: null, km: null };
+    avgStats(bl, sport).forEach(a => {
+      if (a.label === 'W MOY') out.w = +a.val;
+      else if (a.label === 'BPM MOY') out.bpm = +a.val;
+      else out.pace = a.val;
+    });
+    const dk = paceDistanceKm(bl, sport);
+    if (dk > 0) out.km = Math.round(dk * 100) / 100;
+    return out;
+  }
+
   // ---------- Undo / redo ----------
   const snap = () => { undoStack.push(JSON.stringify(blocks)); if (undoStack.length > 60) undoStack.shift(); redoStack = []; };
   const undo = () => { if (!undoStack.length) return; redoStack.push(JSON.stringify(blocks)); blocks = JSON.parse(undoStack.pop()); clampSel(); render(); };
@@ -723,5 +751,5 @@
     if (window.__updateSbMini) setTimeout(window.__updateSbMini, 80);
   }
 
-  window.StructEd = { open, close, avgStats, paceDistanceKm };
+  window.StructEd = { open, close, avgStats, paceDistanceKm, summary };
 })();
