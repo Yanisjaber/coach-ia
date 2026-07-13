@@ -4211,6 +4211,8 @@ function openCompModal() {
   const delBtn = document.getElementById('comp-modal-delete');
   if (delBtn) delBtn.hidden = true;
   { const _tt = document.getElementById('comp-modal-to-training'); if (_tt) _tt.hidden = true; }
+  { const _ex = document.getElementById('comp-modal-excl'); if (_ex) _ex.hidden = true; }
+  window._compExclSbId = null;
   window._compToTrainingAct = null; window._compToTrainingIso = null;
   // Reset form (sauf "time" qui est géré par le stepper)
   ['name','date','type','km','dplus','target','laps','notes','speed','tss','rpe','level'].forEach(k => {
@@ -4534,6 +4536,17 @@ async function saveCompFromModal() {
     comps.push(newEntry);
   }
   saveCompetitions(comps);
+  // Exclusions records/stats (compét réalisée) : mise à jour de l'activité en base
+  if (window._compExclSbId) {
+    const _ex = document.getElementById('comp-modal-excl');
+    const _on = (m) => !!(_ex && _ex.querySelector('.ae-metric-btn[data-m="' + m + '"].active'));
+    const _excl = { excl_power: _on('power'), excl_hr: _on('hr'), excl_distance: _on('dist') };
+    try { if (window.sb) await window.sb.from('activities').update(_excl).eq('id', window._compExclSbId); } catch (e) { console.warn('[comp excl]', e.message || e); }
+    const _act = (typeof _findActBySbId === 'function') ? _findActBySbId(window._compExclSbId) : null;
+    if (_act) { _act._exclPower = _excl.excl_power; _act._exclHr = _excl.excl_hr; _act._exclDistance = _excl.excl_distance; }
+    if (typeof window.__applyOverridesAndRerender === 'function') window.__applyOverridesAndRerender();
+    window._compExclSbId = null;
+  }
   closeCompModal();
   renderCompList();
   if (newEntry.realised) {
@@ -5303,6 +5316,11 @@ window.gpxDeleteTraining = async function(id, mode, sbId) {
   else if (typeof renderCalendar === 'function') renderCalendar();
 };
 
+// Exclusions records/stats de la modale competition : toggle simple
+{
+  const _ex = document.getElementById('comp-modal-excl');
+  if (_ex) _ex.querySelectorAll('.ae-metric-btn').forEach(b => b.addEventListener('click', () => b.classList.toggle('active')));
+}
 // Cablage (une fois) des controles activite de la modale entrainement.
 {
   const _c = document.getElementById('train-modal-act-controls');
@@ -12807,6 +12825,17 @@ function openCompModalForEdit(comp) {
     window._compToTrainingAct = _isRealisedAct ? { _sbId: comp._sbId, category: 'competition', name: comp.name, sport: comp.sport } : null;
     window._compToTrainingIso = comp.date || null;
     window._compToTrainingPlannedId = _isRealisedAct ? null : comp.id;
+    // Exclusions records/stats : uniquement pour une compét réalisée (activité en base)
+    const _ex = document.getElementById('comp-modal-excl');
+    if (_ex) {
+      _ex.hidden = !_isRealisedAct;
+      window._compExclSbId = _isRealisedAct ? String(comp._sbId) : null;
+      if (_isRealisedAct) {
+        const _act = (typeof _findActBySbId === 'function') ? _findActBySbId(comp._sbId) : null;
+        const _set = (m, on) => { const b = _ex.querySelector('.ae-metric-btn[data-m="' + m + '"]'); if (b) b.classList.toggle('active', !!on); };
+        _set('power', _act && _act._exclPower); _set('hr', _act && _act._exclHr); _set('dist', _act && _act._exclDistance);
+      }
+    }
   }
 }
 
