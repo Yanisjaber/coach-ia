@@ -4081,13 +4081,14 @@ function wireTrio(cfg) {
   };
   const compute = (changed) => {
     const tm = readTime(), dv = readDist(), rv = readRate();
+    const rateLocked = !!(cfg.lockRate && cfg.lockRate()); // allure pilotée par la structure
     if (changed === 'time') {
       if (tm == null) return;
-      if (dv != null) setRate(tm, dv);
+      if (dv != null && !rateLocked) setRate(tm, dv);
       else if (rv != null && !cfg.noAutoDist) setDist(tm, rv);
     } else if (changed === 'dist') {
       if (dv == null) return;
-      if (tm != null) setRate(tm, dv);
+      if (tm != null && !rateLocked) setRate(tm, dv);
       else if (rv != null) setTime(dv, rv);
     } else {
       if (rv == null) return;
@@ -4102,6 +4103,7 @@ function wireTrio(cfg) {
 function wireCompTrios() {
   wireTrio({ timeId: 'comp-modal-target', distId: 'comp-modal-km', rateId: 'comp-modal-speed', mode: 'speed', timeParse: 'target' });
   wireTrio({ timeId: 'train-modal-duration', distId: 'train-modal-km', rateId: 'train-modal-speed', timeParse: 'minutes', noAutoDist: true,
+    lockRate: () => { const tg = document.getElementById('sb-toggle'); return !!(tg && tg.checked) && window._trainSpeedMode && window._trainSpeedMode !== 'speed'; },
     mode: () => window._trainSpeedMode || 'speed' });
   wireTrio({ timeId: 'comp-tri-nat-time', distId: 'comp-tri-nat-dist', rateId: 'comp-tri-nat-pace', mode: 'pace_100m' });
   wireTrio({ timeId: 'comp-tri-bike-time', distId: 'comp-tri-bike-dist', rateId: 'comp-tri-bike-speed', mode: 'speed' });

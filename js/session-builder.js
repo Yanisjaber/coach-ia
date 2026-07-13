@@ -277,7 +277,13 @@
   function getBlocks() { if (!isOn()) return null; return (blocks && blocks.length) ? JSON.parse(JSON.stringify(blocks)) : null; }
   function setBlocks(st) { var has = !!(st && st.length && st[0] && st[0].work); if (has) { blocks = JSON.parse(JSON.stringify(st)); blocks.forEach(function (b) { if (!b.metric && b.work && b.work.metric) b.metric = b.work.metric; if (!b.unit && b.work && b.work.unit) b.unit = b.work.unit; }); } ensureMount(); var tg = R('sb-toggle'); if (tg) tg.checked = has; setActive(has); }
   function reset() { blocks = defaults(); ensureMount(); var tg = R('sb-toggle'); if (tg) tg.checked = false; setActive(false); }
-  function setRO(ro) { ['train-modal-duration', 'train-modal-tss'].forEach(function (id) { var e = R(id); if (e) { e.readOnly = ro; e.style.opacity = ro ? '0.6' : ''; } }); }
+  function setRO(ro) {
+    var ids = ['train-modal-duration', 'train-modal-tss'];
+    // sports en allure : l'allure est pilotée par la structure -> verrouillée aussi
+    if (window._trainSpeedMode && window._trainSpeedMode !== 'speed') ids.push('train-modal-speed');
+    else { var sp0 = R('train-modal-speed'); if (sp0 && sp0.readOnly) { sp0.readOnly = false; sp0.style.opacity = ''; } }
+    ids.forEach(function (id) { var e = R(id); if (e) { e.readOnly = ro; e.style.opacity = ro ? '0.6' : ''; } });
+  }
   function setActive(on) { ensureMount(); var body = R('sb-body'); if (body) body.hidden = !on; setRO(on); if (on) renderAll(); }
   function showSection() { var sb = R('sb-section'); var old = document.querySelector('.workout-structure-block'); if (sb) sb.hidden = false; if (old) old.style.display = 'none'; ensureMount(); }
 
