@@ -10227,9 +10227,6 @@ function openActivityEditModal(activityId, iso) {
               <button type="button" class="ae-metric-btn${exclHr ? ' active' : ''}" data-m="hr">Cardio</button>
               <button type="button" class="ae-metric-btn${exclDist ? ' active' : ''}" data-m="dist">Distance</button>
             </div>
-            <button type="button" class="btn-secondary" id="_ae-transform" style="margin-top:12px">
-              ${act.category === 'competition' ? '→ Entraînement' : '→ Compétition'}
-            </button>
             <div id="_ae-event-wrap" style="${act.category === 'competition' ? 'margin-top:12px' : 'display:none;'}">
               <label class="note-field-label">Priorité</label>
               <div class="note-type-chips" id="_ae-prio">
@@ -10244,7 +10241,10 @@ function openActivityEditModal(activityId, iso) {
         </div>
       </div>
       <div class="day-modal-footer">
-        <button class="day-modal-delete" type="button" id="_ae-reset">Réinitialiser</button>
+        <button class="btn-trash" type="button" id="_ae-reset" title="Réinitialiser : annuler les modifications et revenir aux données d'origine">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+        <button type="button" class="btn-secondary" id="_ae-transform">${act.category === 'competition' ? '→ Entraînement' : '→ Compétition'}</button>
         <div style="flex:1;"></div>
         <button class="day-modal-cancel" type="button">Annuler</button>
         <button class="day-modal-save" type="button">Enregistrer</button>
