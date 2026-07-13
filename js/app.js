@@ -801,7 +801,7 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
             return acts.map(a => {
               const name = a.name || a.sessionName || 'Séance';
               const dur = a.duration ? fmtDur(a.duration) : '';
-              const km = a.distance_km ? window.fmtKm(a.distance_km) + ' km' : '';
+              const km = a.distance_km ? window.fmtDist(a.distance_km, a.raw_type || a.sport) : '';
               const meta = [dur, km].filter(Boolean).join(' · ');
               return meta ? `• ${name} — ${meta}` : `• ${name}`;
             });
@@ -2408,7 +2408,7 @@ function renderCompetitionsPage() {
       }
       if (!tssV && g.day && g.dayFallback) tssV = g.day.tss || 0;
       const metrics = [];
-      if (dist) metrics.push(window.fmtKm(dist) + ' km');
+      if (dist) metrics.push(window.fmtDist(dist, (g.raceActs[0] && (g.raceActs[0].raw_type || g.raceActs[0].sport)) || ''));
       if (dur) metrics.push(fmtDur(dur));
       if (elev) metrics.push(Math.round(elev) + ' m D+');
       if (tssV) metrics.push(Math.round(tssV) + ' TSS');
@@ -3992,6 +3992,26 @@ function fmtPaceSec(sec) {
 // et affichage canonique — au-delà de 60 min on passe en heures (1h15).
 // Distance affichée à la dizaine de mètres près (35.42 km), zéros superflus retirés
 window.fmtKm = function (v) { const n = Math.round((+v || 0) * 100) / 100; return String(n); };
+// Distance selon le sport : natation en mètres, le reste en km
+window.fmtDist = function (km, sport) {
+  const cat = window.getSportCategory ? window.getSportCategory(sport || '') : 'autre';
+  if (cat === 'natation') return (Math.round((+km || 0) * 100) * 10) + ' m';
+  return window.fmtKm(km) + ' km';
+};
+// Vitesse/allure selon le sport : course en min/km, natation en min/100m, sinon km/h
+window.fmtRate = function (km, durMin, sport) {
+  km = +km || 0; durMin = +durMin || 0;
+  if (!(km > 0) || !(durMin > 0)) return null;
+  const cat = window.getSportCategory ? window.getSportCategory(sport || '') : 'autre';
+  const mmss = (sec) => Math.floor(sec / 60) + ':' + String(Math.round(sec) % 60).padStart(2, '0');
+  if (cat === 'course') return mmss(durMin * 60 / km) + ' /km';
+  if (cat === 'natation') return mmss(durMin * 60 / (km * 10)) + ' /100m';
+  return (Math.round(km / (durMin / 60) * 10) / 10) + ' km/h';
+};
+window.rateLabel = function (sport) {
+  const cat = window.getSportCategory ? window.getSportCategory(sport || '') : 'autre';
+  return (cat === 'course' || cat === 'natation') ? 'Allure' : 'Vitesse';
+};
 window.__parseDurField = function (v) {
   if (typeof v === 'number') return isNaN(v) ? null : v;
   if (window.__durParse) return window.__durParse(v);
@@ -5428,7 +5448,7 @@ function renderWeekPlan() {
         sportLabel = window.sportFr(proposal.sport || 'cyclisme');
         sportCat = window.activitySportColorKey({ sport: proposal.sport || 'cyclisme' }) || 'autre';
       }
-      const kmStr = proposal.km ? window.fmtKm(proposal.km) + ' km' : '';
+      const kmStr = proposal.km ? window.fmtDist(proposal.km, proposal.sport) : '';
       const durStr = proposal.dur ? fmtDur(proposal.dur) : '';
       const dplusStr = proposal.dplus ? Math.round(proposal.dplus) + ' m D+' : '';
       const rpeStr = (proposal.rpe != null && proposal.rpe !== '') ? 'RPE ' + proposal.rpe : '';
@@ -5461,7 +5481,7 @@ function renderWeekPlan() {
           const g = _r ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(it.sport, 22) : '');
           // Format compact pour colonnes étroites : "42m" au lieu de "42 min"
           // (évite que "min" parte sur une 2e ligne quand 4-5 activités en parallèle)
-          const tRaw = it.dur ? fmtDur(it.dur) : (it.km ? window.fmtKm(it.km) + ' km' : '');
+          const tRaw = it.dur ? fmtDur(it.dur) : (it.km ? window.fmtDist(it.km, it.sport) : '');
           const t = tRaw.replace(' min', 'm');
           const nm = it.name || 'Séance';
           return `<div class="day-multi-col" data-iso="${iso}" data-source="prevu" data-actidx="${i}" title="${String(nm).replace(/\"/g, '&quot;')}" style="background:${hex}1a">`
@@ -5651,7 +5671,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
       const hex = isComp ? compPrio(a.priority).color : (window.sportColor ? window.sportColor(a.raw_type || a.sport) : '#9ca3af');
       const g = isComp ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(a.raw_type || a.sport, 22) : '');
       // Format compact pour colonnes étroites : "42m" au lieu de "42 min"
-      const _tRaw = a.duration ? fmtDur(a.duration) : (a.distance_km ? window.fmtKm(a.distance_km) + ' km' : '');
+      const _tRaw = a.duration ? fmtDur(a.duration) : (a.distance_km ? window.fmtDist(a.distance_km, a.raw_type || a.sport) : '');
       const t = _tRaw.replace(' min', 'm');
       const _nm = a.name || a.sessionName || 'Séance';
       return `<div class="day-multi-col" data-iso="${iso}" data-source="realise" data-actidx="${i}" title="${String(_nm).replace(/"/g, '&quot;')}" style="background:${hex}1a">`
@@ -5692,7 +5712,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   // Fallbacks robustes pour data.js ancien format (champs day-level)
   const aType = act.type || act.sessionType || '';
   const aName = act.name || act.sessionName || 'Séance';
-  const km = act.distance_km ? window.fmtKm(act.distance_km) + ' km' : '';
+  const km = act.distance_km ? window.fmtDist(act.distance_km, act.raw_type || act.sport) : '';
   // Nom de sport Strava exact + clé couleur pour la pill
   let sportLabel = window.activitySportLabel ? window.activitySportLabel(act) : '';
   let sportCat = window.activitySportColorKey ? window.activitySportColorKey(act) : 'autre';
@@ -7497,8 +7517,17 @@ async function renderStreamsSection(container, activityId) {
     set('stat-dplus', s.dPlus + ' m');
     set('stat-dminus', s.dMinus + ' m');
     set('stat-altmax', s.altMax !== null ? s.altMax + ' m' : '—');
-    set('stat-vmoy', s.vAvg !== null ? s.vAvg.toFixed(1) + ' km/h' : '—');
-    set('stat-vmax', s.vMax !== null ? s.vMax.toFixed(1) + ' km/h' : '—');
+    // course / natation : la vitesse se lit en allure (min/km, min/100m)
+    const _vCat = window.__lastActSport;
+    if (_vCat === 'course' || _vCat === 'natation') {
+      const _p100 = _vCat === 'natation';
+      const _kmhToPace = (v) => { const sec = (_p100 ? 360 : 3600) / v; return Math.floor(sec / 60) + ':' + String(Math.round(sec % 60)).padStart(2, '0') + (_p100 ? ' /100m' : ' /km'); };
+      set('stat-vmoy', s.vAvg ? _kmhToPace(s.vAvg) : '—');
+      set('stat-vmax', s.vMax ? _kmhToPace(s.vMax) : '—');
+    } else {
+      set('stat-vmoy', s.vAvg !== null ? s.vAvg.toFixed(1) + ' km/h' : '—');
+      set('stat-vmax', s.vMax !== null ? s.vMax.toFixed(1) + ' km/h' : '—');
+    }
     const wrap = document.getElementById('stat-slope-wrap');
     if (wrap) {
       if (s.isZoomed && s.slopeAvg !== null && s.slopeMax !== null) {
@@ -8207,9 +8236,9 @@ window.__buildAfOverview = function (act, m) {
 
   var vRows = [];
   vRows.push(row('Durée', fmtHMS(durSec)));
-  if (act.distance_km) vRows.push(row('Distance', window.fmtKm(act.distance_km) + ' km'));
+  if (act.distance_km) vRows.push(row('Distance', window.fmtDist(act.distance_km, act.raw_type || act.sport)));
   if (act.elevation_gain) vRows.push(row('Dénivelé+', Math.round(act.elevation_gain) + ' m'));
-  if (act.avg_speed_kmh) vRows.push(row('Vitesse moy', (+act.avg_speed_kmh).toFixed(1) + ' km/h'));
+  if (act.avg_speed_kmh) { const _sp3 = act.raw_type || act.sport; const _al = window.rateLabel(_sp3) === 'Allure' ? window.fmtRate(act.distance_km, durSec / 60, _sp3) : null; vRows.push(row(window.rateLabel(_sp3) + ' moy', _al || (+act.avg_speed_kmh).toFixed(1) + ' km/h')); }
 
   var eRows = [];
   if (act.kj) eRows.push(row('Travail', Math.round(act.kj) + ' kJ'));
@@ -11963,8 +11992,8 @@ function openSessionModal(iso, source) {
       const _S = window.__statSvg || {};
       const _heroes = [];
       if (dur) _heroes.push({ svg: _S.clock, val: (dur < 60 ? Math.round(dur) + '<span style="font-size:13px"> min</span>' : (Math.floor(dur / 60) + '<span style="font-size:13px">h</span>' + String(Math.round(dur % 60)).padStart(2, '0'))), unit: '', lab: 'Durée prévue', color: '#60a5fa' });
-      if (t.km) _heroes.push({ svg: _S.route, val: window.fmtKm(t.km), unit: 'km', lab: 'Distance prévue', color: '#22d3ee' });
-      if (t.km && dur) _heroes.push({ svg: _S.speed, val: (Math.round((t.km / (dur / 60)) * 10) / 10), unit: 'km/h', lab: 'Vitesse prévue', color: '#34d399' });
+      if (t.km) { const _dp = window.fmtDist(t.km, t.sport).split(' '); _heroes.push({ svg: _S.route, val: _dp[0], unit: _dp[1], lab: 'Distance prévue', color: '#22d3ee' }); }
+      if (t.km && dur) { const _rp = window.fmtRate(t.km, dur, t.sport) || ''; const _ri = _rp.indexOf(' '); if (_rp) _heroes.push({ svg: _S.speed, val: _rp.slice(0, _ri), unit: _rp.slice(_ri + 1), lab: window.rateLabel(t.sport) + ' prévue', color: '#34d399' }); }
       if (t.dplus) _heroes.push({ svg: _S.mtn, val: Math.round(t.dplus), unit: 'm D+', lab: 'Dénivelé prévu', color: '#84cc16' });
       if (_heroes.length < 3 && t.tss) _heroes.push({ svg: _S.bolt, val: t.tss, unit: '', lab: 'TSS estimé', color: '#fbbf24' });
       const _tiles = [];
@@ -13180,7 +13209,7 @@ function renderSessionsTable() {
     const sportLabel = window.activitySportLabel ? window.activitySportLabel(s) : (s.sport || '—');
     const sportCat = window.activitySportColorKey ? window.activitySportColorKey(s) : 'autre';
     const dist = s.distance_km != null
-      ? window.fmtKm(s.distance_km).replace('.', ',') + ' km'
+      ? window.fmtDist(s.distance_km, s.raw_type || s.sport).replace('.', ',')
       : '—';
     const dplus = s.elevation_gain != null ? Math.round(s.elevation_gain) + ' m' : '—';
     return `
