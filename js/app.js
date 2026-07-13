@@ -4907,6 +4907,16 @@ function saveTrainFromModal() {
   if (Array.isArray(structure) && structure.length && window.StructEd && window.StructEd.summary) {
     try { sm = window.StructEd.summary(structure, sport); } catch (e) { sm = null; }
   }
+  // Pas de structure mais temps + distance connus : l'allure est calculable
+  // et stockée quand même (sports en allure uniquement)
+  let paceNoStruct = null;
+  if (!sm) {
+    const _cat = getSportCategory(sport);
+    if ((_cat === 'course' || _cat === 'natation') && km > 0 && duration > 0) {
+      const sec = _cat === 'natation' ? duration * 60 / (km * 10) : duration * 60 / km;
+      paceNoStruct = Math.floor(sec / 60) + ':' + String(Math.round(sec % 60)).padStart(2, '0');
+    }
+  }
   const entry = {
     id: editingId || Date.now().toString(),
     name, date, time, sport, type, notes,
@@ -4914,7 +4924,7 @@ function saveTrainFromModal() {
     tss: sm ? sm.tss : tss,
     estWatts: sm ? sm.w : null,
     estBpm: sm ? sm.bpm : null,
-    estPace: sm ? sm.pace : null,
+    estPace: sm ? sm.pace : paceNoStruct,
     estKj: sm ? sm.kj : null,
     estIf: sm ? sm.ifr : null,
     rpe, km: (sm && sm.km != null) ? sm.km : km,
