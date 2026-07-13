@@ -182,10 +182,11 @@ function renderLibrary() {
         <span class="lib-ic" style="background:${info.color}22;color:${info.color}">${sportIcon(k)}</span>
         <div class="lib-item-body">
           <div class="lib-item-name">${esc(t.name)}</div>
-          ${[t.duration_min ? fmtDur(t.duration_min) : null, t.tss ? (t.tss + ' TSS') : null].filter(Boolean).join(' · ') ? `<div class="lib-item-meta">${[t.duration_min ? fmtDur(t.duration_min) : null, t.tss ? (t.tss + ' TSS') : null].filter(Boolean).join(' · ')}</div>` : ''}
         </div>
-        <button class="lib-item-eye" data-view="${t.id}" title="Aperçu" type="button"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
-        <button class="lib-item-edit" data-edit="${t.id}" title="Modifier" type="button">✎</button>
+        <div class="lib-item-actions">
+          <button class="lib-item-eye" data-view="${t.id}" title="Aperçu" type="button"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button class="lib-item-edit" data-edit="${t.id}" title="Modifier" type="button">✎</button>
+        </div>
       </div>
     `).join('');
     return `

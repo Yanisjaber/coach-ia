@@ -222,9 +222,11 @@ body.lib-placing-mode .day-card[data-iso]:active {
 .lib-item-body { flex: 1; min-width: 0; }
 .lib-item-name { font-size: 13px; font-weight: 500; color: var(--text); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lib-item-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+/* Œil + crayon empilés verticalement à droite de la carte */
+.lib-item-actions { display: flex; flex-direction: column; gap: 2px; flex: none; align-items: center; }
 .lib-item-edit {
   background: none; border: none; color: var(--text-mute);
-  cursor: pointer; font-size: 13px; padding: 4px 6px; flex: none;
+  cursor: pointer; font-size: 13px; padding: 2px 6px; flex: none;
   border-radius: 6px; opacity: 0.5; transition: opacity 0.12s, color 0.12s, background 0.12s;
 }
 .lib-item:hover .lib-item-edit { opacity: 1; }
@@ -232,7 +234,7 @@ body.lib-placing-mode .day-card[data-iso]:active {
 /* Œil aperçu : même look que le crayon */
 .lib-item-eye {
   background: none; border: none; color: var(--text-mute);
-  cursor: pointer; padding: 4px 6px; flex: none; display: flex; align-items: center;
+  cursor: pointer; padding: 2px 6px; flex: none; display: flex; align-items: center;
   border-radius: 6px; opacity: 0.5; transition: opacity 0.12s, color 0.12s, background 0.12s;
 }
 .lib-item:hover .lib-item-eye { opacity: 1; }
