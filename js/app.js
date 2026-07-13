@@ -4084,7 +4084,7 @@ function wireTrio(cfg) {
     if (changed === 'time') {
       if (tm == null) return;
       if (dv != null) setRate(tm, dv);
-      else if (rv != null) setDist(tm, rv);
+      else if (rv != null && !cfg.noAutoDist) setDist(tm, rv);
     } else if (changed === 'dist') {
       if (dv == null) return;
       if (tm != null) setRate(tm, dv);
@@ -4092,7 +4092,7 @@ function wireTrio(cfg) {
     } else {
       if (rv == null) return;
       if (dv != null) setTime(dv, rv);
-      else if (tm != null) setDist(tm, rv);
+      else if (tm != null && !cfg.noAutoDist) setDist(tm, rv);
     }
   };
   t.addEventListener('input', () => { delete t.dataset.auto; compute('time'); });
@@ -4101,7 +4101,7 @@ function wireTrio(cfg) {
 }
 function wireCompTrios() {
   wireTrio({ timeId: 'comp-modal-target', distId: 'comp-modal-km', rateId: 'comp-modal-speed', mode: 'speed', timeParse: 'target' });
-  wireTrio({ timeId: 'train-modal-duration', distId: 'train-modal-km', rateId: 'train-modal-speed', timeParse: 'minutes',
+  wireTrio({ timeId: 'train-modal-duration', distId: 'train-modal-km', rateId: 'train-modal-speed', timeParse: 'minutes', noAutoDist: true,
     mode: () => window._trainSpeedMode || 'speed' });
   wireTrio({ timeId: 'comp-tri-nat-time', distId: 'comp-tri-nat-dist', rateId: 'comp-tri-nat-pace', mode: 'pace_100m' });
   wireTrio({ timeId: 'comp-tri-bike-time', distId: 'comp-tri-bike-dist', rateId: 'comp-tri-bike-speed', mode: 'speed' });
@@ -11993,7 +11993,16 @@ function openSessionModal(iso, source) {
       const _heroes = [];
       if (dur) _heroes.push({ svg: _S.clock, val: (dur < 60 ? Math.round(dur) + '<span style="font-size:13px"> min</span>' : (Math.floor(dur / 60) + '<span style="font-size:13px">h</span>' + String(Math.round(dur % 60)).padStart(2, '0'))), unit: '', lab: 'Durée prévue', color: '#60a5fa' });
       if (t.km) { const _dp = window.fmtDist(t.km, t.sport).split(' '); _heroes.push({ svg: _S.route, val: _dp[0], unit: _dp[1], lab: 'Distance prévue', color: '#22d3ee' }); }
-      if (t.km && dur) { const _rp = window.fmtRate(t.km, dur, t.sport) || ''; const _ri = _rp.indexOf(' '); if (_rp) _heroes.push({ svg: _S.speed, val: _rp.slice(0, _ri), unit: _rp.slice(_ri + 1), lab: window.rateLabel(t.sport) + ' prévue', color: '#34d399' }); }
+      // Allure/vitesse prévue : la structure fait foi si elle existe, sinon km+durée
+      let _rp = null;
+      if (Array.isArray(t.structure) && t.structure.length && window.StructEd && window.StructEd.avgStats) {
+        try {
+          const _pa = window.StructEd.avgStats(t.structure, t.sport || 'Ride').find(a => a.label === 'ALLURE MOY');
+          if (_pa) _rp = _pa.val + (window.getSportCategory(t.sport) === 'natation' ? ' /100m' : ' /km');
+        } catch (e) { /* éditeur non chargé */ }
+      }
+      if (!_rp && t.km && dur) _rp = window.fmtRate(t.km, dur, t.sport);
+      if (_rp) { const _ri = _rp.indexOf(' '); _heroes.push({ svg: _S.speed, val: _rp.slice(0, _ri), unit: _rp.slice(_ri + 1), lab: window.rateLabel(t.sport) + ' prévue', color: '#34d399' }); }
       if (t.dplus) _heroes.push({ svg: _S.mtn, val: Math.round(t.dplus), unit: 'm D+', lab: 'Dénivelé prévu', color: '#84cc16' });
       if (_heroes.length < 3 && t.tss) _heroes.push({ svg: _S.bolt, val: t.tss, unit: '', lab: 'TSS estimé', color: '#fbbf24' });
       const _tiles = [];
@@ -12004,10 +12013,10 @@ function openSessionModal(iso, source) {
       // moyennes estimées de la structure (W / bpm / allure)
       if (Array.isArray(t.structure) && t.structure.length && window.StructEd && window.StructEd.avgStats) {
         try {
-          const _pretty = { 'W MOY': ['Watts moy estimés', ' W'], 'BPM MOY': ['FC moy estimée', ' bpm'], 'ALLURE MOY': ['Allure moy estimée', ''] };
+          const _pretty = { 'W MOY': ['Watts moy estimés', ' W'], 'BPM MOY': ['FC moy estimée', ' bpm'] };
           window.StructEd.avgStats(t.structure, t.sport || 'Ride').forEach(function (a) {
-            const p = _pretty[a.label] || [a.label, ''];
-            _tiles.push({ lab: p[0], val: a.val + p[1], color: '#a5b4fc' });
+            const p = _pretty[a.label]; // l'allure vit déjà dans le héro « Allure prévue »
+            if (p) _tiles.push({ lab: p[0], val: a.val + p[1], color: '#a5b4fc' });
           });
         } catch (e) { /* éditeur non chargé */ }
       }
