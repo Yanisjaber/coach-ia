@@ -706,7 +706,7 @@
       +       '<button type="button" class="se-add" data-add="cooldown" style="--c:#4ade80">+ Retour au calme</button>'
       +     '</div>'
       +   '</div>'
-      +   '<div class="se-right"><div class="se-flowwrap"><div class="se-flowhead"><span>Déroulé</span></div><div id="se-flow"></div><button type="button" class="se-preset" id="se-savelib" style="margin-top:10px">Enregistrer dans ma bibliothèque</button></div></div>'
+      +   '<div class="se-right"><div class="se-flowwrap"><div class="se-flowhead"><span>Déroulé</span></div><div id="se-flow"></div></div></div>'
       + '</div>'
       + '<div class="se-inspwrap"><div id="se-insp"></div></div>';
     root = page;
@@ -728,22 +728,8 @@
       sel = { bi: +it.dataset.bi, which: 'work' };
       render();
     });
-    page.querySelector('#se-savelib').addEventListener('click', () => {
-      if (!blocks.length) return;
-      const nameV = (document.getElementById('train-modal-name') || {}).value || 'Séance structurée';
-      const sportSel = document.getElementById('train-modal-sport');
-      if (typeof window.libraryAddTemplate === 'function') {
-        // structure NETTOYÉE (sans clés de travail) + données dérivées par summary
-        const clean = JSON.parse(JSON.stringify(blocks, (k, v) => (k === '_recSaved' || k === '_prevType') ? undefined : v));
-        const sm = summary(clean);
-        window.libraryAddTemplate({ name: nameV, sport: grp(), sport_raw: sportSel ? sportSel.value : 'Ride',
-          duration_min: sm.durMin, tss: sm.tss, km: sm.km != null ? sm.km : null,
-          estWatts: sm.w, estBpm: sm.bpm, estSpeed: sm.speedKmh, estKj: sm.kj, estIf: sm.ifr,
-          description: '', structure: clean });
-        const btn = page.querySelector('#se-savelib'); btn.textContent = 'Enregistrée ✓'; btn.disabled = true;
-        setTimeout(() => { btn.textContent = 'Enregistrer dans ma bibliothèque'; btn.disabled = false; }, 2500);
-      }
-    });
+    // (l'ajout en bibliothèque se fait depuis la modal — bouton « + Bibliothèque »
+    //  qui récupère aussi km / D+ / RPE)
     wireGraph();
     // raccourcis clavier
     page.addEventListener('keydown', (e) => {

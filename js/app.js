@@ -4661,6 +4661,7 @@ function openTrainModal(mode) {
   // Sortie du mode "modèle bibliothèque" : réaffiche date/heure/GPX masqués
   window._templateMode = false;
   window._templateEditing = null;
+  { const _alb = document.getElementById('train-modal-addlib'); if (_alb) _alb.hidden = false; }
   ['train-modal-date', 'train-modal-time'].forEach(id => {
     const el = document.getElementById(id);
     const lab = el && el.closest('label');
@@ -5007,6 +5008,8 @@ window.openLibraryTemplateModal = function (tpl) {
   openTrainModal('prevu');            // reset complet (champs, structure, GPX)
   window._templateMode = true;
   window._templateEditing = tpl || null;
+  // mode modèle : « + Bibliothèque » n'a pas de sens (Enregistrer fait le travail)
+  { const _alb = document.getElementById('train-modal-addlib'); if (_alb) _alb.hidden = true; }
   // Masque les champs sans objet pour un modèle : date, heure, GPX
   ['train-modal-date', 'train-modal-time'].forEach(id => {
     const el = document.getElementById(id);
@@ -5036,6 +5039,45 @@ window.openLibraryTemplateModal = function (tpl) {
   if (saveBtn) saveBtn.textContent = tpl ? 'Enregistrer les modifications' : 'Enregistrer';
 };
 
+// « + Bibliothèque » : enregistre la séance de la modal comme modèle,
+// AVEC km / D+ / RPE (que l'éditeur de structure ne connaissait pas).
+function addTrainModalToLibrary() {
+  const name = document.getElementById('train-modal-name').value.trim();
+  if (!name) { if (typeof _markFieldError === 'function') _markFieldError('train-modal-name', 'Nomme la séance d\'abord'); return; }
+  const rawSport = document.getElementById('train-modal-sport').value || 'Ride';
+  const structure = (typeof window.getCurrentWorkoutStructure === 'function') ? window.getCurrentWorkoutStructure() : null;
+  let sm = null;
+  if (Array.isArray(structure) && structure.length && window.StructEd && window.StructEd.summary) {
+    try { sm = window.StructEd.summary(structure, rawSport); } catch (e) { sm = null; }
+  }
+  const kmField = (typeof readDistAsKm === 'function') ? readDistAsKm('train-modal-km') : (parseFloat(document.getElementById('train-modal-km').value) || null);
+  const entry = {
+    id: Date.now().toString() + Math.random().toString(36).slice(2, 5),
+    sort_order: 0,
+    sport: rawToLibKey(rawSport),
+    sport_raw: rawSport,
+    name,
+    duration_min: sm ? sm.durMin : Math.round(window.__parseDurField(document.getElementById('train-modal-duration').value) || 0),
+    tss: sm ? sm.tss : (parseInt(document.getElementById('train-modal-tss').value, 10) || 0),
+    estWatts: sm ? sm.w : null,
+    estBpm: sm ? sm.bpm : null,
+    estSpeed: sm ? sm.speedKmh : null,
+    estKj: sm ? sm.kj : null,
+    estIf: sm ? sm.ifr : null,
+    description: document.getElementById('train-modal-notes').value.trim(),
+    rpe: parseFloat(document.getElementById('train-modal-rpe').value) || null,
+    km: (sm && sm.km != null) ? sm.km : kmField,
+    dplus: parseInt(document.getElementById('train-modal-dplus').value, 10) || null,
+    structure: (structure && structure.length) ? structure : null,
+  };
+  if (window.libraryUpsertTemplate) window.libraryUpsertTemplate(entry);
+  const btn = document.getElementById('train-modal-addlib');
+  if (btn) { btn.textContent = 'Ajoutée ✓'; btn.disabled = true; setTimeout(() => { btn.textContent = '+ Bibliothèque'; btn.disabled = false; }, 2200); }
+}
+{
+  const _albBtn = document.getElementById('train-modal-addlib');
+  if (_albBtn) _albBtn.addEventListener('click', addTrainModalToLibrary);
+}
 function saveTemplateFromTrainModal() {
   if (typeof _clearAllFieldErrors === 'function') _clearAllFieldErrors('#train-modal');
   const name = document.getElementById('train-modal-name').value.trim();
