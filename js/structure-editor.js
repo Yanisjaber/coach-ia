@@ -204,6 +204,13 @@
     });
     const dk = paceDistanceKm(bl, sport);
     if (dk > 0) out.km = Math.round(dk * 100) / 100;
+    // vitesse canonique en km/h (l'affichage convertit selon le sport)
+    let paceMin = 0;
+    bl.forEach(b => {
+      if ((b.metric || METRICS[g2][0][0]) !== 'pace') return;
+      blockSegs(b).forEach(({ seg }) => { paceMin += +seg.min || 0; });
+    });
+    out.speedKmh = (dk > 0 && paceMin > 0) ? Math.round(dk / (paceMin / 60) * 100) / 100 : null;
     return out;
   }
 
@@ -710,7 +717,7 @@
         const sm = summary(clean);
         window.libraryAddTemplate({ name: nameV, sport: grp(), sport_raw: sportSel ? sportSel.value : 'Ride',
           duration_min: sm.durMin, tss: sm.tss, km: sm.km != null ? sm.km : null,
-          estWatts: sm.w, estBpm: sm.bpm, estPace: sm.pace, estKj: sm.kj, estIf: sm.ifr,
+          estWatts: sm.w, estBpm: sm.bpm, estSpeed: sm.speedKmh, estKj: sm.kj, estIf: sm.ifr,
           description: '', structure: clean });
         const btn = page.querySelector('#se-savelib'); btn.textContent = 'Enregistrée ✓'; btn.disabled = true;
         setTimeout(() => { btn.textContent = 'Enregistrer dans ma bibliothèque'; btn.disabled = false; }, 2500);

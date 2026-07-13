@@ -4012,6 +4012,15 @@ window.rateLabel = function (sport) {
   const cat = window.getSportCategory ? window.getSportCategory(sport || '') : 'autre';
   return (cat === 'course' || cat === 'natation') ? 'Allure' : 'Vitesse';
 };
+// Vitesse canonique (km/h) -> affichage selon sport (min/km, min/100m, km/h)
+window.speedToRate = function (kmh, sport) {
+  kmh = +kmh; if (!(kmh > 0)) return null;
+  const cat = window.getSportCategory ? window.getSportCategory(sport || '') : 'autre';
+  const mmss = (sec) => Math.floor(sec / 60) + ':' + String(Math.round(sec) % 60).padStart(2, '0');
+  if (cat === 'course') return mmss(3600 / kmh) + ' /km';
+  if (cat === 'natation') return mmss(360 / kmh) + ' /100m';
+  return (Math.round(kmh * 10) / 10) + ' km/h';
+};
 window.__parseDurField = function (v) {
   if (typeof v === 'number') return isNaN(v) ? null : v;
   if (window.__durParse) return window.__durParse(v);
@@ -4739,10 +4748,11 @@ function openTrainModalForEdit(training, mode) {
     if (sp && !_hasPaceStruct) {
       const m = window._trainSpeedMode || 'speed';
       let v = '';
-      // valeur STOCKÉE d'abord (saisie manuelle ou calculée au save)
-      if (m === 'speed' && training.estSpeed != null && training.estSpeed > 0) v = training.estSpeed;
-      else if (m !== 'speed' && training.estPace) v = training.estPace;
-      else {
+      // valeur STOCKÉE d'abord (est_speed canonique en km/h, convertie ici)
+      if (+training.estSpeed > 0) {
+        if (m === 'speed') v = +(+training.estSpeed).toFixed(1);
+        else v = fmtPaceSec((m === 'pace_100m' ? 360 : 3600) / +training.estSpeed);
+      } else {
         const mins = +training.duration || 0, km2 = +training.km || 0;
         if (mins > 0 && km2 > 0) {
           if (m === 'speed') v = +(km2 / (mins / 60)).toFixed(1);
@@ -4752,8 +4762,8 @@ function openTrainModalForEdit(training, mode) {
       }
       sp.value = v;
       if (v) sp.dataset.auto = '1';
-    } else if (sp && _hasPaceStruct && training.estPace) {
-      sp.value = training.estPace;
+    } else if (sp && _hasPaceStruct && +training.estSpeed > 0) {
+      sp.value = fmtPaceSec(((window._trainSpeedMode === 'pace_100m') ? 360 : 3600) / +training.estSpeed);
     }
   }
   // Controles "activite" (mode realise edite) : exclusions records + transformer en compet
@@ -4912,22 +4922,19 @@ function saveTrainFromModal() {
   if (Array.isArray(structure) && structure.length && window.StructEd && window.StructEd.summary) {
     try { sm = window.StructEd.summary(structure, sport); } catch (e) { sm = null; }
   }
-  // Vitesse/allure : la valeur du champ (saisie manuelle OU calculée par le
-  // trio temps+distance) est stockée. La structure reste prioritaire (sm).
+  // Vitesse/allure UNIFIÉE : une seule valeur canonique en km/h (est_speed).
+  // Priorité : structure (sm.speedKmh) > champ saisi > temps÷distance.
   const _cat = getSportCategory(sport);
   const _spdField = String((document.getElementById('train-modal-speed') || {}).value || '').trim();
-  let paceNoStruct = null, estSpeed = null;
-  if (_cat === 'course' || _cat === 'natation') {
-    if (!sm) {
-      if (/^\d{1,2}:\d{2}$/.test(_spdField)) paceNoStruct = _spdField; // saisie manuelle
-      else if (km > 0 && duration > 0) {
-        const sec = _cat === 'natation' ? duration * 60 / (km * 10) : duration * 60 / km;
-        paceNoStruct = Math.floor(sec / 60) + ':' + String(Math.round(sec % 60)).padStart(2, '0');
-      }
+  let estSpeed = (sm && sm.speedKmh) ? sm.speedKmh : null;
+  if (estSpeed == null) {
+    if (_cat === 'course' || _cat === 'natation') {
+      const mm = _spdField.match(/^(\d{1,2}):(\d{2})$/);
+      if (mm) { const sec = (+mm[1]) * 60 + (+mm[2]); estSpeed = Math.round(((_cat === 'natation' ? 360 : 3600) / sec) * 100) / 100; }
+    } else {
+      estSpeed = parseFloat(_spdField.replace(',', '.')) || null;
     }
-  } else {
-    estSpeed = parseFloat(_spdField.replace(',', '.')) || null; // km/h saisis
-    if (!estSpeed && km > 0 && duration > 0) estSpeed = Math.round(km / (duration / 60) * 10) / 10;
+    if (estSpeed == null && km > 0 && duration > 0) estSpeed = Math.round(km / (duration / 60) * 100) / 100;
   }
   const entry = {
     id: editingId || Date.now().toString(),
@@ -4936,7 +4943,6 @@ function saveTrainFromModal() {
     tss: sm ? sm.tss : tss,
     estWatts: sm ? sm.w : null,
     estBpm: sm ? sm.bpm : null,
-    estPace: sm ? sm.pace : paceNoStruct,
     estSpeed,
     estKj: sm ? sm.kj : null,
     estIf: sm ? sm.ifr : null,
@@ -5049,7 +5055,7 @@ function saveTemplateFromTrainModal() {
     tss: sm ? sm.tss : (parseInt(document.getElementById('train-modal-tss').value, 10) || 0),
     estWatts: sm ? sm.w : null,
     estBpm: sm ? sm.bpm : null,
-    estPace: sm ? sm.pace : null,
+    estSpeed: sm ? sm.speedKmh : null,
     estKj: sm ? sm.kj : null,
     estIf: sm ? sm.ifr : null,
     description: document.getElementById('train-modal-notes').value.trim(),
@@ -5073,7 +5079,7 @@ window.coachInsertTemplate = function (iso, tpl, mode, ia) {
   const sport = tpl.sport_raw || tpl.sport || 'cyclisme';
   // Les stats STOCKÉES sur le template sont transférées telles quelles.
   // Fallback summary() uniquement pour les vieux templates sans colonnes est_*.
-  const hasEst = tpl.estWatts != null || tpl.estBpm != null || tpl.estPace != null || tpl.estKj != null || tpl.estIf != null;
+  const hasEst = tpl.estWatts != null || tpl.estBpm != null || tpl.estSpeed != null || tpl.estKj != null || tpl.estIf != null;
   let sm = null;
   if (!hasEst && Array.isArray(tpl.structure) && tpl.structure.length && window.StructEd && window.StructEd.summary) {
     try { sm = window.StructEd.summary(tpl.structure, sport); } catch (e) { sm = null; }
@@ -5088,7 +5094,7 @@ window.coachInsertTemplate = function (iso, tpl, mode, ia) {
     tss: hasEst ? (tpl.tss || 0) : (sm ? sm.tss : (tpl.tss || 0)),
     estWatts: hasEst ? (tpl.estWatts ?? null) : (sm ? sm.w : null),
     estBpm: hasEst ? (tpl.estBpm ?? null) : (sm ? sm.bpm : null),
-    estPace: hasEst ? (tpl.estPace ?? null) : (sm ? sm.pace : null),
+    estSpeed: hasEst ? (tpl.estSpeed ?? null) : (sm ? sm.speedKmh : null),
     estKj: hasEst ? (tpl.estKj ?? null) : (sm ? sm.kj : null),
     estIf: hasEst ? (tpl.estIf ?? null) : (sm ? sm.ifr : null),
     notes: tpl.description || '',
@@ -12062,15 +12068,13 @@ function openSessionModal(iso, source) {
       if (t.km) { const _dp = window.fmtDist(t.km, t.sport).split(' '); _heroes.push({ svg: _S.route, val: _dp[0], unit: _dp[1], lab: 'Distance prévue', color: '#22d3ee' }); }
       // TOUT vient des valeurs STOCKÉES (dérivées de la structure au save).
       // Fallback unique pour les anciennes séances jamais re-sauvées : summary().
-      let _est = { w: t.estWatts, bpm: t.estBpm, pace: t.estPace, kj: t.estKj, ifr: t.estIf };
-      if (_est.w == null && _est.bpm == null && _est.pace == null && _est.kj == null
+      let _est = { w: t.estWatts, bpm: t.estBpm, speedKmh: t.estSpeed, kj: t.estKj, ifr: t.estIf };
+      if (_est.w == null && _est.bpm == null && _est.speedKmh == null && _est.kj == null
           && Array.isArray(t.structure) && t.structure.length && window.StructEd && window.StructEd.summary) {
         try { _est = window.StructEd.summary(t.structure, t.sport || 'Ride'); } catch (e) { /* ignore */ }
       }
-      // Allure/vitesse prévue : valeur stockée, sinon km+durée
-      let _rp = null;
-      if (_est.pace) _rp = _est.pace + (window.getSportCategory(t.sport) === 'natation' ? ' /100m' : ' /km');
-      if (!_rp && t.estSpeed != null && t.estSpeed > 0) _rp = t.estSpeed + ' km/h';
+      // Allure/vitesse prévue : est_speed stockée convertie selon le sport, sinon km+durée
+      let _rp = _est.speedKmh ? window.speedToRate(_est.speedKmh, t.sport) : null;
       if (!_rp && t.km && dur) _rp = window.fmtRate(t.km, dur, t.sport);
       if (_rp) { const _ri = _rp.indexOf(' '); _heroes.push({ svg: _S.speed, val: _rp.slice(0, _ri), unit: _rp.slice(_ri + 1), lab: window.rateLabel(t.sport) + ' prévue', color: '#34d399' }); }
       if (t.dplus) _heroes.push({ svg: _S.mtn, val: Math.round(t.dplus), unit: 'm D+', lab: 'Dénivelé prévu', color: '#84cc16' });
