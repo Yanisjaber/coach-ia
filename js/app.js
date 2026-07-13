@@ -8365,9 +8365,20 @@ window.__updateSbMini = function () {
   var blocks = (typeof window.getCurrentWorkoutStructure === 'function') ? window.getCurrentWorkoutStructure() : null;
   mini.hidden = false;
   btn.hidden = false;
-  mini.innerHTML = (blocks && blocks.length && window.renderWorkoutProfileHTML)
-    ? window.renderWorkoutProfileHTML(blocks, { height: 46, labels: false })
-    : '<div class="sb-mini-empty">Aucun bloc pour l\'instant — ouvre l\'éditeur pour construire la séance.</div>';
+  if (blocks && blocks.length && window.renderWorkoutProfileHTML) {
+    var html = window.renderWorkoutProfileHTML(blocks, { height: 46, labels: false });
+    // moyennes de la structure (W moy / bpm moy / allure moy) sous le mini-profil
+    try {
+      var pretty = { 'W MOY': 'W moy', 'BPM MOY': 'bpm moy', 'ALLURE MOY': 'allure moy' };
+      var avgs = (window.StructEd && window.StructEd.avgStats) ? window.StructEd.avgStats(blocks) : [];
+      if (avgs.length) html += '<div class="sb-mini-avgs">' + avgs.map(function (a) {
+        return '<b>' + a.val + '</b> ' + (pretty[a.label] || a.label.toLowerCase());
+      }).join(' · ') + '</div>';
+    } catch (e) { /* éditeur non chargé : pas de moyennes */ }
+    mini.innerHTML = html;
+  } else {
+    mini.innerHTML = '<div class="sb-mini-empty">Aucun bloc pour l\'instant — ouvre l\'éditeur pour construire la séance.</div>';
+  }
 };
 // Toggle « Activer » : affiche simplement le résumé + le bouton d'ouverture
 // (l'utilisateur ouvre la page de création quand IL le décide).

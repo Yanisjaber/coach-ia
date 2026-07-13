@@ -140,9 +140,10 @@
     return { dur, tss: Math.round(tss), ifr, kj: Math.round(kj) };
   }
   // Moyenne pondérée par la durée, PAR MÉTRIQUE utilisée -> [{label, val}]
-  function avgStats() {
+  // (bl optionnel : permet au résumé de la modal de calculer sur ses blocs)
+  function avgStats(bl) {
     const acc = {}; // metric -> { s: somme %·min, w: minutes }
-    blocks.forEach(b => {
+    (bl || blocks).forEach(b => {
       const m = b.metric || curMetric();
       blockSegs(b).forEach(({ seg }) => {
         const w = +seg.min || 0; if (!w) return;
@@ -704,5 +705,5 @@
     if (window.__updateSbMini) setTimeout(window.__updateSbMini, 80);
   }
 
-  window.StructEd = { open, close };
+  window.StructEd = { open, close, avgStats };
 })();
