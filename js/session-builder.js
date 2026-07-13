@@ -127,7 +127,7 @@
   function R(id) { return document.getElementById(id); }
   function fillFields() {
     var t = totals();
-    var d = R('train-modal-duration'); if (d) { d.value = Math.round(t.dur); }
+    var d = R('train-modal-duration'); if (d) { d.value = window.__fmtDurField ? window.__fmtDurField(Math.round(t.dur)) : Math.round(t.dur); }
     var ts = R('train-modal-tss'); if (ts) { ts.value = t.tss; }
   }
 

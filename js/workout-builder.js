@@ -154,7 +154,7 @@ function renderTotalsAndPreview() {
     const tssInp = document.getElementById('train-modal-tss');
     const durInp = document.getElementById('train-modal-duration');
     if (tssInp && totals.tss > 0) tssInp.value = totals.tss;
-    if (durInp && totals.duration > 0) durInp.value = totals.duration;
+    if (durInp && totals.duration > 0) durInp.value = window.__fmtDurField ? window.__fmtDurField(totals.duration) : totals.duration;
   }
 }
 

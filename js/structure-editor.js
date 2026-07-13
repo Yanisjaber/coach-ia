@@ -81,6 +81,7 @@
     const f = parseFloat(v);
     return isNaN(f) ? null : f;
   }
+  window.__durParse = parseDurTxt; // réutilisé par la modal (champ Durée en saisie libre)
 
   function segTargetLabel(seg, metric) {
     const lo = +seg.int || 0, hi = (seg.intHi != null && +seg.intHi > 0) ? +seg.intHi : null;

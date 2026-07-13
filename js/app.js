@@ -3988,6 +3988,22 @@ function fmtPaceSec(sec) {
   if (sec == null || !isFinite(sec) || sec <= 0) return '';
   return Math.floor(sec / 60) + ':' + String(Math.round(sec % 60)).padStart(2, '0');
 }
+// Champ Durée en saisie libre : parse (15 · 15min · 15s · 1h15 · 4:30 · 1,5)
+// et affichage canonique — au-delà de 60 min on passe en heures (1h15).
+window.__parseDurField = function (v) {
+  if (typeof v === 'number') return isNaN(v) ? null : v;
+  if (window.__durParse) return window.__durParse(v);
+  const f = parseFloat(String(v || '').replace(',', '.'));
+  return isNaN(f) ? null : f;
+};
+window.__fmtDurField = function (min) {
+  min = +min || 0; if (min <= 0) return '';
+  const tot = Math.round(min * 60), h = Math.floor(tot / 3600), m = Math.floor((tot % 3600) / 60), s = tot % 60;
+  const p2 = (n) => (n < 10 ? '0' : '') + n;
+  if (h) return h + 'h' + (m || s ? p2(m) : '') + (s ? ':' + p2(s) : '');
+  if (s) return m + ':' + p2(s);
+  return String(m);
+};
 // Câble un trio : cfg = { timeId, distId, rateId, mode: 'speed'|'pace_km'|'pace_100m' }
 // time en min (parseSegTime OU parseTimeToMin pour le temps cible), dist selon champ, rate selon mode.
 function wireTrio(cfg) {
@@ -3998,7 +4014,7 @@ function wireTrio(cfg) {
   const modeOf = () => (typeof cfg.mode === 'function' ? cfg.mode() : cfg.mode);
   const readTime = () => {
     if (cfg.timeParse === 'target') return parseTimeToMin(t.value);
-    if (cfg.timeParse === 'minutes') { const v = parseFloat(String(t.value).replace(',', '.')); return (isNaN(v) || v <= 0) ? null : v; }
+    if (cfg.timeParse === 'minutes') { const v = window.__parseDurField(t.value); return (v == null || v <= 0) ? null : v; }
     return parseSegTime(t.value);
   };
   const readDist = () => {
@@ -4037,7 +4053,7 @@ function wireTrio(cfg) {
     else mins = (dv / 100) * rv / 60;
     let out;
     if (cfg.timeParse === 'target') out = fmtMinToTime(Math.round(mins));
-    else if (cfg.timeParse === 'minutes') out = String(Math.round(mins));
+    else if (cfg.timeParse === 'minutes') out = window.__fmtDurField(Math.round(mins));
     else out = fmtSegTime(mins);
     if (out) { t.value = out; t.dataset.auto = '1'; }
   };
@@ -4070,6 +4086,16 @@ function wireCompTrios() {
   wireTrio({ timeId: 'comp-tri-run-time', distId: 'comp-tri-run-dist', rateId: 'comp-tri-run-pace', mode: 'pace_km' });
 }
 wireCompTrios();
+// Normalise l'affichage du champ Durée après saisie (90 -> 1h30, 15s -> 0:15…)
+(function wireDurField() {
+  const el = document.getElementById('train-modal-duration');
+  if (!el || el._durWired) return;
+  el._durWired = true;
+  el.addEventListener('change', function () {
+    const v = window.__parseDurField(el.value);
+    el.value = v && v > 0 ? window.__fmtDurField(v) : '';
+  });
+})();
 
 // Onglets triathlon : bascule des panneaux + marquage "rempli"
 (function wireTriTabs() {
@@ -4662,7 +4688,7 @@ function openTrainModalForEdit(training, mode) {
     const t = document.getElementById('train-modal-type');
     if (t) { t.value = training.type; if (t._customUpdate) t._customUpdate(); }
   }
-  document.getElementById('train-modal-duration').value = training.duration != null ? training.duration : '';
+  document.getElementById('train-modal-duration').value = training.duration != null ? window.__fmtDurField(training.duration) : '';
   document.getElementById('train-modal-tss').value = training.tss != null ? training.tss : '';
   document.getElementById('train-modal-notes').value = training.notes || '';
   document.getElementById('train-modal-rpe').value = training.rpe != null ? training.rpe : '';
@@ -4817,7 +4843,7 @@ function saveTrainFromModal() {
   const time = (document.getElementById('train-modal-time') || {}).value || '';
   const sport = document.getElementById('train-modal-sport').value;
   const type = (document.getElementById('train-modal-type') || {}).value || '';
-  const duration = parseInt(document.getElementById('train-modal-duration').value, 10) || 0;
+  const duration = Math.round(window.__parseDurField(document.getElementById('train-modal-duration').value) || 0);
   const tss = parseInt(document.getElementById('train-modal-tss').value, 10) || 0;
   const notes = document.getElementById('train-modal-notes').value.trim();
   const rpe = parseFloat(document.getElementById('train-modal-rpe').value) || null;
@@ -4914,7 +4940,7 @@ window.openLibraryTemplateModal = function (tpl) {
   // Pré-remplissage en édition
   if (tpl) {
     document.getElementById('train-modal-name').value = tpl.name || '';
-    document.getElementById('train-modal-duration').value = tpl.duration_min || '';
+    document.getElementById('train-modal-duration').value = tpl.duration_min ? window.__fmtDurField(tpl.duration_min) : '';
     document.getElementById('train-modal-tss').value = tpl.tss || '';
     document.getElementById('train-modal-notes').value = tpl.description || '';
     document.getElementById('train-modal-rpe').value = tpl.rpe != null ? tpl.rpe : '';
@@ -4948,7 +4974,7 @@ function saveTemplateFromTrainModal() {
     sport: rawToLibKey(rawSport),      // clé de regroupement bibliothèque
     sport_raw: rawSport,               // sport Strava exact (repris à l'insertion calendrier)
     name,
-    duration_min: parseInt(document.getElementById('train-modal-duration').value, 10) || 0,
+    duration_min: Math.round(window.__parseDurField(document.getElementById('train-modal-duration').value) || 0),
     tss: parseInt(document.getElementById('train-modal-tss').value, 10) || 0,
     description: document.getElementById('train-modal-notes').value.trim(),
     rpe: parseFloat(document.getElementById('train-modal-rpe').value) || null,
@@ -12293,7 +12319,7 @@ if (_modalEditBtn) {
         setVal('train-modal-date', isoT);
         const dateEl = document.getElementById('train-modal-date');
         if (dateEl && dateEl._flatpickr && isoT) dateEl._flatpickr.setDate(isoT, false);
-        setVal('train-modal-duration', payload.duration);
+        setVal('train-modal-duration', payload.duration != null ? window.__fmtDurField(payload.duration) : null);
         setVal('train-modal-tss', payload.tss);
         setVal('train-modal-notes', payload.notes);
         const sportEl = document.getElementById('train-modal-sport');
