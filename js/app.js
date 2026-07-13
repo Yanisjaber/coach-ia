@@ -3993,14 +3993,11 @@ function fmtPaceSec(sec) {
 // Distance affichée à la dizaine de mètres près (35.42 km), zéros superflus retirés
 window.fmtKm = function (v) { const n = Math.round((+v || 0) * 100) / 100; return String(n); };
 // Distance selon le sport : natation en mètres, le reste en km.
-// prec '100m' (cartes calendrier) : arrondi à la centaine de mètres (7.4 km, 1400 m) ;
-// défaut (modals) : dizaine de mètres (7.38 km, 1420 m).
+// prec '100m' (cartes calendrier) : les km s'arrondissent à la centaine de
+// mètres (7.4 km) ; les valeurs en MÈTRES gardent la dizaine (1420 m).
 window.fmtDist = function (km, sport, prec) {
   const cat = window.getSportCategory ? window.getSportCategory(sport || '') : 'autre';
-  if (cat === 'natation') {
-    const m = (+km || 0) * 1000;
-    return (prec === '100m' ? Math.round(m / 100) * 100 : Math.round(m / 10) * 10) + ' m';
-  }
+  if (cat === 'natation') return (Math.round((+km || 0) * 100) * 10) + ' m';
   if (prec === '100m') return String(Math.round((+km || 0) * 10) / 10) + ' km';
   return window.fmtKm(km) + ' km';
 };
