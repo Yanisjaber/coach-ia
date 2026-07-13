@@ -80,7 +80,12 @@
   function HRMAX() { try { var a = window.DASHBOARD_DATA && window.DASHBOARD_DATA.athlete; return (a && (+a.hr_max || +a.hrMax)) || 190; } catch (e) { return 190; } }
   var PACE = { course: { base: 240, unit: '/km' }, natation: { base: 100, unit: '/100m' } };
   var ZC = ['var(--z1)', 'var(--z2)', 'var(--z3)', 'var(--z4)', 'var(--z5)', 'var(--z6)'];
-  function zoneOf(p) { if (p < 55) return 0; if (p < 76) return 1; if (p < 91) return 2; if (p < 106) return 3; if (p < 121) return 4; if (p < 151) return 5; return 6; }
+  // Zone selon la MÉTRIQUE DU BLOC (power 7 zones, hr/pace 5) — par bornes lo
+  function zoneOf(p, m) {
+    var Z = ZONES[m || 'power'] || ZONES.power;
+    for (var i = Z.lo.length - 1; i >= 0; i--) { if (p >= Z.lo[i]) return i; }
+    return 0;
+  }
   var ICO = { warmup: '&#9650;', interval: '&#9889;', steady: '&#9473;', recovery: '&#9176;', cooldown: '&#9660;' };
   var NAME = { warmup: 'Echauffement', interval: 'Intervalles', steady: 'Bloc continu', recovery: 'Recuperation', cooldown: 'Retour au calme' };
   var DESC = { warmup: 'Montee progressive', interval: 'Serie effort / recup', steady: 'Effort soutenu', recovery: 'Entre les efforts', cooldown: 'Descente progressive' };
@@ -164,7 +169,7 @@
       var grp = document.createElement('div'); grp.className = 'sb-pblock'; grp.draggable = true; grp.dataset.bi = bi;
       grp.style.flex = Math.max(0.06, bmin / tot); grp.title = (b.name || NAME[b.type]) + ' - ' + fmtDur(bmin);
       var inner = document.createElement('div'); inner.className = 'sb-bars'; var it = bmin || 1;
-      segs.forEach(function (s) { var bar = document.createElement('div'); bar.className = 'sb-bar'; bar.style.flex = Math.max(0.05, (+s.min || 0) / it); bar.style.height = Math.max(8, (midOf(s) / mx) * 100) + '%'; bar.style.background = ZC[zoneOf(midOf(s))]; inner.appendChild(bar); });
+      segs.forEach(function (s) { var bar = document.createElement('div'); bar.className = 'sb-bar'; bar.style.flex = Math.max(0.05, (+s.min || 0) / it); bar.style.height = Math.max(8, (midOf(s) / mx) * 100) + '%'; bar.style.background = ZC[zoneOf(midOf(s), b.metric)]; inner.appendChild(bar); });
       var lab = document.createElement('div'); lab.className = 'sb-plab'; lab.textContent = b.name || NAME[b.type];
       grp.appendChild(inner); grp.appendChild(lab); wrap.appendChild(grp);
     });
@@ -176,13 +181,13 @@
     var els = document.querySelectorAll('#sb-blocks .sb-blk');
     els.forEach(function (el, bi) {
       var b = blocks[bi]; if (!b) return;
-      el.style.borderLeftColor = ZC[zoneOf(midOf(b.work))];
+      el.style.borderLeftColor = ZC[zoneOf(midOf(b.work), b.metric)];
       var order = ['work']; if (b.type === 'interval' && b.rec) order.push('rec');
       var lines = el.querySelectorAll('.sb-line');
       lines.forEach(function (ln, k) {
         var seg = b[order[k]]; if (!seg) return;
         var pill = ln.querySelector('.sb-eqpill'); if (!pill) return;
-        var col = ZC[zoneOf(midOf(seg))];
+        var col = ZC[zoneOf(midOf(seg), b.metric)];
         pill.style.borderLeftColor = col;
         pill.innerHTML = '<span class="sb-chip" style="background:' + col + '"></span>' + label(seg, b.metric);
       });
@@ -213,13 +218,13 @@
       + '<span class="sb-role">' + role + '</span>'
       + '<div><span class="sb-mini">Duree (min)</span><input type="number" min="0" step="0.5" data-i="' + idx + '" data-seg="' + which + '" data-f="min" value="' + seg.min + '"></div>'
       + '<div><span class="sb-mini">Cible</span>' + targetInput(idx, which, b) + '</div>'
-      + '<div class="sb-eq"><span class="sb-eqpill" style="border-left-color:' + ZC[zoneOf(midOf(seg))] + '"><span class="sb-chip" style="background:' + ZC[zoneOf(midOf(seg))] + '"></span>' + label(seg, b.metric) + '</span></div>'
+      + '<div class="sb-eq"><span class="sb-eqpill" style="border-left-color:' + ZC[zoneOf(midOf(seg), b.metric)] + '"><span class="sb-chip" style="background:' + ZC[zoneOf(midOf(seg), b.metric)] + '"></span>' + label(seg, b.metric) + '</span></div>'
       + '</div>';
   }
   function renderBlocks() {
     var wrap = R('sb-blocks'); if (!wrap) return; wrap.innerHTML = '';
     blocks.forEach(function (b, idx) {
-      var el = document.createElement('div'); el.className = 'sb-blk'; el.style.borderLeftColor = ZC[zoneOf(midOf(b.work))];
+      var el = document.createElement('div'); el.className = 'sb-blk'; el.style.borderLeftColor = ZC[zoneOf(midOf(b.work), b.metric)];
       var isInt = b.type === 'interval';
       el.innerHTML = '<div class="sb-blk-top">'
         + '<span class="sb-bico">' + (ICO[b.type] || '&#9473;') + '</span>'
@@ -351,7 +356,7 @@
       html += '<div style="display:flex;flex-direction:column;height:100%;min-width:0;flex:' + Math.max(minFlex, bmin / tot) + '">';
       html += '<div style="flex:1;display:flex;align-items:flex-end;gap:0;min-height:0">';
       segs.forEach(function (s) {
-        var zi = zoneOf(midOf(s));
+        var zi = zoneOf(midOf(s), _m);
         var hgt = Math.max(8, (midOf(s) / mx) * 100);
         var sName = (b.type === 'interval' && b.rec && s === b.rec) ? 'Récup'
           : (b.type === 'interval' ? ((b.name && b.name !== NAME.interval) ? b.name : 'Effort') : (b.name || NAME[b.type] || ''));
@@ -396,7 +401,7 @@
       if (b.type === 'interval' && b.rec && +b.rec.min > maxMin) maxMin = +b.rec.min;
     });
     function bar(seg, m, leftLabel) {
-      var zi = zoneOf(midOf(seg)); var col = ZHEX[zi];
+      var zi = zoneOf(midOf(seg), m); var col = ZHEX[zi];
       var pct = Math.max(10, Math.min(100, Math.round((+seg.min || 0) / maxMin * 100)));
       var txt = fmtDur(+seg.min || 0) + ' · Z' + (zi + 1) + ' · ' + valStr(seg, m);
       return '<div style="display:flex;align-items:center;gap:10px;margin:7px 0">'
