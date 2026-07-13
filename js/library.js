@@ -308,20 +308,29 @@ function openTemplatePreview(id) {
   if (!t) return;
   const k = t.sport || 'autre';
   const info = sportInfo(k);
-  const meta = [
-    t.duration_min ? fmtDur(t.duration_min) : null,
-    t.tss ? t.tss + ' TSS' : null,
-    t.km ? t.km + ' km' : null,
-    t.dplus ? t.dplus + ' m D+' : null,
-    (t.rpe != null && t.rpe !== '') ? 'RPE ' + t.rpe : null,
-  ].filter(Boolean).join(' · ');
+  // Proto D : bandeau de stats intégré à la carte du profil (une seule carte)
+  const _statCell = (val, lab, col) => `<div class="lib-pv-stat"><div class="lib-pv-val" style="color:${col}">${val}</div><div class="lib-pv-lab">${lab}</div></div>`;
+  const _rate = (t.estSpeed != null && t.estSpeed > 0 && window.speedToRate) ? window.speedToRate(t.estSpeed, t.sport_raw || t.sport) : null;
+  const _dist = (t.km != null && t.km > 0 && window.fmtDist) ? window.fmtDist(t.km, t.sport_raw || t.sport) : null;
+  const stats = [
+    t.duration_min ? _statCell(fmtDur(t.duration_min), 'durée', '#60a5fa') : null,
+    _dist ? _statCell(_dist, 'distance', '#22d3ee') : null,
+    _rate ? _statCell(_rate.replace(' ', '&nbsp;'), (window.rateLabel ? window.rateLabel(t.sport_raw || t.sport) : 'Vitesse').toLowerCase(), '#34d399') : null,
+    (t.estWatts != null) ? _statCell(t.estWatts + '&nbsp;W', 'w moy', '#a5b4fc') : null,
+    t.tss ? _statCell(t.tss, 'tss', '#fbbf24') : null,
+    (t.estIf != null && t.estIf > 0) ? _statCell((+t.estIf).toFixed(2), 'if', '#f97316') : null,
+  ].filter(Boolean).join('');
   const _hasStruct = Array.isArray(t.structure) && t.structure.length;
-  const profile = (_hasStruct && window.renderWorkoutProfileHTML)
-    ? `<div class="lib-preview-profile">${window.renderWorkoutProfileHTML(t.structure, { height: 56, labels: false, sport: t.sport })}</div>`
+  const _graph = (_hasStruct && window.renderWorkoutProfileHTML)
+    ? window.renderWorkoutProfileHTML(t.structure, { height: 56, labels: false, sport: t.sport_raw || t.sport, bg: 'transparent', border: 'none', radius: 0, padding: 0 })
     : '';
-  // Détail du profil (liste des blocs/intervalles) sous le graphique
+  const profile = (stats || _graph)
+    ? `<div class="lib-pv-card">${stats ? `<div class="lib-pv-band">${stats}</div>` : ''}${_graph ? `<div class="lib-pv-graph">${_graph}</div>` : ''}</div>`
+    : '';
+  const meta = ''; // les stats vivent dans le bandeau
+  // Détail du profil (liste des blocs/intervalles) sous la carte
   const detail = (_hasStruct && typeof window.renderWorkoutDetailHTML === 'function')
-    ? `<div class="lib-preview-detail">${window.renderWorkoutDetailHTML(t.structure, { sport: t.sport })}</div>`
+    ? `<div class="lib-preview-detail">${window.renderWorkoutDetailHTML(t.structure, { sport: t.sport_raw || t.sport })}</div>`
     : '';
   const overlay = document.createElement('div');
   overlay.className = 'day-modal-overlay active';

@@ -242,6 +242,13 @@ body.lib-placing-mode .day-card[data-iso]:active {
 /* Modal aperçu (œil) */
 .lib-preview-meta { font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
 .lib-preview-profile { margin: 4px 0 10px; }
+/* Proto D : carte unique = bandeau de stats + graphe */
+.lib-pv-card { background: var(--bg-elev2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 4px 0 12px; }
+.lib-pv-band { display: flex; justify-content: space-around; padding: 11px 8px; border-bottom: 1px solid var(--border); }
+.lib-pv-stat { text-align: center; min-width: 0; padding: 0 4px; }
+.lib-pv-val { font-weight: 800; font-size: 15px; white-space: nowrap; }
+.lib-pv-lab { font-size: 9px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px; }
+.lib-pv-graph { padding: 12px; }
 .lib-preview-desc { font-size: 13px; color: var(--text); white-space: pre-wrap; line-height: 1.5; }
 
 .lib-empty, .lib-noresult {
