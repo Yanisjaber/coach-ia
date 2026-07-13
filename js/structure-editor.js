@@ -532,14 +532,14 @@
       rerender();
     };
     box.querySelectorAll('.se-w-lo, .se-w-hi').forEach(inp => inp.addEventListener('change', () => applyLoHi(inp.dataset.w)));
-    // mini-flèches allure : ±5 s sur le champ visé (▴ = plus lent, ▾ = plus rapide)
+    // mini-flèches allure : ±1 s sur le champ visé (▴ = plus lent, ▾ = plus rapide)
     box.querySelectorAll('.se-ps').forEach(x => x.addEventListener('click', () => {
       const card = box.querySelector('.se-segcard[data-card="' + x.dataset.pw + '"]');
       const inp = card.querySelector(x.dataset.pf === 'lo' ? '.se-w-lo' : '.se-w-hi');
       const src = String(inp.value || card.querySelector('.se-w-lo').value || '').trim();
       const m = src.match(/^(\d{1,2}):(\d{2})$/);
       if (!m) return;
-      const sec = Math.max(5, (+m[1]) * 60 + (+m[2]) + (+x.dataset.pd) * 5);
+      const sec = Math.max(1, (+m[1]) * 60 + (+m[2]) + (+x.dataset.pd));
       inp.value = Math.floor(sec / 60) + ':' + pad2(sec % 60);
       inp.dispatchEvent(new Event('change', { bubbles: true }));
     }));
