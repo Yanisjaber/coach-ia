@@ -586,7 +586,7 @@ export async function pushTraining(training, mode) {
         user_notes: training.notes ?? null,
         distance_km: training.km ?? null, total_elevation_gain: training.dplus ?? null, rpe: training.rpe ?? null,
         laps: training.laps ?? null, gpx_name: training.gpxName ?? null, gpx_content: training.gpxContent ?? null,
-        structure: training.structure ?? null, est: training.est ?? null, type: training.type ?? null,
+        structure: training.structure ?? null, type: training.type ?? null,
         excl_power: !!training.exclPower, excl_hr: !!training.exclHr, excl_distance: !!training.exclDistance,
         tri: training.tri ?? null,
       };
