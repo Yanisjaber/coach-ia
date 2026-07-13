@@ -2773,6 +2773,9 @@ function _openCompActionsMenu(btn, id) {
       saveCompetitions(rest);
       renderCompList(); renderCompetitionsPage(); renderCalendar();
     } });
+  } else if (!isRealised) {
+    // compét PRÉVUE : redevient une séance planifiée (mêmes données)
+    items.push({ lab: 'Transformer en entraînement', fn: () => window.convertPlannedCompToTraining(id) });
   }
   items.push({ lab: 'Supprimer', danger: true, fn: () => {
     const rest = loadCompetitions().filter(c => c.id !== id);
@@ -4556,9 +4559,13 @@ if (compModalSave) compModalSave.addEventListener('click', saveCompFromModal);
 const _compToTrainingBtn = document.getElementById('comp-modal-to-training');
 if (_compToTrainingBtn) _compToTrainingBtn.addEventListener('click', async () => {
   const act = window._compToTrainingAct, iso = window._compToTrainingIso;
-  if (!act || !act._sbId) return;
+  const plannedId = window._compToTrainingPlannedId;
   if (typeof closeCompModal === 'function') closeCompModal();
-  if (typeof setActivityCategory === 'function') await setActivityCategory(act, 'entrainement', iso);
+  if (act && act._sbId) {
+    if (typeof setActivityCategory === 'function') await setActivityCategory(act, 'entrainement', iso);
+  } else if (plannedId != null && window.convertPlannedCompToTraining) {
+    window.convertPlannedCompToTraining(plannedId);
+  }
 });
 const compModalOverlay = document.getElementById('comp-modal');
 if (compModalOverlay) compModalOverlay.addEventListener('click', (e) => {
@@ -4662,6 +4669,7 @@ function openTrainModal(mode) {
   window._templateMode = false;
   window._templateEditing = null;
   { const _alb = document.getElementById('train-modal-addlib'); if (_alb) _alb.hidden = false; }
+  { const _tc = document.getElementById('train-modal-tocomp'); if (_tc) _tc.hidden = true; } // visible seulement en édition prévu
   ['train-modal-date', 'train-modal-time'].forEach(id => {
     const el = document.getElementById(id);
     const lab = el && el.closest('label');
@@ -4714,6 +4722,7 @@ function openTrainModalForEdit(training, mode) {
   openTrainModal(mode);
   window._editingTrainId = training.id;
   window._editingTrainMode = mode;
+  { const _tc = document.getElementById('train-modal-tocomp'); if (_tc) _tc.hidden = mode !== 'prevu'; }
   trainModalMode = mode;
   document.getElementById('train-modal-name').value = training.name || '';
   document.getElementById('train-modal-date').value = training.date || '';
@@ -5039,6 +5048,45 @@ window.openLibraryTemplateModal = function (tpl) {
   if (saveBtn) saveBtn.textContent = tpl ? 'Enregistrer les modifications' : 'Enregistrer';
 };
 
+// ===== Conversions prévu : séance <-> compétition (mêmes données, autre catégorie) =====
+window.convertPlannedCompToTraining = function (compId) {
+  const comp = loadCompetitions().find(c => String(c.id) === String(compId));
+  if (!comp) return;
+  const entry = {
+    id: Date.now().toString() + Math.random().toString(36).slice(2, 5),
+    name: comp.name, date: comp.date, time: comp.time || '', sport: comp.sport || 'Ride', type: '',
+    duration: comp.target || 0, tss: comp.tss || 0,
+    estWatts: null, estBpm: null, estKj: null, estIf: null,
+    estSpeed: (comp.km > 0 && comp.target > 0) ? Math.round(comp.km / (comp.target / 60) * 100) / 100 : null,
+    notes: comp.notes || '', rpe: comp.rpe ?? null, km: comp.km ?? null, dplus: comp.dplus ?? null,
+    laps: null, tri: comp.tri ?? null, gpxName: comp.gpxName || null, gpxContent: comp.gpxContent || null,
+    mode: 'prevu', structure: null,
+  };
+  const arr = loadTrainings(); arr.push(entry); saveTrainings(arr);
+  saveCompetitions(loadCompetitions().filter(c => String(c.id) !== String(compId)));
+  if (typeof renderCompList === 'function') renderCompList();
+  if (typeof renderCompetitionsPage === 'function') renderCompetitionsPage();
+  if (typeof renderCalendar === 'function') renderCalendar();
+};
+window.convertTrainingToComp = function (trainingId) {
+  const arr = loadTrainings();
+  const t = arr.find(x => String(x.id) === String(trainingId));
+  if (!t) return;
+  const comp = {
+    id: Date.now().toString() + Math.random().toString(36).slice(2, 5),
+    name: t.name, date: t.date, time: t.time || null, sport: t.sport || 'Ride',
+    priority: 'B', km: t.km ?? null, dplus: t.dplus ?? null,
+    target: t.duration || null, tss: t.tss || null, rpe: t.rpe ?? null,
+    notes: t.notes || '', laps: t.laps ?? null, tri: t.tri ?? null,
+    gpxName: t.gpxName || null, gpxContent: t.gpxContent || null,
+  };
+  const comps = loadCompetitions(); comps.push(comp); saveCompetitions(comps);
+  saveTrainings(arr.filter(x => String(x.id) !== String(trainingId)));
+  if (typeof renderCompList === 'function') renderCompList();
+  if (typeof renderCompetitionsPage === 'function') renderCompetitionsPage();
+  if (typeof renderCalendar === 'function') renderCalendar();
+};
+
 // « + Bibliothèque » : enregistre la séance de la modal comme modèle,
 // AVEC km / D+ / RPE (que l'éditeur de structure ne connaissait pas).
 function addTrainModalToLibrary() {
@@ -5077,6 +5125,17 @@ function addTrainModalToLibrary() {
 {
   const _albBtn = document.getElementById('train-modal-addlib');
   if (_albBtn) _albBtn.addEventListener('click', addTrainModalToLibrary);
+  const _tcBtn = document.getElementById('train-modal-tocomp');
+  if (_tcBtn) _tcBtn.addEventListener('click', async () => {
+    const id = window._editingTrainId;
+    if (!id || !window.convertTrainingToComp) return;
+    const ok = await (window.appConfirm
+      ? window.appConfirm({ title: 'Transformer en compétition', message: 'Cette séance deviendra une compétition (priorité B, modifiable ensuite). Continuer ?', confirmLabel: 'Transformer' })
+      : Promise.resolve(window.confirm('Transformer en compétition ?')));
+    if (!ok) return;
+    closeTrainModal();
+    window.convertTrainingToComp(id);
+  });
 }
 function saveTemplateFromTrainModal() {
   if (typeof _clearAllFieldErrors === 'function') _clearAllFieldErrors('#train-modal');
@@ -12739,13 +12798,15 @@ function openCompModalForEdit(comp) {
   // Affiche le bouton poubelle (uniquement en édition)
   const delBtn = document.getElementById('comp-modal-delete');
   if (delBtn) delBtn.hidden = false;
-  // Bouton "Transformer en entrainement" : uniquement pour une compet REALISEE (activite en base).
+  // Bouton "Transformer en entrainement" : compet réalisée (activité en base)
+  // OU compét prévue (conversion locale planned -> séance)
   const _toTrain = document.getElementById('comp-modal-to-training');
   if (_toTrain) {
     const _isRealisedAct = !!(comp._sbId && (comp._table === 'activity' || comp.realised === true));
-    _toTrain.hidden = !_isRealisedAct;
+    _toTrain.hidden = false;
     window._compToTrainingAct = _isRealisedAct ? { _sbId: comp._sbId, category: 'competition', name: comp.name, sport: comp.sport } : null;
     window._compToTrainingIso = comp.date || null;
+    window._compToTrainingPlannedId = _isRealisedAct ? null : comp.id;
   }
 }
 
