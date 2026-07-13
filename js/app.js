@@ -801,7 +801,7 @@ const loadChart = new Chart(document.getElementById('chart-load'), {
             return acts.map(a => {
               const name = a.name || a.sessionName || 'Séance';
               const dur = a.duration ? fmtDur(a.duration) : '';
-              const km = a.distance_km ? Math.round(a.distance_km) + ' km' : '';
+              const km = a.distance_km ? window.fmtKm(a.distance_km) + ' km' : '';
               const meta = [dur, km].filter(Boolean).join(' · ');
               return meta ? `• ${name} — ${meta}` : `• ${name}`;
             });
@@ -1108,7 +1108,7 @@ function formatWeekStats(week) {
   };
   const chip = (icon, val, lbl) => `<div class="vol-stat">${icon}<div><span class="vs-val">${val}</span><span class="vs-lbl">${lbl}</span></div></div>`;
   const chips = [chip(ic.dur, durStr, 'Durée')];
-  if (km > 0) chips.push(chip(ic.km, Math.round(km) + ' km', 'Distance'));
+  if (km > 0) chips.push(chip(ic.km, window.fmtKm(km) + ' km', 'Distance'));
   if (dplus > 0) chips.push(chip(ic.dplus, Math.round(dplus) + ' m', 'D+'));
   chips.push(chip(ic.tss, Math.round(week.tss || 0), 'TSS'));
   return `<div class="vol-stats-week">${week.label}</div><div class="vol-stats-grid">${chips.join('')}</div>`;
@@ -2408,7 +2408,7 @@ function renderCompetitionsPage() {
       }
       if (!tssV && g.day && g.dayFallback) tssV = g.day.tss || 0;
       const metrics = [];
-      if (dist) metrics.push(Math.round(dist) + ' km');
+      if (dist) metrics.push(window.fmtKm(dist) + ' km');
       if (dur) metrics.push(fmtDur(dur));
       if (elev) metrics.push(Math.round(elev) + ' m D+');
       if (tssV) metrics.push(Math.round(tssV) + ' TSS');
@@ -3990,6 +3990,8 @@ function fmtPaceSec(sec) {
 }
 // Champ Durée en saisie libre : parse (15 · 15min · 15s · 1h15 · 4:30 · 1,5)
 // et affichage canonique — au-delà de 60 min on passe en heures (1h15).
+// Distance affichée à la dizaine de mètres près (35.42 km), zéros superflus retirés
+window.fmtKm = function (v) { const n = Math.round((+v || 0) * 100) / 100; return String(n); };
 window.__parseDurField = function (v) {
   if (typeof v === 'number') return isNaN(v) ? null : v;
   if (window.__durParse) return window.__durParse(v);
@@ -5342,7 +5344,7 @@ function renderWeekPlan() {
             km: c.km || null,
             dplus: c.dplus || null,
             priority: c.priority,
-            why: `Compétition · ${compPrio(c.priority).label}${c.km ? ' · ' + Math.round(c.km) + ' km' : ''}`,
+            why: `Compétition · ${compPrio(c.priority).label}${c.km ? ' · ' + window.fmtKm(c.km) + ' km' : ''}`,
           });
         }
 
@@ -5426,7 +5428,7 @@ function renderWeekPlan() {
         sportLabel = window.sportFr(proposal.sport || 'cyclisme');
         sportCat = window.activitySportColorKey({ sport: proposal.sport || 'cyclisme' }) || 'autre';
       }
-      const kmStr = proposal.km ? Math.round(proposal.km) + ' km' : '';
+      const kmStr = proposal.km ? window.fmtKm(proposal.km) + ' km' : '';
       const durStr = proposal.dur ? fmtDur(proposal.dur) : '';
       const dplusStr = proposal.dplus ? Math.round(proposal.dplus) + ' m D+' : '';
       const rpeStr = (proposal.rpe != null && proposal.rpe !== '') ? 'RPE ' + proposal.rpe : '';
@@ -5459,7 +5461,7 @@ function renderWeekPlan() {
           const g = _r ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(it.sport, 22) : '');
           // Format compact pour colonnes étroites : "42m" au lieu de "42 min"
           // (évite que "min" parte sur une 2e ligne quand 4-5 activités en parallèle)
-          const tRaw = it.dur ? fmtDur(it.dur) : (it.km ? Math.round(it.km) + ' km' : '');
+          const tRaw = it.dur ? fmtDur(it.dur) : (it.km ? window.fmtKm(it.km) + ' km' : '');
           const t = tRaw.replace(' min', 'm');
           const nm = it.name || 'Séance';
           return `<div class="day-multi-col" data-iso="${iso}" data-source="prevu" data-actidx="${i}" title="${String(nm).replace(/\"/g, '&quot;')}" style="background:${hex}1a">`
@@ -5649,7 +5651,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
       const hex = isComp ? compPrio(a.priority).color : (window.sportColor ? window.sportColor(a.raw_type || a.sport) : '#9ca3af');
       const g = isComp ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(a.raw_type || a.sport, 22) : '');
       // Format compact pour colonnes étroites : "42m" au lieu de "42 min"
-      const _tRaw = a.duration ? fmtDur(a.duration) : (a.distance_km ? Math.round(a.distance_km) + ' km' : '');
+      const _tRaw = a.duration ? fmtDur(a.duration) : (a.distance_km ? window.fmtKm(a.distance_km) + ' km' : '');
       const t = _tRaw.replace(' min', 'm');
       const _nm = a.name || a.sessionName || 'Séance';
       return `<div class="day-multi-col" data-iso="${iso}" data-source="realise" data-actidx="${i}" title="${String(_nm).replace(/"/g, '&quot;')}" style="background:${hex}1a">`
@@ -5690,7 +5692,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   // Fallbacks robustes pour data.js ancien format (champs day-level)
   const aType = act.type || act.sessionType || '';
   const aName = act.name || act.sessionName || 'Séance';
-  const km = act.distance_km ? Math.round(act.distance_km) + ' km' : '';
+  const km = act.distance_km ? window.fmtKm(act.distance_km) + ' km' : '';
   // Nom de sport Strava exact + clé couleur pour la pill
   let sportLabel = window.activitySportLabel ? window.activitySportLabel(act) : '';
   let sportCat = window.activitySportColorKey ? window.activitySportColorKey(act) : 'autre';
@@ -8205,7 +8207,7 @@ window.__buildAfOverview = function (act, m) {
 
   var vRows = [];
   vRows.push(row('Durée', fmtHMS(durSec)));
-  if (act.distance_km) vRows.push(row('Distance', (+act.distance_km).toFixed(1) + ' km'));
+  if (act.distance_km) vRows.push(row('Distance', window.fmtKm(act.distance_km) + ' km'));
   if (act.elevation_gain) vRows.push(row('Dénivelé+', Math.round(act.elevation_gain) + ' m'));
   if (act.avg_speed_kmh) vRows.push(row('Vitesse moy', (+act.avg_speed_kmh).toFixed(1) + ' km/h'));
 
@@ -11961,7 +11963,7 @@ function openSessionModal(iso, source) {
       const _S = window.__statSvg || {};
       const _heroes = [];
       if (dur) _heroes.push({ svg: _S.clock, val: (dur < 60 ? Math.round(dur) + '<span style="font-size:13px"> min</span>' : (Math.floor(dur / 60) + '<span style="font-size:13px">h</span>' + String(Math.round(dur % 60)).padStart(2, '0'))), unit: '', lab: 'Durée prévue', color: '#60a5fa' });
-      if (t.km) _heroes.push({ svg: _S.route, val: Math.round(t.km), unit: 'km', lab: 'Distance prévue', color: '#22d3ee' });
+      if (t.km) _heroes.push({ svg: _S.route, val: window.fmtKm(t.km), unit: 'km', lab: 'Distance prévue', color: '#22d3ee' });
       if (t.km && dur) _heroes.push({ svg: _S.speed, val: (Math.round((t.km / (dur / 60)) * 10) / 10), unit: 'km/h', lab: 'Vitesse prévue', color: '#34d399' });
       if (t.dplus) _heroes.push({ svg: _S.mtn, val: Math.round(t.dplus), unit: 'm D+', lab: 'Dénivelé prévu', color: '#84cc16' });
       if (_heroes.length < 3 && t.tss) _heroes.push({ svg: _S.bolt, val: t.tss, unit: '', lab: 'TSS estimé', color: '#fbbf24' });
@@ -13178,7 +13180,7 @@ function renderSessionsTable() {
     const sportLabel = window.activitySportLabel ? window.activitySportLabel(s) : (s.sport || '—');
     const sportCat = window.activitySportColorKey ? window.activitySportColorKey(s) : 'autre';
     const dist = s.distance_km != null
-      ? (s.distance_km >= 100 ? Math.round(s.distance_km) : s.distance_km.toFixed(1)).toString().replace('.', ',') + ' km'
+      ? window.fmtKm(s.distance_km).replace('.', ',') + ' km'
       : '—';
     const dplus = s.elevation_gain != null ? Math.round(s.elevation_gain) + ' m' : '—';
     return `
