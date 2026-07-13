@@ -12056,7 +12056,7 @@ function openSessionModal(iso, source) {
       const sportLabel = window.sportFr(t.sport || 'Ride');
       const sportCat = window.activitySportColorKey({ sport: t.sport }) || 'autre';
       const sportPill = `<span class="sport-pill" data-sport-cat="${sportCat}" style="margin-left:8px;vertical-align:middle;">${sportLabel}</span>`;
-      titleEl.innerHTML = `${t.name}${sportPill}`;
+      titleEl.textContent = t.name;
       // Heure (comme en realise) si la seance en a une ; sinon juste la date.
       let _timeStr = '';
       if (t.time) _timeStr = ' · ' + String(t.time).replace(':', 'h');
@@ -12064,7 +12064,7 @@ function openSessionModal(iso, source) {
         const _mt = String(t.start_date_local).match(/T(\d{2}):(\d{2})/);
         if (_mt) _timeStr = ` · ${_mt[1]}h${_mt[2]}`;
       }
-      metaEl.innerHTML = `${_dateStr}${_timeStr}`;
+      metaEl.innerHTML = `${_dateStr}${_timeStr}${sportPill}`;
       const dur = t.duration || 0;
       const _S = window.__statSvg || {};
       const _heroes = [];
