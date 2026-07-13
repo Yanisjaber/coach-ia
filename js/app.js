@@ -5037,17 +5037,28 @@ function saveTemplateFromTrainModal() {
 window.coachInsertTemplate = function (iso, tpl, mode, ia) {
   if (!iso || !tpl) return;
   const m = mode === 'realise' ? 'realise' : 'prevu';
+  const sport = tpl.sport_raw || tpl.sport || 'cyclisme';
+  // Structure = source de vérité : mêmes dérivations qu'au save de la modal
+  let sm = null;
+  if (Array.isArray(tpl.structure) && tpl.structure.length && window.StructEd && window.StructEd.summary) {
+    try { sm = window.StructEd.summary(tpl.structure, sport); } catch (e) { sm = null; }
+  }
   const entry = {
     id: Date.now().toString() + Math.random().toString(36).slice(2, 5),
     name: tpl.name || 'Séance',
     date: iso,
-    sport: tpl.sport_raw || tpl.sport || 'cyclisme',
+    sport,
     type: tpl.type || '',
-    duration: tpl.duration_min || 0,
-    tss: tpl.tss || 0,
+    duration: sm ? sm.durMin : (tpl.duration_min || 0),
+    tss: sm ? sm.tss : (tpl.tss || 0),
+    estWatts: sm ? sm.w : null,
+    estBpm: sm ? sm.bpm : null,
+    estPace: sm ? sm.pace : null,
+    estKj: sm ? sm.kj : null,
+    estIf: sm ? sm.ifr : null,
     notes: tpl.description || '',
     rpe: (tpl.rpe != null ? tpl.rpe : null),
-    km: (tpl.km != null ? tpl.km : null),
+    km: (sm && sm.km != null) ? sm.km : (tpl.km != null ? tpl.km : null),
     dplus: (tpl.dplus != null ? tpl.dplus : null),
     mode: m,
     structure: tpl.structure || null,

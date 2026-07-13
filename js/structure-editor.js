@@ -702,11 +702,13 @@
     });
     page.querySelector('#se-savelib').addEventListener('click', () => {
       if (!blocks.length) return;
-      const t = totals();
       const nameV = (document.getElementById('train-modal-name') || {}).value || 'Séance structurée';
       const sportSel = document.getElementById('train-modal-sport');
       if (typeof window.libraryAddTemplate === 'function') {
-        window.libraryAddTemplate({ name: nameV, sport: grp(), sport_raw: sportSel ? sportSel.value : 'Ride', duration_min: Math.round(t.dur), tss: t.tss, description: '', structure: JSON.parse(JSON.stringify(blocks)) });
+        // structure NETTOYÉE (sans clés de travail) + données dérivées par summary
+        const clean = JSON.parse(JSON.stringify(blocks, (k, v) => (k === '_recSaved' || k === '_prevType') ? undefined : v));
+        const sm = summary(clean);
+        window.libraryAddTemplate({ name: nameV, sport: grp(), sport_raw: sportSel ? sportSel.value : 'Ride', duration_min: sm.durMin, tss: sm.tss, km: sm.km != null ? sm.km : null, description: '', structure: clean });
         const btn = page.querySelector('#se-savelib'); btn.textContent = 'Enregistrée ✓'; btn.disabled = true;
         setTimeout(() => { btn.textContent = 'Enregistrer dans ma bibliothèque'; btn.disabled = false; }, 2500);
       }
