@@ -4737,13 +4737,18 @@ function openTrainModalForEdit(training, mode) {
     const _hasPaceStruct = Array.isArray(training.structure) && training.structure.length
       && window._trainSpeedMode && window._trainSpeedMode !== 'speed';
     if (sp && !_hasPaceStruct) {
-      const mins = +training.duration || 0, km2 = +training.km || 0;
+      const m = window._trainSpeedMode || 'speed';
       let v = '';
-      if (mins > 0 && km2 > 0) {
-        const m = window._trainSpeedMode || 'speed';
-        if (m === 'speed') v = +(km2 / (mins / 60)).toFixed(1);
-        else if (m === 'pace_km') v = fmtPaceSec(mins * 60 / km2);
-        else v = fmtPaceSec(mins * 60 / (km2 * 10));
+      // valeur STOCKÉE d'abord (saisie manuelle ou calculée au save)
+      if (m === 'speed' && training.estSpeed != null && training.estSpeed > 0) v = training.estSpeed;
+      else if (m !== 'speed' && training.estPace) v = training.estPace;
+      else {
+        const mins = +training.duration || 0, km2 = +training.km || 0;
+        if (mins > 0 && km2 > 0) {
+          if (m === 'speed') v = +(km2 / (mins / 60)).toFixed(1);
+          else if (m === 'pace_km') v = fmtPaceSec(mins * 60 / km2);
+          else v = fmtPaceSec(mins * 60 / (km2 * 10));
+        }
       }
       sp.value = v;
       if (v) sp.dataset.auto = '1';
@@ -4907,15 +4912,22 @@ function saveTrainFromModal() {
   if (Array.isArray(structure) && structure.length && window.StructEd && window.StructEd.summary) {
     try { sm = window.StructEd.summary(structure, sport); } catch (e) { sm = null; }
   }
-  // Pas de structure mais temps + distance connus : l'allure est calculable
-  // et stockée quand même (sports en allure uniquement)
-  let paceNoStruct = null;
-  if (!sm) {
-    const _cat = getSportCategory(sport);
-    if ((_cat === 'course' || _cat === 'natation') && km > 0 && duration > 0) {
-      const sec = _cat === 'natation' ? duration * 60 / (km * 10) : duration * 60 / km;
-      paceNoStruct = Math.floor(sec / 60) + ':' + String(Math.round(sec % 60)).padStart(2, '0');
+  // Vitesse/allure : la valeur du champ (saisie manuelle OU calculée par le
+  // trio temps+distance) est stockée. La structure reste prioritaire (sm).
+  const _cat = getSportCategory(sport);
+  const _spdField = String((document.getElementById('train-modal-speed') || {}).value || '').trim();
+  let paceNoStruct = null, estSpeed = null;
+  if (_cat === 'course' || _cat === 'natation') {
+    if (!sm) {
+      if (/^\d{1,2}:\d{2}$/.test(_spdField)) paceNoStruct = _spdField; // saisie manuelle
+      else if (km > 0 && duration > 0) {
+        const sec = _cat === 'natation' ? duration * 60 / (km * 10) : duration * 60 / km;
+        paceNoStruct = Math.floor(sec / 60) + ':' + String(Math.round(sec % 60)).padStart(2, '0');
+      }
     }
+  } else {
+    estSpeed = parseFloat(_spdField.replace(',', '.')) || null; // km/h saisis
+    if (!estSpeed && km > 0 && duration > 0) estSpeed = Math.round(km / (duration / 60) * 10) / 10;
   }
   const entry = {
     id: editingId || Date.now().toString(),
@@ -4925,6 +4937,7 @@ function saveTrainFromModal() {
     estWatts: sm ? sm.w : null,
     estBpm: sm ? sm.bpm : null,
     estPace: sm ? sm.pace : paceNoStruct,
+    estSpeed,
     estKj: sm ? sm.kj : null,
     estIf: sm ? sm.ifr : null,
     rpe, km: (sm && sm.km != null) ? sm.km : km,
@@ -12057,6 +12070,7 @@ function openSessionModal(iso, source) {
       // Allure/vitesse prévue : valeur stockée, sinon km+durée
       let _rp = null;
       if (_est.pace) _rp = _est.pace + (window.getSportCategory(t.sport) === 'natation' ? ' /100m' : ' /km');
+      if (!_rp && t.estSpeed != null && t.estSpeed > 0) _rp = t.estSpeed + ' km/h';
       if (!_rp && t.km && dur) _rp = window.fmtRate(t.km, dur, t.sport);
       if (_rp) { const _ri = _rp.indexOf(' '); _heroes.push({ svg: _S.speed, val: _rp.slice(0, _ri), unit: _rp.slice(_ri + 1), lab: window.rateLabel(t.sport) + ' prévue', color: '#34d399' }); }
       if (t.dplus) _heroes.push({ svg: _S.mtn, val: Math.round(t.dplus), unit: 'm D+', lab: 'Dénivelé prévu', color: '#84cc16' });

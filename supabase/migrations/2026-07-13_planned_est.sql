@@ -8,6 +8,7 @@ alter table activity_planned add column if not exists est_bpm   int;      -- bpm
 alter table activity_planned add column if not exists est_pace  text;     -- allure moyenne ("4:49")
 alter table activity_planned add column if not exists est_kj    int;      -- énergie estimée
 alter table activity_planned add column if not exists est_if    numeric;  -- intensity factor
+alter table activity_planned add column if not exists est_speed numeric;  -- vitesse km/h (vélo & co : saisie ou temps÷distance)
 
 -- Mêmes colonnes sur les MODÈLES de la bibliothèque : les stats dérivées y
 -- sont stockées au save du template, puis TRANSFÉRÉES telles quelles quand
