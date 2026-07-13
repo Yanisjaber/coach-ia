@@ -228,8 +228,23 @@
     const kjEl = q('#se-kj');
     if (curMetric() === 'power') { kjEl.parentElement.style.display = ''; kjEl.textContent = t.kj; }
     else kjEl.parentElement.style.display = 'none';
-    q('#se-avgs').innerHTML = avgStats().map(a =>
+    let avgsHtml = avgStats().map(a =>
       '<span class="se-stat"><b style="color:#a5b4fc">' + a.val + '</b><i>' + a.label.toLowerCase() + '</i></span>').join('');
+    // segments en allure -> distance estimée (course en km, natation en m)
+    let paceUnits = 0; // km (course) ou x100m (natation)
+    blocks.forEach(b => {
+      if ((b.metric || curMetric()) !== 'pace') return;
+      blockSegs(b).forEach(({ seg }) => {
+        const sec = paceBase() * 100 / Math.max(1, midOf(seg));
+        paceUnits += (+seg.min || 0) * 60 / sec;
+      });
+    });
+    if (paceUnits > 0) {
+      const isSwim = grp() === 'natation';
+      const val = isSwim ? (Math.round(paceUnits * 10) * 10) + ' m' : (Math.round(paceUnits * 100) / 100) + ' km';
+      avgsHtml += '<span class="se-stat"><b style="color:#22d3ee">' + val + '</b><i>distance</i></span>';
+    }
+    q('#se-avgs').innerHTML = avgsHtml;
     q('#se-undo').disabled = !undoStack.length;
     q('#se-redo').disabled = !redoStack.length;
   }
