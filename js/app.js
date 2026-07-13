@@ -3992,10 +3992,16 @@ function fmtPaceSec(sec) {
 // et affichage canonique — au-delà de 60 min on passe en heures (1h15).
 // Distance affichée à la dizaine de mètres près (35.42 km), zéros superflus retirés
 window.fmtKm = function (v) { const n = Math.round((+v || 0) * 100) / 100; return String(n); };
-// Distance selon le sport : natation en mètres, le reste en km
-window.fmtDist = function (km, sport) {
+// Distance selon le sport : natation en mètres, le reste en km.
+// prec '100m' (cartes calendrier) : arrondi à la centaine de mètres (7.4 km, 1400 m) ;
+// défaut (modals) : dizaine de mètres (7.38 km, 1420 m).
+window.fmtDist = function (km, sport, prec) {
   const cat = window.getSportCategory ? window.getSportCategory(sport || '') : 'autre';
-  if (cat === 'natation') return (Math.round((+km || 0) * 100) * 10) + ' m';
+  if (cat === 'natation') {
+    const m = (+km || 0) * 1000;
+    return (prec === '100m' ? Math.round(m / 100) * 100 : Math.round(m / 10) * 10) + ' m';
+  }
+  if (prec === '100m') return String(Math.round((+km || 0) * 10) / 10) + ' km';
   return window.fmtKm(km) + ' km';
 };
 // Vitesse/allure selon le sport : course en min/km, natation en min/100m, sinon km/h
@@ -5525,7 +5531,7 @@ function renderWeekPlan() {
         sportLabel = window.sportFr(proposal.sport || 'cyclisme');
         sportCat = window.activitySportColorKey({ sport: proposal.sport || 'cyclisme' }) || 'autre';
       }
-      const kmStr = proposal.km ? window.fmtDist(proposal.km, proposal.sport) : '';
+      const kmStr = proposal.km ? window.fmtDist(proposal.km, proposal.sport, '100m') : '';
       const durStr = proposal.dur ? fmtDur(proposal.dur) : '';
       const dplusStr = proposal.dplus ? Math.round(proposal.dplus) + ' m D+' : '';
       const rpeStr = (proposal.rpe != null && proposal.rpe !== '') ? 'RPE ' + proposal.rpe : '';
@@ -5558,7 +5564,7 @@ function renderWeekPlan() {
           const g = _r ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(it.sport, 22) : '');
           // Format compact pour colonnes étroites : "42m" au lieu de "42 min"
           // (évite que "min" parte sur une 2e ligne quand 4-5 activités en parallèle)
-          const tRaw = it.dur ? fmtDur(it.dur) : (it.km ? window.fmtDist(it.km, it.sport) : '');
+          const tRaw = it.dur ? fmtDur(it.dur) : (it.km ? window.fmtDist(it.km, it.sport, '100m') : '');
           const t = tRaw.replace(' min', 'm');
           const nm = it.name || 'Séance';
           return `<div class="day-multi-col" data-iso="${iso}" data-source="prevu" data-actidx="${i}" title="${String(nm).replace(/\"/g, '&quot;')}" style="background:${hex}1a">`
@@ -5748,7 +5754,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
       const hex = isComp ? compPrio(a.priority).color : (window.sportColor ? window.sportColor(a.raw_type || a.sport) : '#9ca3af');
       const g = isComp ? trophySvg(hex, 16) : (window.sportGlyph ? window.sportGlyph(a.raw_type || a.sport, 22) : '');
       // Format compact pour colonnes étroites : "42m" au lieu de "42 min"
-      const _tRaw = a.duration ? fmtDur(a.duration) : (a.distance_km ? window.fmtDist(a.distance_km, a.raw_type || a.sport) : '');
+      const _tRaw = a.duration ? fmtDur(a.duration) : (a.distance_km ? window.fmtDist(a.distance_km, a.raw_type || a.sport, '100m') : '');
       const t = _tRaw.replace(' min', 'm');
       const _nm = a.name || a.sessionName || 'Séance';
       return `<div class="day-multi-col" data-iso="${iso}" data-source="realise" data-actidx="${i}" title="${String(_nm).replace(/"/g, '&quot;')}" style="background:${hex}1a">`
@@ -5789,7 +5795,7 @@ function renderRealisedDayCard(d, dow, realDay, isToday) {
   // Fallbacks robustes pour data.js ancien format (champs day-level)
   const aType = act.type || act.sessionType || '';
   const aName = act.name || act.sessionName || 'Séance';
-  const km = act.distance_km ? window.fmtDist(act.distance_km, act.raw_type || act.sport) : '';
+  const km = act.distance_km ? window.fmtDist(act.distance_km, act.raw_type || act.sport, '100m') : '';
   // Nom de sport Strava exact + clé couleur pour la pill
   let sportLabel = window.activitySportLabel ? window.activitySportLabel(act) : '';
   let sportCat = window.activitySportColorKey ? window.activitySportColorKey(act) : 'autre';
