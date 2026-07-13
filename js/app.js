@@ -5564,7 +5564,10 @@ function renderWeekPlan() {
           const tRaw = it.dur ? fmtDur(it.dur) : (it.km ? window.fmtDist(it.km, it.sport, '100m') : '');
           const t = tRaw.replace(' min', 'm');
           const nm = it.name || 'Séance';
-          return `<div class="day-multi-col" data-iso="${iso}" data-source="prevu" data-actidx="${i}" title="${String(nm).replace(/\"/g, '&quot;')}" style="background:${hex}1a">`
+          // Chaque colonne d'un jour multi est déplaçable individuellement
+          const _mv = it._id && (it._manual || (it.isRace && !it._isStage));
+          const _mvAttr = _mv ? ` data-move-kind="${it._manual ? 'training' : 'comp'}" data-move-id="${String(it._id).replace(/"/g, '&quot;')}"` : '';
+          return `<div class="day-multi-col" data-iso="${iso}" data-source="prevu" data-actidx="${i}"${_mvAttr} title="${String(nm).replace(/\"/g, '&quot;')}" style="background:${hex}1a">`
             + `<div class="dmc-bar" style="background:${hex}"></div>`
             + `<div class="dmc-body">${g ? `<span class="dmc-glyph" style="line-height:0">${g}</span>` : ''}${t ? `<span class="dmc-time">${t}</span>` : ''}</div>`
             + `</div>`;
@@ -6207,7 +6210,8 @@ let _dayPtr = null, _dayJustDragged = false;
     if (e.pointerType === 'touch') return;                 // tactile : scroll prioritaire
     if (e.button != null && e.button > 0) return;
     if (e.target.closest && e.target.closest('button')) return; // flèches, +, etc.
-    const card = e.target.closest ? e.target.closest('.day-card[data-move-id]') : null;
+    // carte simple OU colonne d'un jour multi-activités
+    const card = e.target.closest ? e.target.closest('.day-card[data-move-id], .day-multi-col[data-move-id]') : null;
     if (!card) return;
     _dayPtr = { card, kind: card.dataset.moveKind, id: card.dataset.moveId, from: card.dataset.iso, x: e.clientX, y: e.clientY, started: false, ghost: null };
   });
