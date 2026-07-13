@@ -136,6 +136,13 @@
     flex-wrap: wrap;
   }
   .modal-meta { font-size: 13px; color: var(--text-dim); }
+  /* pill sport à côté de l'heure : plus discrète et centrée sur la ligne */
+  .modal-meta .sport-pill {
+    font-size: 9px;
+    padding: 2px 7px;
+    position: relative;
+    top: -1px;
+  }
   .modal-close {
     background: none;
     border: none;
