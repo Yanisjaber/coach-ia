@@ -318,7 +318,12 @@
     }
     ids.forEach(function (id) { var e = R(id); if (e) { e.readOnly = ro; e.style.opacity = ro ? '0.6' : ''; } });
   }
-  function setActive(on) { ensureMount(); var body = R('sb-body'); if (body) body.hidden = !on; setRO(on); if (on) renderAll(); }
+  function setActive(on) {
+    ensureMount(); var body = R('sb-body'); if (body) body.hidden = !on; setRO(on); if (on) renderAll();
+    // le résumé de la modal (mini-profil + bouton éditeur) doit suivre, même
+    // quand le toggle est posé par code (setBlocks à l'ouverture d'une séance)
+    if (window.__updateSbMini) setTimeout(window.__updateSbMini, 0);
+  }
   function showSection() { var sb = R('sb-section'); var old = document.querySelector('.workout-structure-block'); if (sb) sb.hidden = false; if (old) old.style.display = 'none'; ensureMount(); }
 
   // -------- override des 3 fonctions pivot (mode prevu) --------
