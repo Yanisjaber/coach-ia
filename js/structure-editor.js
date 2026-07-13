@@ -708,7 +708,10 @@
         // structure NETTOYÉE (sans clés de travail) + données dérivées par summary
         const clean = JSON.parse(JSON.stringify(blocks, (k, v) => (k === '_recSaved' || k === '_prevType') ? undefined : v));
         const sm = summary(clean);
-        window.libraryAddTemplate({ name: nameV, sport: grp(), sport_raw: sportSel ? sportSel.value : 'Ride', duration_min: sm.durMin, tss: sm.tss, km: sm.km != null ? sm.km : null, description: '', structure: clean });
+        window.libraryAddTemplate({ name: nameV, sport: grp(), sport_raw: sportSel ? sportSel.value : 'Ride',
+          duration_min: sm.durMin, tss: sm.tss, km: sm.km != null ? sm.km : null,
+          estWatts: sm.w, estBpm: sm.bpm, estPace: sm.pace, estKj: sm.kj, estIf: sm.ifr,
+          description: '', structure: clean });
         const btn = page.querySelector('#se-savelib'); btn.textContent = 'Enregistrée ✓'; btn.disabled = true;
         setTimeout(() => { btn.textContent = 'Enregistrer dans ma bibliothèque'; btn.disabled = false; }, 2500);
       }

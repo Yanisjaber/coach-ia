@@ -5010,6 +5010,11 @@ function saveTemplateFromTrainModal() {
   const rawSport = document.getElementById('train-modal-sport').value || 'Ride';
   const prev = window._templateEditing;
   const structure = (typeof window.getCurrentWorkoutStructure === 'function') ? window.getCurrentWorkoutStructure() : null;
+  // Structure = source de vérité (mêmes dérivations que le save d'une séance)
+  let sm = null;
+  if (Array.isArray(structure) && structure.length && window.StructEd && window.StructEd.summary) {
+    try { sm = window.StructEd.summary(structure, rawSport); } catch (e) { sm = null; }
+  }
   const entry = {
     id: (prev && prev.id) || (Date.now().toString() + Math.random().toString(36).slice(2, 5)),
     _sbId: (prev && prev._sbId) || undefined,
@@ -5017,11 +5022,16 @@ function saveTemplateFromTrainModal() {
     sport: rawToLibKey(rawSport),      // clé de regroupement bibliothèque
     sport_raw: rawSport,               // sport Strava exact (repris à l'insertion calendrier)
     name,
-    duration_min: Math.round(window.__parseDurField(document.getElementById('train-modal-duration').value) || 0),
-    tss: parseInt(document.getElementById('train-modal-tss').value, 10) || 0,
+    duration_min: sm ? sm.durMin : Math.round(window.__parseDurField(document.getElementById('train-modal-duration').value) || 0),
+    tss: sm ? sm.tss : (parseInt(document.getElementById('train-modal-tss').value, 10) || 0),
+    estWatts: sm ? sm.w : null,
+    estBpm: sm ? sm.bpm : null,
+    estPace: sm ? sm.pace : null,
+    estKj: sm ? sm.kj : null,
+    estIf: sm ? sm.ifr : null,
     description: document.getElementById('train-modal-notes').value.trim(),
     rpe: parseFloat(document.getElementById('train-modal-rpe').value) || null,
-    km: (typeof readDistAsKm === 'function') ? readDistAsKm('train-modal-km') : (parseFloat(document.getElementById('train-modal-km').value) || null),
+    km: (sm && sm.km != null) ? sm.km : ((typeof readDistAsKm === 'function') ? readDistAsKm('train-modal-km') : (parseFloat(document.getElementById('train-modal-km').value) || null)),
     dplus: parseInt(document.getElementById('train-modal-dplus').value, 10) || null,
     structure: (structure && structure.length) ? structure : null,
   };
@@ -5038,9 +5048,11 @@ window.coachInsertTemplate = function (iso, tpl, mode, ia) {
   if (!iso || !tpl) return;
   const m = mode === 'realise' ? 'realise' : 'prevu';
   const sport = tpl.sport_raw || tpl.sport || 'cyclisme';
-  // Structure = source de vérité : mêmes dérivations qu'au save de la modal
+  // Les stats STOCKÉES sur le template sont transférées telles quelles.
+  // Fallback summary() uniquement pour les vieux templates sans colonnes est_*.
+  const hasEst = tpl.estWatts != null || tpl.estBpm != null || tpl.estPace != null || tpl.estKj != null || tpl.estIf != null;
   let sm = null;
-  if (Array.isArray(tpl.structure) && tpl.structure.length && window.StructEd && window.StructEd.summary) {
+  if (!hasEst && Array.isArray(tpl.structure) && tpl.structure.length && window.StructEd && window.StructEd.summary) {
     try { sm = window.StructEd.summary(tpl.structure, sport); } catch (e) { sm = null; }
   }
   const entry = {
@@ -5049,16 +5061,16 @@ window.coachInsertTemplate = function (iso, tpl, mode, ia) {
     date: iso,
     sport,
     type: tpl.type || '',
-    duration: sm ? sm.durMin : (tpl.duration_min || 0),
-    tss: sm ? sm.tss : (tpl.tss || 0),
-    estWatts: sm ? sm.w : null,
-    estBpm: sm ? sm.bpm : null,
-    estPace: sm ? sm.pace : null,
-    estKj: sm ? sm.kj : null,
-    estIf: sm ? sm.ifr : null,
+    duration: hasEst ? (tpl.duration_min || 0) : (sm ? sm.durMin : (tpl.duration_min || 0)),
+    tss: hasEst ? (tpl.tss || 0) : (sm ? sm.tss : (tpl.tss || 0)),
+    estWatts: hasEst ? (tpl.estWatts ?? null) : (sm ? sm.w : null),
+    estBpm: hasEst ? (tpl.estBpm ?? null) : (sm ? sm.bpm : null),
+    estPace: hasEst ? (tpl.estPace ?? null) : (sm ? sm.pace : null),
+    estKj: hasEst ? (tpl.estKj ?? null) : (sm ? sm.kj : null),
+    estIf: hasEst ? (tpl.estIf ?? null) : (sm ? sm.ifr : null),
     notes: tpl.description || '',
     rpe: (tpl.rpe != null ? tpl.rpe : null),
-    km: (sm && sm.km != null) ? sm.km : (tpl.km != null ? tpl.km : null),
+    km: hasEst ? (tpl.km != null ? tpl.km : null) : ((sm && sm.km != null) ? sm.km : (tpl.km != null ? tpl.km : null)),
     dplus: (tpl.dplus != null ? tpl.dplus : null),
     mode: m,
     structure: tpl.structure || null,

@@ -189,6 +189,8 @@ async function pullAllFromCloud() {
           rpe: (r.rpe != null ? r.rpe : null),
           km: (r.distance_km != null ? r.distance_km : null),
           dplus: (r.dplus != null ? r.dplus : null),
+          estWatts: r.est_watts ?? null, estBpm: r.est_bpm ?? null, estPace: r.est_pace ?? null,
+          estKj: r.est_kj ?? null, estIf: r.est_if ?? null,
           structure: r.structure || null,
         }));
       localStorage.setItem('coach_ia_templates_v1', JSON.stringify(arr));
@@ -425,6 +427,8 @@ export async function pushTemplate(tpl) {
       rpe: (tpl.rpe != null ? tpl.rpe : null),
       distance_km: (tpl.km != null ? tpl.km : null),
       dplus: (tpl.dplus != null ? tpl.dplus : null),
+      est_watts: tpl.estWatts ?? null, est_bpm: tpl.estBpm ?? null, est_pace: tpl.estPace ?? null,
+      est_kj: tpl.estKj ?? null, est_if: tpl.estIf ?? null,
       structure: (tpl.structure && tpl.structure.length) ? tpl.structure : null,
       updated_at: new Date().toISOString(),
     };
