@@ -1,0 +1,165 @@
+/* ============================================================
+   sommeil.css
+   Panel Sommeil (p8) : données Garmin (garmin_sleep), synchronisées
+   automatiquement via l'Edge Function garmin-ingest (pg_cron horaire).
+   Couleurs de phases distinctes des tokens --accent/--info/--purple/--warn
+   déjà utilisés ailleurs (cohérence visuelle avec le reste de l'app).
+   ============================================================ */
+
+#p8 {
+  --sleep-deep: var(--info);
+  --sleep-light: var(--accent);
+  --sleep-rem: var(--purple);
+  --sleep-awake: var(--warn);
+}
+
+/* === Statut de connexion / chargement === */
+.sleep-state {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+/* === Score pill === */
+.sleep-score-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 12px 5px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.sleep-score-pill .n { font-size: 16px; }
+.sleep-score-pill.good     { background: rgba(74, 222, 128, 0.14); color: var(--accent); }
+.sleep-score-pill.warning  { background: rgba(251, 191, 36, 0.16); color: var(--warn); }
+.sleep-score-pill.critical { background: rgba(248, 113, 113, 0.14); color: var(--danger); }
+
+/* === Bandeau de phases (mini, dans hero + historique) === */
+.sleep-phasebar {
+  display: flex;
+  height: 10px;
+  width: 100%;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--bg-elev2);
+  margin: 14px 0;
+}
+.sleep-phasebar span { height: 100%; }
+.sleep-phasebar .deep  { background: var(--sleep-deep); }
+.sleep-phasebar .light { background: var(--sleep-light); }
+.sleep-phasebar .rem   { background: var(--sleep-rem); }
+.sleep-phasebar .awake { background: var(--sleep-awake); }
+
+.sleep-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.sleep-legend .item { display: inline-flex; align-items: center; gap: 6px; }
+.sleep-legend .sw { width: 9px; height: 9px; border-radius: 2.5px; display: inline-block; }
+.sleep-legend .sw.deep  { background: var(--sleep-deep); }
+.sleep-legend .sw.light { background: var(--sleep-light); }
+.sleep-legend .sw.rem   { background: var(--sleep-rem); }
+.sleep-legend .sw.awake { background: var(--sleep-awake); }
+
+/* === Hero (dernière nuit) === */
+.sleep-hero-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.sleep-hero-date { font-size: 17px; font-weight: 600; }
+.sleep-hero-date .sub { color: var(--text-dim); font-weight: 400; font-size: 13px; }
+
+/* === Chronologie (hypnogramme) === */
+.sleep-hypno-row {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  align-items: center;
+  height: 26px;
+  gap: 10px;
+}
+.sleep-hypno-row .label { font-size: 11px; color: var(--text-dim); text-align: right; }
+.sleep-hypno-track { position: relative; height: 18px; background: var(--bg-elev2); border-radius: 4px; }
+.sleep-hypno-seg { position: absolute; top: 2px; height: 14px; border-radius: 2px; }
+.sleep-hypno-seg.deep  { background: var(--sleep-deep); }
+.sleep-hypno-seg.light { background: var(--sleep-light); }
+.sleep-hypno-seg.rem   { background: var(--sleep-rem); }
+.sleep-hypno-seg.awake { background: var(--sleep-awake); }
+.sleep-hypno-ticks { display: flex; justify-content: space-between; margin-top: 4px; padding-left: 66px; font-size: 10.5px; color: var(--text-mute); }
+
+/* === Historique === */
+.sleep-history-row {
+  display: grid;
+  grid-template-columns: 76px 1fr 64px 60px 16px;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 4px;
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+}
+.sleep-history-row:first-child { border-top: none; }
+.sleep-history-row:hover { background: var(--bg-elev2); border-radius: 8px; }
+.sleep-history-date { font-size: 12.5px; color: var(--text-dim); }
+.sleep-history-date .dow { display: block; font-size: 10px; text-transform: uppercase; color: var(--text-mute); margin-top: 1px; }
+.sleep-history-dur { font-weight: 600; font-size: 13.5px; text-align: right; }
+.sleep-history-caret { color: var(--text-mute); transition: transform 0.15s; justify-self: center; }
+.sleep-history-item.open .sleep-history-caret { transform: rotate(90deg); }
+.sleep-history-detail { display: none; padding: 4px 4px 16px; }
+.sleep-history-item.open .sleep-history-detail { display: block; }
+
+.sleep-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 14px;
+  margin: 14px 0 4px;
+}
+.sleep-detail-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-mute); margin-bottom: 3px; }
+.sleep-detail-value { font-size: 14px; font-weight: 600; }
+
+.sleep-chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.sleep-chip {
+  font-size: 11.5px; font-weight: 600;
+  padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.sleep-chip.good      { color: var(--accent);  border-color: rgba(74, 222, 128, 0.4); }
+.sleep-chip.fair      { color: var(--warn);    border-color: rgba(251, 191, 36, 0.4); }
+.sleep-chip.poor      { color: var(--danger);  border-color: rgba(248, 113, 113, 0.4); }
+.sleep-chip.excellent { color: var(--accent);  border-color: rgba(74, 222, 128, 0.4); }
+
+/* === Conseils === */
+.sleep-target-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.sleep-target-box {
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.sleep-target-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-mute); margin-bottom: 6px; }
+.sleep-target-value { font-size: 19px; font-weight: 700; color: var(--accent); }
+.sleep-target-sub { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
+
+.sleep-insight-list { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+.sleep-insight-list li { display: flex; gap: 10px; font-size: 13.5px; line-height: 1.5; color: var(--text-dim); }
+.sleep-insight-tag {
+  flex-shrink: 0; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 6px; height: fit-content; white-space: nowrap;
+}
+.sleep-insight-tag.perso { background: rgba(74, 222, 128, 0.14); color: var(--accent); }
+.sleep-insight-tag.general { background: var(--bg-elev2); color: var(--text-mute); border: 1px solid var(--border); }
+.sleep-insight-list strong { color: var(--text); }

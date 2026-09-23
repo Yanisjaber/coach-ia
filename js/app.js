@@ -13485,9 +13485,9 @@ try { renderSessionsTable(); } catch (e) { console.error('[renderSessionsTable]'
 // ========= TABS =========
 // ========= ONGLETS + routage par ancre (#entraineur, #bilan, #termes) =========
 // p1 (Tableau de bord) = pas de hash. #profil est géré par profile-modal.js.
-const PANEL_HASH = { p2: '#calendrier', p3: '#statistiques', p4: '#performance', p5: '#termes', p6: '#competitions', p7: '#ia' };
+const PANEL_HASH = { p2: '#calendrier', p3: '#statistiques', p4: '#performance', p5: '#termes', p6: '#competitions', p7: '#ia', p8: '#sommeil' };
 // '#bilan' conservé comme alias (anciens liens/favoris) → pointe toujours sur p3.
-const HASH_PANEL = { '#calendrier': 'p2', '#statistiques': 'p3', '#performance': 'p4', '#bilan': 'p3', '#termes': 'p5', '#competitions': 'p6', '#ia': 'p7' };
+const HASH_PANEL = { '#calendrier': 'p2', '#statistiques': 'p3', '#performance': 'p4', '#bilan': 'p3', '#termes': 'p5', '#competitions': 'p6', '#ia': 'p7', '#sommeil': 'p8' };
 
 function activatePanel(panelId, updateHash = true) {
   const panelEl = document.getElementById(panelId);

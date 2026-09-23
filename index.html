@@ -59,6 +59,7 @@
 <link rel="stylesheet" href="styles/mobile-fixes.css">
 <link rel="stylesheet" href="styles/mobile-home.css">
 <link rel="stylesheet" href="styles/coach.css">
+<link rel="stylesheet" href="styles/sommeil.css">
 
 <!-- Loading overlay PRÉ-AFFICHÉ : visible dès le DOM rendu pour cacher le flash de
      data.js statique avant que Supabase ait fini de charger les vraies données.
@@ -100,6 +101,7 @@
     <button class="tab" data-panel="p3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Statistiques</span></button>
     <button class="tab" data-panel="p4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M8.21 13.89 7 22l5-3 5 3-1.21-8.11"/></svg><span>Performance</span></button>
     <button class="tab" data-panel="p5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Termes</span></button>
+    <button class="tab" data-panel="p8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><span>Sommeil</span></button>
   </nav>
   <div class="header-info sidebar-foot">
     <!-- Toggle Mode IA / Manuel -->
@@ -561,6 +563,20 @@
       <div class="section-subtitle">Discute avec ton coach : conseils, et il peut ajouter des séances ou des jours de repos à ton calendrier.</div>
       <div id="coach-chat"></div>
     </div>
+  </div>
+</section>
+
+<!-- PANEL 8: Sommeil (Garmin, synchro auto via pg_cron / garmin-ingest) -->
+<section class="panel" id="p8">
+  <div class="grid-1 card">
+    <div class="section-title vol-head">
+      <span>Sommeil</span>
+      <button id="sleep-refresh-btn" class="comp-add-btn" type="button" style="width:auto;padding:0 12px;font-size:12px;">Actualiser</button>
+    </div>
+    <div class="section-subtitle">Synchronisé automatiquement depuis Garmin toutes les heures.</div>
+  </div>
+  <div id="sleep-app">
+    <div class="card"><div class="sleep-state">Chargement…</div></div>
   </div>
 </section>
 
@@ -1297,5 +1313,6 @@
 <script type="module" src="js/coach-mode.js"></script>
 <script type="module" src="js/coach-athlete-page.js"></script>
 <script type="module" src="js/coach-overview.js"></script>
+<script type="module" src="js/garmin-sleep.js"></script>
 </body>
 </html>
