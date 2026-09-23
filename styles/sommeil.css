@@ -13,6 +13,42 @@
   --sleep-awake: var(--warn);
 }
 
+/* === Espacement des cartes KPI (dernière nuit) : un peu plus respirant
+   que le .hero générique, pour rester lisible même resserré (12px) sur
+   les largeurs "laptop" === */
+#p8 .hero { gap: 16px; }
+
+/* La règle mobile générique ".hero .card:last-child:nth-child(even) → pleine
+   largeur" (pensée pour les cartes nommées de l'accueil) casse la grille 2x2
+   du Sommeil : avec 4 cartes (pair), la 4e (HRV) partait seule sur sa ligne
+   et laissait Réveil orphelin. On annule ce comportement ici. */
+#p8 .hero .card:last-child { grid-column: auto; }
+
+/* Notes sous les valeurs des cartes KPI (dernière nuit) : du texte simple,
+   pas la pastille .kpi-trend (pensée pour un delta chiffré court — un
+   texte plus long qui passe sur 2 lignes dans une pilule ronde, ça rend
+   mal). */
+.sleep-kpi-note {
+  font-size: 11px;
+  color: var(--text-mute);
+  margin-top: 8px;
+  line-height: 1.35;
+}
+
+/* === Écart entre les sections (hero / score / historique / graphiques /
+   conseils) : les cartes du panel Sommeil sont générées en JS avec la
+   seule classe .card (pas .grid-1.card comme ailleurs dans l'app), donc
+   elles n'héritent pas du margin-bottom:16px de .grid-1 — on le recrée
+   ici pour rester cohérent avec le reste du dashboard. === */
+.sleep-subpanel > .card { margin-bottom: 16px; }
+.sleep-subpanel > .card:last-child { margin-bottom: 0; }
+
+/* === Barre du haut : sous-onglets + bouton de synchro sur la même ligne
+   (pas de bandeau séparé, pour ne pas créer de grand vide au-dessus) === */
+#sleep-refresh-btn svg { transition: transform 0.5s ease; }
+#sleep-refresh-btn.syncing svg { animation: sleep-spin 0.8s linear infinite; }
+@keyframes sleep-spin { to { transform: rotate(360deg); } }
+
 /* === Statut de connexion / chargement === */
 .sleep-state {
   padding: 32px 20px;
@@ -53,19 +89,23 @@
 .sleep-phasebar .rem   { background: var(--sleep-rem); }
 .sleep-phasebar .awake { background: var(--sleep-awake); }
 
-.sleep-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  font-size: 12.5px;
-  color: var(--text-dim);
+/* === Répartition des phases (grille 2x2, sous la barre) === */
+.sleep-phase-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
 }
-.sleep-legend .item { display: inline-flex; align-items: center; gap: 6px; }
-.sleep-legend .sw { width: 9px; height: 9px; border-radius: 2.5px; display: inline-block; }
-.sleep-legend .sw.deep  { background: var(--sleep-deep); }
-.sleep-legend .sw.light { background: var(--sleep-light); }
-.sleep-legend .sw.rem   { background: var(--sleep-rem); }
-.sleep-legend .sw.awake { background: var(--sleep-awake); }
+.sleep-phase-item { display: flex; align-items: center; gap: 10px; }
+.sleep-phase-item .sw {
+  width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0;
+}
+.sleep-phase-item .sw.deep  { background: var(--sleep-deep); }
+.sleep-phase-item .sw.light { background: var(--sleep-light); }
+.sleep-phase-item .sw.rem   { background: var(--sleep-rem); }
+.sleep-phase-item .sw.awake { background: var(--sleep-awake); }
+.sleep-phase-name { font-size: 12px; color: var(--text-dim); }
+.sleep-phase-val { font-size: 14.5px; font-weight: 600; margin-top: 1px; }
+.sleep-phase-pct { font-size: 12px; font-weight: 400; color: var(--text-mute); }
 
 /* === Hero (dernière nuit) === */
 .sleep-hero-head {
@@ -79,22 +119,36 @@
 .sleep-hero-date { font-size: 17px; font-weight: 600; }
 .sleep-hero-date .sub { color: var(--text-dim); font-weight: 400; font-size: 13px; }
 
+.sleep-hero-hypno { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+.sleep-hero-hypno-title { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 12px; }
+
+/* === Arc coucher → lever (courbe nuit) === */
+.sleep-arc { width: 100%; height: auto; display: block; overflow: visible; }
+.sleep-arc-path { stroke: var(--border); stroke-width: 2; stroke-dasharray: 3 6; stroke-linecap: round; }
+.sleep-arc-badge { stroke: var(--border); stroke-width: 1; }
+.sleep-arc-badge.moon { fill: rgba(96, 165, 250, 0.14); }
+.sleep-arc-badge.sun  { fill: rgba(251, 191, 36, 0.14); }
+.sleep-arc-icon.moon { color: var(--info); }
+.sleep-arc-icon.sun  { color: var(--warn); }
+.sleep-arc-time  { font-size: 15px; font-weight: 700; fill: var(--text); }
+.sleep-arc-label { font-size: 10px; fill: var(--text-mute); text-transform: uppercase; letter-spacing: 0.4px; }
+.sleep-arc-dur   { font-size: 26px; font-weight: 800; fill: var(--text); }
+
+.sleep-hrv-mini { margin-top: 16px; display: flex; align-items: baseline; gap: 10px; }
+.sleep-hrv-mini .kpi-label { margin-bottom: 0; }
+
 /* === Chronologie (hypnogramme) === */
-.sleep-hypno-row {
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  align-items: center;
-  height: 26px;
-  gap: 10px;
-}
-.sleep-hypno-row .label { font-size: 11px; color: var(--text-dim); text-align: right; }
+/* Pas de label par ligne : les couleurs sont déjà expliquées par la grille
+   des phases juste au-dessus, donc chaque piste prend toute la largeur
+   (alignée avec la barre de phases et le reste de la carte). */
+.sleep-hypno-row { height: 22px; margin-bottom: 4px; }
 .sleep-hypno-track { position: relative; height: 18px; background: var(--bg-elev2); border-radius: 4px; }
 .sleep-hypno-seg { position: absolute; top: 2px; height: 14px; border-radius: 2px; }
 .sleep-hypno-seg.deep  { background: var(--sleep-deep); }
 .sleep-hypno-seg.light { background: var(--sleep-light); }
 .sleep-hypno-seg.rem   { background: var(--sleep-rem); }
 .sleep-hypno-seg.awake { background: var(--sleep-awake); }
-.sleep-hypno-ticks { display: flex; justify-content: space-between; margin-top: 4px; padding-left: 66px; font-size: 10.5px; color: var(--text-mute); }
+.sleep-hypno-ticks { display: flex; justify-content: space-between; margin-top: 4px; font-size: 10.5px; color: var(--text-mute); }
 
 /* === Historique === */
 .sleep-history-row {
@@ -137,6 +191,100 @@
 .sleep-chip.poor      { color: var(--danger);  border-color: rgba(248, 113, 113, 0.4); }
 .sleep-chip.excellent { color: var(--accent);  border-color: rgba(74, 222, 128, 0.4); }
 
+/* === Barre du haut : sous-onglets + bouton de synchro === */
+.sleep-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.sleep-toolbar #sleep-refresh-btn { flex-shrink: 0; }
+
+.sleep-subtabs {
+  display: flex;
+  gap: 6px;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.sleep-subtab {
+  flex: 1;
+  padding: 9px 4px;
+  text-align: center;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.sleep-subtab:hover { color: var(--text); }
+.sleep-subtab.active { background: var(--accent); color: #06231a; }
+.sleep-subpanel { display: none; }
+.sleep-subpanel.active { display: block; }
+
+/* === Comparaisons (7j/7j, semaine/week-end) === */
+.sleep-compare-table { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+.sleep-compare-head {
+  display: grid;
+  grid-template-columns: 1fr auto 14px auto;
+  gap: 8px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-mute);
+  padding: 0 4px 6px;
+}
+.sleep-compare-row {
+  display: grid;
+  grid-template-columns: 1fr auto 14px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 4px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.sleep-compare-row:first-child { border-top: none; }
+.sleep-compare-label { color: var(--text-dim); }
+.sleep-compare-vals { display: contents; }
+.sleep-compare-vals .prev { color: var(--text-dim); text-align: right; }
+.sleep-compare-vals .arrow { color: var(--text-mute); text-align: center; }
+.sleep-compare-vals .cur { font-weight: 700; text-align: right; }
+.sleep-compare-delta { font-size: 11.5px; color: var(--text-mute); text-align: right; white-space: nowrap; }
+
+/* === Signaux physiologiques === */
+.sleep-signal-list { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.sleep-signal-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.sleep-signal-icon { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+.sleep-signal-icon.good { background: var(--accent); }
+.sleep-signal-icon.warn { background: var(--warn); }
+.sleep-signal-icon.bad { background: var(--danger); }
+.sleep-signal-icon.neutral { background: var(--text-mute); }
+.sleep-signal-body { flex: 1; min-width: 0; }
+.sleep-signal-title { font-size: 13.5px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+.sleep-signal-value { font-weight: 700; white-space: nowrap; }
+.sleep-signal-text { font-size: 12.5px; color: var(--text-dim); margin-top: 3px; line-height: 1.5; }
+
+.sleep-disclaimer {
+  font-size: 11.5px;
+  color: var(--text-mute);
+  line-height: 1.5;
+  padding: 0 4px;
+}
+
 /* === Conseils === */
 .sleep-target-grid {
   display: grid;
@@ -160,6 +308,8 @@
   flex-shrink: 0; font-size: 10px; font-weight: 700; text-transform: uppercase;
   padding: 3px 8px; border-radius: 6px; height: fit-content; white-space: nowrap;
 }
-.sleep-insight-tag.perso { background: rgba(74, 222, 128, 0.14); color: var(--accent); }
+.sleep-insight-tag.perso,
+.sleep-insight-tag.fort { background: rgba(74, 222, 128, 0.14); color: var(--accent); }
+.sleep-insight-tag.modere { background: rgba(96, 165, 250, 0.14); color: var(--info); }
 .sleep-insight-tag.general { background: var(--bg-elev2); color: var(--text-mute); border: 1px solid var(--border); }
 .sleep-insight-list strong { color: var(--text); }

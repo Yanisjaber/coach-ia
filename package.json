@@ -9,12 +9,16 @@
     "cap:ios": "cap open ios",
     "mode:dev": "node -e \"require('fs').copyFileSync('capacitor.config.dev.json','capacitor.config.json')\" && cap sync android",
     "mode:prod": "node -e \"require('fs').copyFileSync('capacitor.config.prod.json','capacitor.config.json')\" && cap sync android",
-    "emu": "cap run android"
+    "emu": "cap run android",
+    "preview:iphone": "browser-sync start --server --port 8000 --startPath iphone-preview.html --files \"index.html, dashboard.html, js/**/*.js, styles/**/*.css, *.js\" --no-notify --reload-delay 100"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",
     "@capacitor/cli": "^6.2.1",
     "@capacitor/core": "^6.2.1",
     "@capacitor/ios": "^6.2.1"
+  },
+  "devDependencies": {
+    "browser-sync": "^3.0.4"
   }
 }

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Coach IA — Aperçu iPhone</title>
+<style>
+  :root {
+    --bezel: 14px;
+    --radius: 55px;
+    --w: 393px;
+    --h: 852px;
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #1a1a1e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: #999;
+    font-size: 13px;
+  }
+  .toolbar select, .toolbar button {
+    background: #2a2a30;
+    color: #eee;
+    border: 1px solid #3a3a42;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .phone {
+    position: relative;
+    width: calc(var(--w) + var(--bezel) * 2);
+    height: calc(var(--h) + var(--bezel) * 2);
+    background: #0a0a0c;
+    border-radius: calc(var(--radius) + var(--bezel));
+    box-shadow:
+      0 0 0 2px #3a3a3f,
+      0 20px 60px rgba(0,0,0,.6),
+      inset 0 0 0 1px #000;
+    padding: var(--bezel);
+    box-sizing: border-box;
+  }
+  .screen-wrap {
+    position: relative;
+    width: var(--w);
+    height: var(--h);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: #000;
+  }
+  .screen-wrap iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+    background: #0b0e14;
+  }
+  .island {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 34px;
+    background: #000;
+    border-radius: 20px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .btn-side {
+    position: absolute;
+    background: #232328;
+  }
+  .btn-mute   { left: -3px; top: 118px; width: 3px; height: 30px; border-radius: 2px 0 0 2px; }
+  .btn-vol-up { left: -3px; top: 168px; width: 3px; height: 55px; border-radius: 2px 0 0 2px; }
+  .btn-vol-dn { left: -3px; top: 232px; width: 3px; height: 55px; border-radius: 2px 0 0 2px; }
+  .btn-power  { right: -3px; top: 190px; width: 3px; height: 80px; border-radius: 0 2px 2px 0; }
+  .status {
+    color: #555;
+    font-size: 12px;
+  }
+  .status .dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #4ade80;
+    margin-right: 5px;
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="toolbar">
+      <label>Page :
+        <select id="pageSelect">
+          <option value="index.html">index.html</option>
+          <option value="dashboard.html">dashboard.html (legacy)</option>
+        </select>
+      </label>
+      <button id="reloadBtn">↻ Recharger</button>
+    </div>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="btn-mute btn-side"></div>
+      <div class="btn-vol-up btn-side"></div>
+      <div class="btn-vol-dn btn-side"></div>
+      <div class="btn-power btn-side"></div>
+      <div class="screen-wrap">
+        <iframe id="screen" src="index.html"></iframe>
+      </div>
+    </div>
+    <div class="status"><span class="dot"></span>live-reload actif — sauvegarde un fichier pour voir la mise à jour</div>
+  </div>
+
+  <script>
+    const select = document.getElementById('pageSelect');
+    const iframe = document.getElementById('screen');
+    const reloadBtn = document.getElementById('reloadBtn');
+    select.addEventListener('change', () => { iframe.src = select.value; });
+    reloadBtn.addEventListener('click', () => { iframe.contentWindow.location.reload(); });
+  </script>
+</body>
+</html>

@@ -23,17 +23,24 @@ async function fetchConnections() {
   const sb = window.sb;
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { user: null };
-  const [{ data: strava }, { data: whoop }, { count: whoopDays }, { count: stravaActs }] = await Promise.all([
+  const [{ data: strava }, { data: whoop }, { data: garmin }, { count: whoopDays }, { count: stravaActs }, { count: garminNights }] = await Promise.all([
     sb.from('connexions_app')
       .select('external_id, athlete_name, last_sync_at, last_sync_status, total_activities_synced, first_connected_at')
       .eq('user_id', user.id).eq('app', 'strava').maybeSingle(),
     sb.from('connexions_app')
       .select('external_id, athlete_name, last_sync_at, last_sync_status, first_connected_at')
       .eq('user_id', user.id).eq('app', 'whoop').maybeSingle(),
+    sb.from('connexions_app')
+      .select('external_id, athlete_name, last_sync_at, last_sync_status, first_connected_at')
+      .eq('user_id', user.id).eq('app', 'garmin').maybeSingle(),
     sb.from('whoop_data').select('iso_date', { count: 'exact', head: true }).eq('user_id', user.id),
     sb.from('activities').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
+    sb.from('garmin_sleep').select('date', { count: 'exact', head: true }).eq('user_id', user.id),
   ]);
-  return { user, strava, whoop, whoopDays: whoopDays || 0, stravaActs: stravaActs || 0 };
+  return {
+    user, strava, whoop, garmin,
+    whoopDays: whoopDays || 0, stravaActs: stravaActs || 0, garminNights: garminNights || 0,
+  };
 }
 
 export async function openConnectionsModal() {
@@ -85,6 +92,7 @@ async function render(body) {
   body.innerHTML = `
     ${cardStrava(data.strava, data.stravaActs)}
     ${cardWhoop(data.whoop, data.whoopDays)}
+    ${cardGarmin(data.garmin, data.garminNights)}
     ${cardOpenDossard()}
     ${orphanStrava ? `<button class="cnx-purge" data-act="purge-strava" type="button">Vider les activités restantes (${data.stravaActs})</button>` : ''}
     <p class="cnx-foot">Tes jetons d'accès restent stockés côté serveur (Supabase) et ne sont jamais exposés ici.</p>
@@ -164,6 +172,26 @@ function cardWhoop(c, days = 0) {
     </div>`;
 }
 
+function cardGarmin(c, nights = 0) {
+  const last = fmtDate(c?.last_sync_at);
+  const sub = c
+    ? `${nights} nuit${nights > 1 ? 's' : ''} de sommeil${last ? ' · sync ' + last : ''}`
+    : 'Importe ton sommeil (phases, score, HRV, SpO2, stress).';
+  return `
+    <div class="cnx-card garmin">
+      <div class="cnx-card-top">
+        <div class="cnx-logo garmin">G</div>
+        <div class="cnx-card-title"><strong>Garmin</strong>${statusPill(c)}</div>
+      </div>
+      <p class="cnx-card-sub">${sub}</p>
+      <div class="cnx-actions">
+        ${c
+          ? `<button class="cnx-btn primary" data-act="garmin-sync">Re-synchroniser</button>`
+          : `<span class="cnx-card-note">Connexion à mettre en place manuellement pour l'instant (pas d'OAuth public Garmin).</span>`}
+      </div>
+    </div>`;
+}
+
 function cardOpenDossard() {
   const lic = window.odGetLicence ? window.odGetLicence() : null;
   const name = lic ? `${lic.firstName || ''} ${lic.lastName || lic.name || ''}`.trim() : '';
@@ -207,6 +235,11 @@ function wire(body) {
       if (act === 'whoop-sync') {
         closeOverlay();
         await window.startWhoopIngest?.();
+        return;
+      }
+      if (act === 'garmin-sync') {
+        closeOverlay();
+        await window.startGarminIngest?.();
         return;
       }
       if (act === 'strava-disconnect') return showDisconnectChoice('strava', 'Strava', body);
@@ -392,7 +425,9 @@ function injectStyles() {
       border-radius: 12px; padding: 16px; }
     .cnx-card.strava { border-left: 3px solid #FC4C02; }
     .cnx-card.whoop { border-left: 3px solid #0bbfa6; }
+    .cnx-card.garmin { border-left: 3px solid #007cc3; }
     .cnx-card.opendossard { border-left: 3px solid #fbbf24; }
+    .cnx-logo.garmin { background: rgba(0,124,195,0.18); color: #4db8e8; font-size: 15px; }
     .cnx-logo.opendossard { background: rgba(251,191,36,0.15); color: #fbbf24; font-size: 13px; }
     .cnx-card-top { display: flex; align-items: center; gap: 12px; }
     .cnx-logo { width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center;
@@ -407,7 +442,8 @@ function injectStyles() {
     .cnx-pill.err { background: rgba(248,113,113,0.15); color: var(--danger, #f87171); }
     .cnx-pill.run { background: rgba(96,165,250,0.15); color: var(--info, #60a5fa); }
     .cnx-card-sub { color: var(--text-dim, #8b94a8); font-size: 12.5px; margin: 10px 0 14px; line-height: 1.5; }
-    .cnx-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .cnx-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .cnx-card-note { color: var(--text-mute, #6b7689); font-size: 12px; line-height: 1.5; }
     .cnx-btn { border: none; border-radius: 8px; padding: 9px 14px; font-size: 12.5px; font-weight: 700;
       cursor: pointer; font-family: inherit; transition: filter .15s, transform .15s; }
     .cnx-btn:hover { transform: translateY(-1px); }
