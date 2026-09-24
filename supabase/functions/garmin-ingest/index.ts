@@ -81,10 +81,13 @@ Deno.serve(async (req) => {
 
     let accessToken = conn.access_token as string;
     if (new Date(conn.expires_at) <= new Date(Date.now() + 60_000)) {
-      const refreshed = await refreshGarminToken(conn.oauth1_token, conn.oauth1_secret);
-      if (!refreshed) {
-        await markErr(sbAdmin, userId, "token_refresh_failed");
-        return json({ error: "token_refresh_failed" }, 500);
+      let refreshed: any;
+      try {
+        refreshed = await refreshGarminToken(conn.oauth1_token, conn.oauth1_secret);
+      } catch (e: any) {
+        const detail = `token_refresh_failed: ${(e?.message || String(e)).slice(0, 200)}`;
+        await markErr(sbAdmin, userId, detail);
+        return json({ error: "token_refresh_failed", detail: e?.message || String(e) }, 500);
       }
       accessToken = refreshed.access_token;
       await sbAdmin.from("connexions_app").update({
@@ -117,7 +120,39 @@ Deno.serve(async (req) => {
           { date: ds, nonSleepBufferMinutes: "60" },
         );
         const night = extractNight(raw, ds);
-        if (night) nights.push(night);
+        if (night) {
+          // FC de repos : endpoint séparé (résumé quotidien), distinct de
+          // avg_heart_rate qui ne couvre que la fenêtre de sommeil.
+          try {
+            const summary = await connectapiGet(
+              `/usersummary-service/usersummary/daily/${displayName}`,
+              accessToken,
+              { calendarDate: ds },
+            );
+            night.resting_heart_rate = summary?.restingHeartRate ?? null;
+          } catch (e: any) {
+            console.error(`garmin resting HR fetch ${ds}:`, e?.message || e);
+          }
+          // Stream FC continu (~2 min de résolution) : endpoint journalier,
+          // recoupé sur la fenêtre de sommeil réelle (coucher -> lever).
+          try {
+            const dto = raw?.dailySleepDTO || {};
+            const sleepStartMs = dto.sleepStartTimestampGMT;
+            const sleepEndMs = dto.sleepEndTimestampGMT
+              ?? (sleepStartMs + ((night.total_sec || 0) + (night.awake_sec || 0)) * 1000);
+            if (sleepStartMs) {
+              const hrRaw = await connectapiGet(
+                `/wellness-service/wellness/dailyHeartRate/${displayName}`,
+                accessToken,
+                { date: ds },
+              );
+              night.hr_stream = filterHrStream(hrRaw, sleepStartMs, sleepEndMs);
+            }
+          } catch (e: any) {
+            console.error(`garmin hr stream fetch ${ds}:`, e?.message || e);
+          }
+          nights.push(night);
+        }
       } catch (e: any) {
         console.error(`garmin sleep fetch ${ds}:`, e?.message || e);
       }
@@ -167,6 +202,21 @@ function extractSegments(d: any, sleepStartGmtMs: number): number[][] {
     ]);
   }
   return segments;
+}
+
+// Stream FC brut Garmin -> paires [minute depuis le début du sommeil, bpm],
+// même convention que segments (minute-offset relatif à sleepStartGMT).
+function filterHrStream(raw: any, sleepStartMs: number, sleepEndMs: number): number[][] {
+  const vals: any[] = raw?.heartRateValues || [];
+  const out: number[][] = [];
+  for (const v of vals) {
+    if (!Array.isArray(v) || v.length < 2) continue;
+    const [ts, bpm] = v;
+    if (bpm == null || ts == null) continue;
+    if (ts < sleepStartMs || ts > sleepEndMs) continue;
+    out.push([Math.round((ts - sleepStartMs) / 60000), bpm]);
+  }
+  return out;
 }
 
 function extractNight(d: any, targetDate: string): any | null {
@@ -233,9 +283,11 @@ async function connectapiGet(path: string, accessToken: string, params?: Record<
   return await res.json();
 }
 
-async function refreshGarminToken(oauth1Token: string, oauth1Secret: string): Promise<any | null> {
+async function refreshGarminToken(oauth1Token: string, oauth1Secret: string): Promise<any> {
   const consumerRes = await fetch(OAUTH_CONSUMER_URL);
-  if (!consumerRes.ok) return null;
+  if (!consumerRes.ok) {
+    throw new Error(`consumer_fetch_${consumerRes.status}`);
+  }
   const consumer = await consumerRes.json();
 
   const url = "https://connectapi.garmin.com/oauth-service/oauth/exchange/user/2.0";
@@ -251,8 +303,14 @@ async function refreshGarminToken(oauth1Token: string, oauth1Secret: string): Pr
     },
     body: "",
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`exchange_${res.status}_${txt.slice(0, 150)}`);
+  }
   const token = await res.json();
+  if (!token?.access_token) {
+    throw new Error(`no_access_token_in_response_${JSON.stringify(token).slice(0, 150)}`);
+  }
   const now = Math.floor(Date.now() / 1000);
   token.expires_at = now + Number(token.expires_in);
   return token;

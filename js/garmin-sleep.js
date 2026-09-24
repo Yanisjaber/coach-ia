@@ -12,26 +12,26 @@
      Conseils   : analyse façon bilan de sommeil (architecture, signaux
                   physiologiques, régularité, plan d'action priorisé)
 
-   Un bouton "Actualiser" permet de forcer un sync immédiat (appel
-   direct à garmin-ingest), même pattern que startWhoopIngest dans
-   whoop-oauth.js.
+   La synchro forcée se fait depuis la page Connexions (carte Garmin,
+   bouton "Re-synchroniser" → window.startGarminIngest, exposé en bas de
+   ce fichier), pas depuis ce panel.
    ============================================================ */
 
 const LEVEL_NAME = ['deep', 'light', 'rem', 'awake'];
 const LEVEL_LABEL = { deep: 'Profond', light: 'Léger', rem: 'Paradoxal', awake: 'Éveil' };
 const QUALIFIER_LABEL_FR = { EXCELLENT: 'Excellent', GOOD: 'Bon', FAIR: 'Correct', POOR: 'Faible', INVALID: 'N/D' };
 const QUALIFIER_CLASS = { EXCELLENT: 'excellent', GOOD: 'good', FAIR: 'fair', POOR: 'poor', INVALID: 'invalid' };
-const COMPONENT_LABEL_FR = {
-  totalDuration: 'Durée', stress: 'Stress', awakeCount: 'Réveils',
-  remPercentage: '% Paradoxal', restlessness: 'Agitation',
-  lightPercentage: '% Léger', deepPercentage: '% Profond',
+const MY_COMPONENT_LABEL_FR = {
+  duration: 'Durée', efficiency: 'Efficacité', waso: 'Éveil nocturne',
+  awakenings: 'Réveils', latency: 'Endormissement', architecture: 'Architecture',
 };
-const COMPONENT_ADVICE_FR = {
-  totalDuration: "te coucher plus tôt pour allonger la nuit — c'est le levier n°1 ici",
-  awakeCount: "limiter ce qui te réveille la nuit (bruit, lumière, température de la chambre)",
-  stress: "installer une routine de descente en charge avant le coucher (écrans, lumière tamisée)",
-  restlessness: "réduire l'agitation nocturne — activité physique en journée, éviter les écrans tard",
-  remPercentage: "protéger la fin de nuit, où se concentre l'essentiel du sommeil paradoxal",
+const MY_COMPONENT_ADVICE_FR = {
+  duration: "te coucher plus tôt pour allonger la nuit — c'est le levier n°1 ici",
+  efficiency: "ne te mets au lit que quand tu as sommeil, et lève-toi si tu ne t'endors pas en 20 min plutôt que de tourner",
+  waso: "limiter ce qui te réveille en pleine nuit (bruit, lumière, température de la chambre) — c'est le temps éveillé après l'endormissement qui pèse ici",
+  awakenings: "limiter le nombre de réveils — mêmes leviers que l'éveil nocturne (bruit, lumière, température, vessie pleine)",
+  latency: "couper les écrans 30-45 min avant le coucher et éviter les activités stimulantes juste avant, pour t'endormir plus vite",
+  architecture: "protéger la fin de nuit (où se concentre le sommeil paradoxal) en évitant de l'écourter",
 };
 
 // Repères "pro" (hygiène du sommeil / actigraphie grand public — informatif, pas un diagnostic)
@@ -45,7 +45,150 @@ const REF_RESP_RANGE = [12, 20];
 const REF_SPO2_GOOD = 95;
 const REF_DEBT_TARGET_MIN = 8 * 60;
 
-let _scoreChart = null;
+/* ============================================================
+   Score de sommeil "maison" — remplace le score Garmin affiché.
+   100 = nuit idéale sur tous les critères. 0 = nuit blanche.
+
+   Basé sur des seuils publiés, pas des seuils inventés :
+
+   - Durée : Hirshkowitz et al. 2015, "National Sleep Foundation's sleep
+     time duration recommendations" (Sleep Health). Adultes 18-64 ans :
+     7-9h recommandé, 6-10h "peut convenir", <6h ou >10h déconseillé.
+
+   - Efficacité, latence d'endormissement, réveils (>5 min), WASO (temps
+     éveillé après l'endormissement) : Ohayon et al. 2017, "National
+     Sleep Foundation's sleep quality recommendations: first report"
+     (Sleep Health) — panel de consensus d'experts. Seuils adultes :
+     efficacité "bonne" ≥85%, "inappropriée" <75% ; latence "appropriée"
+     <30 min, "inappropriée" >45 min ; réveils >5min "appropriés" 0-1,
+     "inappropriés" >4 ; WASO "approprié" <20 min (le panel n'a pas publié
+     de seuil "inapproprié" chiffré pour le WASO — on reprend ~40 min,
+     valeur usuelle en pratique clinique, à prendre avec plus de réserve
+     que les autres seuils).
+
+   - Architecture (% profond / % paradoxal) : ce même panel Ohayon 2017
+     n'a PAS trouvé de consensus pour ériger l'architecture du sommeil en
+     critère de qualité. Les cibles utilisées ici (profond ~13-23%,
+     paradoxal ~20-25% du temps de sommeil) viennent de normes
+     descriptives de polysomnographie (Ohayon et al. 2004, méta-analyse
+     des paramètres de sommeil normaux) — un repère de population, pas
+     un seuil de "qualité" validé. D'où un poids plus faible ici.
+
+   Les signaux physio (HRV/FC/stress vs ta moyenne, SpO2) restent
+   affichés dans "Signaux physiologiques" mais ne sont PAS inclus dans ce
+   score : ce sont des marqueurs de récupération, pas des critères de
+   qualité du sommeil au sens de cette littérature.
+
+   Pondération : Durée 25% / Efficacité 20% / WASO 15% / Réveils 15% /
+   Latence d'endormissement 10% / Architecture 15%.
+   ============================================================ */
+const SCORE_WEIGHTS = { duration: 0.25, efficiency: 0.20, waso: 0.15, awakenings: 0.15, latency: 0.10, architecture: 0.15 };
+
+// Seuils Ohayon et al. 2017 (bon / repère "inapproprié" / point zéro).
+// Au-delà du seuil "inapproprié" publié, la dégradation continue
+// linéairement jusqu'à un point zéro (nuit extrême) plutôt que de
+// tomber à 0 dès le seuil — un score continu est plus réaliste qu'un
+// score en paliers.
+const REF_EFF_GOOD = 85, REF_EFF_BAD = 75, REF_EFF_ZERO = 40;           // %, plus haut = mieux
+const REF_LATENCY_GOOD = 15, REF_LATENCY_BAD = 45, REF_LATENCY_ZERO = 90; // min, plus bas = mieux
+const REF_WASO_GOOD = 20, REF_WASO_BAD = 40, REF_WASO_ZERO = 120;        // min, plus bas = mieux
+const REF_AWAKENINGS_GOOD = 1, REF_AWAKENINGS_BAD = 4, REF_AWAKENINGS_ZERO = 12; // plus bas = mieux
+const REF_DURATION_GOOD = [7, 9], REF_DURATION_ZERO = [3, 13];           // h, Hirshkowitz 2015
+
+function scoreToQualifier(v) {
+  if (v >= 80) return 'EXCELLENT';
+  if (v >= 65) return 'GOOD';
+  if (v >= 50) return 'FAIR';
+  return 'POOR';
+}
+
+// Score continu 100 → 25 entre "bon" et "inapproprié" (seuils publiés),
+// puis 25 → 0 entre "inapproprié" et un point zéro au-delà.
+function tierScore(value, good, bad, zero, higherIsBetter) {
+  if (value == null) return null;
+  if (higherIsBetter) {
+    if (value >= good) return 100;
+    if (value >= bad) return 25 + 75 * (value - bad) / (good - bad);
+    if (value <= zero) return 0;
+    return 25 * (value - zero) / (bad - zero);
+  }
+  if (value <= good) return 100;
+  if (value <= bad) return 25 + 75 * (bad - value) / (bad - good);
+  if (value >= zero) return 0;
+  return 25 * (zero - value) / (zero - bad);
+}
+
+function scoreDurationComp(totalSec) {
+  if (totalSec == null) return null;
+  const h = totalSec / 3600;
+  const [goodLo, goodHi] = REF_DURATION_GOOD;
+  const [zeroLo, zeroHi] = REF_DURATION_ZERO;
+  if (h >= goodLo && h <= goodHi) return 100;
+  if (h < goodLo) return tierScore(h, goodLo, goodLo - 1, zeroLo, true);
+  return tierScore(h, goodHi, goodHi + 1, zeroHi, false);
+}
+
+function scoreEfficiencyComp(totalSec, awakeSec) {
+  const eff = sleepEfficiencyPct({ total_sec: totalSec, awake_sec: awakeSec });
+  return tierScore(eff, REF_EFF_GOOD, REF_EFF_BAD, REF_EFF_ZERO, true);
+}
+
+function scoreLatencyComp(n) {
+  const sol = sleepOnsetLatencyMin(n);
+  return tierScore(sol, REF_LATENCY_GOOD, REF_LATENCY_BAD, REF_LATENCY_ZERO, false);
+}
+
+function scoreWasoComp(awakeSec) {
+  const waso = awakeSec != null ? awakeSec / 60 : null;
+  return tierScore(waso, REF_WASO_GOOD, REF_WASO_BAD, REF_WASO_ZERO, false);
+}
+
+function scoreAwakeningsComp(awakeCount) {
+  return tierScore(awakeCount, REF_AWAKENINGS_GOOD, REF_AWAKENINGS_BAD, REF_AWAKENINGS_ZERO, false);
+}
+
+// Paradoxal légèrement plus pénalisant que profond dans le mélange : sur
+// une nuit écourtée c'est lui qui manque en premier (il se concentre en
+// fin de nuit) — mais rappel : ni l'un ni l'autre n'est un critère de
+// "qualité" validé par le consensus Ohayon 2017, juste une norme
+// descriptive (Ohayon 2004).
+function scoreArchitectureComp(deepSec, remSec, totalSec) {
+  if (!totalSec) return null;
+  const deepPct = (deepSec || 0) / totalSec * 100;
+  const remPct = (remSec || 0) / totalSec * 100;
+  const deepScore = tierScore(deepPct, REF_DEEP_PCT[0], REF_DEEP_PCT[0] * 0.6, 0, true);
+  const remScore = remPct <= REF_REM_PCT[1] + 5
+    ? tierScore(remPct, REF_REM_PCT[0], REF_REM_PCT[0] * 0.6, 0, true)
+    : Math.max(65, 100 - (remPct - REF_REM_PCT[1] - 5) * 3);
+  return deepScore * 0.45 + remScore * 0.55;
+}
+
+function computeSleepScore(n) {
+  // Nuit blanche : 0 explicite, sans dépendre des cas limites du calcul
+  // pondéré (division par zéro, composants exclus faute de données...).
+  if (!n.total_sec || n.total_sec <= 0) {
+    return { total: 0, qualifier: 'POOR', components: {} };
+  }
+  const parts = [
+    ['duration', scoreDurationComp(n.total_sec)],
+    ['efficiency', scoreEfficiencyComp(n.total_sec, n.awake_sec)],
+    ['waso', scoreWasoComp(n.awake_sec)],
+    ['awakenings', scoreAwakeningsComp(n.awake_count)],
+    ['latency', scoreLatencyComp(n)],
+    ['architecture', scoreArchitectureComp(n.deep_sec, n.rem_sec, n.total_sec)],
+  ];
+  let sum = 0, totalW = 0;
+  const components = {};
+  parts.forEach(([key, val]) => {
+    if (val == null) return;
+    sum += val * SCORE_WEIGHTS[key]; totalW += SCORE_WEIGHTS[key];
+    components[key] = Math.round(val);
+  });
+  if (!totalW) return null;
+  const total = Math.round(sum / totalW);
+  return { total, qualifier: scoreToQualifier(total), components };
+}
+
 let _graphCharts = {};
 let _graphsRendered = false;
 let _sleepLoaded = false;
@@ -133,6 +276,16 @@ function phaseGridHtml(n) {
   </div>`;
 }
 
+function nightTicksHtml(bedtimeClock, totalMin) {
+  return [0, 0.25, 0.5, 0.75, 1].map((f) => {
+    const min = totalMin * f;
+    const [bh, bm] = (bedtimeClock || '0:0').split(':').map(Number);
+    const total = bh * 60 + bm + min;
+    const hh = Math.floor((total / 60) % 24), mm = Math.round(total % 60);
+    return `<span>${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}</span>`;
+  }).join('');
+}
+
 function hypnoHtml(n) {
   const segs = n.segments;
   if (!segs || !segs.length) return phaseBarHtml(n);
@@ -145,14 +298,7 @@ function hypnoHtml(n) {
     }).join('');
     return `<div class="sleep-hypno-row"><div class="sleep-hypno-track">${segHtml}</div></div>`;
   }).join('');
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => {
-    const min = totalMin * f;
-    const [bh, bm] = (bedtimeClock || '0:0').split(':').map(Number);
-    const total = bh * 60 + bm + min;
-    const hh = Math.floor((total / 60) % 24), mm = Math.round(total % 60);
-    return `<span>${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}</span>`;
-  }).join('');
-  return `<div>${rows}</div><div class="sleep-hypno-ticks">${ticks}</div>`;
+  return `<div>${rows}</div><div class="sleep-hypno-ticks">${nightTicksHtml(bedtimeClock, totalMin)}</div>`;
 }
 
 const ICON_MOON = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
@@ -184,121 +330,272 @@ function sleepArcHtml(n) {
     </svg>`;
 }
 
+// Les 5 données les plus indicatives d'une nuit (cf. Ohayon et al. 2017
+// pour l'efficacité/éveil nocturne, + HRV/FC/SpO2 comme signaux de
+// récupération et d'alerte les plus fiables sur un wearable au poignet).
+function keyStatsHtml(n) {
+  const eff = sleepEfficiencyPct(n);
+  const item = (label, val, unit) => `<div><div class="sleep-detail-label">${label}</div><div class="sleep-detail-value">${val != null ? val : '—'}${val != null && unit ? `<span class="kpi-unit">${unit}</span>` : ''}</div></div>`;
+  return `
+    <div class="card">
+      <div class="sleep-key-stats">
+        ${item('Effic.', eff != null ? Math.round(eff) : null, '%')}
+        ${item('HRV', n.hrv_avg != null ? Math.round(n.hrv_avg) : null, 'ms')}
+        ${item('FC moy.', n.avg_heart_rate != null ? Math.round(n.avg_heart_rate) : null, 'bpm')}
+        ${item('FCR', n.resting_heart_rate != null ? Math.round(n.resting_heart_rate) : null, 'bpm')}
+        ${item('Stress', n.avg_stress != null ? Math.round(n.avg_stress) : null, null)}
+      </div>
+    </div>`;
+}
+
 function heroHtml(n) {
-  const st = scoreStatus(n.score_qualifier);
+  const my = n.myScore;
+  const st = scoreStatus(my && my.qualifier);
+  const subLabel = n.date === _latestDate ? 'dernière nuit' : 'nuit sélectionnée';
   return `
     <div class="sleep-hero-head">
-      <div class="sleep-hero-date">${dowFr(n.date)} ${dateShort(n.date)} <span class="sub">— dernière nuit</span></div>
-      <div class="sleep-score-pill ${st}"><span class="n">${n.score ?? '—'}</span>${QUALIFIER_LABEL_FR[n.score_qualifier] || ''}</div>
+      <div class="sleep-hero-date">${dowFr(n.date)} ${dateShort(n.date)} <span class="sub">— ${subLabel}</span></div>
+      <div class="sleep-score-pill ${st}" title="Score maison, indépendant de Garmin (durée, efficacité, WASO, réveils, endormissement, architecture)"><span class="n">${my ? my.total : '—'}</span>${my ? QUALIFIER_LABEL_FR[my.qualifier] : ''}</div>
     </div>
     ${sleepArcHtml(n)}
-    <div class="card sleep-hrv-mini">
-      <div class="kpi-label">HRV</div>
-      <div class="kpi-value" style="font-size:22px;">${n.hrv_avg != null ? Math.round(n.hrv_avg) : '—'}</div>
-    </div>
+    ${keyStatsHtml(n)}
     ${phaseBarHtml(n)}
     ${phaseGridHtml(n)}
     <div class="sleep-hero-hypno">
       <div class="sleep-hero-hypno-title">Chronologie de la nuit</div>
       ${hypnoHtml(n)}
+      ${n.hr_stream && n.hr_stream.length ? `
+        <div class="sleep-night-hr-title">FC pendant la nuit</div>
+        <div class="sleep-night-hr-wrap"><canvas id="sleep-night-hr-chart"></canvas></div>
+      ` : ''}
+      <button class="btn-secondary sleep-detail-btn" type="button" id="sleep-open-detail">Analyse détaillée</button>
     </div>`;
 }
 
-function detailHtml(n) {
-  const comps = ['totalDuration', 'stress', 'awakeCount', 'remPercentage', 'restlessness', 'lightPercentage', 'deepPercentage'];
-  const detail = n.score_detail || {};
-  const chips = comps.filter((k) => detail[k]).map((k) => {
-    const c = detail[k];
-    const cls = QUALIFIER_CLASS[c.qualifierKey] || 'invalid';
-    const label = QUALIFIER_LABEL_FR[c.qualifierKey] || c.qualifierKey || '—';
-    const val = (c.value !== null && c.value !== undefined) ? ` ${c.value}%` : '';
-    return `<span class="sleep-chip ${cls}">${COMPONENT_LABEL_FR[k]}: ${label}${val}</span>`;
-  }).join('');
-  const eff = sleepEfficiencyPct(n);
-  const sol = sleepOnsetLatencyMin(n);
-  return `
-    <div class="sleep-history-detail">
-      ${hypnoHtml(n)}
-      <div class="sleep-detail-grid">
-        <div><div class="sleep-detail-label">Efficacité</div><div class="sleep-detail-value">${eff != null ? Math.round(eff) + '%' : '—'}</div></div>
-        <div><div class="sleep-detail-label">Endormissement</div><div class="sleep-detail-value">${sol != null ? sol + ' min' : '—'}</div></div>
-        <div><div class="sleep-detail-label">Réveils</div><div class="sleep-detail-value">${n.awake_count ?? '—'}</div></div>
-        <div><div class="sleep-detail-label">Agitation</div><div class="sleep-detail-value">${n.restless_count ?? '—'} mvts</div></div>
-        <div><div class="sleep-detail-label">Stress moy.</div><div class="sleep-detail-value">${n.avg_stress ?? '—'}</div></div>
-        <div><div class="sleep-detail-label">FC sommeil</div><div class="sleep-detail-value">${n.avg_heart_rate ?? '—'} bpm</div></div>
-        <div><div class="sleep-detail-label">Respiration</div><div class="sleep-detail-value">${n.resp_avg ?? '—'} /min</div></div>
-        <div><div class="sleep-detail-label">SpO2</div><div class="sleep-detail-value">${n.spo2_avg ?? '—'}%</div></div>
-        <div><div class="sleep-detail-label">Body Battery</div><div class="sleep-detail-value">${n.body_battery_change != null ? '+' + n.body_battery_change : '—'}</div></div>
-        <div><div class="sleep-detail-label">HRV</div><div class="sleep-detail-value">${n.hrv_avg != null ? Math.round(n.hrv_avg) : '—'} ms</div></div>
+function detailStatsHtml(bpms) {
+  if (!bpms.length) return '';
+  const avgBpm = Math.round(avg(bpms)), minBpm = Math.min(...bpms), maxBpm = Math.max(...bpms);
+  const item = (label, val) => `<div><span class="sleep-detail-label">${label}</span> <strong>${val}</strong> <span class="kpi-unit">bpm</span></div>`;
+  return `<div class="sleep-detail-stream-stats">${item('Moy', avgBpm)}${item('Min', minBpm)}${item('Max', maxBpm)}</div>`;
+}
+
+let _detailChart = null;
+function closeNightDetailModal() {
+  document.getElementById('_sleep-detail-modal')?.remove();
+  if (_detailChart) { _detailChart.destroy(); _detailChart = null; }
+}
+
+function openNightDetailModal(n) {
+  closeNightDetailModal();
+  const hasStream = n.hr_stream && n.hr_stream.length;
+  const overlay = document.createElement('div');
+  overlay.className = 'day-modal-overlay active';
+  overlay.id = '_sleep-detail-modal';
+  overlay.innerHTML = `
+    <div class="day-modal" style="width:640px;max-width:calc(100vw - 32px);">
+      <div class="day-modal-header">
+        <h3>${dowFr(n.date)} ${dateShort(n.date)} — minute par minute</h3>
+        <button class="day-modal-close" type="button" title="Fermer">×</button>
       </div>
-      ${chips ? `<div class="sleep-chip-row">${chips}</div>` : ''}
+      <div class="day-modal-body">
+        ${hasStream ? `
+          ${detailStatsHtml(n.hr_stream.map((p) => p[1]))}
+          <div class="section-title" style="margin-top:14px;margin-bottom:8px;">Fréquence cardiaque</div>
+          <div class="chart-wrap" style="height:260px;"><canvas id="sleep-detail-hr-chart"></canvas></div>
+          <div class="sleep-hypno-ticks">${nightTicksHtml((n.bedtime || '').split(' ')[1], Math.max(...n.hr_stream.map((p) => p[0])))}</div>
+        ` : `<div class="sleep-state">Pas de données minute par minute pour cette nuit. Resynchronise (Connexions → Garmin) pour la récupérer sur les prochaines nuits.</div>`}
+      </div>
     </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('.day-modal-close').addEventListener('click', closeNightDetailModal);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeNightDetailModal(); });
+
+  if (hasStream && typeof Chart !== 'undefined') {
+    const canvas = document.getElementById('sleep-detail-hr-chart');
+    _detailChart = new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: n.hr_stream.map((p) => p[0]),
+        datasets: [{ data: n.hr_stream.map((p) => p[1]), borderColor: '#f87171', backgroundColor: 'transparent', fill: false, tension: 0.25, pointRadius: 0, borderWidth: 1.5 }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: { x: { display: false }, y: gridScale({ ticks: { color: CHART_AXIS_LABEL } }) },
+        plugins: { legend: legend(false) },
+      },
+    });
+  }
 }
 
-function historyHtml(nights) {
-  const rows = nights.map((n) => {
-    const total = (n.deep_sec || 0) + (n.light_sec || 0) + (n.rem_sec || 0);
-    const st = scoreStatus(n.score_qualifier);
-    return `
-      <div class="sleep-history-item">
-        <div class="sleep-history-row" data-date="${n.date}" tabindex="0" role="button">
-          <div class="sleep-history-date">${dateShort(n.date)}<span class="dow">${dowFr(n.date)}</span></div>
-          ${phaseBarHtml(n)}
-          <div class="sleep-score-pill ${st}" style="justify-self:end"><span class="n">${n.score ?? '—'}</span></div>
-          <div class="sleep-history-dur">${hms(total)}</div>
-          <div class="sleep-history-caret">▸</div>
-        </div>
-        ${detailHtml(n)}
-      </div>`;
-  }).join('');
-  return `<div class="card"><div class="section-title">Historique</div>${rows}</div>`;
+function wireNightDetailButton(root, n) {
+  const btn = root.querySelector('#sleep-open-detail');
+  if (btn) btn.onclick = () => openNightDetailModal(n);
 }
 
-/* ---------- Aperçu : onglet 1 ---------- */
-function overviewHtml(sorted) {
-  return `
-    <div class="card">${heroHtml(sorted[0])}</div>
-    <div class="card">
-      <div class="section-title">Score de sommeil</div>
-      <div class="chart-wrap small"><canvas id="chart-sleep-score"></canvas></div>
-    </div>
-    ${historyHtml(sorted)}
-  `;
-}
-
-function renderScoreChart(nights) {
-  const canvas = document.getElementById('chart-sleep-score');
-  if (!canvas || typeof Chart === 'undefined') return;
-  const pts = nights.filter((n) => n.score != null).slice().reverse();
-  if (_scoreChart) { _scoreChart.destroy(); _scoreChart = null; }
-  if (pts.length < 2) return;
-  _scoreChart = new Chart(canvas.getContext('2d'), {
+let _nightHrChart = null;
+function renderNightHrChart(n) {
+  if (_nightHrChart) { _nightHrChart.destroy(); _nightHrChart = null; }
+  const canvas = document.getElementById('sleep-night-hr-chart');
+  if (!canvas || typeof Chart === 'undefined' || !n || !n.hr_stream || !n.hr_stream.length) return;
+  const pts = n.hr_stream;
+  _nightHrChart = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: {
-      labels: pts.map((n) => dateShort(n.date)),
-      datasets: [{
-        label: 'Score de sommeil',
-        data: pts.map((n) => n.score),
-        borderColor: '#4ade80',
-        backgroundColor: 'rgba(74, 222, 128, 0.12)',
-        fill: true, tension: 0.3, pointRadius: 3,
-      }],
+      labels: pts.map((p) => p[0]),
+      datasets: [{ data: pts.map((p) => p[1]), borderColor: '#f87171', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 0, borderWidth: 1.5 }],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      scales: { y: { min: 0, max: 100, grid: { color: '#232a3a' } }, x: { grid: { display: false } } },
-      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: false },
+        y: gridScale({ ticks: { color: CHART_AXIS_LABEL, font: { size: 10 } } }),
+      },
+      plugins: { legend: legend(false), tooltip: { enabled: false } },
     },
   });
 }
 
+// Détail chiffré d'une nuit (efficacité, endormissement, réveils...) +
+// chips par composante du score — affiché sous le calendrier pour la
+// nuit sélectionnée (remplace l'ancien accordéon de la liste Historique).
+function nightExtraStatsHtml(n) {
+  // Efficacité, HRV, FC, Stress sont déjà dans les indicateurs clés en
+  // haut de la carte — pas repris ici pour éviter le doublon. Et plus de
+  // chips de score à côté (même mot que les valeurs brutes mais un
+  // nombre différent = confusion, cf. retour utilisateur).
+  const sol = sleepOnsetLatencyMin(n);
+  return `
+    <div class="card">
+      <div class="section-title">Détail</div>
+      <div class="sleep-detail-grid">
+        <div><div class="sleep-detail-label">Endormissement</div><div class="sleep-detail-value">${sol != null ? sol + ' min' : '—'}</div></div>
+        <div><div class="sleep-detail-label">Réveils</div><div class="sleep-detail-value">${n.awake_count ?? '—'}</div></div>
+        <div><div class="sleep-detail-label">Agitation</div><div class="sleep-detail-value">${n.restless_count ?? '—'} mvts</div></div>
+        <div><div class="sleep-detail-label">Respiration</div><div class="sleep-detail-value">${n.resp_avg ?? '—'} /min</div></div>
+        <div><div class="sleep-detail-label">SpO2</div><div class="sleep-detail-value">${n.spo2_avg != null ? n.spo2_avg + '%' : '—'}</div></div>
+        <div><div class="sleep-detail-label">Body Battery</div><div class="sleep-detail-value">${n.body_battery_change != null ? '+' + n.body_battery_change : '—'}</div></div>
+      </div>
+    </div>`;
+}
+
+/* ---------- Calendrier (sélecteur de nuit) ---------- */
+function monthOf(dateStr) { return dateStr.slice(0, 7); }
+function shiftMonth(ym, delta) {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function monthLabelFr(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const names = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+  return `${names[m - 1]} ${y}`;
+}
+
+function calendarHtml(nightsByDate, ym, selectedDate) {
+  const [y, m] = ym.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  let dow = new Date(y, m - 1, 1).getDay();
+  dow = (dow + 6) % 7; // 0=Lundi ... 6=Dimanche
+  const cells = [];
+  for (let i = 0; i < dow; i++) cells.push('<div class="cal-day empty"></div>');
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const n = nightsByDate.get(ds);
+    if (!n || !n.myScore) {
+      cells.push(`<div class="cal-day nodata">${d}</div>`);
+    } else {
+      const st = scoreStatus(n.myScore.qualifier);
+      const sel = ds === selectedDate ? ' selected' : '';
+      cells.push(`<div class="cal-day ${st}${sel}" data-date="${ds}" role="button" tabindex="0">${d}</div>`);
+    }
+  }
+  return `
+    <div class="card">
+      <div class="sleep-cal-head">
+        <button class="sleep-cal-nav" data-nav="-1" type="button" aria-label="Mois précédent">‹</button>
+        <div class="section-title" style="margin:0;">${monthLabelFr(ym)}</div>
+        <button class="sleep-cal-nav" data-nav="1" type="button" aria-label="Mois suivant">›</button>
+      </div>
+      <div class="sleep-cal-grid">
+        <div class="sleep-cal-dow">L</div><div class="sleep-cal-dow">M</div><div class="sleep-cal-dow">M</div><div class="sleep-cal-dow">J</div><div class="sleep-cal-dow">V</div><div class="sleep-cal-dow">S</div><div class="sleep-cal-dow">D</div>
+        ${cells.join('')}
+      </div>
+      <div class="sleep-cal-legend-row">
+        <div class="sleep-cal-legend">
+          <span><span class="sw critical"></span>Faible</span>
+          <span><span class="sw warning"></span>Correct</span>
+          <span><span class="sw good"></span>Bon</span>
+        </div>
+        ${selectedDate !== _latestDate ? `<button class="sleep-cal-today" type="button" data-today="1">↺ Dernière nuit</button>` : ''}
+      </div>
+    </div>`;
+}
+
+let _calState = { month: null, selected: null };
+let _latestDate = null;
+
+function wireCalendar(root, sorted) {
+  const byDate = new Map(sorted.map((n) => [n.date, n]));
+  const wrap = root.querySelector('#sleep-cal-wrap');
+  if (!wrap) return;
+  const selectNight = (ds) => {
+    const n = byDate.get(ds);
+    if (!n) return;
+    _calState.selected = ds;
+    const hero = root.querySelector('#sleep-hero-card');
+    if (hero) hero.innerHTML = heroHtml(n);
+    renderNightHrChart(n);
+    wireNightDetailButton(root, n);
+    const extra = root.querySelector('#sleep-extra-stats');
+    if (extra) extra.innerHTML = nightExtraStatsHtml(n);
+    wrap.innerHTML = calendarHtml(byDate, _calState.month, _calState.selected);
+  };
+  wrap.addEventListener('click', (e) => {
+    const dayEl = e.target.closest('.cal-day[data-date]');
+    if (dayEl) { selectNight(dayEl.dataset.date); return; }
+    const todayEl = e.target.closest('.sleep-cal-today');
+    if (todayEl) { _calState.month = monthOf(_latestDate); selectNight(_latestDate); return; }
+    const navEl = e.target.closest('.sleep-cal-nav[data-nav]');
+    if (navEl) {
+      _calState.month = shiftMonth(_calState.month, Number(navEl.dataset.nav));
+      wrap.innerHTML = calendarHtml(byDate, _calState.month, _calState.selected);
+    }
+  });
+}
+
+/* ---------- Aperçu : onglet 1 ---------- */
+function overviewHtml(sorted) {
+  const latest = sorted[0];
+  _calState.month = _calState.month || monthOf(latest.date);
+  _calState.selected = _calState.selected || latest.date;
+  const byDate = new Map(sorted.map((n) => [n.date, n]));
+  const selectedNight = byDate.get(_calState.selected) || latest;
+  return `
+    <div class="card" id="sleep-hero-card">${heroHtml(selectedNight)}</div>
+    <div id="sleep-cal-wrap">${calendarHtml(byDate, _calState.month, _calState.selected)}</div>
+    <div id="sleep-extra-stats">${nightExtraStatsHtml(selectedNight)}</div>
+  `;
+}
+
 /* ---------- Graphiques : onglet 2 ---------- */
+// Thème partagé par tous les graphiques Chart.js du panel : mêmes
+// couleurs de grille/texte, même style de légende. Un seul endroit à
+// modifier pour que tous les graphiques restent visuellement cohérents.
+const CHART_GRID = '#232a3a';
+const CHART_AXIS_LABEL = '#8b94a8';
+function legend(show) {
+  return show
+    ? { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 11 }, color: CHART_AXIS_LABEL } }
+    : { display: false };
+}
+function gridScale(extra) { return Object.assign({ grid: { color: CHART_GRID } }, extra); }
+function noGridScale(extra) { return Object.assign({ grid: { display: false } }, extra); }
 function groupStats(list) {
   const effList = list.map(sleepEfficiencyPct).filter((v) => v != null);
   return {
     n: list.length,
     durSec: avg(list.map((n) => n.total_sec).filter((v) => v != null)),
-    score: avg(list.map((n) => n.score).filter((v) => v != null)),
+    score: avg(list.map((n) => n.myScore && n.myScore.total).filter((v) => v != null)),
     hrv: avg(list.map((n) => n.hrv_avg).filter((v) => v != null)),
     eff: effList.length ? avg(effList) : null,
     bedMin: avgClockMin(list.map((n) => n.bedtime && n.bedtime.split(' ')[1])),
@@ -373,7 +670,7 @@ function graphsHtml(valid) {
     return `<div class="card"><div class="sleep-state">Pas encore assez de nuits synchronisées pour les graphiques détaillés (3 minimum).</div></div>`;
   }
   return `
-    ${chartCard('chart-sleep-duration-score', 'Durée & score', 'Durée de sommeil (barres) et score (ligne) — 10 dernières nuits.')}
+    ${chartCard('chart-sleep-duration-score', 'Durée & score', 'Score maison (Hirshkowitz 2015, Ohayon 2017 — pas Garmin) en ligne, durée de sommeil en barres. 10 dernières nuits.')}
     ${chartCard('chart-sleep-architecture', 'Architecture du sommeil', 'Répartition des phases par nuit, en % de la durée totale.')}
     ${chartCard('chart-sleep-hrv', 'Variabilité cardiaque nocturne (HRV)', 'Ligne pointillée = ta moyenne sur la période.')}
     ${chartCard('chart-sleep-resp', 'Fréquence respiratoire', 'Zone = intervalle min–max, ligne = moyenne de la nuit.')}
@@ -404,17 +701,17 @@ function renderGraphCharts(valid) {
       labels: labelsBars,
       datasets: [
         { type: 'bar', label: 'Durée (h)', data: bars.map((n) => n.total_sec != null ? +(n.total_sec / 3600).toFixed(2) : null), backgroundColor: 'rgba(96,165,250,0.55)', yAxisID: 'y', borderRadius: 4 },
-        { type: 'line', label: 'Score', data: bars.map((n) => n.score), borderColor: '#4ade80', backgroundColor: 'transparent', yAxisID: 'y1', tension: 0.3, pointRadius: 3 },
+        { type: 'line', label: 'Score', data: bars.map((n) => n.myScore && n.myScore.total), borderColor: '#4ade80', backgroundColor: 'transparent', yAxisID: 'y1', fill: false, tension: 0.3, pointRadius: 3 },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       scales: {
-        y: { position: 'left', title: { display: true, text: 'h', color: '#8b94a8' }, grid: { color: '#232a3a' } },
-        y1: { position: 'right', min: 0, max: 100, title: { display: true, text: 'score', color: '#8b94a8' }, grid: { drawOnChartArea: false } },
-        x: { grid: { display: false } },
+        y: gridScale({ position: 'left', title: { display: true, text: 'h', color: CHART_AXIS_LABEL } }),
+        y1: { position: 'right', min: 0, max: 100, title: { display: true, text: 'score', color: CHART_AXIS_LABEL }, grid: { drawOnChartArea: false } },
+        x: noGridScale(),
       },
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+      plugins: { legend: legend(true) },
     },
   });
 
@@ -431,10 +728,10 @@ function renderGraphCharts(valid) {
     options: {
       responsive: true, maintainAspectRatio: false,
       scales: {
-        x: { stacked: true, grid: { display: false } },
-        y: { stacked: true, min: 0, max: 100, grid: { color: '#232a3a' } },
+        x: noGridScale({ stacked: true }),
+        y: gridScale({ stacked: true, min: 0, max: 100 }),
       },
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+      plugins: { legend: legend(true) },
     },
   });
 
@@ -445,14 +742,14 @@ function renderGraphCharts(valid) {
     data: {
       labels: labelsLines,
       datasets: [
-        { label: 'HRV', data: hrvVals, borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.12)', fill: true, tension: 0.3, pointRadius: 2 },
+        { label: 'HRV', data: hrvVals, borderColor: '#a78bfa', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 2 },
         { label: 'Moyenne période', data: hrvVals.map(() => hrvBaseline), borderColor: '#5a6378', borderDash: [5, 4], pointRadius: 0, fill: false },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      scales: { y: { grid: { color: '#232a3a' } }, x: { grid: { display: false } } },
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+      scales: { y: gridScale(), x: noGridScale() },
+      plugins: { legend: legend(true) },
     },
   });
 
@@ -468,8 +765,8 @@ function renderGraphCharts(valid) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      scales: { y: { grid: { color: '#232a3a' } }, x: { grid: { display: false } } },
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+      scales: { y: gridScale(), x: noGridScale() },
+      plugins: { legend: legend(true) },
     },
   });
 
@@ -478,14 +775,14 @@ function renderGraphCharts(valid) {
     data: {
       labels: labelsLines,
       datasets: [
-        { label: 'SpO2 moy.', data: lines.map((n) => n.spo2_avg), borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.1)', fill: true, tension: 0.3, pointRadius: 2 },
+        { label: 'SpO2 moy.', data: lines.map((n) => n.spo2_avg), borderColor: '#4ade80', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 2 },
         { label: 'Seuil 95%', data: lines.map(() => REF_SPO2_GOOD), borderColor: '#5a6378', borderDash: [5, 4], pointRadius: 0, fill: false },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      scales: { y: { min: 85, max: 100, grid: { color: '#232a3a' } }, x: { grid: { display: false } } },
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+      scales: { y: gridScale({ min: 85, max: 100 }), x: noGridScale() },
+      plugins: { legend: legend(true) },
     },
   });
 
@@ -501,8 +798,8 @@ function renderGraphCharts(valid) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      scales: { y: { min: 0, max: 100, grid: { color: '#232a3a' } }, x: { grid: { display: false } } },
-      plugins: { legend: { display: false } },
+      scales: { y: gridScale({ min: 0, max: 100 }), x: noGridScale() },
+      plugins: { legend: legend(false) },
     },
   });
 }
@@ -519,25 +816,23 @@ function computeInsights(nights) {
   const bedRangeMin = Math.max(...bedShifted) - Math.min(...bedShifted);
   const wakeRangeMin = Math.max(...wakeShifted) - Math.min(...wakeShifted);
 
-  const RANK = { POOR: 0, FAIR: 1, GOOD: 2, EXCELLENT: 3 };
+  // Composant le plus faible du score maison (pas celui de Garmin) : moyenne
+  // de chaque composant (0-100) sur les nuits dispo, on prend le plus bas.
   const compScores = {};
   withDetail.forEach((n) => {
-    const sd = n.score_detail || {};
-    Object.keys(sd).forEach((k) => {
-      const q = sd[k] && sd[k].qualifierKey;
-      if (q == null || RANK[q] == null) return;
-      (compScores[k] = compScores[k] || []).push(RANK[q]);
+    const comps = n.myScore && n.myScore.components;
+    if (!comps) return;
+    Object.keys(comps).forEach((k) => {
+      (compScores[k] = compScores[k] || []).push(comps[k]);
     });
   });
-  let weakest = null, weakestAvg = 4;
+  let weakest = null, weakestAvg = 101;
   Object.keys(compScores).forEach((k) => {
-    if (!COMPONENT_ADVICE_FR[k]) return;
     const a = avg(compScores[k]);
     if (a < weakestAvg) { weakestAvg = a; weakest = k; }
   });
 
-  const remVals = withDetail.map((n) => n.score_detail && n.score_detail.remPercentage && n.score_detail.remPercentage.value).filter((v) => v != null);
-  const avgRemPct = remVals.length ? avg(remVals) : null;
+  const avgRemPct = avg(withDetail.map((n) => n.total_sec ? (n.rem_sec || 0) / n.total_sec * 100 : null));
 
   const targetDurationMin = 7.5 * 60;
   const targetWake = roundTo(unshiftNoon(avgWakeShifted), 15);
@@ -671,13 +966,13 @@ function architectureHtml(pro) {
 }
 
 function synthesisText(sorted, pro) {
-  const withScore = sorted.filter((n) => n.score != null).slice(0, 14);
+  const withScore = sorted.filter((n) => n.myScore != null).slice(0, 14);
   if (!withScore.length) return "Pas encore assez de nuits scorées pour une synthèse.";
-  const avgScore = Math.round(avg(withScore.map((n) => n.score)));
+  const avgScore = Math.round(avg(withScore.map((n) => n.myScore.total)));
   const qualWord = avgScore >= 80 ? 'bon' : avgScore >= 65 ? 'correct' : avgScore >= 50 ? 'modéré' : 'faible';
   let s = `Sur tes ${withScore.length} dernières nuits, ton sommeil est en moyenne <strong>${qualWord}</strong> (score moyen ${avgScore}/100).`;
-  if (pro.ins && pro.ins.weakest && COMPONENT_ADVICE_FR[pro.ins.weakest]) {
-    s += ` Le facteur qui pèse le plus sur ce score : <strong>${COMPONENT_LABEL_FR[pro.ins.weakest].toLowerCase()}</strong>.`;
+  if (pro.ins && pro.ins.weakest && MY_COMPONENT_ADVICE_FR[pro.ins.weakest]) {
+    s += ` Le facteur qui pèse le plus sur ce score : <strong>${MY_COMPONENT_LABEL_FR[pro.ins.weakest].toLowerCase()}</strong>.`;
   }
   if (pro.effAvg != null) {
     s += pro.effAvg < REF_EFFICIENCY_FAIR
@@ -706,8 +1001,8 @@ function proKpiGridHtml(pro) {
 function actionPlanHtml(sorted, pro) {
   const ins = pro.ins;
   const actions = [];
-  if (ins && ins.weakest && COMPONENT_ADVICE_FR[ins.weakest]) {
-    actions.push({ tag: 'fort', html: `<strong>Priorité n°1 :</strong> ${COMPONENT_ADVICE_FR[ins.weakest]}. C'est le point qui a le plus pénalisé ton score sur tes ${ins.nightsCount} dernières nuits.` });
+  if (ins && ins.weakest && MY_COMPONENT_ADVICE_FR[ins.weakest]) {
+    actions.push({ tag: 'fort', html: `<strong>Priorité n°1 :</strong> ${MY_COMPONENT_ADVICE_FR[ins.weakest]}. C'est le point qui a le plus pénalisé ton score sur tes ${ins.nightsCount} dernières nuits.` });
   }
   if (pro.effAvg != null && pro.effAvg < REF_EFFICIENCY_FAIR) {
     actions.push({ tag: 'fort', html: `Ton efficacité de sommeil est basse (${Math.round(pro.effAvg)}%) : ne va te coucher que quand tu as sommeil, et si tu ne t'endors pas en 20 min, lève-toi plutôt que de rester à tourner au lit.` });
@@ -768,29 +1063,21 @@ function adviceHtml(sorted) {
     ${physioSignalsHtml(pro)}
     ${actionPlanHtml(sorted, pro)}
     ${targetsHtml(pro.ins)}
-    <div class="sleep-disclaimer">Ces analyses s'appuient sur les mesures Garmin (montre au poignet) et des repères généraux d'hygiène du sommeil. Elles ne posent aucun diagnostic médical — en cas de doute (fatigue persistante, ronflements, SpO2 basse récurrente…), consulte un médecin.</div>
+    <div class="sleep-disclaimer">Score et analyses basés sur les mesures Garmin (montre au poignet), recalculés selon des seuils publiés : Hirshkowitz et al. 2015 (durée, National Sleep Foundation) et Ohayon et al. 2017 (efficacité, latence d'endormissement, réveils, éveil nocturne — consensus d'experts National Sleep Foundation). L'architecture profond/paradoxal suit des normes descriptives de polysomnographie, pas un seuil de qualité validé par ce consensus — pondérée en conséquence. Ce n'est pas un diagnostic médical — en cas de doute (fatigue persistante, ronflements, SpO2 basse récurrente…), consulte un médecin.</div>
   `;
 }
 
 /* ---------- sous-onglets ---------- */
 function subtabsHtml() {
   return `
-    <div class="sleep-toolbar">
-      <div class="sleep-subtabs" id="sleep-subtabs" role="tablist">
-        <button class="sleep-subtab active" data-tab="apercu" type="button">Aperçu</button>
-        <button class="sleep-subtab" data-tab="graphiques" type="button">Graphiques</button>
-        <button class="sleep-subtab" data-tab="conseils" type="button">Conseils</button>
-      </div>
-      <button id="sleep-refresh-btn" class="comp-add-btn" type="button" title="Actualiser (synchronisé automatiquement depuis Garmin toutes les heures)">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-      </button>
+    <div class="sleep-subtabs" id="sleep-subtabs" role="tablist">
+      <button class="sleep-subtab active" data-tab="apercu" type="button">Aperçu</button>
+      <button class="sleep-subtab" data-tab="graphiques" type="button">Graphiques</button>
+      <button class="sleep-subtab" data-tab="conseils" type="button">Conseils</button>
     </div>`;
 }
 
 function wireSleepSubtabs(root, valid) {
-  const refreshBtn = root.querySelector('#sleep-refresh-btn');
-  if (refreshBtn) refreshBtn.addEventListener('click', forceSync);
-
   const bar = root.querySelector('#sleep-subtabs');
   if (!bar) return;
   bar.querySelectorAll('.sleep-subtab').forEach((btn) => {
@@ -805,14 +1092,6 @@ function wireSleepSubtabs(root, valid) {
   });
 }
 
-function attachInteractions(root) {
-  root.querySelectorAll('.sleep-history-row').forEach((row) => {
-    const toggle = () => row.closest('.sleep-history-item').classList.toggle('open');
-    row.addEventListener('click', toggle);
-    row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
-  });
-}
-
 function render(nights) {
   const app = document.getElementById('sleep-app');
   if (!app) return;
@@ -820,13 +1099,16 @@ function render(nights) {
     app.innerHTML = `<div class="card"><div class="sleep-state">Aucune nuit synchronisée pour l'instant. La synchro se fait automatiquement toutes les heures depuis Garmin.</div></div>`;
     return;
   }
-  if (_scoreChart) { _scoreChart.destroy(); _scoreChart = null; }
   Object.values(_graphCharts).forEach((c) => c && c.destroy());
   _graphCharts = {};
   _graphsRendered = false;
+  if (_nightHrChart) { _nightHrChart.destroy(); _nightHrChart = null; }
+  _calState = { month: null, selected: null };
 
   const sorted = nights.slice().sort((a, b) => b.date.localeCompare(a.date));
   const valid = sorted.filter((n) => n.total_sec != null);
+  sorted.forEach((n) => { n.myScore = computeSleepScore(n); });
+  _latestDate = sorted[0].date;
 
   app.innerHTML = `
     ${subtabsHtml()}
@@ -834,9 +1116,11 @@ function render(nights) {
     <div class="sleep-subpanel" id="sleep-tab-graphiques">${graphsHtml(valid)}</div>
     <div class="sleep-subpanel" id="sleep-tab-conseils">${adviceHtml(sorted)}</div>
   `;
-  attachInteractions(app);
+  wireCalendar(app, sorted);
   wireSleepSubtabs(app, valid);
-  renderScoreChart(sorted);
+  const _initialNight = sorted.find((n) => n.date === _calState.selected) || sorted[0];
+  renderNightHrChart(_initialNight);
+  wireNightDetailButton(app, _initialNight);
 }
 
 async function loadAndRender() {
@@ -851,14 +1135,7 @@ async function loadAndRender() {
   render(data || []);
 }
 
-async function forceSync() {
-  const btn = document.getElementById('sleep-refresh-btn');
-  if (btn) { btn.disabled = true; btn.classList.add('syncing'); }
-  await startGarminIngest({ silent: true });
-  if (btn) { btn.disabled = false; btn.classList.remove('syncing'); }
-}
-
-/* ---------- synchro Garmin, réutilisable (panel Sommeil + page Connexions) ---------- */
+/* ---------- synchro Garmin, réutilisable depuis la page Connexions ---------- */
 let _garminToast = null;
 function showGarminToast(message, type = 'loading') {
   if (_garminToast) _garminToast.remove();

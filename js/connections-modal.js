@@ -144,8 +144,8 @@ function stravaSyncBarOrActions(c) {
     <div class="cnx-actions">
       ${c
         ? `<button class="cnx-btn primary" data-act="strava-sync">Re-synchroniser</button>
-           ${c.last_sync_status === 'error' ? `<button class="cnx-btn ghost" data-act="strava-connect">Reconnecter</button>` : ''}
-           <button class="cnx-btn danger" data-act="strava-disconnect">Déconnecter</button>`
+           ${c.last_sync_status === 'error' ? `<button class="cnx-link" data-act="strava-connect">Reconnecter</button>` : ''}
+           <button class="cnx-link danger" data-act="strava-disconnect">Déconnecter</button>`
         : `<button class="cnx-btn primary" data-act="strava-connect">Connecter Strava</button>`}
     </div>`;
 }
@@ -165,8 +165,8 @@ function cardWhoop(c, days = 0) {
       <div class="cnx-actions">
         ${c
           ? `<button class="cnx-btn primary" data-act="whoop-sync">Re-synchroniser</button>
-             ${c.last_sync_status === 'error' ? `<button class="cnx-btn ghost" data-act="whoop-connect">Reconnecter</button>` : ''}
-             <button class="cnx-btn danger" data-act="whoop-disconnect">Déconnecter</button>`
+             ${c.last_sync_status === 'error' ? `<button class="cnx-link" data-act="whoop-connect">Reconnecter</button>` : ''}
+             <button class="cnx-link danger" data-act="whoop-disconnect">Déconnecter</button>`
           : `<button class="cnx-btn primary" data-act="whoop-connect">Connecter Whoop</button>`}
       </div>
     </div>`;
@@ -207,8 +207,8 @@ function cardOpenDossard() {
       <p class="cnx-card-sub">${sub}</p>
       <div class="cnx-actions">
         ${lic
-          ? `<button class="cnx-btn ghost" data-act="od-relink">Changer de licence</button>
-             <button class="cnx-btn danger" data-act="od-unlink">Délier</button>`
+          ? `<button class="cnx-link" data-act="od-relink">Changer de licence</button>
+             <button class="cnx-link danger" data-act="od-unlink">Délier</button>`
           : `<button class="cnx-btn primary" data-act="od-link">Lier ma licence</button>`}
       </div>
     </div>`;
@@ -415,41 +415,49 @@ function injectStyles() {
     .cnx-close { background: none; border: none; color: var(--text-dim, #8b94a8); font-size: 24px;
       cursor: pointer; line-height: 1; padding: 0 4px; }
     .cnx-close:hover { color: var(--text, #fff); }
-    .cnx-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 16px; }
+    .cnx-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
     .cnx-loading, .cnx-error { color: var(--text-dim, #8b94a8); font-size: 14px; display: flex; align-items: center; gap: 10px; }
     .cnx-error { color: var(--danger, #f87171); }
     .cnx-spin { width: 16px; height: 16px; border: 2px solid var(--bg-elev2, #2a3242);
       border-top-color: var(--accent, #4ade80); border-radius: 50%; animation: cnxSpin .7s linear infinite; display: inline-block; }
     @keyframes cnxSpin { to { transform: rotate(360deg); } }
     .cnx-card { background: var(--bg, #0b0e14); border: 1px solid var(--border, #2a3242);
-      border-radius: 12px; padding: 16px; }
+      border-radius: 12px; padding: 13px 14px; }
     .cnx-card.strava { border-left: 3px solid #FC4C02; }
     .cnx-card.whoop { border-left: 3px solid #0bbfa6; }
     .cnx-card.garmin { border-left: 3px solid #007cc3; }
     .cnx-card.opendossard { border-left: 3px solid #fbbf24; }
-    .cnx-logo.garmin { background: rgba(0,124,195,0.18); color: #4db8e8; font-size: 15px; }
-    .cnx-logo.opendossard { background: rgba(251,191,36,0.15); color: #fbbf24; font-size: 13px; }
-    .cnx-card-top { display: flex; align-items: center; gap: 12px; }
-    .cnx-logo { width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center;
+    .cnx-logo.garmin { background: rgba(0,124,195,0.18); color: #4db8e8; font-size: 13px; }
+    .cnx-logo.opendossard { background: rgba(251,191,36,0.15); color: #fbbf24; font-size: 11px; }
+    .cnx-card-top { display: flex; align-items: center; gap: 10px; }
+    .cnx-logo { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center;
       justify-content: center; flex-shrink: 0; font-weight: 800; }
     .cnx-logo.strava { background: rgba(252,76,2,0.15); color: #FC4C02; }
     .cnx-logo.whoop { background: rgba(11,191,166,0.15); color: #0bbfa6; }
-    .cnx-card-title { display: flex; align-items: center; gap: 10px; }
-    .cnx-card-title strong { color: var(--text, #e8edf5); font-size: 15px; }
-    .cnx-pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 99px; }
+    .cnx-card-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+    .cnx-card-title strong { color: var(--text, #e8edf5); font-size: 14px; }
+    .cnx-pill { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
     .cnx-pill.on  { background: rgba(74,222,128,0.15); color: var(--accent, #4ade80); }
     .cnx-pill.off { background: rgba(139,148,168,0.15); color: var(--text-dim, #8b94a8); }
     .cnx-pill.err { background: rgba(248,113,113,0.15); color: var(--danger, #f87171); }
     .cnx-pill.run { background: rgba(96,165,250,0.15); color: var(--info, #60a5fa); }
-    .cnx-card-sub { color: var(--text-dim, #8b94a8); font-size: 12.5px; margin: 10px 0 14px; line-height: 1.5; }
-    .cnx-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .cnx-card-sub { color: var(--text-dim, #8b94a8); font-size: 12px; margin: 6px 0 10px; line-height: 1.4; }
+    .cnx-actions { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
     .cnx-card-note { color: var(--text-mute, #6b7689); font-size: 12px; line-height: 1.5; }
-    .cnx-btn { border: none; border-radius: 8px; padding: 9px 14px; font-size: 12.5px; font-weight: 700;
+    .cnx-btn { border: none; border-radius: 7px; padding: 7px 12px; font-size: 12px; font-weight: 700;
       cursor: pointer; font-family: inherit; transition: filter .15s, transform .15s; }
     .cnx-btn:hover { transform: translateY(-1px); }
     .cnx-btn.primary { background: var(--accent, #4ade80); color: #06231a; }
     .cnx-btn.ghost { background: var(--bg-elev2, #232a38); color: var(--text, #e8edf5); }
-    .cnx-btn.danger { background: rgba(248,113,113,0.12); color: var(--danger, #f87171); }
+    /* Actions secondaires/destructives : lien texte discret plutôt qu'un
+       2e bouton plein — moins de blocs colorés par carte. */
+    .cnx-link { background: none; border: none; padding: 4px 2px; font-size: 12px; font-weight: 600;
+      cursor: pointer; font-family: inherit; color: var(--text-dim, #8b94a8);
+      text-decoration: underline; text-underline-offset: 2px; text-decoration-color: transparent;
+      transition: color .15s, text-decoration-color .15s; }
+    .cnx-link:hover { color: var(--text, #e8edf5); text-decoration-color: currentColor; }
+    .cnx-link.danger { color: var(--danger, #f87171); }
+    .cnx-link.danger:hover { filter: brightness(1.15); }
     /* Barre de progression intégrée dans la carte */
     .cnx-cardprog { margin-top: 4px; }
     .cnx-cardprog-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
