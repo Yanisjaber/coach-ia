@@ -1,5 +1,8 @@
 # Secrets locaux — JAMAIS commiter
 .env
+# Tokens Garmin : contrairement à Whoop, pas de portail dev pour les
+# révoquer facilement — restent locaux uniquement.
+.garmin_tokens.json
 
 # Logs locaux
 update.log
