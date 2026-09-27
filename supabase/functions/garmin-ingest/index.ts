@@ -75,12 +75,29 @@ Deno.serve(async (req) => {
       .from("connexions_app").select("*").eq("user_id", userId).eq("app", "garmin").maybeSingle();
     if (connErr || !conn) return json({ error: "no_garmin_connection" }, 400);
 
+    // Cooldown après un rate-limit Garmin : l'endpoint d'échange de token
+    // (connectapi.garmin.com/oauth-service/oauth/exchange/user/2.0) est
+    // connu pour bloquer dur tout l'écosystème garth/python-garminconnect
+    // depuis le passage de Garmin au TLS fingerprinting (cf. issues
+    // matin/garth#217, cyberjunky/python-garminconnect#213/#337). Retenter
+    // immédiatement après un 429 prolonge le blocage — la communauté
+    // attend ~30 min avant de retenter, on fait pareil ici.
+    const needsRefresh = new Date(conn.expires_at) <= new Date(Date.now() + 60_000);
+    const RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
+    if (needsRefresh && conn.last_sync_error?.includes("Rate limited") && conn.last_sync_at) {
+      const elapsed = Date.now() - new Date(conn.last_sync_at).getTime();
+      if (elapsed < RATE_LIMIT_COOLDOWN_MS) {
+        const retryInMinutes = Math.ceil((RATE_LIMIT_COOLDOWN_MS - elapsed) / 60_000);
+        return json({ error: "garmin_rate_limited_cooldown", retry_in_minutes: retryInMinutes }, 429);
+      }
+    }
+
     await sbAdmin.from("connexions_app").update({
       last_sync_status: "running", last_sync_at: new Date().toISOString(),
     }).eq("user_id", userId).eq("app", "garmin");
 
     let accessToken = conn.access_token as string;
-    if (new Date(conn.expires_at) <= new Date(Date.now() + 60_000)) {
+    if (needsRefresh) {
       let refreshed: any;
       try {
         refreshed = await refreshGarminToken(conn.oauth1_token, conn.oauth1_secret);

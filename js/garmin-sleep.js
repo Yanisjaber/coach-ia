@@ -1181,7 +1181,11 @@ async function startGarminIngest(opts = {}) {
     });
     const data = await res.json();
     if (!res.ok) {
-      const msg = data.error === 'no_garmin_connection' ? 'Aucun compte Garmin connecté' : `Erreur synchro Garmin : ${data.error || res.status}`;
+      const msg = data.error === 'no_garmin_connection'
+        ? 'Aucun compte Garmin connecté'
+        : data.error === 'garmin_rate_limited_cooldown'
+        ? `Garmin limite les requêtes, réessaie dans ~${data.retry_in_minutes} min`
+        : `Erreur synchro Garmin : ${data.error || res.status}`;
       if (!silent) showGarminToast(msg, 'error');
       console.error('[garmin-ingest]', data);
       return;
